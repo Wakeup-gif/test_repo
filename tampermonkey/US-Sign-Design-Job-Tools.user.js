@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign - Design Job Tools
 // @namespace    us-sign-local-tools
-// @version      4.2.5
-// @description  Stable Design workspace with measured column alignment, compact side panels, and consistent spacing.
+// @version      4.2.6
+// @description  Stable Design workspace with measured alignment, compact scrollable Designs and Files panels, and automatic text trimming.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-idle
 // @grant        GM_setClipboard
@@ -16,8 +16,8 @@
 (function () {
   "use strict";
 
-  const STYLE_ID = "us-sign-design-v425-layout-style";
-  const LAYOUT_CLASS = "us-sign-design-v425-layout";
+  const STYLE_ID = "us-sign-design-v426-layout-style";
+  const LAYOUT_CLASS = "us-sign-design-v426-layout";
   const TOP_ROW_ID = "us-sign-design-top-row";
   const LEFT_STACK_ID = "us-sign-design-left-stack";
 
@@ -34,7 +34,8 @@
     "us-sign-design-v421-layout-style",
     "us-sign-design-v422-layout-style",
     "us-sign-design-v423-layout-style",
-    "us-sign-design-v424-layout-style"
+    "us-sign-design-v424-layout-style",
+    "us-sign-design-v425-layout-style"
   ];
 
   const OLD_LAYOUT_CLASSES = [
@@ -42,7 +43,8 @@
     "us-sign-design-v421-layout",
     "us-sign-design-v422-layout",
     "us-sign-design-v423-layout",
-    "us-sign-design-v424-layout"
+    "us-sign-design-v424-layout",
+    "us-sign-design-v425-layout"
   ];
 
   function installStyle() {
@@ -107,15 +109,17 @@
         display: flex !important;
         flex-direction: column !important;
         align-self: stretch !important;
-        gap: 12px !important;
+        gap: 10px !important;
         width: 100% !important;
         min-width: 0 !important;
-        min-height: var(--us-sign-left-stack-height, 0px) !important;
-        height: auto !important;
+        min-height: 0 !important;
+        height: var(--us-sign-left-stack-height, auto) !important;
+        max-height: var(--us-sign-left-stack-height, none) !important;
         margin: 0 !important;
         padding: 0 !important;
         position: relative !important;
         inset: auto !important;
+        overflow: hidden !important;
       }
 
       .${LAYOUT_CLASS}
@@ -125,8 +129,13 @@
       > #${IDS.rightStack}
       > .us-sign-files-panel {
         box-sizing: border-box !important;
+        display: flex !important;
+        flex: 1 1 0 !important;
+        flex-direction: column !important;
         width: 100% !important;
         min-width: 0 !important;
+        min-height: 0 !important;
+        max-height: calc((var(--us-sign-left-stack-height, 220px) - 10px) / 2) !important;
         margin: 0 !important;
         position: relative !important;
         inset: auto !important;
@@ -135,46 +144,132 @@
 
       .${LAYOUT_CLASS}
       > #${IDS.rightStack}
-      > .us-sign-designs-panel {
-        flex: 0 0 auto !important;
-        min-height: 0 !important;
-        height: auto !important;
-      }
-
-      .${LAYOUT_CLASS}
-      > #${IDS.rightStack}
-      > .us-sign-files-panel {
-        display: flex !important;
-        flex: 1 1 74px !important;
-        flex-direction: column !important;
-        min-height: 74px !important;
-        height: auto !important;
-        margin-top: 0 !important;
-      }
-
-      .${LAYOUT_CLASS}
-      > #${IDS.rightStack}
-      > .us-sign-files-panel
-      > .panel-body {
-        flex: 1 1 auto !important;
-        min-height: 28px !important;
-      }
-
-      .${LAYOUT_CLASS}
-      > #${IDS.rightStack}
       > .panel
       > .panel-heading {
-        min-height: 40px !important;
-        padding: 7px 10px !important;
+        flex: 0 0 auto !important;
+        min-height: 36px !important;
+        padding: 6px 9px !important;
+      }
+
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      > .panel
+      > .panel-heading,
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      > .panel
+      > .panel-heading * {
+        font-size: 11px !important;
+        line-height: 1.2 !important;
       }
 
       .${LAYOUT_CLASS}
       > #${IDS.rightStack}
       > .panel
       > .panel-body {
+        flex: 1 1 auto !important;
         min-width: 0 !important;
-        padding: 8px 10px !important;
+        min-height: 0 !important;
+        padding: 5px 7px !important;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+        overscroll-behavior: contain !important;
+        scrollbar-gutter: stable !important;
+        scrollbar-width: thin !important;
+      }
+
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      > .panel
+      > .panel-body::-webkit-scrollbar {
+        width: 7px !important;
+      }
+
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      > .panel
+      > .panel-body::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.16) !important;
+        border: 2px solid transparent !important;
+        border-radius: 999px !important;
+        background-clip: padding-box !important;
+      }
+
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      table,
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      .table {
+        width: 100% !important;
+        margin: 0 !important;
+        table-layout: fixed !important;
+      }
+
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      tr {
+        height: 25px !important;
+      }
+
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      td,
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      th,
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      .list-group-item,
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      .us-sign-auto-trim {
+        min-width: 0 !important;
+        max-width: 100% !important;
+        padding: 4px 6px !important;
         overflow: hidden !important;
+        color: inherit !important;
+        font-size: 10px !important;
+        line-height: 1.2 !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        word-break: normal !important;
+        overflow-wrap: normal !important;
+      }
+
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      .us-sign-auto-trim:not(td):not(th) {
+        display: block !important;
+      }
+
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      td:first-child {
+        width: 58% !important;
+      }
+
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      td:last-child {
+        width: 42% !important;
+        text-align: right !important;
+      }
+
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      :is(a, span, div):not(.btn):not(button).us-sign-auto-trim {
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+      }
+
+      .${LAYOUT_CLASS}
+      #${IDS.overview}
+      .us-sign-overview-value {
+        min-width: 0 !important;
+        word-break: normal !important;
+        overflow-wrap: normal !important;
       }
 
       .${LAYOUT_CLASS} > .us-sign-description-panel {
@@ -192,52 +287,6 @@
         display: contents !important;
         margin: 0 !important;
         padding: 0 !important;
-      }
-
-      .${LAYOUT_CLASS}
-      > #${IDS.rightStack}
-      table,
-      .${LAYOUT_CLASS}
-      > #${IDS.rightStack}
-      .table {
-        width: 100% !important;
-        table-layout: fixed !important;
-      }
-
-      .${LAYOUT_CLASS}
-      > #${IDS.rightStack}
-      td,
-      .${LAYOUT_CLASS}
-      > #${IDS.rightStack}
-      th {
-        min-width: 0 !important;
-        padding: 5px 7px !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        white-space: nowrap !important;
-        word-break: normal !important;
-        overflow-wrap: normal !important;
-      }
-
-      .${LAYOUT_CLASS}
-      > #${IDS.rightStack}
-      td:first-child {
-        width: 58% !important;
-      }
-
-      .${LAYOUT_CLASS}
-      > #${IDS.rightStack}
-      td:last-child {
-        width: 42% !important;
-        text-align: right !important;
-      }
-
-      .${LAYOUT_CLASS}
-      #${IDS.overview}
-      .us-sign-overview-value {
-        min-width: 0 !important;
-        word-break: normal !important;
-        overflow-wrap: normal !important;
       }
 
       @media (max-width: 1220px) {
@@ -263,7 +312,19 @@
         }
 
         .${LAYOUT_CLASS} > #${IDS.rightStack} {
-          min-height: 0 !important;
+          height: auto !important;
+          max-height: none !important;
+          overflow: visible !important;
+        }
+
+        .${LAYOUT_CLASS}
+        > #${IDS.rightStack}
+        > .us-sign-designs-panel,
+        .${LAYOUT_CLASS}
+        > #${IDS.rightStack}
+        > .us-sign-files-panel {
+          flex: 0 0 auto !important;
+          max-height: 150px !important;
         }
       }
     `;
@@ -285,7 +346,6 @@
     const overview = document.getElementById(IDS.overview);
     const summary = document.getElementById(IDS.summary);
     const rightStack = document.getElementById(IDS.rightStack);
-
     const anchor = description || topRow.nextSibling;
 
     for (const element of [actionbar, overview, summary, rightStack]) {
@@ -294,6 +354,39 @@
 
     leftStack?.remove();
     topRow.remove();
+  }
+
+  function addTrimTargets(rightStack) {
+    if (!rightStack) return;
+
+    const selectors = [
+      "td",
+      "th",
+      ".list-group-item",
+      ".panel-body a:not(.btn)",
+      ".panel-body li",
+      ".panel-body [class*='name' i]",
+      ".panel-body [class*='file' i]",
+      ".panel-body [class*='design' i]"
+    ].join(",");
+
+    for (const element of rightStack.querySelectorAll(selectors)) {
+      if (
+        element.matches("button, .btn, input, select, textarea") ||
+        element.querySelector("button, .btn, input, select, textarea")
+      ) {
+        continue;
+      }
+
+      const fullText = String(element.textContent || "")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      if (!fullText) continue;
+
+      element.classList.add("us-sign-auto-trim");
+      element.setAttribute("title", fullText);
+    }
   }
 
   function normalizeStructure() {
@@ -354,6 +447,7 @@
       );
     }
 
+    addTrimTargets(rightStack);
     return true;
   }
 
