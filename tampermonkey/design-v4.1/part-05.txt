@@ -1,0 +1,500 @@
+        border-right: 1px solid var(--djt-border) !important;
+        font-size: 10px !important;
+        font-weight: 600 !important;
+        letter-spacing: 0 !important;
+        text-transform: none !important;
+      }
+
+      #${IDS.overview}
+      .us-sign-overview-field {
+        gap: 3px !important;
+        min-height: 48px !important;
+        padding: 7px 10px !important;
+        color: var(--djt-text) !important;
+        background: transparent !important;
+        background-image: none !important;
+        border: 0 !important;
+        border-right: 1px solid var(--djt-border) !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        text-transform: none !important;
+        transition: background 160ms ease !important;
+      }
+
+      #${IDS.overview}
+      .us-sign-overview-field:hover,
+      #${IDS.overview}
+      .us-sign-overview-field:focus-visible {
+        background: var(--djt-hover) !important;
+        outline: none !important;
+      }
+
+      #${IDS.overview}
+      .us-sign-overview-field:disabled {
+        opacity: 0.55 !important;
+      }
+
+      #${IDS.overview}
+      .us-sign-overview-label {
+        color: var(--djt-text-muted) !important;
+        font-size: 9px !important;
+        font-weight: 550 !important;
+        letter-spacing: 0 !important;
+        text-transform: none !important;
+      }
+
+      #${IDS.overview}
+      .us-sign-overview-value {
+        color: var(--djt-text-soft) !important;
+        font-size: 11px !important;
+        font-weight: 550 !important;
+        letter-spacing: 0 !important;
+      }
+
+      /* Design summary */
+
+      #${IDS.summary} {
+        min-height: 58px !important;
+        background: var(--djt-surface) !important;
+        background-image: none !important;
+        border: 1px solid var(--djt-border) !important;
+        border-top: 0 !important;
+        border-bottom-color: var(--djt-border) !important;
+        border-radius:
+          0
+          0
+          var(--djt-radius-lg)
+          var(--djt-radius-lg) !important;
+        box-shadow: none !important;
+      }
+
+      #${IDS.summary}
+      > .us-sign-djt-summary-cell {
+        min-height: 58px !important;
+        gap: 4px !important;
+        padding: 8px 11px !important;
+        background: transparent !important;
+        border-right: 1px solid var(--djt-border) !important;
+      }
+
+      #${IDS.summary}
+      .us-sign-djt-summary-label {
+        color: var(--djt-text-muted) !important;
+        font-size: 9px !important;
+        font-weight: 550 !important;
+        line-height: 1.15 !important;
+        letter-spacing: 0 !important;
+        text-transform: none !important;
+      }
+
+      #${IDS.summary}
+      .us-sign-djt-summary-value {
+        color: var(--djt-text) !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        line-height: 1.25 !important;
+        letter-spacing: 0 !important;
+        text-transform: none !important;
+      }
+
+      #${IDS.summary}
+      > [data-summary-kind="hours"]
+      .us-sign-djt-summary-value {
+        font-size: 16px !important;
+        font-weight: 600 !important;
+      }
+
+      #${IDS.summary}
+      > [data-summary-kind="priority"]
+      .us-sign-djt-summary-value,
+      #${IDS.summary}
+      > [data-summary-kind="status"]
+      .us-sign-djt-summary-value {
+        padding: 3px 7px !important;
+        color: var(--djt-text-soft) !important;
+        background: rgba(255, 255, 255, 0.035) !important;
+        border: 1px solid var(--djt-border-strong) !important;
+        border-radius: 999px !important;
+        font-size: 10px !important;
+        font-weight: 550 !important;
+        letter-spacing: 0 !important;
+        text-transform: none !important;
+      }
+
+      #${IDS.summary}
+      > [data-due-state="overdue"]
+      .us-sign-djt-summary-value {
+        color: var(--djt-danger) !important;
+      }
+
+      #${IDS.summary}
+      > [data-due-state="critical"]
+      .us-sign-djt-summary-value {
+        color: var(--djt-warning) !important;
+      }
+
+      /* Lower panel spacing */
+
+      #${IDS.bottomGrid} {
+        column-gap: 12px !important;
+        margin-top: 12px !important;
+      }
+
+      #${IDS.rightStack}
+      > .us-sign-files-panel {
+        margin-top: 12px !important;
+      }
+
+      #${IDS.bottomGrid}
+      > .us-sign-description-panel,
+      #${IDS.rightStack}
+      > .us-sign-designs-panel,
+      #${IDS.rightStack}
+      > .us-sign-files-panel {
+        border-color: var(--djt-border) !important;
+        box-shadow: none !important;
+      }
+
+      /* Responsive refinement */
+
+      @media (max-width: 1180px) {
+        #${IDS.overview}
+        .us-sign-overview-title {
+          display: none !important;
+        }
+
+        #${IDS.overview} {
+          grid-template-columns: minmax(0, 1fr) !important;
+        }
+
+        #${IDS.actionbar} {
+          overflow-x: auto !important;
+        }
+      }
+
+      @media (max-width: 900px) {
+        #${IDS.bottomGrid} {
+          grid-template-columns: minmax(0, 1fr) !important;
+          row-gap: 12px !important;
+        }
+
+        #${IDS.bottomGrid}
+        > .us-sign-description-panel,
+        #${IDS.rightStack} {
+          grid-column: 1 !important;
+        }
+
+        #${IDS.rightStack} {
+          grid-row: 2 !important;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        #${IDS.lookup},
+        #${IDS.copyTools} button,
+        #${IDS.nativeActions}
+        > .us-sign-native-action,
+        #${IDS.overview}
+        .us-sign-overview-field {
+          transition: none !important;
+        }
+      }
+
+    `;
+  }
+
+  /* =========================================================
+     LOOKUP BUTTON
+  ========================================================= */
+
+  function findSearchContext() {
+    const candidates = [
+      ...document.querySelectorAll(
+        [
+          "input[placeholder*='search' i]",
+          "input[name*='search' i]",
+          "input[id*='search' i]",
+          ".navbar input[type='search']",
+          ".navbar input[type='text']"
+        ].join(", ")
+      )
+    ].filter((input) => {
+      const rect =
+        input.getBoundingClientRect();
+
+      return (
+        !input.disabled &&
+        input.type !== "hidden" &&
+        rect.width > 80 &&
+        rect.height > 18 &&
+        rect.top >= 0 &&
+        rect.top < 130
+      );
+    });
+
+    const input =
+      candidates[0] ||
+      null;
+
+    if (!input) {
+      return null;
+    }
+
+    return {
+      input,
+      form:
+        input.closest("form"),
+      mount:
+        input.parentElement
+    };
+  }
+
+  function submitSearch(context) {
+    context.input.dispatchEvent(
+      new Event(
+        "input",
+        { bubbles: true }
+      )
+    );
+
+    context.input.dispatchEvent(
+      new Event(
+        "change",
+        { bubbles: true }
+      )
+    );
+
+    window.setTimeout(() => {
+      if (
+        context.form &&
+        typeof context.form.requestSubmit ===
+          "function"
+      ) {
+        context.form.requestSubmit();
+        return;
+      }
+
+      context.input.dispatchEvent(
+        new KeyboardEvent(
+          "keydown",
+          {
+            key: "Enter",
+            code: "Enter",
+            keyCode: 13,
+            which: 13,
+            bubbles: true,
+            cancelable: true
+          }
+        )
+      );
+    }, 80);
+  }
+
+  function ensureLookupButton(data) {
+    const context =
+      findSearchContext();
+
+    if (!context?.mount) {
+      return;
+    }
+
+    context.mount.classList.add(
+      "us-sign-search-with-lookup"
+    );
+
+    let button =
+      document.getElementById(
+        IDS.lookup
+      );
+
+    if (!button) {
+      button =
+        document.createElement(
+          "button"
+        );
+
+      button.id = IDS.lookup;
+      button.type = "button";
+      button.textContent =
+        "Look Up Job #";
+
+      button.addEventListener(
+        "click",
+        () => {
+          const number = clean(
+            state.data?.designNumber ||
+            state.data?.projectNumber
+          );
+
+          const current =
+            findSearchContext();
+
+          if (
+            !number ||
+            !current
+          ) {
+            flash(
+              button,
+              "Not found",
+              true
+            );
+
+            return;
+          }
+
+          current.input.value =
+            number;
+
+          current.input.focus();
+
+          flash(
+            button,
+            "Searching..."
+          );
+
+          submitSearch(current);
+        }
+      );
+    }
+
+    if (
+      button.parentElement !==
+      context.mount
+    ) {
+      context.mount.insertBefore(
+        button,
+        context.input.nextSibling
+      );
+    }
+
+    button.disabled =
+      !clean(
+        data.designNumber ||
+        data.projectNumber
+      );
+  }
+
+  /* =========================================================
+     ACTION BAR
+  ========================================================= */
+
+  function nativeActionLabel(control) {
+    return clean(
+      control?.innerText ||
+      control?.textContent ||
+      control?.value ||
+      control?.getAttribute?.(
+        "aria-label"
+      ) ||
+      control?.getAttribute?.(
+        "title"
+      )
+    ).toUpperCase();
+  }
+
+  function styleNativeAction(control) {
+    control.classList.add(
+      "us-sign-native-action"
+    );
+
+    setImportant(
+      control,
+      "position",
+      "static"
+    );
+
+    setImportant(
+      control,
+      "inset",
+      "auto"
+    );
+
+    setImportant(
+      control,
+      "float",
+      "none"
+    );
+
+    setImportant(
+      control,
+      "display",
+      "inline-flex"
+    );
+
+    setImportant(
+      control,
+      "align-items",
+      "center"
+    );
+
+    setImportant(
+      control,
+      "justify-content",
+      "center"
+    );
+
+    setImportant(
+      control,
+      "flex",
+      "0 0 auto"
+    );
+
+    setImportant(
+      control,
+      "width",
+      "auto"
+    );
+
+    setImportant(
+      control,
+      "min-width",
+      "max-content"
+    );
+
+    setImportant(
+      control,
+      "height",
+      "28px"
+    );
+
+    setImportant(
+      control,
+      "margin",
+      "0"
+    );
+
+    setImportant(
+      control,
+      "transform",
+      "none"
+    );
+  }
+
+  function collectNativeActions(workspace) {
+    const group =
+      document.getElementById(
+        IDS.nativeActions
+      );
+
+    const existing =
+      group
+        ? [
+          ...group.querySelectorAll(
+            "a, button, input[type='button'], input[type='submit']"
+          )
+        ]
+        : [];
+
+    const pageControls = [
+      ...workspace.workspacePanel
+        .querySelectorAll(
+          "a, button, input[type='button'], input[type='submit']"
+        )
+    ].filter((control) => {
+      return (
+        !control.closest(
+          `#${IDS.copyTools}, #${IDS.nativeActions}`
+        ) &&
+        !control.closest(
+          ".modal, .mfp-hide, .popup-modal, .popup-basic"
+        )
