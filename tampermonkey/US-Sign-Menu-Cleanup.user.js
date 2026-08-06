@@ -1,12 +1,14 @@
 // ==UserScript==
-// @name         US Sign Menu Cleanup and Project Reorder
+// @name         US Sign Menu Cleanup and Reorder
 // @namespace    us-sign-full-modules
-// @version      2.2.0
+// @version      2.2.1
 // @description  Keeps the cleaned main sidebar while restoring and ordering the core project navigation.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-idle
 // @grant        none
 // @noframes
+// @updateURL    https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/US-Sign-Menu-Cleanup.user.js
+// @downloadURL  https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/US-Sign-Menu-Cleanup.user.js
 // ==/UserScript==
 
 (function () {
