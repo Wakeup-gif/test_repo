@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign - Design Job Tools
 // @namespace    us-sign-local-tools
-// @version      4.2.6
-// @description  Stable Design workspace with measured alignment, compact scrollable Designs and Files panels, and automatic text trimming.
+// @version      4.2.7
+// @description  Stable Design workspace with measured alignment, compact three-row side panels, themed scrollbars, and reliable text trimming.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-idle
 // @grant        GM_setClipboard
@@ -16,8 +16,8 @@
 (function () {
   "use strict";
 
-  const STYLE_ID = "us-sign-design-v426-layout-style";
-  const LAYOUT_CLASS = "us-sign-design-v426-layout";
+  const STYLE_ID = "us-sign-design-v427-layout-style";
+  const LAYOUT_CLASS = "us-sign-design-v427-layout";
   const TOP_ROW_ID = "us-sign-design-top-row";
   const LEFT_STACK_ID = "us-sign-design-left-stack";
 
@@ -35,7 +35,8 @@
     "us-sign-design-v422-layout-style",
     "us-sign-design-v423-layout-style",
     "us-sign-design-v424-layout-style",
-    "us-sign-design-v425-layout-style"
+    "us-sign-design-v425-layout-style",
+    "us-sign-design-v426-layout-style"
   ];
 
   const OLD_LAYOUT_CLASSES = [
@@ -44,7 +45,8 @@
     "us-sign-design-v422-layout",
     "us-sign-design-v423-layout",
     "us-sign-design-v424-layout",
-    "us-sign-design-v425-layout"
+    "us-sign-design-v425-layout",
+    "us-sign-design-v426-layout"
   ];
 
   function installStyle() {
@@ -105,11 +107,15 @@
       }
 
       .${LAYOUT_CLASS} > #${IDS.rightStack} {
+        --us-scroll-track: rgba(255, 255, 255, 0.035);
+        --us-scroll-thumb: rgba(127, 146, 166, 0.46);
+        --us-scroll-thumb-hover: rgba(154, 171, 188, 0.68);
+
         grid-area: side !important;
-        display: flex !important;
-        flex-direction: column !important;
+        display: grid !important;
+        grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) !important;
         align-self: stretch !important;
-        gap: 10px !important;
+        gap: 8px !important;
         width: 100% !important;
         min-width: 0 !important;
         min-height: 0 !important;
@@ -130,12 +136,12 @@
       > .us-sign-files-panel {
         box-sizing: border-box !important;
         display: flex !important;
-        flex: 1 1 0 !important;
         flex-direction: column !important;
         width: 100% !important;
         min-width: 0 !important;
         min-height: 0 !important;
-        max-height: calc((var(--us-sign-left-stack-height, 220px) - 10px) / 2) !important;
+        height: 100% !important;
+        max-height: 100% !important;
         margin: 0 !important;
         position: relative !important;
         inset: auto !important;
@@ -146,9 +152,14 @@
       > #${IDS.rightStack}
       > .panel
       > .panel-heading {
-        flex: 0 0 auto !important;
-        min-height: 36px !important;
-        padding: 6px 9px !important;
+        display: flex !important;
+        flex: 0 0 32px !important;
+        align-items: center !important;
+        justify-content: space-between !important;
+        min-height: 32px !important;
+        height: 32px !important;
+        padding: 4px 8px !important;
+        overflow: hidden !important;
       }
 
       .${LAYOUT_CLASS}
@@ -159,8 +170,24 @@
       > #${IDS.rightStack}
       > .panel
       > .panel-heading * {
-        font-size: 11px !important;
-        line-height: 1.2 !important;
+        font-size: 10px !important;
+        line-height: 1.15 !important;
+      }
+
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      > .panel
+      > .panel-heading .btn,
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      > .panel
+      > .panel-heading button {
+        min-width: 28px !important;
+        min-height: 26px !important;
+        height: 26px !important;
+        padding: 0 8px !important;
+        font-size: 9px !important;
+        line-height: 1 !important;
       }
 
       .${LAYOUT_CLASS}
@@ -170,29 +197,69 @@
         flex: 1 1 auto !important;
         min-width: 0 !important;
         min-height: 0 !important;
-        padding: 5px 7px !important;
+        width: calc(100% - 8px) !important;
+        margin: 4px 4px 5px !important;
+        padding: 0 2px 0 0 !important;
         overflow-x: hidden !important;
         overflow-y: auto !important;
         overscroll-behavior: contain !important;
+        border-radius: 8px !important;
         scrollbar-gutter: stable !important;
         scrollbar-width: thin !important;
+        scrollbar-color: var(--us-scroll-thumb) var(--us-scroll-track) !important;
       }
 
       .${LAYOUT_CLASS}
       > #${IDS.rightStack}
       > .panel
       > .panel-body::-webkit-scrollbar {
-        width: 7px !important;
+        width: 8px !important;
+        height: 8px !important;
+        background: transparent !important;
+      }
+
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      > .panel
+      > .panel-body::-webkit-scrollbar-track {
+        margin: 3px 0 !important;
+        background: var(--us-scroll-track) !important;
+        border-radius: 999px !important;
       }
 
       .${LAYOUT_CLASS}
       > #${IDS.rightStack}
       > .panel
       > .panel-body::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.16) !important;
-        border: 2px solid transparent !important;
+        min-height: 24px !important;
+        background: var(--us-scroll-thumb) !important;
+        border: 2px solid rgba(14, 18, 23, 0.94) !important;
         border-radius: 999px !important;
         background-clip: padding-box !important;
+      }
+
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      > .panel
+      > .panel-body::-webkit-scrollbar-thumb:hover {
+        background: var(--us-scroll-thumb-hover) !important;
+        background-clip: padding-box !important;
+      }
+
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      > .panel
+      > .panel-body::-webkit-scrollbar-button {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+      }
+
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      > .panel
+      > .panel-body::-webkit-scrollbar-corner {
+        background: transparent !important;
       }
 
       .${LAYOUT_CLASS}
@@ -209,7 +276,7 @@
       .${LAYOUT_CLASS}
       > #${IDS.rightStack}
       tr {
-        height: 25px !important;
+        height: 24px !important;
       }
 
       .${LAYOUT_CLASS}
@@ -217,30 +284,18 @@
       td,
       .${LAYOUT_CLASS}
       > #${IDS.rightStack}
-      th,
-      .${LAYOUT_CLASS}
-      > #${IDS.rightStack}
-      .list-group-item,
-      .${LAYOUT_CLASS}
-      > #${IDS.rightStack}
-      .us-sign-auto-trim {
+      th {
         min-width: 0 !important;
         max-width: 100% !important;
-        padding: 4px 6px !important;
+        height: 24px !important;
+        padding: 3px 6px !important;
         overflow: hidden !important;
-        color: inherit !important;
-        font-size: 10px !important;
-        line-height: 1.2 !important;
+        font-size: 9.5px !important;
+        line-height: 1.15 !important;
         text-overflow: ellipsis !important;
         white-space: nowrap !important;
         word-break: normal !important;
         overflow-wrap: normal !important;
-      }
-
-      .${LAYOUT_CLASS}
-      > #${IDS.rightStack}
-      .us-sign-auto-trim:not(td):not(th) {
-        display: block !important;
       }
 
       .${LAYOUT_CLASS}
@@ -258,10 +313,77 @@
 
       .${LAYOUT_CLASS}
       > #${IDS.rightStack}
-      :is(a, span, div):not(.btn):not(button).us-sign-auto-trim {
+      .list-group,
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      ul {
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      .us-sign-compact-file-row,
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      .list-group-item {
+        box-sizing: border-box !important;
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) auto !important;
+        align-items: center !important;
+        gap: 6px !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        min-height: 28px !important;
+        margin: 0 0 4px !important;
+        padding: 3px 5px 3px 7px !important;
         overflow: hidden !important;
+      }
+
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      .us-sign-compact-file-row:last-child,
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      .list-group-item:last-child {
+        margin-bottom: 0 !important;
+      }
+
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      .us-sign-trim-text,
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      .us-sign-auto-trim {
+        display: block !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+        font-size: 9.5px !important;
+        line-height: 1.15 !important;
         text-overflow: ellipsis !important;
         white-space: nowrap !important;
+        word-break: normal !important;
+        overflow-wrap: normal !important;
+      }
+
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      .us-sign-compact-file-row
+      :is(button, .btn),
+      .${LAYOUT_CLASS}
+      > #${IDS.rightStack}
+      .list-group-item
+      :is(button, .btn) {
+        grid-column: 2 !important;
+        min-width: 28px !important;
+        width: 28px !important;
+        min-height: 26px !important;
+        height: 26px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        font-size: 10px !important;
+        line-height: 1 !important;
       }
 
       .${LAYOUT_CLASS}
@@ -323,7 +445,7 @@
         .${LAYOUT_CLASS}
         > #${IDS.rightStack}
         > .us-sign-files-panel {
-          flex: 0 0 auto !important;
+          height: 150px !important;
           max-height: 150px !important;
         }
       }
@@ -356,36 +478,80 @@
     topRow.remove();
   }
 
-  function addTrimTargets(rightStack) {
-    if (!rightStack) return;
+  function trimElement(element) {
+    if (!element || element.matches("button, .btn, input, select, textarea")) return;
 
-    const selectors = [
-      "td",
-      "th",
-      ".list-group-item",
-      ".panel-body a:not(.btn)",
-      ".panel-body li",
-      ".panel-body [class*='name' i]",
-      ".panel-body [class*='file' i]",
-      ".panel-body [class*='design' i]"
-    ].join(",");
+    const fullText = String(element.textContent || "")
+      .replace(/\s+/g, " ")
+      .trim();
 
-    for (const element of rightStack.querySelectorAll(selectors)) {
-      if (
-        element.matches("button, .btn, input, select, textarea") ||
-        element.querySelector("button, .btn, input, select, textarea")
-      ) {
-        continue;
-      }
+    if (!fullText) return;
 
-      const fullText = String(element.textContent || "")
+    element.classList.add("us-sign-auto-trim");
+    element.setAttribute("title", fullText);
+  }
+
+  function wrapDirectTextNodes(row) {
+    for (const node of Array.from(row.childNodes)) {
+      if (node.nodeType !== Node.TEXT_NODE) continue;
+
+      const fullText = String(node.textContent || "")
         .replace(/\s+/g, " ")
         .trim();
 
       if (!fullText) continue;
 
-      element.classList.add("us-sign-auto-trim");
-      element.setAttribute("title", fullText);
+      const span = document.createElement("span");
+      span.className = "us-sign-trim-text";
+      span.textContent = fullText;
+      span.title = fullText;
+      node.replaceWith(span);
+    }
+  }
+
+  function decorateRightStack(rightStack) {
+    if (!rightStack) return;
+
+    for (const cell of rightStack.querySelectorAll("td, th")) {
+      trimElement(cell);
+    }
+
+    const filesPanel = rightStack.querySelector(".us-sign-files-panel");
+    const filesBody = filesPanel?.querySelector(":scope > .panel-body");
+
+    if (filesBody) {
+      const buttons = filesBody.querySelectorAll("button, .btn");
+
+      for (const button of buttons) {
+        const row =
+          button.closest("li, .list-group-item, [class*='file-row' i], [class*='file-item' i]") ||
+          button.parentElement;
+
+        if (!row || row === filesBody || !filesBody.contains(row)) continue;
+
+        row.classList.add("us-sign-compact-file-row");
+        wrapDirectTextNodes(row);
+
+        for (const child of Array.from(row.children)) {
+          if (child === button || child.matches("button, .btn") || child.querySelector("button, .btn")) {
+            continue;
+          }
+          trimElement(child);
+        }
+      }
+    }
+
+    const leafSelectors = [
+      ".panel-body a:not(.btn)",
+      ".panel-body li > :not(button):not(.btn)",
+      ".panel-body [class*='name' i]",
+      ".panel-body [class*='file' i]",
+      ".panel-body [class*='design' i]"
+    ].join(",");
+
+    for (const element of rightStack.querySelectorAll(leafSelectors)) {
+      if (element.querySelector("button, .btn, input, select, textarea")) continue;
+      trimElement(element);
     }
   }
 
@@ -447,7 +613,7 @@
       );
     }
 
-    addTrimTargets(rightStack);
+    decorateRightStack(rightStack);
     return true;
   }
 
