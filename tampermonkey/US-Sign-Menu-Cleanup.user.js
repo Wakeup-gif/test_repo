@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         US Sign Menu Cleanup and Reorder
+// @name         US Sign Menu Reorder
 // @namespace    us-sign-full-modules
-// @version      2.0.0
-// @description  Hides unused SquareCoil menu links and reorders the project navigation.
+// @version      2.1.0
+// @description  Preserves every SquareCoil menu item and only reorders project navigation links.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-idle
 // @grant        none
@@ -12,7 +12,7 @@
 (function () {
   "use strict";
 
-  const HIDDEN_LINKS = new Set([
+  const LEGACY_HIDDEN_LINKS = new Set([
     "LEADS",
     "QUEUES",
     "PURCHASING",
@@ -49,11 +49,16 @@
     return anchor.closest("li") || anchor.parentElement;
   }
 
-  function hideUnusedLinks() {
+  function restoreLegacyHiddenLinks() {
     for (const anchor of document.querySelectorAll("#sidebar_left a, #pmlt a, header.navbar a")) {
-      if (!HIDDEN_LINKS.has(clean(anchor.textContent))) continue;
+      if (!LEGACY_HIDDEN_LINKS.has(clean(anchor.textContent))) continue;
+
       const row = rowFor(anchor);
-      if (row) row.style.setProperty("display", "none", "important");
+      if (!row) continue;
+
+      row.style.removeProperty("display");
+      row.classList.remove("us-sign-hidden-menu-row");
+      row.removeAttribute("hidden");
     }
   }
 
@@ -62,14 +67,19 @@
     if (!rail) return;
 
     const rows = new Map();
+
     for (const anchor of rail.querySelectorAll("a")) {
       const label = clean(anchor.textContent);
       if (!PROJECT_ORDER.includes(label)) continue;
+
       const row = rowFor(anchor);
       if (row) rows.set(label, row);
     }
 
-    const ordered = PROJECT_ORDER.map((label) => rows.get(label)).filter(Boolean);
+    const ordered = PROJECT_ORDER
+      .map((label) => rows.get(label))
+      .filter(Boolean);
+
     if (ordered.length < 2) return;
 
     const parent = ordered[0].parentElement;
@@ -81,7 +91,7 @@
   }
 
   function apply() {
-    hideUnusedLinks();
+    restoreLegacyHiddenLinks();
     reorderProjectLinks();
   }
 
