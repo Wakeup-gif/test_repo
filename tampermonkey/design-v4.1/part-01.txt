@@ -1,0 +1,500 @@
+// ==UserScript==
+// @name         US Sign - Design Job Tools
+// @namespace    us-sign-local-tools
+// @version      4.1.0
+// @description  Stable full-width Design workspace with robust hidden Open Date and Project Manager detection.
+// @match        https://ussignandmill.squarecoil.net/*
+// @run-at       document-idle
+// @grant        GM_setClipboard
+// @grant        GM_openInTab
+// @noframes
+// ==/UserScript==
+
+(function () {
+  "use strict";
+
+  const IDS = {
+    style: "us-sign-design-runtime-style",
+    actionbar: "us-sign-design-actionbar",
+    copyTools: "us-sign-job-copy-tools",
+    nativeActions: "us-sign-native-action-group",
+    overview: "us-sign-job-overview",
+    summary: "us-sign-design-summary",
+    bottomGrid: "us-sign-design-bottom-grid",
+    rightStack: "us-sign-design-right-stack",
+    lookup: "us-sign-job-lookup-button"
+  };
+
+  const VERSION = "4.1.0";
+
+  const NATIVE_ACTION_ORDER = [
+    "EDIT",
+    "EMAIL FILE",
+    "EMAIL LINK",
+    "PRINT",
+    "DELETE"
+  ];
+
+  const SUMMARY_FIELDS = [
+    {
+      label: "Job Type",
+      key: "designType",
+      kind: "type"
+    },
+    {
+      label: "Due Date",
+      key: "dateRequired",
+      kind: "due"
+    },
+    {
+      label: "Priority",
+      key: "priority",
+      kind: "priority"
+    },
+    {
+      label: "Hours",
+      key: "hours",
+      kind: "hours"
+    },
+    {
+      label: "Status",
+      key: "status",
+      kind: "status"
+    }
+  ];
+
+  const PATH_HOST_IDS = [
+    "us-sign-description-path-tools",
+    "us-sign-description-path-tools-standalone"
+  ];
+
+  const STATUS_PATTERN =
+    /^(?:SUBMITTED|IN PROGRESS|COMPLETE|COMPLETED|PENDING|PENDING REVIEW|ON HOLD|READY|READY TO BEGIN|APPROVED|REJECTED|CANCELLED|CANCELED|DRAFT|ACTIVE|OPEN|CLOSED|REVISION|IN REVISION|DESIGNING|PRODUCTION)$/i;
+
+  const SECTION_STOP_LABELS = new Set([
+    "SALES",
+    "PROJECT TOOLS",
+    "DESIGN",
+    "SCOPE OF WORK",
+    "PROJECT STATUS",
+    "TASKS",
+    "DOCUMENTS",
+    "PHOTOS",
+    "PRODUCTION FILES"
+  ]);
+
+  const state = {
+    table: null,
+    workspace: null,
+    data: null,
+    mounting: false,
+    rebuildTimer: null,
+    refreshTimer: null,
+    structureObserver: null,
+    dataObserver: null
+  };
+
+  /* =========================================================
+     HELPERS
+  ========================================================= */
+
+  function clean(value) {
+    return String(value || "")
+      .replace(/\u00a0/g, " ")
+      .replace(/[ \t]+/g, " ")
+      .replace(/\s*\n\s*/g, " ")
+      .trim();
+  }
+
+  function cleanBlock(value) {
+    return String(value || "")
+      .replace(/\u00a0/g, " ")
+      .replace(/\r/g, "")
+      .replace(/[ \t]+$/gm, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+
+
+  /*
+   * Reads DOM text without depending on visibility.
+   * Unlike innerText, this still includes values hidden by
+   * the reskin, such as the native Open Date span.
+   */
+  function textWithBreaks(root) {
+    if (!root) {
+      return "";
+    }
+
+    const clone =
+      root.cloneNode(true);
+
+    for (
+      const element of
+      clone.querySelectorAll(
+        "script, style, noscript"
+      )
+    ) {
+      element.remove();
+    }
+
+    for (
+      const br of
+      clone.querySelectorAll("br")
+    ) {
+      br.replaceWith("\n");
+    }
+
+    for (
+      const element of
+      clone.querySelectorAll(
+        [
+          "div",
+          "p",
+          "li",
+          "tr",
+          "td",
+          "th",
+          "address",
+          "section",
+          "header",
+          "footer"
+        ].join(", ")
+      )
+    ) {
+      element.append("\n");
+    }
+
+    return String(
+      clone.textContent || ""
+    )
+      .replace(/\u00a0/g, " ")
+      .replace(/[–—]/g, "-")
+      .replace(/\r/g, "")
+      .replace(/[ \t]+/g, " ")
+      .replace(/ *\n */g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+
+  function firstNonEmpty(...values) {
+    return values
+      .map(clean)
+      .find(Boolean) || "";
+  }
+
+  function normalizeHeading(value) {
+    return clean(value)
+      .replace(/^\/+\s*/, "")
+      .replace(/:\s*$/, "")
+      .toUpperCase();
+  }
+
+  function escapeRegExp(value) {
+    return String(value || "")
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function setImportant(element, property, value) {
+    if (!element) {
+      return;
+    }
+
+    element.style.setProperty(
+      property,
+      value,
+      "important"
+    );
+  }
+
+  function directChildUnder(parent, element) {
+    let current = element;
+
+    while (
+      current?.parentElement &&
+      current.parentElement !== parent
+    ) {
+      current = current.parentElement;
+    }
+
+    return current?.parentElement === parent
+      ? current
+      : null;
+  }
+
+  function cleanJobName(value, projectNumber = "") {
+    let name = clean(value)
+      .replace(
+        /\s*(?:[-|•·]\s*)?USSM(?:\s*[★☆*])?\s*$/i,
+        ""
+      )
+      .trim();
+
+    if (projectNumber) {
+      name = name.replace(
+        new RegExp(
+          `^${escapeRegExp(projectNumber)}(?:-\\d+)?\\s*-\\s*`,
+          "i"
+        ),
+        ""
+      );
+    }
+
+    return name;
+  }
+
+  async function copyText(value) {
+    const text = String(value || "").trim();
+
+    if (!text) {
+      throw new Error("No text found");
+    }
+
+    if (typeof GM_setClipboard === "function") {
+      GM_setClipboard(text, "text");
+      return;
+    }
+
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+
+    const helper = document.createElement("textarea");
+
+    helper.value = text;
+    helper.style.position = "fixed";
+    helper.style.opacity = "0";
+    helper.style.pointerEvents = "none";
+
+    document.body.appendChild(helper);
+    helper.select();
+    document.execCommand("copy");
+    helper.remove();
+  }
+
+  function flash(button, message, isError = false) {
+    if (
+      !button ||
+      button.dataset.flashing === "true"
+    ) {
+      return;
+    }
+
+    const original =
+      button.dataset.originalHtml ||
+      button.innerHTML;
+
+    button.dataset.originalHtml = original;
+    button.dataset.flashing = "true";
+    button.textContent = message;
+
+    button.classList.toggle(
+      "error",
+      isError
+    );
+
+    window.setTimeout(() => {
+      button.innerHTML = original;
+      button.classList.remove("error");
+      delete button.dataset.flashing;
+    }, 1250);
+  }
+
+  function openMaps(address) {
+    if (!address) {
+      throw new Error("No address found");
+    }
+
+    const url =
+      "https://www.google.com/maps/search/" +
+      "?api=1&query=" +
+      encodeURIComponent(address);
+
+    if (typeof GM_openInTab === "function") {
+      GM_openInTab(url, {
+        active: true,
+        insert: true,
+        setParent: true
+      });
+
+      return;
+    }
+
+    window.open(
+      url,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  }
+
+  /* =========================================================
+     WORKSPACE DISCOVERY
+  ========================================================= */
+
+  function findDesignTable() {
+    return [
+      ...document.querySelectorAll("table")
+    ].find((table) => {
+      const text = clean(
+        table.innerText ||
+        table.textContent
+      ).toLowerCase();
+
+      return (
+        text.includes("number") &&
+        text.includes("assigned to") &&
+        text.includes("date required")
+      );
+    }) || null;
+  }
+
+  function getDirectPanelHeading(panel) {
+    if (!panel) {
+      return "";
+    }
+
+    const heading = panel.querySelector(
+      [
+        ":scope > .panel-heading",
+        ":scope > .box-heading",
+        ":scope > header"
+      ].join(", ")
+    );
+
+    if (!heading) {
+      return "";
+    }
+
+    const clone = heading.cloneNode(true);
+
+    clone.querySelectorAll(
+      [
+        "a",
+        "button",
+        "input",
+        "select",
+        "textarea",
+        "form",
+        "script",
+        "style",
+        ".widget-menu",
+        ".panel-menu",
+        ".popup-modal",
+        ".popup-basic",
+        ".mfp-hide",
+        ".modal"
+      ].join(", ")
+    ).forEach((element) => {
+      element.remove();
+    });
+
+    return normalizeHeading(
+      clone.textContent
+    );
+  }
+
+  function findWorkspace(
+    table = findDesignTable()
+  ) {
+    if (!table) {
+      return null;
+    }
+
+    const workspaceBody =
+      table.closest(".panel-body");
+
+    const workspacePanel =
+      workspaceBody?.closest(".panel");
+
+    const workspaceColumn =
+      workspacePanel?.closest(
+        ".col-md-9, [class*='col-md-']"
+      );
+
+    const row =
+      workspaceColumn?.parentElement
+        ?.classList.contains("row")
+        ? workspaceColumn.parentElement
+        : workspaceColumn?.closest(".row");
+
+    if (
+      !workspaceBody ||
+      !workspacePanel ||
+      !workspaceColumn ||
+      !row
+    ) {
+      return null;
+    }
+
+    const siblingColumns = [
+      ...row.children
+    ].filter((element) => {
+      return element !== workspaceColumn;
+    });
+
+    const sourceColumn =
+      siblingColumns.find((column) => {
+        return [
+          ...column.querySelectorAll(".panel")
+        ].some((panel) => {
+          return (
+            getDirectPanelHeading(panel) ===
+            "DESIGNS"
+          );
+        });
+      }) ||
+      siblingColumns.find((column) => {
+        return column.classList.contains(
+          "us-sign-design-source-column"
+        );
+      }) ||
+      siblingColumns[0] ||
+      null;
+
+    if (!sourceColumn) {
+      return null;
+    }
+
+    const tableAnchor =
+      directChildUnder(
+        workspaceBody,
+        table
+      );
+
+    if (!tableAnchor) {
+      return null;
+    }
+
+    return {
+      table,
+      row,
+      sourceColumn,
+      workspaceColumn,
+      workspacePanel,
+      workspaceBody,
+      tableAnchor
+    };
+  }
+
+  function findNativeSections(workspace) {
+    const panels = [
+      ...workspace.workspaceBody
+        .querySelectorAll(".panel")
+    ];
+
+    const descriptionPanel =
+      panels.find((panel) => {
+        return (
+          getDirectPanelHeading(panel) ===
+          "DESCRIPTION"
+        );
+      }) || null;
+
+    const filesPanel =
+      panels.find((panel) => {
+        return (
+          getDirectPanelHeading(panel) ===
+          "FILES"
+        );
+      }) || null;
