@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         US Sign Menu Reorder
+// @name         US Sign Menu Cleanup and Project Reorder
 // @namespace    us-sign-full-modules
-// @version      2.1.0
-// @description  Preserves every SquareCoil menu item and only reorders project navigation links.
+// @version      2.2.0
+// @description  Keeps the cleaned main sidebar while restoring and ordering the core project navigation.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-idle
 // @grant        none
@@ -12,13 +12,16 @@
 (function () {
   "use strict";
 
-  const LEGACY_HIDDEN_LINKS = new Set([
+  /*
+   * These remain hidden only in the main SquareCoil sidebar.
+   * Estimate Requests remains visible to match the user's existing layout.
+   */
+  const SIDEBAR_HIDDEN_LINKS = new Set([
     "LEADS",
     "QUEUES",
     "PURCHASING",
     "SCHEDULE",
     "INSTALL CALENDAR",
-    "ESTIMATE REQUESTS",
     "CONTACTS",
     "ESTIMATES",
     "SHOP ORDER",
@@ -29,6 +32,7 @@
     "HELP CENTER"
   ]);
 
+  /* Core links that must remain visible in the project rail. */
   const PROJECT_ORDER = [
     "DESIGN",
     "SCOPE OF WORK",
@@ -49,16 +53,52 @@
     return anchor.closest("li") || anchor.parentElement;
   }
 
-  function restoreLegacyHiddenLinks() {
-    for (const anchor of document.querySelectorAll("#sidebar_left a, #pmlt a, header.navbar a")) {
-      if (!LEGACY_HIDDEN_LINKS.has(clean(anchor.textContent))) continue;
+  function labelFor(anchor) {
+    const clone = anchor.cloneNode(true);
+    clone.querySelectorAll(".badge, .label, small, sup").forEach((node) => node.remove());
+    return clean(clone.textContent);
+  }
+
+  function restoreCoreProjectLinks() {
+    const rail = document.getElementById("pmlt");
+    if (!rail) return;
+
+    for (const anchor of rail.querySelectorAll("a")) {
+      const label = labelFor(anchor);
+      if (!PROJECT_ORDER.includes(label)) continue;
 
       const row = rowFor(anchor);
       if (!row) continue;
 
-      row.style.removeProperty("display");
+      row.hidden = false;
       row.classList.remove("us-sign-hidden-menu-row");
-      row.removeAttribute("hidden");
+      row.style.removeProperty("display");
+      row.style.removeProperty("visibility");
+      row.style.removeProperty("opacity");
+      anchor.style.removeProperty("display");
+      anchor.style.removeProperty("visibility");
+      anchor.style.removeProperty("opacity");
+    }
+  }
+
+  function cleanMainSidebar() {
+    for (const anchor of document.querySelectorAll("#sidebar_left a")) {
+      const row = rowFor(anchor);
+      if (!row) continue;
+
+      const shouldHide = SIDEBAR_HIDDEN_LINKS.has(labelFor(anchor));
+
+      if (shouldHide) {
+        row.style.setProperty("display", "none", "important");
+      } else if (row.dataset.usSignMenuHidden === "true") {
+        row.style.removeProperty("display");
+      }
+
+      if (shouldHide) {
+        row.dataset.usSignMenuHidden = "true";
+      } else {
+        delete row.dataset.usSignMenuHidden;
+      }
     }
   }
 
@@ -69,7 +109,7 @@
     const rows = new Map();
 
     for (const anchor of rail.querySelectorAll("a")) {
-      const label = clean(anchor.textContent);
+      const label = labelFor(anchor);
       if (!PROJECT_ORDER.includes(label)) continue;
 
       const row = rowFor(anchor);
@@ -91,7 +131,8 @@
   }
 
   function apply() {
-    restoreLegacyHiddenLinks();
+    cleanMainSidebar();
+    restoreCoreProjectLinks();
     reorderProjectLinks();
   }
 
