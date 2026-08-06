@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign - Design Job Tools
 // @namespace    us-sign-local-tools
-// @version      4.2.3
-// @description  Stable Design workspace with corrected top-row alignment, panel spacing, and non-overlapping Description placement.
+// @version      4.2.4
+// @description  Stable Design workspace with a true nested top row and aligned Designs, Files, and Job Overview columns.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-idle
 // @grant        GM_setClipboard
@@ -16,8 +16,10 @@
 (function () {
   "use strict";
 
-  const STYLE_ID = "us-sign-design-v423-layout-style";
-  const LAYOUT_CLASS = "us-sign-design-v423-layout";
+  const STYLE_ID = "us-sign-design-v424-layout-style";
+  const LAYOUT_CLASS = "us-sign-design-v424-layout";
+  const TOP_ROW_ID = "us-sign-design-top-row";
+  const LEFT_STACK_ID = "us-sign-design-left-stack";
 
   const IDS = {
     actionbar: "us-sign-design-actionbar",
@@ -30,13 +32,15 @@
   const OLD_STYLE_IDS = [
     "us-sign-design-v42-layout-style",
     "us-sign-design-v421-layout-style",
-    "us-sign-design-v422-layout-style"
+    "us-sign-design-v422-layout-style",
+    "us-sign-design-v423-layout-style"
   ];
 
   const OLD_LAYOUT_CLASSES = [
     "us-sign-design-v42-layout",
     "us-sign-design-v421-layout",
-    "us-sign-design-v422-layout"
+    "us-sign-design-v422-layout",
+    "us-sign-design-v423-layout"
   ];
 
   function installStyle() {
@@ -50,74 +54,63 @@
     style.id = STYLE_ID;
     style.textContent = `
       .${LAYOUT_CLASS} {
+        display: block !important;
+        width: 100% !important;
+        min-width: 0 !important;
+      }
+
+      .${LAYOUT_CLASS} > #${TOP_ROW_ID} {
         display: grid !important;
         grid-template-columns:
           minmax(0, 6.3fr)
           minmax(270px, 1.7fr) !important;
-        grid-template-rows:
-          auto
-          auto
-          auto
-          16px
-          auto !important;
         column-gap: 14px !important;
-        row-gap: 0 !important;
         align-items: stretch !important;
         width: 100% !important;
         min-width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
       }
 
-      .${LAYOUT_CLASS} > * {
-        box-sizing: border-box !important;
+      .${LAYOUT_CLASS} #${LEFT_STACK_ID} {
+        display: flex !important;
+        flex-direction: column !important;
+        align-self: stretch !important;
+        width: 100% !important;
         min-width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
       }
 
-      .${LAYOUT_CLASS} > #${IDS.actionbar} {
-        grid-column: 1 !important;
-        grid-row: 1 !important;
+      .${LAYOUT_CLASS} #${LEFT_STACK_ID} > #${IDS.actionbar},
+      .${LAYOUT_CLASS} #${LEFT_STACK_ID} > #${IDS.overview},
+      .${LAYOUT_CLASS} #${LEFT_STACK_ID} > #${IDS.summary} {
+        flex: 0 0 auto !important;
         width: 100% !important;
+        min-width: 0 !important;
         margin: 0 !important;
       }
 
-      .${LAYOUT_CLASS} > #${IDS.overview} {
-        grid-column: 1 !important;
-        grid-row: 2 !important;
-        align-self: stretch !important;
-        width: 100% !important;
-        margin: 0 !important;
-      }
-
-      .${LAYOUT_CLASS} > #${IDS.summary} {
-        grid-column: 1 !important;
-        grid-row: 3 !important;
-        align-self: stretch !important;
-        width: 100% !important;
-        margin: 0 !important;
-      }
-
-      .${LAYOUT_CLASS} > #${IDS.rightStack} {
-        grid-column: 2 !important;
-        grid-row: 1 / 4 !important;
+      .${LAYOUT_CLASS} > #${TOP_ROW_ID} > #${IDS.rightStack} {
         display: grid !important;
-        grid-template-rows:
-          auto
-          minmax(70px, 1fr) !important;
+        grid-template-rows: auto minmax(70px, 1fr) !important;
         align-self: stretch !important;
-        align-content: stretch !important;
         gap: 12px !important;
         width: 100% !important;
         min-width: 0 !important;
-        height: 100% !important;
         margin: 0 !important;
         padding: 0 !important;
         position: relative !important;
+        inset: auto !important;
         z-index: 1 !important;
       }
 
       .${LAYOUT_CLASS}
+      > #${TOP_ROW_ID}
       > #${IDS.rightStack}
       > .us-sign-designs-panel,
       .${LAYOUT_CLASS}
+      > #${TOP_ROW_ID}
       > #${IDS.rightStack}
       > .us-sign-files-panel {
         box-sizing: border-box !important;
@@ -131,6 +124,7 @@
       }
 
       .${LAYOUT_CLASS}
+      > #${TOP_ROW_ID}
       > #${IDS.rightStack}
       > .us-sign-designs-panel {
         align-self: start !important;
@@ -138,15 +132,17 @@
       }
 
       .${LAYOUT_CLASS}
+      > #${TOP_ROW_ID}
       > #${IDS.rightStack}
       > .us-sign-files-panel {
         align-self: stretch !important;
         min-height: 70px !important;
-        height: 100% !important;
+        height: auto !important;
         margin-top: 0 !important;
       }
 
       .${LAYOUT_CLASS}
+      > #${TOP_ROW_ID}
       > #${IDS.rightStack}
       > .panel
       > .panel-heading {
@@ -155,6 +151,7 @@
       }
 
       .${LAYOUT_CLASS}
+      > #${TOP_ROW_ID}
       > #${IDS.rightStack}
       > .panel
       > .panel-body {
@@ -163,29 +160,29 @@
         overflow: hidden !important;
       }
 
-      .${LAYOUT_CLASS}
-      > .us-sign-description-panel {
-        grid-column: 1 / -1 !important;
-        grid-row: 5 !important;
-        align-self: start !important;
+      .${LAYOUT_CLASS} > .us-sign-description-panel {
+        display: block !important;
         width: 100% !important;
         min-width: 0 !important;
-        margin: 0 !important;
+        margin: 16px 0 0 !important;
         position: relative !important;
+        inset: auto !important;
         z-index: 0 !important;
         clear: both !important;
       }
 
       .${LAYOUT_CLASS} > #${IDS.bottomGrid} {
-        display: contents !important;
+        display: none !important;
         margin: 0 !important;
         padding: 0 !important;
       }
 
       .${LAYOUT_CLASS}
+      > #${TOP_ROW_ID}
       > #${IDS.rightStack}
       table,
       .${LAYOUT_CLASS}
+      > #${TOP_ROW_ID}
       > #${IDS.rightStack}
       .table {
         width: 100% !important;
@@ -193,9 +190,11 @@
       }
 
       .${LAYOUT_CLASS}
+      > #${TOP_ROW_ID}
       > #${IDS.rightStack}
       td,
       .${LAYOUT_CLASS}
+      > #${TOP_ROW_ID}
       > #${IDS.rightStack}
       th {
         min-width: 0 !important;
@@ -208,12 +207,14 @@
       }
 
       .${LAYOUT_CLASS}
+      > #${TOP_ROW_ID}
       > #${IDS.rightStack}
       td:first-child {
         width: 55% !important;
       }
 
       .${LAYOUT_CLASS}
+      > #${TOP_ROW_ID}
       > #${IDS.rightStack}
       td:last-child {
         width: 45% !important;
@@ -228,14 +229,8 @@
         overflow-wrap: normal !important;
       }
 
-      .${LAYOUT_CLASS}
-      #${IDS.overview}
-      .us-sign-overview-field {
-        min-width: 0 !important;
-      }
-
       @media (max-width: 1220px) {
-        .${LAYOUT_CLASS} {
+        .${LAYOUT_CLASS} > #${TOP_ROW_ID} {
           grid-template-columns:
             minmax(0, 1fr)
             minmax(250px, 0.34fr) !important;
@@ -244,35 +239,33 @@
       }
 
       @media (max-width: 960px) {
-        .${LAYOUT_CLASS} {
+        .${LAYOUT_CLASS} > #${TOP_ROW_ID} {
           grid-template-columns: minmax(0, 1fr) !important;
-          grid-template-rows: auto !important;
           row-gap: 12px !important;
         }
 
-        .${LAYOUT_CLASS} > #${IDS.actionbar},
-        .${LAYOUT_CLASS} > #${IDS.overview},
-        .${LAYOUT_CLASS} > #${IDS.summary},
-        .${LAYOUT_CLASS} > #${IDS.rightStack},
-        .${LAYOUT_CLASS} > .us-sign-description-panel {
-          grid-column: 1 !important;
-          grid-row: auto !important;
-        }
-
-        .${LAYOUT_CLASS} > #${IDS.rightStack} {
-          grid-template-rows: auto auto !important;
-          height: auto !important;
-        }
-
         .${LAYOUT_CLASS}
-        > #${IDS.rightStack}
-        > .us-sign-files-panel {
-          height: auto !important;
+        > #${TOP_ROW_ID}
+        > #${IDS.rightStack} {
+          grid-template-rows: auto auto !important;
+        }
+
+        .${LAYOUT_CLASS} > .us-sign-description-panel {
+          margin-top: 12px !important;
         }
       }
     `;
 
     (document.head || document.documentElement).appendChild(style);
+  }
+
+  function childrenMatch(parent, elements) {
+    if (!parent) return false;
+    const children = Array.from(parent.children);
+    return (
+      children.length === elements.length &&
+      elements.every((element, index) => children[index] === element)
+    );
   }
 
   function normalizeStructure() {
@@ -283,49 +276,61 @@
     const summary = document.getElementById(IDS.summary);
     const bottomGrid = document.getElementById(IDS.bottomGrid);
     const rightStack = document.getElementById(IDS.rightStack);
+    let topRow = document.getElementById(TOP_ROW_ID);
+    let leftStack = document.getElementById(LEFT_STACK_ID);
 
     if (!actionbar || !overview || !summary || !rightStack) {
       return false;
     }
 
-    const parent = overview.parentElement;
-    if (!parent) return false;
-
     const descriptionPanel =
-      document.querySelector(
-        `#${IDS.bottomGrid} > .us-sign-description-panel`
-      ) ||
-      parent.querySelector(
-        ":scope > .us-sign-description-panel"
-      );
+      bottomGrid?.querySelector(":scope > .us-sign-description-panel") ||
+      document.querySelector(".us-sign-description-panel");
 
     if (!descriptionPanel) return false;
+
+    const parent =
+      topRow?.parentElement ||
+      bottomGrid?.parentElement ||
+      descriptionPanel.parentElement ||
+      actionbar.parentElement;
+
+    if (!parent) return false;
 
     for (const className of OLD_LAYOUT_CLASSES) {
       parent.classList.remove(className);
     }
-
     parent.classList.add(LAYOUT_CLASS);
 
-    const ordered = [
-      actionbar,
-      overview,
-      summary,
-      rightStack,
-      descriptionPanel
-    ];
-
-    for (const element of ordered) {
-      if (element.parentElement !== parent) {
-        parent.appendChild(element);
-      }
+    if (!topRow) {
+      topRow = document.createElement("section");
+      topRow.id = TOP_ROW_ID;
     }
 
-    if (
-      bottomGrid &&
-      bottomGrid.parentElement === parent &&
-      bottomGrid.childElementCount === 0
-    ) {
+    if (!leftStack) {
+      leftStack = document.createElement("div");
+      leftStack.id = LEFT_STACK_ID;
+    }
+
+    if (!childrenMatch(leftStack, [actionbar, overview, summary])) {
+      leftStack.append(actionbar, overview, summary);
+    }
+
+    if (!childrenMatch(topRow, [leftStack, rightStack])) {
+      topRow.append(leftStack, rightStack);
+    }
+
+    if (descriptionPanel.parentElement !== parent) {
+      parent.appendChild(descriptionPanel);
+    }
+
+    if (topRow.parentElement !== parent) {
+      parent.insertBefore(topRow, descriptionPanel);
+    } else if (topRow.nextElementSibling !== descriptionPanel) {
+      parent.insertBefore(topRow, descriptionPanel);
+    }
+
+    if (bottomGrid && bottomGrid.parentElement === parent) {
       bottomGrid.remove();
     }
 
