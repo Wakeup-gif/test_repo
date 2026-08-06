@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign - Design Job Tools
 // @namespace    us-sign-local-tools
-// @version      4.2.0
-// @description  Stable Design workspace with Designs and Files aligned beside Job Overview.
+// @version      4.2.1
+// @description  Stable Design workspace with Designs and Files aligned beside Job Overview with refined spacing.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-idle
 // @grant        GM_setClipboard
@@ -16,8 +16,8 @@
 (function () {
   "use strict";
 
-  const STYLE_ID = "us-sign-design-v42-layout-style";
-  const LAYOUT_CLASS = "us-sign-design-v42-layout";
+  const STYLE_ID = "us-sign-design-v421-layout-style";
+  const LAYOUT_CLASS = "us-sign-design-v421-layout";
 
   function installStyle() {
     if (document.getElementById(STYLE_ID)) return;
@@ -28,10 +28,10 @@
       .${LAYOUT_CLASS} {
         display: grid !important;
         grid-template-columns:
-          minmax(0, 7fr)
-          minmax(220px, 1fr) !important;
+          minmax(0, 6.25fr)
+          minmax(270px, 1.75fr) !important;
         grid-template-rows: auto auto auto auto !important;
-        column-gap: 12px !important;
+        column-gap: 14px !important;
         row-gap: 0 !important;
         align-items: stretch !important;
         width: 100% !important;
@@ -39,27 +39,31 @@
       }
 
       .${LAYOUT_CLASS} > * {
+        box-sizing: border-box !important;
         min-width: 0 !important;
       }
 
       .${LAYOUT_CLASS} > #us-sign-design-actionbar {
         grid-column: 1 !important;
         grid-row: 1 !important;
-        margin-top: 0 !important;
+        width: 100% !important;
+        margin: 0 !important;
       }
 
       .${LAYOUT_CLASS} > #us-sign-job-overview {
         grid-column: 1 !important;
         grid-row: 2 !important;
         align-self: stretch !important;
-        margin-top: 0 !important;
+        width: 100% !important;
+        margin: 0 !important;
       }
 
       .${LAYOUT_CLASS} > #us-sign-design-summary {
         grid-column: 1 !important;
         grid-row: 3 !important;
         align-self: stretch !important;
-        margin-top: 0 !important;
+        width: 100% !important;
+        margin: 0 !important;
       }
 
       .${LAYOUT_CLASS} > #us-sign-design-bottom-grid {
@@ -69,13 +73,15 @@
       .${LAYOUT_CLASS}
       #us-sign-design-right-stack {
         grid-column: 2 !important;
-        grid-row: 1 / span 3 !important;
+        grid-row: 1 / 4 !important;
         display: grid !important;
-        grid-template-rows: auto minmax(0, 1fr) !important;
+        grid-template-rows: auto minmax(68px, 1fr) !important;
         align-self: stretch !important;
-        gap: 12px !important;
+        align-content: stretch !important;
+        gap: 14px !important;
         width: 100% !important;
         min-width: 0 !important;
+        height: 100% !important;
         margin: 0 !important;
         padding: 0 !important;
       }
@@ -86,15 +92,36 @@
       .${LAYOUT_CLASS}
       #us-sign-design-right-stack
       > .us-sign-files-panel {
+        box-sizing: border-box !important;
         width: 100% !important;
         min-width: 0 !important;
+        min-height: 0 !important;
         margin: 0 !important;
+        overflow: hidden !important;
       }
 
       .${LAYOUT_CLASS}
       #us-sign-design-right-stack
       > .us-sign-files-panel {
         align-self: stretch !important;
+        height: 100% !important;
+      }
+
+      .${LAYOUT_CLASS}
+      #us-sign-design-right-stack
+      > .panel
+      > .panel-heading {
+        min-height: 40px !important;
+        padding: 7px 9px !important;
+      }
+
+      .${LAYOUT_CLASS}
+      #us-sign-design-right-stack
+      > .panel
+      > .panel-body {
+        min-width: 0 !important;
+        padding: 8px 9px !important;
+        overflow: hidden !important;
       }
 
       .${LAYOUT_CLASS}
@@ -104,7 +131,7 @@
         grid-row: 4 !important;
         width: 100% !important;
         min-width: 0 !important;
-        margin-top: 12px !important;
+        margin: 14px 0 0 !important;
       }
 
       .${LAYOUT_CLASS}
@@ -113,7 +140,8 @@
       .${LAYOUT_CLASS}
       #us-sign-design-right-stack
       .table {
-        table-layout: fixed !important;
+        width: 100% !important;
+        table-layout: auto !important;
       }
 
       .${LAYOUT_CLASS}
@@ -121,23 +149,59 @@
       td,
       .${LAYOUT_CLASS}
       #us-sign-design-right-stack
-      th,
-      .${LAYOUT_CLASS}
-      #us-sign-design-right-stack
-      a {
-        overflow-wrap: anywhere !important;
-        word-break: break-word !important;
+      th {
+        min-width: 0 !important;
+        padding: 5px 7px !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+        word-break: normal !important;
+        overflow-wrap: normal !important;
       }
 
-      @media (max-width: 1120px) {
+      .${LAYOUT_CLASS}
+      #us-sign-design-right-stack
+      td:first-child {
+        width: 55% !important;
+      }
+
+      .${LAYOUT_CLASS}
+      #us-sign-design-right-stack
+      td:last-child {
+        width: 45% !important;
+        text-align: right !important;
+      }
+
+      .${LAYOUT_CLASS}
+      #us-sign-design-right-stack
+      td a,
+      .${LAYOUT_CLASS}
+      #us-sign-design-right-stack
+      th a {
+        display: block !important;
+        min-width: 0 !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+      }
+
+      .${LAYOUT_CLASS}
+      #us-sign-design-right-stack
+      .btn {
+        flex: 0 0 auto !important;
+        white-space: nowrap !important;
+      }
+
+      @media (max-width: 1220px) {
         .${LAYOUT_CLASS} {
           grid-template-columns:
             minmax(0, 1fr)
-            minmax(200px, 0.28fr) !important;
+            minmax(250px, 0.34fr) !important;
+          column-gap: 12px !important;
         }
       }
 
-      @media (max-width: 900px) {
+      @media (max-width: 960px) {
         .${LAYOUT_CLASS} {
           grid-template-columns: minmax(0, 1fr) !important;
           grid-template-rows: auto !important;
@@ -158,6 +222,13 @@
         .${LAYOUT_CLASS}
         #us-sign-design-right-stack {
           grid-template-rows: auto auto !important;
+          height: auto !important;
+        }
+
+        .${LAYOUT_CLASS}
+        #us-sign-design-bottom-grid
+        > .us-sign-description-panel {
+          margin-top: 0 !important;
         }
       }
     `;
@@ -183,6 +254,7 @@
     if (summary && summary.parentElement !== parent) return false;
     if (bottomGrid.parentElement !== parent) return false;
 
+    parent.classList.remove("us-sign-design-v42-layout");
     parent.classList.add(LAYOUT_CLASS);
     return true;
   }
