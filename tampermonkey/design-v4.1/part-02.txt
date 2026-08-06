@@ -1,0 +1,500 @@
+
+    if (
+      !descriptionPanel ||
+      !filesPanel ||
+      descriptionPanel === filesPanel
+    ) {
+      return null;
+    }
+
+    return {
+      descriptionPanel,
+      filesPanel
+    };
+  }
+
+  function findDesignsPanel(workspace) {
+    const movedPanel =
+      document.querySelector(
+        `#${IDS.rightStack} > .us-sign-designs-panel`
+      );
+
+    if (movedPanel) {
+      return movedPanel;
+    }
+
+    return [
+      ...workspace.sourceColumn
+        .querySelectorAll(".panel")
+    ].find((panel) => {
+      return (
+        getDirectPanelHeading(panel) ===
+        "DESIGNS"
+      );
+    }) || null;
+  }
+
+  /* =========================================================
+     SOURCE TABLE PARSING
+  ========================================================= */
+
+  function readCellValue(cell) {
+    if (!cell) {
+      return "";
+    }
+
+    const input = cell.querySelector(
+      "input, textarea, select"
+    );
+
+    if (input) {
+      return clean(
+        input.tagName === "SELECT"
+          ? input.selectedOptions?.[0]?.textContent
+          : input.value
+      );
+    }
+
+    return clean(
+      cell.innerText ||
+      cell.textContent
+    );
+  }
+
+  function normalizeTableLabel(value) {
+    return clean(value)
+      .replace(/:\s*$/, "")
+      .toLowerCase();
+  }
+
+  function isLabelCell(cell) {
+    return /:\s*$/.test(
+      clean(
+        cell?.innerText ||
+        cell?.textContent
+      )
+    );
+  }
+
+  function findKnownStatus(table) {
+    const controlSelectors = [
+      "select[name*='status' i]",
+      "input[name*='status' i]",
+      "select[id*='status' i]",
+      "input[id*='status' i]",
+      "[data-status]",
+      "[class*='status' i]"
+    ];
+
+    for (const selector of controlSelectors) {
+      const elements =
+        table.querySelectorAll(selector);
+
+      for (const element of elements) {
+        const value =
+          element.tagName === "SELECT"
+            ? clean(
+              element.selectedOptions?.[0]
+                ?.textContent
+            )
+            : clean(
+              element.value ||
+              element.innerText ||
+              element.textContent ||
+              element.getAttribute(
+                "data-status"
+              )
+            );
+
+        if (
+          value &&
+          STATUS_PATTERN.test(value)
+        ) {
+          return value;
+        }
+      }
+    }
+
+    const candidates =
+      table.querySelectorAll(
+        "td, th, span, strong, label, a, button"
+      );
+
+    for (const element of candidates) {
+      const value = clean(
+        element.innerText ||
+        element.textContent
+      );
+
+      if (
+        value &&
+        STATUS_PATTERN.test(value)
+      ) {
+        return value;
+      }
+    }
+
+    return "";
+  }
+
+  function readTablePairs(table) {
+    const values = {};
+    const rows = [...(table?.rows || [])];
+
+    for (
+      let rowIndex = 0;
+      rowIndex < rows.length;
+      rowIndex += 1
+    ) {
+      const cells = [
+        ...rows[rowIndex].cells
+      ];
+
+      for (
+        let cellIndex = 0;
+        cellIndex < cells.length;
+        cellIndex += 1
+      ) {
+        const rawLabel = clean(
+          cells[cellIndex]?.innerText ||
+          cells[cellIndex]?.textContent
+        );
+
+        if (!/:\s*$/.test(rawLabel)) {
+          continue;
+        }
+
+        const label =
+          normalizeTableLabel(rawLabel);
+
+        let value = "";
+
+        for (
+          let nextIndex = cellIndex + 1;
+          nextIndex < cells.length;
+          nextIndex += 1
+        ) {
+          const nextCell =
+            cells[nextIndex];
+
+          const nextText = clean(
+            nextCell?.innerText ||
+            nextCell?.textContent
+          );
+
+          if (!nextText) {
+            continue;
+          }
+
+          if (isLabelCell(nextCell)) {
+            break;
+          }
+
+          value =
+            readCellValue(nextCell);
+
+          if (value) {
+            break;
+          }
+        }
+
+        /*
+         * SquareCoil sometimes places the Status value
+         * on the next row instead of beside the label.
+         */
+        if (
+          !value &&
+          label === "status"
+        ) {
+          for (
+            let nextRowIndex = rowIndex + 1;
+            nextRowIndex <
+              Math.min(
+                rows.length,
+                rowIndex + 4
+              );
+            nextRowIndex += 1
+          ) {
+            const nextCells = [
+              ...rows[nextRowIndex].cells
+            ];
+
+            for (
+              let candidateIndex = 0;
+              candidateIndex <
+                nextCells.length;
+              candidateIndex += 1
+            ) {
+              const candidate =
+                readCellValue(
+                  nextCells[candidateIndex]
+                );
+
+              if (
+                candidate &&
+                STATUS_PATTERN.test(candidate)
+              ) {
+                value = candidate;
+                break;
+              }
+            }
+
+            if (value) {
+              break;
+            }
+          }
+        }
+
+        if (label && value) {
+          values[label] = value;
+        }
+      }
+    }
+
+    if (!values.status) {
+      values.status =
+        findKnownStatus(table);
+    }
+
+    return values;
+  }
+
+  function getProjectNumber(details) {
+    const designNumber =
+      details.number ||
+      details["design number"] ||
+      "";
+
+    const match =
+      designNumber.match(/^(\d{5,})/);
+
+    if (match) {
+      return match[1];
+    }
+
+    const rail = cleanBlock(
+      document.querySelector("#pmlt")
+        ?.innerText
+    );
+
+    const railMatch = rail.match(
+      /PROJECT\s*(?:NUMBER|NO\.?|#|NODE|MODE)?\s*(\d{5,})/i
+    );
+
+    if (railMatch) {
+      return railMatch[1];
+    }
+
+    const urlNumber =
+      new URL(location.href)
+        .searchParams.get("id") ||
+      "";
+
+    return /^\d{5,}$/.test(urlNumber)
+      ? urlNumber
+      : "";
+  }
+
+  function getJobName(projectNumber) {
+    const heading =
+      document.querySelector(
+        "#customer-name h1"
+      ) ||
+      document.querySelector(
+        "#customer-name h2"
+      ) ||
+      document.querySelector(
+        "#customer-name h3"
+      );
+
+    return heading
+      ? cleanJobName(
+        heading.innerText,
+        projectNumber
+      )
+      : "";
+  }
+
+  function getPlazaName(jobName) {
+    const parts = clean(jobName)
+      .split(/\s+-\s+/)
+      .map(clean)
+      .filter(Boolean);
+
+    if (parts.length >= 3) {
+      return parts
+        .slice(1, -1)
+        .join(" - ");
+    }
+
+    if (parts.length === 2) {
+      return parts[1];
+    }
+
+    return "";
+  }
+
+  function getProjectManager() {
+    const rail =
+      document.querySelector("#pmlt");
+
+    if (!rail) {
+      return "";
+    }
+
+    /*
+     * First inspect text nodes in source order. This handles:
+     * PM - <br><strong>Erin Fitzgerald</strong>
+     * even when CSS changes visual line breaks.
+     */
+    const walker =
+      document.createTreeWalker(
+        rail,
+        NodeFilter.SHOW_TEXT
+      );
+
+    const textNodes = [];
+    let node = walker.nextNode();
+
+    while (node) {
+      const value =
+        clean(node.nodeValue);
+
+      if (value) {
+        textNodes.push(value);
+      }
+
+      node = walker.nextNode();
+    }
+
+    for (
+      let index = 0;
+      index < textNodes.length;
+      index += 1
+    ) {
+      const value =
+        textNodes[index]
+          .replace(/[–—]/g, "-");
+
+      const sameNode = value.match(
+        /(?:^|\b)(?:PM|PROJECT MANAGER)\s*[-:]\s*(.+)$/i
+      );
+
+      if (sameNode?.[1]) {
+        const manager =
+          clean(sameNode[1]);
+
+        if (
+          manager &&
+          !SECTION_STOP_LABELS.has(
+            normalizeHeading(manager)
+          )
+        ) {
+          return manager;
+        }
+      }
+
+      if (
+        /^(?:PM|PROJECT MANAGER)\s*[-:]?\s*$/i
+          .test(value)
+      ) {
+        for (
+          let nextIndex = index + 1;
+          nextIndex < textNodes.length;
+          nextIndex += 1
+        ) {
+          const candidate =
+            clean(textNodes[nextIndex]);
+
+          if (!candidate) {
+            continue;
+          }
+
+          if (
+            SECTION_STOP_LABELS.has(
+              normalizeHeading(candidate)
+            )
+          ) {
+            break;
+          }
+
+          if (
+            /^(?:SALES|PM|PROJECT MANAGER)\s*[-:]?$/i
+              .test(candidate)
+          ) {
+            continue;
+          }
+
+          return candidate;
+        }
+      }
+    }
+
+    /*
+     * Fallback to a line-preserving DOM clone. textContent is
+     * used instead of innerText so hidden rail values remain
+     * detectable.
+     */
+    const lines =
+      textWithBreaks(rail)
+        .split("\n")
+        .map(clean)
+        .filter(Boolean);
+
+    for (
+      let index = 0;
+      index < lines.length;
+      index += 1
+    ) {
+      const line = lines[index];
+
+      const sameLine = line.match(
+        /^(?:PM|PROJECT MANAGER)\s*[-:]\s*(.+)$/i
+      );
+
+      if (sameLine?.[1]) {
+        return clean(sameLine[1]);
+      }
+
+      if (
+        /^(?:PM|PROJECT MANAGER)\s*[-:]?\s*$/i
+          .test(line)
+      ) {
+        const candidate =
+          clean(lines[index + 1]);
+
+        if (
+          candidate &&
+          !SECTION_STOP_LABELS.has(
+            normalizeHeading(candidate)
+          )
+        ) {
+          return candidate;
+        }
+      }
+    }
+
+    return "";
+  }
+
+  function formatDesigner(name) {
+    const parts = clean(name)
+      .replace(/[.,]+$/g, "")
+      .split(/\s+/)
+      .filter(Boolean);
+
+    if (!parts.length) {
+      return "";
+    }
+
+    if (parts.length === 1) {
+      return parts[0];
+    }
+
+    const initial =
+      parts.at(-1)
+        ?.match(/[A-Z]/i)?.[0];
+
+    return initial
+      ? `${parts[0]} ${initial.toUpperCase()}.`
+      : parts[0];
