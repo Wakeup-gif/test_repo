@@ -1,0 +1,500 @@
+        color: var(--cyan, #2ab7ff) !important;
+        background: rgba(5, 14, 19, 0.98) !important;
+        border: 1px solid rgba(42, 183, 255, 0.32) !important;
+        border-radius: 0 !important;
+        font-size: 10.5px !important;
+        font-weight: 800 !important;
+        text-transform: uppercase !important;
+        white-space: nowrap !important;
+      }
+
+      #${IDS.copyTools} button.primary {
+        color: var(--acid, #b7ff00) !important;
+        border-color: rgba(183, 255, 0, 0.46) !important;
+      }
+
+      #${IDS.nativeActions} {
+        display: inline-flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        gap: 5px !important;
+        flex: 0 0 auto !important;
+        width: max-content !important;
+        min-width: max-content !important;
+        margin: 0 0 0 auto !important;
+        padding: 0 !important;
+      }
+
+      #${IDS.nativeActions}
+      > .us-sign-native-action {
+        position: static !important;
+        inset: auto !important;
+        float: none !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        flex: 0 0 auto !important;
+        width: auto !important;
+        min-width: max-content !important;
+        height: 28px !important;
+        margin: 0 !important;
+        transform: none !important;
+        white-space: nowrap !important;
+      }
+
+      #${IDS.overview} {
+        display: grid !important;
+        grid-template-columns: auto minmax(0, 1fr) !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        background: rgba(2, 7, 10, 0.82) !important;
+        border-top: 1px solid rgba(183, 255, 0, 0.16) !important;
+        border-bottom: 1px solid rgba(42, 183, 255, 0.17) !important;
+      }
+
+      #${IDS.overview}
+      .us-sign-overview-title {
+        display: flex !important;
+        align-items: center !important;
+        padding: 0 10px !important;
+        color: var(--acid, #b7ff00) !important;
+        border-right: 1px solid rgba(183, 255, 0, 0.18) !important;
+        font-size: 8px !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+      }
+
+      #${IDS.overview}
+      .us-sign-overview-stack {
+        display: grid !important;
+        min-width: 0 !important;
+      }
+
+      #${IDS.overview}
+      .us-sign-overview-row {
+        display: grid !important;
+        width: 100% !important;
+        min-width: 0 !important;
+      }
+
+      #${IDS.overview}
+      .us-sign-overview-row:first-child {
+        grid-template-columns:
+          minmax(112px, 0.88fr)
+          minmax(150px, 2fr)
+          minmax(110px, 1.2fr)
+          minmax(82px, 0.78fr)
+          minmax(105px, 1fr)
+          minmax(95px, 0.9fr) !important;
+      }
+
+      #${IDS.overview}
+      .us-sign-overview-row:last-child {
+        grid-template-columns:
+          minmax(230px, 2.2fr)
+          minmax(170px, 1.55fr)
+          minmax(110px, 0.95fr)
+          minmax(100px, 0.82fr) !important;
+      }
+
+      #${IDS.overview}
+      .us-sign-overview-field {
+        display: grid !important;
+        align-content: center !important;
+        justify-items: start !important;
+        gap: 2px !important;
+        min-width: 0 !important;
+        min-height: 46px !important;
+        margin: 0 !important;
+        padding: 6px 9px !important;
+        overflow: hidden !important;
+        color: var(--text-main, #f4f7f0) !important;
+        background: transparent !important;
+        border: 0 !important;
+        border-right: 1px solid rgba(244, 247, 240, 0.075) !important;
+        border-radius: 0 !important;
+        text-align: left !important;
+      }
+
+      #${IDS.overview}
+      .us-sign-overview-label {
+        color: var(--text-muted, #89938f) !important;
+        font-size: 8px !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+      }
+
+      #${IDS.overview}
+      .us-sign-overview-value {
+        display: block !important;
+        width: 100% !important;
+        overflow: hidden !important;
+        color: var(--text-main, #f4f7f0) !important;
+        font-size: 10.5px !important;
+        font-weight: 700 !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+      }
+
+      #${IDS.summary} {
+        display: grid !important;
+        grid-template-columns:
+          minmax(190px, 2.2fr)
+          minmax(112px, 1fr)
+          minmax(94px, 0.85fr)
+          minmax(72px, 0.55fr)
+          minmax(112px, 0.95fr) !important;
+        grid-template-rows: minmax(56px, auto) !important;
+        align-items: stretch !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        min-height: 56px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        background: rgba(4, 10, 14, 0.92) !important;
+        border-bottom: 1px solid rgba(42, 183, 255, 0.17) !important;
+      }
+
+      #${IDS.summary}
+      > .us-sign-djt-summary-cell {
+        position: static !important;
+        float: none !important;
+        display: grid !important;
+        align-content: center !important;
+        justify-items: start !important;
+        gap: 4px !important;
+        min-width: 0 !important;
+        min-height: 56px !important;
+        margin: 0 !important;
+        padding: 8px 10px !important;
+        transform: none !important;
+        border-right: 1px solid rgba(244, 247, 240, 0.09) !important;
+      }
+
+      #${IDS.summary}
+      > .us-sign-djt-summary-cell:last-child {
+        border-right: 0 !important;
+      }
+
+      #${IDS.summary}
+      .us-sign-djt-summary-label {
+        position: static !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        color: var(--text-muted, #89938f) !important;
+        font-size: 8px !important;
+        font-weight: 700 !important;
+        line-height: 1.1 !important;
+        letter-spacing: 0.08em !important;
+        text-transform: uppercase !important;
+        white-space: nowrap !important;
+      }
+
+      #${IDS.summary}
+      .us-sign-djt-summary-value {
+        position: static !important;
+        display: block !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        color: var(--text-main, #f4f7f0) !important;
+        font-size: 12px !important;
+        font-weight: 750 !important;
+        line-height: 1.2 !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+      }
+
+      #${IDS.summary}
+      > [data-summary-kind="hours"] {
+        justify-items: center !important;
+        text-align: center !important;
+      }
+
+      #${IDS.summary}
+      > [data-summary-kind="hours"]
+      .us-sign-djt-summary-value {
+        font-size: 17px !important;
+      }
+
+      #${IDS.summary}
+      > [data-summary-kind="priority"]
+      .us-sign-djt-summary-value,
+      #${IDS.summary}
+      > [data-summary-kind="status"]
+      .us-sign-djt-summary-value {
+        justify-self: start !important;
+        width: auto !important;
+        padding: 3px 7px !important;
+        background: rgba(127, 127, 127, 0.10) !important;
+        border: 1px solid rgba(127, 127, 127, 0.28) !important;
+        font-size: 9px !important;
+        font-weight: 800 !important;
+        text-transform: uppercase !important;
+      }
+
+      #${IDS.summary}
+      > [data-due-state="overdue"]
+      .us-sign-djt-summary-value {
+        color: #ff6879 !important;
+      }
+
+      #${IDS.summary}
+      > [data-due-state="critical"]
+      .us-sign-djt-summary-value {
+        color: #ffbf52 !important;
+      }
+
+      #${IDS.bottomGrid} {
+        display: grid !important;
+        grid-template-columns:
+          minmax(0, 1fr)
+          minmax(0, 1fr) !important;
+        align-items: start !important;
+        column-gap: 10px !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        margin: 10px 0 0 !important;
+        padding: 0 !important;
+      }
+
+      #${IDS.bottomGrid}
+      > .us-sign-description-panel {
+        grid-column: 1 !important;
+        grid-row: 1 !important;
+        align-self: start !important;
+        position: static !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      #${IDS.rightStack} {
+        grid-column: 2 !important;
+        grid-row: 1 !important;
+        align-self: start !important;
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      #${IDS.rightStack}
+      > .us-sign-designs-panel {
+        width: 100% !important;
+        min-width: 0 !important;
+        margin: 0 !important;
+      }
+
+      #${IDS.rightStack}
+      > .us-sign-files-panel {
+        width: 100% !important;
+        min-width: 0 !important;
+        margin: 15px 0 0 !important;
+      }
+
+      /* =====================================================
+         FLAT GLASS THEME v5.2
+         Matches the main US Sign interface stylesheet.
+         Visual overrides only. Script behavior is unchanged.
+      ===================================================== */
+
+      #${IDS.actionbar},
+      #${IDS.overview},
+      #${IDS.summary},
+      #${IDS.copyTools},
+      #${IDS.nativeActions},
+      #${IDS.bottomGrid},
+      #${IDS.rightStack},
+      #${IDS.lookup},
+      .us-sign-search-with-lookup {
+        --djt-bg: #0b0e12;
+        --djt-surface: rgba(16, 20, 25, 0.90);
+        --djt-surface-strong: rgba(13, 17, 22, 0.96);
+        --djt-surface-soft: rgba(255, 255, 255, 0.025);
+        --djt-hover: rgba(255, 255, 255, 0.045);
+        --djt-border: rgba(255, 255, 255, 0.06);
+        --djt-border-strong: rgba(255, 255, 255, 0.10);
+        --djt-text: #e8edf2;
+        --djt-text-soft: #bcc4cd;
+        --djt-text-muted: #87919c;
+        --djt-accent: #7f92a6;
+        --djt-accent-hover: #c8d3de;
+        --djt-accent-soft: rgba(127, 146, 166, 0.13);
+        --djt-danger: #c7a3a3;
+        --djt-warning: #d0b786;
+        --djt-radius-sm: 7px;
+        --djt-radius-md: 10px;
+        --djt-radius-lg: 14px;
+        --djt-font:
+          var(
+            --font-ui,
+            "Inter",
+            system-ui,
+            -apple-system,
+            BlinkMacSystemFont,
+            "Segoe UI",
+            sans-serif
+          );
+
+        font-family: var(--djt-font) !important;
+        text-shadow: none !important;
+      }
+
+      #${IDS.actionbar} *,
+      #${IDS.overview} *,
+      #${IDS.summary} *,
+      #${IDS.copyTools} *,
+      #${IDS.nativeActions} *,
+      #${IDS.bottomGrid} *,
+      #${IDS.rightStack} *,
+      #${IDS.lookup} {
+        font-family: var(--djt-font) !important;
+        text-shadow: none !important;
+      }
+
+      /* Search lookup */
+
+      .us-sign-search-with-lookup {
+        gap: 7px !important;
+      }
+
+      #${IDS.lookup} {
+        min-height: 34px !important;
+        height: 34px !important;
+        padding: 0 11px !important;
+        color: var(--djt-text-soft) !important;
+        background: var(--djt-surface-soft) !important;
+        background-image: none !important;
+        border: 1px solid var(--djt-border-strong) !important;
+        border-radius: var(--djt-radius-sm) !important;
+        box-shadow: none !important;
+        font-size: 11px !important;
+        font-weight: 550 !important;
+        letter-spacing: 0 !important;
+        line-height: 1 !important;
+        text-transform: none !important;
+        transition:
+          background 160ms ease,
+          border-color 160ms ease,
+          color 160ms ease !important;
+      }
+
+      #${IDS.lookup}:hover,
+      #${IDS.lookup}:focus-visible {
+        color: var(--djt-text) !important;
+        background: var(--djt-hover) !important;
+        border-color: rgba(255, 255, 255, 0.15) !important;
+        outline: none !important;
+      }
+
+      #${IDS.lookup}:disabled {
+        color: var(--djt-text-muted) !important;
+        opacity: 0.52 !important;
+      }
+
+      /* Main toolbar */
+
+      #${IDS.actionbar} {
+        min-height: 46px !important;
+        gap: 8px !important;
+        padding: 7px 9px !important;
+        background: var(--djt-surface-strong) !important;
+        background-image: none !important;
+        border: 1px solid var(--djt-border) !important;
+        border-bottom-color: var(--djt-border) !important;
+        border-radius:
+          var(--djt-radius-lg)
+          var(--djt-radius-lg)
+          0
+          0 !important;
+        box-shadow: none !important;
+        backdrop-filter: blur(14px) saturate(1.02) !important;
+        -webkit-backdrop-filter: blur(14px) saturate(1.02) !important;
+      }
+
+      #${IDS.copyTools},
+      #${IDS.copyTools} .us-sign-copy-toolbar,
+      #${IDS.nativeActions} {
+        gap: 6px !important;
+      }
+
+      #${IDS.copyTools} button,
+      #${IDS.nativeActions}
+      > .us-sign-native-action {
+        min-height: 30px !important;
+        height: 30px !important;
+        padding: 0 10px !important;
+        color: var(--djt-text-soft) !important;
+        background: var(--djt-surface-soft) !important;
+        background-image: none !important;
+        border: 1px solid var(--djt-border-strong) !important;
+        border-radius: var(--djt-radius-sm) !important;
+        box-shadow: none !important;
+        font-size: 11px !important;
+        font-weight: 550 !important;
+        letter-spacing: 0 !important;
+        line-height: 1 !important;
+        text-transform: none !important;
+        transition:
+          background 160ms ease,
+          border-color 160ms ease,
+          color 160ms ease !important;
+      }
+
+      #${IDS.copyTools} button.primary {
+        color: var(--djt-text) !important;
+        background: var(--djt-accent-soft) !important;
+        border-color: rgba(127, 146, 166, 0.22) !important;
+      }
+
+      #${IDS.copyTools} button:hover,
+      #${IDS.copyTools} button:focus-visible,
+      #${IDS.nativeActions}
+      > .us-sign-native-action:hover,
+      #${IDS.nativeActions}
+      > .us-sign-native-action:focus-visible {
+        color: var(--djt-text) !important;
+        background: var(--djt-hover) !important;
+        border-color: rgba(255, 255, 255, 0.15) !important;
+        outline: none !important;
+      }
+
+      #${IDS.copyTools} button.error,
+      #${IDS.nativeActions}
+      > .us-sign-native-action.error {
+        color: #ead7d7 !important;
+        background: rgba(199, 163, 163, 0.10) !important;
+        border-color: rgba(199, 163, 163, 0.22) !important;
+      }
+
+      #${IDS.copyTools} button:disabled,
+      #${IDS.nativeActions}
+      > .us-sign-native-action:disabled {
+        color: var(--djt-text-muted) !important;
+        background: rgba(255, 255, 255, 0.018) !important;
+        opacity: 0.48 !important;
+      }
+
+      /* Job overview */
+
+      #${IDS.overview} {
+        background: var(--djt-surface) !important;
+        background-image: none !important;
+        border: 1px solid var(--djt-border) !important;
+        border-top: 0 !important;
+        border-bottom-color: var(--djt-border) !important;
+        box-shadow: none !important;
+      }
+
+      #${IDS.overview}
+      .us-sign-overview-title {
+        padding: 0 12px !important;
+        color: var(--djt-text-muted) !important;
+        background: rgba(255, 255, 255, 0.018) !important;
