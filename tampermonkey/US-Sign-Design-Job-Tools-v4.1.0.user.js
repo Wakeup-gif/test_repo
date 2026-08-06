@@ -2,167 +2,3808 @@
 // @name         US Sign - Design Job Tools
 // @namespace    us-sign-local-tools
 // @version      4.1.0
-// @description  Full Design workspace, job overview, summary, copy tools, lookup, and responsive panel layout.
+// @description  Stable full-width Design workspace with robust hidden Open Date and Project Manager detection.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-idle
-// @grant        GM_xmlhttpRequest
-// @grant        GM_getValue
-// @grant        GM_setValue
 // @grant        GM_setClipboard
 // @grant        GM_openInTab
-// @connect      raw.githubusercontent.com
-// @updateURL    https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/US-Sign-Design-Job-Tools-v4.1.0.user.js
-// @downloadURL  https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/US-Sign-Design-Job-Tools-v4.1.0.user.js
 // @noframes
 // ==/UserScript==
 
-(async function () {
+(function () {
   "use strict";
 
-  const BASE_URL =
-    "https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/design-v4.1";
+  const IDS = {
+    style: "us-sign-design-runtime-style",
+    actionbar: "us-sign-design-actionbar",
+    copyTools: "us-sign-job-copy-tools",
+    nativeActions: "us-sign-native-action-group",
+    overview: "us-sign-job-overview",
+    summary: "us-sign-design-summary",
+    bottomGrid: "us-sign-design-bottom-grid",
+    rightStack: "us-sign-design-right-stack",
+    lookup: "us-sign-job-lookup-button"
+  };
 
-  const PART_URLS = Array.from(
-    { length: 8 },
-    (_unused, index) =>
-      `${BASE_URL}/part-${String(index + 1).padStart(2, "0")}.txt`
-  );
+  const VERSION = "4.1.0";
 
-  const CACHE_KEY =
-    "us-sign-design-job-tools-v4.1.0-source";
+  const NATIVE_ACTION_ORDER = [
+    "EDIT",
+    "EMAIL FILE",
+    "EMAIL LINK",
+    "PRINT",
+    "DELETE"
+  ];
 
-  const CACHE_TIME_KEY =
-    "us-sign-design-job-tools-v4.1.0-checked";
+  const SUMMARY_FIELDS = [
+    {
+      label: "Job Type",
+      key: "designType",
+      kind: "type"
+    },
+    {
+      label: "Due Date",
+      key: "dateRequired",
+      kind: "due"
+    },
+    {
+      label: "Priority",
+      key: "priority",
+      kind: "priority"
+    },
+    {
+      label: "Hours",
+      key: "hours",
+      kind: "hours"
+    },
+    {
+      label: "Status",
+      key: "status",
+      kind: "status"
+    }
+  ];
 
-  const CHECK_INTERVAL =
-    6 * 60 * 60 * 1000;
+  const PATH_HOST_IDS = [
+    "us-sign-description-path-tools",
+    "us-sign-description-path-tools-standalone"
+  ];
 
-  function requestText(url) {
-    return new Promise((resolve, reject) => {
-      GM_xmlhttpRequest({
-        method: "GET",
-        url,
-        timeout: 20000,
+  const STATUS_PATTERN =
+    /^(?:SUBMITTED|IN PROGRESS|COMPLETE|COMPLETED|PENDING|PENDING REVIEW|ON HOLD|READY|READY TO BEGIN|APPROVED|REJECTED|CANCELLED|CANCELED|DRAFT|ACTIVE|OPEN|CLOSED|REVISION|IN REVISION|DESIGNING|PRODUCTION)$/i;
 
-        onload(response) {
-          if (
-            response.status >= 200 &&
-            response.status < 300
-          ) {
-            resolve(String(response.responseText || ""));
-            return;
-          }
+  const SECTION_STOP_LABELS = new Set([
+    "SALES",
+    "PROJECT TOOLS",
+    "DESIGN",
+    "SCOPE OF WORK",
+    "PROJECT STATUS",
+    "TASKS",
+    "DOCUMENTS",
+    "PHOTOS",
+    "PRODUCTION FILES"
+  ]);
 
-          reject(
-            new Error(
-              `Design source request failed: ${response.status}`
-            )
-          );
-        },
+  const state = {
+    table: null,
+    workspace: null,
+    data: null,
+    mounting: false,
+    rebuildTimer: null,
+    refreshTimer: null,
+    structureObserver: null,
+    dataObserver: null
+  };
 
-        onerror() {
-          reject(
-            new Error("Design source network request failed.")
-          );
-        },
+  /* =========================================================
+     HELPERS
+  ========================================================= */
 
-        ontimeout() {
-          reject(
-            new Error("Design source request timed out.")
-          );
-        }
-      });
-    });
+  function clean(value) {
+    return String(value || "")
+      .replace(/\u00a0/g, " ")
+      .replace(/[ \t]+/g, " ")
+      .replace(/\s*\n\s*/g, " ")
+      .trim();
   }
 
-  async function fetchSource() {
-    const parts = await Promise.all(
-      PART_URLS.map(requestText)
-    );
+  function cleanBlock(value) {
+    return String(value || "")
+      .replace(/\u00a0/g, " ")
+      .replace(/\r/g, "")
+      .replace(/[ \t]+$/gm, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
 
-    const source = parts.join("\n");
 
-    if (
-      source.length < 70000 ||
-      !source.includes("US Sign - Design Job Tools") ||
-      !source.includes('const VERSION = "4.1.0"') ||
-      !source.trimEnd().endsWith("})();")
+  /*
+   * Reads DOM text without depending on visibility.
+   * Unlike innerText, this still includes values hidden by
+   * the reskin, such as the native Open Date span.
+   */
+  function textWithBreaks(root) {
+    if (!root) {
+      return "";
+    }
+
+    const clone =
+      root.cloneNode(true);
+
+    for (
+      const element of
+      clone.querySelectorAll(
+        "script, style, noscript"
+      )
     ) {
-      throw new Error(
-        "The downloaded Design Job Tools source is incomplete."
+      element.remove();
+    }
+
+    for (
+      const br of
+      clone.querySelectorAll("br")
+    ) {
+      br.replaceWith("\n");
+    }
+
+    for (
+      const element of
+      clone.querySelectorAll(
+        [
+          "div",
+          "p",
+          "li",
+          "tr",
+          "td",
+          "th",
+          "address",
+          "section",
+          "header",
+          "footer"
+        ].join(", ")
+      )
+    ) {
+      element.append("\n");
+    }
+
+    return String(
+      clone.textContent || ""
+    )
+      .replace(/\u00a0/g, " ")
+      .replace(/[–—]/g, "-")
+      .replace(/\r/g, "")
+      .replace(/[ \t]+/g, " ")
+      .replace(/ *\n */g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+
+  function firstNonEmpty(...values) {
+    return values
+      .map(clean)
+      .find(Boolean) || "";
+  }
+
+  function normalizeHeading(value) {
+    return clean(value)
+      .replace(/^\/+\s*/, "")
+      .replace(/:\s*$/, "")
+      .toUpperCase();
+  }
+
+  function escapeRegExp(value) {
+    return String(value || "")
+      .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  function setImportant(element, property, value) {
+    if (!element) {
+      return;
+    }
+
+    element.style.setProperty(
+      property,
+      value,
+      "important"
+    );
+  }
+
+  function directChildUnder(parent, element) {
+    let current = element;
+
+    while (
+      current?.parentElement &&
+      current.parentElement !== parent
+    ) {
+      current = current.parentElement;
+    }
+
+    return current?.parentElement === parent
+      ? current
+      : null;
+  }
+
+  function cleanJobName(value, projectNumber = "") {
+    let name = clean(value)
+      .replace(
+        /\s*(?:[-|•·]\s*)?USSM(?:\s*[★☆*])?\s*$/i,
+        ""
+      )
+      .trim();
+
+    if (projectNumber) {
+      name = name.replace(
+        new RegExp(
+          `^${escapeRegExp(projectNumber)}(?:-\\d+)?\\s*-\\s*`,
+          "i"
+        ),
+        ""
       );
     }
 
-    return source;
+    return name;
   }
 
-  function executeSource(source) {
-    const run = new Function(
-      "GM_setClipboard",
-      "GM_openInTab",
-      `${source}\n//# sourceURL=US-Sign-Design-Job-Tools-v4.1.0.js`
-    );
+  async function copyText(value) {
+    const text = String(value || "").trim();
 
-    run(
-      GM_setClipboard,
-      GM_openInTab
-    );
-  }
-
-  async function refreshCache(currentSource) {
-    try {
-      const freshSource = await fetchSource();
-
-      if (freshSource !== currentSource) {
-        executeSource;
-        GM_setValue(CACHE_KEY, freshSource);
-      }
-
-      GM_setValue(
-        CACHE_TIME_KEY,
-        Date.now()
-      );
-    } catch (error) {
-      console.warn(
-        "US Sign Design Job Tools update check failed.",
-        error
-      );
+    if (!text) {
+      throw new Error("No text found");
     }
+
+    if (typeof GM_setClipboard === "function") {
+      GM_setClipboard(text, "text");
+      return;
+    }
+
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+
+    const helper = document.createElement("textarea");
+
+    helper.value = text;
+    helper.style.position = "fixed";
+    helper.style.opacity = "0";
+    helper.style.pointerEvents = "none";
+
+    document.body.appendChild(helper);
+    helper.select();
+    document.execCommand("copy");
+    helper.remove();
   }
 
-  try {
-    const cachedSource =
-      String(GM_getValue(CACHE_KEY, "") || "");
+  function flash(button, message, isError = false) {
+    if (
+      !button ||
+      button.dataset.flashing === "true"
+    ) {
+      return;
+    }
 
-    if (cachedSource) {
-      executeSource(cachedSource);
+    const original =
+      button.dataset.originalHtml ||
+      button.innerHTML;
 
-      const lastCheck = Number(
-        GM_getValue(CACHE_TIME_KEY, 0)
-      );
+    button.dataset.originalHtml = original;
+    button.dataset.flashing = "true";
+    button.textContent = message;
 
-      if (
-        Date.now() - lastCheck >
-        CHECK_INTERVAL
-      ) {
-        void refreshCache(cachedSource);
-      }
+    button.classList.toggle(
+      "error",
+      isError
+    );
+
+    window.setTimeout(() => {
+      button.innerHTML = original;
+      button.classList.remove("error");
+      delete button.dataset.flashing;
+    }, 1250);
+  }
+
+  function openMaps(address) {
+    if (!address) {
+      throw new Error("No address found");
+    }
+
+    const url =
+      "https://www.google.com/maps/search/" +
+      "?api=1&query=" +
+      encodeURIComponent(address);
+
+    if (typeof GM_openInTab === "function") {
+      GM_openInTab(url, {
+        active: true,
+        insert: true,
+        setParent: true
+      });
 
       return;
     }
 
-    const source = await fetchSource();
-    executeSource(source);
+    window.open(
+      url,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  }
 
-    GM_setValue(CACHE_KEY, source);
-    GM_setValue(
-      CACHE_TIME_KEY,
-      Date.now()
+  /* =========================================================
+     WORKSPACE DISCOVERY
+  ========================================================= */
+
+  function findDesignTable() {
+    return [
+      ...document.querySelectorAll("table")
+    ].find((table) => {
+      const text = clean(
+        table.innerText ||
+        table.textContent
+      ).toLowerCase();
+
+      return (
+        text.includes("number") &&
+        text.includes("assigned to") &&
+        text.includes("date required")
+      );
+    }) || null;
+  }
+
+  function getDirectPanelHeading(panel) {
+    if (!panel) {
+      return "";
+    }
+
+    const heading = panel.querySelector(
+      [
+        ":scope > .panel-heading",
+        ":scope > .box-heading",
+        ":scope > header"
+      ].join(", ")
     );
-  } catch (error) {
-    console.error(
-      "US Sign Design Job Tools could not start.",
-      error
+
+    if (!heading) {
+      return "";
+    }
+
+    const clone = heading.cloneNode(true);
+
+    clone.querySelectorAll(
+      [
+        "a",
+        "button",
+        "input",
+        "select",
+        "textarea",
+        "form",
+        "script",
+        "style",
+        ".widget-menu",
+        ".panel-menu",
+        ".popup-modal",
+        ".popup-basic",
+        ".mfp-hide",
+        ".modal"
+      ].join(", ")
+    ).forEach((element) => {
+      element.remove();
+    });
+
+    return normalizeHeading(
+      clone.textContent
     );
+  }
+
+  function findWorkspace(
+    table = findDesignTable()
+  ) {
+    if (!table) {
+      return null;
+    }
+
+    const workspaceBody =
+      table.closest(".panel-body");
+
+    const workspacePanel =
+      workspaceBody?.closest(".panel");
+
+    const workspaceColumn =
+      workspacePanel?.closest(
+        ".col-md-9, [class*='col-md-']"
+      );
+
+    const row =
+      workspaceColumn?.parentElement
+        ?.classList.contains("row")
+        ? workspaceColumn.parentElement
+        : workspaceColumn?.closest(".row");
+
+    if (
+      !workspaceBody ||
+      !workspacePanel ||
+      !workspaceColumn ||
+      !row
+    ) {
+      return null;
+    }
+
+    const siblingColumns = [
+      ...row.children
+    ].filter((element) => {
+      return element !== workspaceColumn;
+    });
+
+    const sourceColumn =
+      siblingColumns.find((column) => {
+        return [
+          ...column.querySelectorAll(".panel")
+        ].some((panel) => {
+          return (
+            getDirectPanelHeading(panel) ===
+            "DESIGNS"
+          );
+        });
+      }) ||
+      siblingColumns.find((column) => {
+        return column.classList.contains(
+          "us-sign-design-source-column"
+        );
+      }) ||
+      siblingColumns[0] ||
+      null;
+
+    if (!sourceColumn) {
+      return null;
+    }
+
+    const tableAnchor =
+      directChildUnder(
+        workspaceBody,
+        table
+      );
+
+    if (!tableAnchor) {
+      return null;
+    }
+
+    return {
+      table,
+      row,
+      sourceColumn,
+      workspaceColumn,
+      workspacePanel,
+      workspaceBody,
+      tableAnchor
+    };
+  }
+
+  function findNativeSections(workspace) {
+    const panels = [
+      ...workspace.workspaceBody
+        .querySelectorAll(".panel")
+    ];
+
+    const descriptionPanel =
+      panels.find((panel) => {
+        return (
+          getDirectPanelHeading(panel) ===
+          "DESCRIPTION"
+        );
+      }) || null;
+
+    const filesPanel =
+      panels.find((panel) => {
+        return (
+          getDirectPanelHeading(panel) ===
+          "FILES"
+        );
+      }) || null;
+
+    if (
+      !descriptionPanel ||
+      !filesPanel ||
+      descriptionPanel === filesPanel
+    ) {
+      return null;
+    }
+
+    return {
+      descriptionPanel,
+      filesPanel
+    };
+  }
+
+  function findDesignsPanel(workspace) {
+    const movedPanel =
+      document.querySelector(
+        `#${IDS.rightStack} > .us-sign-designs-panel`
+      );
+
+    if (movedPanel) {
+      return movedPanel;
+    }
+
+    return [
+      ...workspace.sourceColumn
+        .querySelectorAll(".panel")
+    ].find((panel) => {
+      return (
+        getDirectPanelHeading(panel) ===
+        "DESIGNS"
+      );
+    }) || null;
+  }
+
+  /* =========================================================
+     SOURCE TABLE PARSING
+  ========================================================= */
+
+  function readCellValue(cell) {
+    if (!cell) {
+      return "";
+    }
+
+    const input = cell.querySelector(
+      "input, textarea, select"
+    );
+
+    if (input) {
+      return clean(
+        input.tagName === "SELECT"
+          ? input.selectedOptions?.[0]?.textContent
+          : input.value
+      );
+    }
+
+    return clean(
+      cell.innerText ||
+      cell.textContent
+    );
+  }
+
+  function normalizeTableLabel(value) {
+    return clean(value)
+      .replace(/:\s*$/, "")
+      .toLowerCase();
+  }
+
+  function isLabelCell(cell) {
+    return /:\s*$/.test(
+      clean(
+        cell?.innerText ||
+        cell?.textContent
+      )
+    );
+  }
+
+  function findKnownStatus(table) {
+    const controlSelectors = [
+      "select[name*='status' i]",
+      "input[name*='status' i]",
+      "select[id*='status' i]",
+      "input[id*='status' i]",
+      "[data-status]",
+      "[class*='status' i]"
+    ];
+
+    for (const selector of controlSelectors) {
+      const elements =
+        table.querySelectorAll(selector);
+
+      for (const element of elements) {
+        const value =
+          element.tagName === "SELECT"
+            ? clean(
+              element.selectedOptions?.[0]
+                ?.textContent
+            )
+            : clean(
+              element.value ||
+              element.innerText ||
+              element.textContent ||
+              element.getAttribute(
+                "data-status"
+              )
+            );
+
+        if (
+          value &&
+          STATUS_PATTERN.test(value)
+        ) {
+          return value;
+        }
+      }
+    }
+
+    const candidates =
+      table.querySelectorAll(
+        "td, th, span, strong, label, a, button"
+      );
+
+    for (const element of candidates) {
+      const value = clean(
+        element.innerText ||
+        element.textContent
+      );
+
+      if (
+        value &&
+        STATUS_PATTERN.test(value)
+      ) {
+        return value;
+      }
+    }
+
+    return "";
+  }
+
+  function readTablePairs(table) {
+    const values = {};
+    const rows = [...(table?.rows || [])];
+
+    for (
+      let rowIndex = 0;
+      rowIndex < rows.length;
+      rowIndex += 1
+    ) {
+      const cells = [
+        ...rows[rowIndex].cells
+      ];
+
+      for (
+        let cellIndex = 0;
+        cellIndex < cells.length;
+        cellIndex += 1
+      ) {
+        const rawLabel = clean(
+          cells[cellIndex]?.innerText ||
+          cells[cellIndex]?.textContent
+        );
+
+        if (!/:\s*$/.test(rawLabel)) {
+          continue;
+        }
+
+        const label =
+          normalizeTableLabel(rawLabel);
+
+        let value = "";
+
+        for (
+          let nextIndex = cellIndex + 1;
+          nextIndex < cells.length;
+          nextIndex += 1
+        ) {
+          const nextCell =
+            cells[nextIndex];
+
+          const nextText = clean(
+            nextCell?.innerText ||
+            nextCell?.textContent
+          );
+
+          if (!nextText) {
+            continue;
+          }
+
+          if (isLabelCell(nextCell)) {
+            break;
+          }
+
+          value =
+            readCellValue(nextCell);
+
+          if (value) {
+            break;
+          }
+        }
+
+        /*
+         * SquareCoil sometimes places the Status value
+         * on the next row instead of beside the label.
+         */
+        if (
+          !value &&
+          label === "status"
+        ) {
+          for (
+            let nextRowIndex = rowIndex + 1;
+            nextRowIndex <
+              Math.min(
+                rows.length,
+                rowIndex + 4
+              );
+            nextRowIndex += 1
+          ) {
+            const nextCells = [
+              ...rows[nextRowIndex].cells
+            ];
+
+            for (
+              let candidateIndex = 0;
+              candidateIndex <
+                nextCells.length;
+              candidateIndex += 1
+            ) {
+              const candidate =
+                readCellValue(
+                  nextCells[candidateIndex]
+                );
+
+              if (
+                candidate &&
+                STATUS_PATTERN.test(candidate)
+              ) {
+                value = candidate;
+                break;
+              }
+            }
+
+            if (value) {
+              break;
+            }
+          }
+        }
+
+        if (label && value) {
+          values[label] = value;
+        }
+      }
+    }
+
+    if (!values.status) {
+      values.status =
+        findKnownStatus(table);
+    }
+
+    return values;
+  }
+
+  function getProjectNumber(details) {
+    const designNumber =
+      details.number ||
+      details["design number"] ||
+      "";
+
+    const match =
+      designNumber.match(/^(\d{5,})/);
+
+    if (match) {
+      return match[1];
+    }
+
+    const rail = cleanBlock(
+      document.querySelector("#pmlt")
+        ?.innerText
+    );
+
+    const railMatch = rail.match(
+      /PROJECT\s*(?:NUMBER|NO\.?|#|NODE|MODE)?\s*(\d{5,})/i
+    );
+
+    if (railMatch) {
+      return railMatch[1];
+    }
+
+    const urlNumber =
+      new URL(location.href)
+        .searchParams.get("id") ||
+      "";
+
+    return /^\d{5,}$/.test(urlNumber)
+      ? urlNumber
+      : "";
+  }
+
+  function getJobName(projectNumber) {
+    const heading =
+      document.querySelector(
+        "#customer-name h1"
+      ) ||
+      document.querySelector(
+        "#customer-name h2"
+      ) ||
+      document.querySelector(
+        "#customer-name h3"
+      );
+
+    return heading
+      ? cleanJobName(
+        heading.innerText,
+        projectNumber
+      )
+      : "";
+  }
+
+  function getPlazaName(jobName) {
+    const parts = clean(jobName)
+      .split(/\s+-\s+/)
+      .map(clean)
+      .filter(Boolean);
+
+    if (parts.length >= 3) {
+      return parts
+        .slice(1, -1)
+        .join(" - ");
+    }
+
+    if (parts.length === 2) {
+      return parts[1];
+    }
+
+    return "";
+  }
+
+  function getProjectManager() {
+    const rail =
+      document.querySelector("#pmlt");
+
+    if (!rail) {
+      return "";
+    }
+
+    /*
+     * First inspect text nodes in source order. This handles:
+     * PM - <br><strong>Erin Fitzgerald</strong>
+     * even when CSS changes visual line breaks.
+     */
+    const walker =
+      document.createTreeWalker(
+        rail,
+        NodeFilter.SHOW_TEXT
+      );
+
+    const textNodes = [];
+    let node = walker.nextNode();
+
+    while (node) {
+      const value =
+        clean(node.nodeValue);
+
+      if (value) {
+        textNodes.push(value);
+      }
+
+      node = walker.nextNode();
+    }
+
+    for (
+      let index = 0;
+      index < textNodes.length;
+      index += 1
+    ) {
+      const value =
+        textNodes[index]
+          .replace(/[–—]/g, "-");
+
+      const sameNode = value.match(
+        /(?:^|\b)(?:PM|PROJECT MANAGER)\s*[-:]\s*(.+)$/i
+      );
+
+      if (sameNode?.[1]) {
+        const manager =
+          clean(sameNode[1]);
+
+        if (
+          manager &&
+          !SECTION_STOP_LABELS.has(
+            normalizeHeading(manager)
+          )
+        ) {
+          return manager;
+        }
+      }
+
+      if (
+        /^(?:PM|PROJECT MANAGER)\s*[-:]?\s*$/i
+          .test(value)
+      ) {
+        for (
+          let nextIndex = index + 1;
+          nextIndex < textNodes.length;
+          nextIndex += 1
+        ) {
+          const candidate =
+            clean(textNodes[nextIndex]);
+
+          if (!candidate) {
+            continue;
+          }
+
+          if (
+            SECTION_STOP_LABELS.has(
+              normalizeHeading(candidate)
+            )
+          ) {
+            break;
+          }
+
+          if (
+            /^(?:SALES|PM|PROJECT MANAGER)\s*[-:]?$/i
+              .test(candidate)
+          ) {
+            continue;
+          }
+
+          return candidate;
+        }
+      }
+    }
+
+    /*
+     * Fallback to a line-preserving DOM clone. textContent is
+     * used instead of innerText so hidden rail values remain
+     * detectable.
+     */
+    const lines =
+      textWithBreaks(rail)
+        .split("\n")
+        .map(clean)
+        .filter(Boolean);
+
+    for (
+      let index = 0;
+      index < lines.length;
+      index += 1
+    ) {
+      const line = lines[index];
+
+      const sameLine = line.match(
+        /^(?:PM|PROJECT MANAGER)\s*[-:]\s*(.+)$/i
+      );
+
+      if (sameLine?.[1]) {
+        return clean(sameLine[1]);
+      }
+
+      if (
+        /^(?:PM|PROJECT MANAGER)\s*[-:]?\s*$/i
+          .test(line)
+      ) {
+        const candidate =
+          clean(lines[index + 1]);
+
+        if (
+          candidate &&
+          !SECTION_STOP_LABELS.has(
+            normalizeHeading(candidate)
+          )
+        ) {
+          return candidate;
+        }
+      }
+    }
+
+    return "";
+  }
+
+  function formatDesigner(name) {
+    const parts = clean(name)
+      .replace(/[.,]+$/g, "")
+      .split(/\s+/)
+      .filter(Boolean);
+
+    if (!parts.length) {
+      return "";
+    }
+
+    if (parts.length === 1) {
+      return parts[0];
+    }
+
+    const initial =
+      parts.at(-1)
+        ?.match(/[A-Z]/i)?.[0];
+
+    return initial
+      ? `${parts[0]} ${initial.toUpperCase()}.`
+      : parts[0];
+  }
+
+  function parseAddress(value) {
+    let address = clean(value)
+      .replace(
+        /\b(?:UNITED STATES(?: OF AMERICA)?|U\.?S\.?A\.?)\b/gi,
+        ""
+      )
+      .replace(/\s*\|\s*/g, ", ")
+      .replace(/\s*,\s*/g, ", ")
+      .replace(/[,\s]+$/g, "")
+      .trim();
+
+    const stateMatch = address.match(
+      /(?:,\s*|\s)([A-Z]{2})\s+(\d{5}(?:-\d{4})?)\b/i
+    );
+
+    const stateZip =
+      stateMatch
+        ? `${stateMatch[1].toUpperCase()} ${stateMatch[2]}`
+        : "";
+
+    let beforeState =
+      stateMatch
+        ? address.slice(
+          0,
+          stateMatch.index
+        )
+        : address;
+
+    beforeState = beforeState
+      .replace(/[,\s]+$/g, "")
+      .trim();
+
+    const parts = beforeState
+      .split(/\s*,\s*/)
+      .map(clean)
+      .filter(Boolean);
+
+    let streetAddress = "";
+    let city = "";
+
+    if (parts.length >= 2) {
+      streetAddress =
+        parts.slice(0, -1).join(", ");
+
+      city = parts.at(-1);
+    } else {
+      streetAddress = beforeState;
+    }
+
+    const fullAddress = [
+      streetAddress,
+      city,
+      stateZip
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    return {
+      streetAddress,
+      city,
+      stateZip,
+      fullAddress:
+        fullAddress || address
+    };
+  }
+
+  function getCustomerInformation() {
+    const root =
+      document.querySelector(
+        "#customer-info"
+      );
+
+    if (!root) {
+      return {
+        streetAddress: "",
+        city: "",
+        stateZip: "",
+        fullAddress: "",
+        openDate: ""
+      };
+    }
+
+    /*
+     * textWithBreaks includes hidden native metadata. This is
+     * required because the Design reskin intentionally hides
+     * the original Open Date span.
+     */
+    const sourceText =
+      textWithBreaks(root);
+
+    const visibleText =
+      cleanBlock(
+        root.innerText || ""
+      );
+
+    const datePatterns = [
+      /OPEN\s*DATE\s*:?[ \t]*(\d{1,2}\/\d{1,2}\/\d{2,4})/i,
+      /DATE\s*OPENED\s*:?[ \t]*(\d{1,2}\/\d{1,2}\/\d{2,4})/i,
+      /OPENED\s*:?[ \t]*(\d{1,2}\/\d{1,2}\/\d{2,4})/i
+    ];
+
+    let openDate = "";
+
+    for (const pattern of datePatterns) {
+      const match =
+        sourceText.match(pattern) ||
+        visibleText.match(pattern);
+
+      if (match?.[1]) {
+        openDate =
+          clean(match[1]);
+        break;
+      }
+    }
+
+    /*
+     * Prefer an element that actually contains the Open Date
+     * label. This also covers minor markup changes.
+     */
+    if (!openDate) {
+      const labeledElement = [
+        ...root.querySelectorAll(
+          "span, div, p, label, strong, b, td, th"
+        )
+      ].find((element) => {
+        return /OPEN\s*DATE|DATE\s*OPENED/i
+          .test(
+            element.textContent || ""
+          );
+      });
+
+      const match =
+        labeledElement?.textContent?.match(
+          /(\d{1,2}\/\d{1,2}\/\d{2,4})/
+        );
+
+      openDate =
+        clean(match?.[1]);
+    }
+
+    const addressElement =
+      root.querySelector("address") ||
+      root.querySelector(
+        ".panel-title"
+      );
+
+    let address =
+      cleanBlock(
+        addressElement?.textContent ||
+        addressElement?.innerText ||
+        ""
+      );
+
+    if (!address) {
+      address = sourceText
+        .replace(
+          /(?:OPEN\s*DATE|DATE\s*OPENED|OPENED)\s*:?[ \t]*\d{1,2}\/\d{1,2}\/\d{2,4}/gi,
+          ""
+        )
+        .replace(/^\/+\s*/, "");
+    }
+
+    return {
+      ...parseAddress(
+        address
+          .split("\n")
+          .map(clean)
+          .filter(Boolean)
+          .join(", ")
+      ),
+
+      openDate
+    };
+  }
+
+  function getDescriptionText(workspace) {
+    const sections =
+      findNativeSections(workspace);
+
+    const panel =
+      sections?.descriptionPanel;
+
+    if (!panel) {
+      return "";
+    }
+
+    const clone =
+      panel.cloneNode(true);
+
+    clone.querySelector(
+      ":scope > .panel-heading"
+    )?.remove();
+
+    for (const id of PATH_HOST_IDS) {
+      clone.querySelector(
+        `#${id}`
+      )?.remove();
+    }
+
+    return cleanBlock(
+      clone.innerText ||
+      clone.textContent
+    )
+      .replace(
+        /^(?:\/\/\s*)?DESCRIPTION\s*:?\s*/i,
+        ""
+      )
+      .trim();
+  }
+
+  function collectJobData(
+    table,
+    workspace
+  ) {
+    const details =
+      readTablePairs(table);
+
+    const designNumber =
+      details.number ||
+      details["design number"] ||
+      "";
+
+    const projectNumber =
+      getProjectNumber(details);
+
+    const revision =
+      designNumber.match(
+        /^\d{5,}-(.+)$/i
+      )?.[1] || "";
+
+    const jobName =
+      getJobName(projectNumber);
+
+    const address =
+      getCustomerInformation();
+
+    const openDate =
+      firstNonEmpty(
+        address.openDate,
+        details["open date"],
+        details["date opened"],
+        details.opened
+      );
+
+    const projectManager =
+      firstNonEmpty(
+        getProjectManager(),
+        details["project manager"],
+        details.pm,
+        details["assigned project manager"]
+      );
+
+    const designer =
+      details.designer ||
+      details["assigned designer"] ||
+      details["assigned to"] ||
+      "";
+
+    return {
+      projectNumber,
+      designNumber,
+
+      projectRevision: [
+        projectNumber,
+        clean(revision)
+      ]
+        .filter(Boolean)
+        .join(" · "),
+
+      projectReference: [
+        projectNumber,
+        jobName
+      ]
+        .filter(Boolean)
+        .join(" - "),
+
+      plazaName:
+        getPlazaName(jobName),
+
+      openDate,
+
+      projectManager,
+
+      designer:
+        formatDesigner(designer),
+
+      fullAddress:
+        address.fullAddress,
+
+      streetAddress:
+        address.streetAddress,
+
+      city:
+        address.city,
+
+      stateZip:
+        address.stateZip,
+
+      designType:
+        details.type ||
+        details["design type"] ||
+        "",
+
+      dateRequired:
+        details["date required"] ||
+        details["due date"] ||
+        details.due ||
+        "",
+
+      priority:
+        details.priority || "",
+
+      hours:
+        details.hours ||
+        details["design hours"] ||
+        "",
+
+      status:
+        details.status || "",
+
+      description:
+        getDescriptionText(workspace)
+    };
+  }
+
+  function buildFullBrief(data) {
+    return [
+      "JOB BRIEF",
+      "",
+      `PROJECT NUMBER: ${data.projectNumber}`,
+      `PROJECT REFERENCE: ${data.projectReference}`,
+      `PLAZA NAME: ${data.plazaName}`,
+      "",
+      `STREET ADDRESS: ${data.streetAddress}`,
+      `CITY: ${data.city}`,
+      `STATE + ZIP: ${data.stateZip}`,
+      `FULL ADDRESS: ${data.fullAddress}`,
+      "",
+      `OPEN DATE: ${data.openDate}`,
+      `PROJECT MANAGER: ${data.projectManager}`,
+      `DESIGNER: ${data.designer}`,
+      "",
+      "DESCRIPTION",
+      data.description
+    ].join("\n");
+  }
+
+  /* =========================================================
+     RUNTIME CSS
+  ========================================================= */
+
+  function installStyles() {
+    let style =
+      document.getElementById(
+        IDS.style
+      );
+
+    if (!style) {
+      style =
+        document.createElement(
+          "style"
+        );
+
+      style.id = IDS.style;
+
+      (
+        document.head ||
+        document.documentElement
+      ).appendChild(style);
+    }
+
+    style.textContent = `
+      .us-sign-search-with-lookup {
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        width: auto !important;
+        max-width: none !important;
+      }
+
+      #${IDS.lookup} {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        flex: 0 0 auto !important;
+        width: auto !important;
+        min-width: max-content !important;
+        height: 32px !important;
+        margin: 0 !important;
+        padding: 0 10px !important;
+        color: var(--cyan, #2ab7ff) !important;
+        background: rgba(4, 12, 17, 0.98) !important;
+        border: 1px solid rgba(42, 183, 255, 0.38) !important;
+        border-radius: 0 !important;
+        font-size: 10px !important;
+        font-weight: 800 !important;
+        letter-spacing: 0.045em !important;
+        text-transform: uppercase !important;
+        white-space: nowrap !important;
+      }
+
+      html body:has(#pmlt)
+      #content
+      .row.us-sign-design-workbench {
+        display: grid !important;
+        grid-template-columns: minmax(0, 1fr) !important;
+        gap: 0 !important;
+        width: 100% !important;
+        max-width: none !important;
+        min-width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      html body:has(#pmlt)
+      #content
+      .row.us-sign-design-workbench
+      > .us-sign-design-source-column {
+        display: none !important;
+        width: 0 !important;
+        max-width: 0 !important;
+        min-width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      html body:has(#pmlt)
+      #content
+      .row.us-sign-design-workbench
+      > .us-sign-design-workspace-column {
+        grid-column: 1 / -1 !important;
+        float: none !important;
+        width: 100% !important;
+        max-width: none !important;
+        min-width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      .us-sign-empty-native-heading,
+      .us-sign-native-workspace-heading-hidden {
+        display: none !important;
+        height: 0 !important;
+        min-height: 0 !important;
+        max-height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        border: 0 !important;
+      }
+
+      #${IDS.actionbar} {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 10px !important;
+        width: 100% !important;
+        max-width: none !important;
+        min-width: 0 !important;
+        min-height: 42px !important;
+        margin: 0 !important;
+        padding: 7px 10px !important;
+        overflow-x: auto !important;
+        overflow-y: hidden !important;
+        background: rgba(3, 8, 11, 0.96) !important;
+        border-bottom: 1px solid rgba(42, 183, 255, 0.20) !important;
+        white-space: nowrap !important;
+        scrollbar-width: none !important;
+      }
+
+      #${IDS.actionbar}::-webkit-scrollbar {
+        display: none !important;
+      }
+
+      #${IDS.copyTools},
+      #${IDS.copyTools} .us-sign-copy-toolbar {
+        display: inline-flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        gap: 5px !important;
+        flex: 0 0 auto !important;
+        width: max-content !important;
+        min-width: max-content !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      #${IDS.copyTools} button {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        flex: 0 0 auto !important;
+        height: 28px !important;
+        margin: 0 !important;
+        padding: 0 8px !important;
+        color: var(--cyan, #2ab7ff) !important;
+        background: rgba(5, 14, 19, 0.98) !important;
+        border: 1px solid rgba(42, 183, 255, 0.32) !important;
+        border-radius: 0 !important;
+        font-size: 10.5px !important;
+        font-weight: 800 !important;
+        text-transform: uppercase !important;
+        white-space: nowrap !important;
+      }
+
+      #${IDS.copyTools} button.primary {
+        color: var(--acid, #b7ff00) !important;
+        border-color: rgba(183, 255, 0, 0.46) !important;
+      }
+
+      #${IDS.nativeActions} {
+        display: inline-flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        gap: 5px !important;
+        flex: 0 0 auto !important;
+        width: max-content !important;
+        min-width: max-content !important;
+        margin: 0 0 0 auto !important;
+        padding: 0 !important;
+      }
+
+      #${IDS.nativeActions}
+      > .us-sign-native-action {
+        position: static !important;
+        inset: auto !important;
+        float: none !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        flex: 0 0 auto !important;
+        width: auto !important;
+        min-width: max-content !important;
+        height: 28px !important;
+        margin: 0 !important;
+        transform: none !important;
+        white-space: nowrap !important;
+      }
+
+      #${IDS.overview} {
+        display: grid !important;
+        grid-template-columns: auto minmax(0, 1fr) !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        background: rgba(2, 7, 10, 0.82) !important;
+        border-top: 1px solid rgba(183, 255, 0, 0.16) !important;
+        border-bottom: 1px solid rgba(42, 183, 255, 0.17) !important;
+      }
+
+      #${IDS.overview}
+      .us-sign-overview-title {
+        display: flex !important;
+        align-items: center !important;
+        padding: 0 10px !important;
+        color: var(--acid, #b7ff00) !important;
+        border-right: 1px solid rgba(183, 255, 0, 0.18) !important;
+        font-size: 8px !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+      }
+
+      #${IDS.overview}
+      .us-sign-overview-stack {
+        display: grid !important;
+        min-width: 0 !important;
+      }
+
+      #${IDS.overview}
+      .us-sign-overview-row {
+        display: grid !important;
+        width: 100% !important;
+        min-width: 0 !important;
+      }
+
+      #${IDS.overview}
+      .us-sign-overview-row:first-child {
+        grid-template-columns:
+          minmax(112px, 0.88fr)
+          minmax(150px, 2fr)
+          minmax(110px, 1.2fr)
+          minmax(82px, 0.78fr)
+          minmax(105px, 1fr)
+          minmax(95px, 0.9fr) !important;
+      }
+
+      #${IDS.overview}
+      .us-sign-overview-row:last-child {
+        grid-template-columns:
+          minmax(230px, 2.2fr)
+          minmax(170px, 1.55fr)
+          minmax(110px, 0.95fr)
+          minmax(100px, 0.82fr) !important;
+      }
+
+      #${IDS.overview}
+      .us-sign-overview-field {
+        display: grid !important;
+        align-content: center !important;
+        justify-items: start !important;
+        gap: 2px !important;
+        min-width: 0 !important;
+        min-height: 46px !important;
+        margin: 0 !important;
+        padding: 6px 9px !important;
+        overflow: hidden !important;
+        color: var(--text-main, #f4f7f0) !important;
+        background: transparent !important;
+        border: 0 !important;
+        border-right: 1px solid rgba(244, 247, 240, 0.075) !important;
+        border-radius: 0 !important;
+        text-align: left !important;
+      }
+
+      #${IDS.overview}
+      .us-sign-overview-label {
+        color: var(--text-muted, #89938f) !important;
+        font-size: 8px !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+      }
+
+      #${IDS.overview}
+      .us-sign-overview-value {
+        display: block !important;
+        width: 100% !important;
+        overflow: hidden !important;
+        color: var(--text-main, #f4f7f0) !important;
+        font-size: 10.5px !important;
+        font-weight: 700 !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+      }
+
+      #${IDS.summary} {
+        display: grid !important;
+        grid-template-columns:
+          minmax(190px, 2.2fr)
+          minmax(112px, 1fr)
+          minmax(94px, 0.85fr)
+          minmax(72px, 0.55fr)
+          minmax(112px, 0.95fr) !important;
+        grid-template-rows: minmax(56px, auto) !important;
+        align-items: stretch !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        min-height: 56px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        background: rgba(4, 10, 14, 0.92) !important;
+        border-bottom: 1px solid rgba(42, 183, 255, 0.17) !important;
+      }
+
+      #${IDS.summary}
+      > .us-sign-djt-summary-cell {
+        position: static !important;
+        float: none !important;
+        display: grid !important;
+        align-content: center !important;
+        justify-items: start !important;
+        gap: 4px !important;
+        min-width: 0 !important;
+        min-height: 56px !important;
+        margin: 0 !important;
+        padding: 8px 10px !important;
+        transform: none !important;
+        border-right: 1px solid rgba(244, 247, 240, 0.09) !important;
+      }
+
+      #${IDS.summary}
+      > .us-sign-djt-summary-cell:last-child {
+        border-right: 0 !important;
+      }
+
+      #${IDS.summary}
+      .us-sign-djt-summary-label {
+        position: static !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        color: var(--text-muted, #89938f) !important;
+        font-size: 8px !important;
+        font-weight: 700 !important;
+        line-height: 1.1 !important;
+        letter-spacing: 0.08em !important;
+        text-transform: uppercase !important;
+        white-space: nowrap !important;
+      }
+
+      #${IDS.summary}
+      .us-sign-djt-summary-value {
+        position: static !important;
+        display: block !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        color: var(--text-main, #f4f7f0) !important;
+        font-size: 12px !important;
+        font-weight: 750 !important;
+        line-height: 1.2 !important;
+        text-overflow: ellipsis !important;
+        white-space: nowrap !important;
+      }
+
+      #${IDS.summary}
+      > [data-summary-kind="hours"] {
+        justify-items: center !important;
+        text-align: center !important;
+      }
+
+      #${IDS.summary}
+      > [data-summary-kind="hours"]
+      .us-sign-djt-summary-value {
+        font-size: 17px !important;
+      }
+
+      #${IDS.summary}
+      > [data-summary-kind="priority"]
+      .us-sign-djt-summary-value,
+      #${IDS.summary}
+      > [data-summary-kind="status"]
+      .us-sign-djt-summary-value {
+        justify-self: start !important;
+        width: auto !important;
+        padding: 3px 7px !important;
+        background: rgba(127, 127, 127, 0.10) !important;
+        border: 1px solid rgba(127, 127, 127, 0.28) !important;
+        font-size: 9px !important;
+        font-weight: 800 !important;
+        text-transform: uppercase !important;
+      }
+
+      #${IDS.summary}
+      > [data-due-state="overdue"]
+      .us-sign-djt-summary-value {
+        color: #ff6879 !important;
+      }
+
+      #${IDS.summary}
+      > [data-due-state="critical"]
+      .us-sign-djt-summary-value {
+        color: #ffbf52 !important;
+      }
+
+      #${IDS.bottomGrid} {
+        display: grid !important;
+        grid-template-columns:
+          minmax(0, 1fr)
+          minmax(0, 1fr) !important;
+        align-items: start !important;
+        column-gap: 10px !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        margin: 10px 0 0 !important;
+        padding: 0 !important;
+      }
+
+      #${IDS.bottomGrid}
+      > .us-sign-description-panel {
+        grid-column: 1 !important;
+        grid-row: 1 !important;
+        align-self: start !important;
+        position: static !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      #${IDS.rightStack} {
+        grid-column: 2 !important;
+        grid-row: 1 !important;
+        align-self: start !important;
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
+        min-width: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      #${IDS.rightStack}
+      > .us-sign-designs-panel {
+        width: 100% !important;
+        min-width: 0 !important;
+        margin: 0 !important;
+      }
+
+      #${IDS.rightStack}
+      > .us-sign-files-panel {
+        width: 100% !important;
+        min-width: 0 !important;
+        margin: 15px 0 0 !important;
+      }
+
+      /* =====================================================
+         FLAT GLASS THEME v5.2
+         Matches the main US Sign interface stylesheet.
+         Visual overrides only. Script behavior is unchanged.
+      ===================================================== */
+
+      #${IDS.actionbar},
+      #${IDS.overview},
+      #${IDS.summary},
+      #${IDS.copyTools},
+      #${IDS.nativeActions},
+      #${IDS.bottomGrid},
+      #${IDS.rightStack},
+      #${IDS.lookup},
+      .us-sign-search-with-lookup {
+        --djt-bg: #0b0e12;
+        --djt-surface: rgba(16, 20, 25, 0.90);
+        --djt-surface-strong: rgba(13, 17, 22, 0.96);
+        --djt-surface-soft: rgba(255, 255, 255, 0.025);
+        --djt-hover: rgba(255, 255, 255, 0.045);
+        --djt-border: rgba(255, 255, 255, 0.06);
+        --djt-border-strong: rgba(255, 255, 255, 0.10);
+        --djt-text: #e8edf2;
+        --djt-text-soft: #bcc4cd;
+        --djt-text-muted: #87919c;
+        --djt-accent: #7f92a6;
+        --djt-accent-hover: #c8d3de;
+        --djt-accent-soft: rgba(127, 146, 166, 0.13);
+        --djt-danger: #c7a3a3;
+        --djt-warning: #d0b786;
+        --djt-radius-sm: 7px;
+        --djt-radius-md: 10px;
+        --djt-radius-lg: 14px;
+        --djt-font:
+          var(
+            --font-ui,
+            "Inter",
+            system-ui,
+            -apple-system,
+            BlinkMacSystemFont,
+            "Segoe UI",
+            sans-serif
+          );
+
+        font-family: var(--djt-font) !important;
+        text-shadow: none !important;
+      }
+
+      #${IDS.actionbar} *,
+      #${IDS.overview} *,
+      #${IDS.summary} *,
+      #${IDS.copyTools} *,
+      #${IDS.nativeActions} *,
+      #${IDS.bottomGrid} *,
+      #${IDS.rightStack} *,
+      #${IDS.lookup} {
+        font-family: var(--djt-font) !important;
+        text-shadow: none !important;
+      }
+
+      /* Search lookup */
+
+      .us-sign-search-with-lookup {
+        gap: 7px !important;
+      }
+
+      #${IDS.lookup} {
+        min-height: 34px !important;
+        height: 34px !important;
+        padding: 0 11px !important;
+        color: var(--djt-text-soft) !important;
+        background: var(--djt-surface-soft) !important;
+        background-image: none !important;
+        border: 1px solid var(--djt-border-strong) !important;
+        border-radius: var(--djt-radius-sm) !important;
+        box-shadow: none !important;
+        font-size: 11px !important;
+        font-weight: 550 !important;
+        letter-spacing: 0 !important;
+        line-height: 1 !important;
+        text-transform: none !important;
+        transition:
+          background 160ms ease,
+          border-color 160ms ease,
+          color 160ms ease !important;
+      }
+
+      #${IDS.lookup}:hover,
+      #${IDS.lookup}:focus-visible {
+        color: var(--djt-text) !important;
+        background: var(--djt-hover) !important;
+        border-color: rgba(255, 255, 255, 0.15) !important;
+        outline: none !important;
+      }
+
+      #${IDS.lookup}:disabled {
+        color: var(--djt-text-muted) !important;
+        opacity: 0.52 !important;
+      }
+
+      /* Main toolbar */
+
+      #${IDS.actionbar} {
+        min-height: 46px !important;
+        gap: 8px !important;
+        padding: 7px 9px !important;
+        background: var(--djt-surface-strong) !important;
+        background-image: none !important;
+        border: 1px solid var(--djt-border) !important;
+        border-bottom-color: var(--djt-border) !important;
+        border-radius:
+          var(--djt-radius-lg)
+          var(--djt-radius-lg)
+          0
+          0 !important;
+        box-shadow: none !important;
+        backdrop-filter: blur(14px) saturate(1.02) !important;
+        -webkit-backdrop-filter: blur(14px) saturate(1.02) !important;
+      }
+
+      #${IDS.copyTools},
+      #${IDS.copyTools} .us-sign-copy-toolbar,
+      #${IDS.nativeActions} {
+        gap: 6px !important;
+      }
+
+      #${IDS.copyTools} button,
+      #${IDS.nativeActions}
+      > .us-sign-native-action {
+        min-height: 30px !important;
+        height: 30px !important;
+        padding: 0 10px !important;
+        color: var(--djt-text-soft) !important;
+        background: var(--djt-surface-soft) !important;
+        background-image: none !important;
+        border: 1px solid var(--djt-border-strong) !important;
+        border-radius: var(--djt-radius-sm) !important;
+        box-shadow: none !important;
+        font-size: 11px !important;
+        font-weight: 550 !important;
+        letter-spacing: 0 !important;
+        line-height: 1 !important;
+        text-transform: none !important;
+        transition:
+          background 160ms ease,
+          border-color 160ms ease,
+          color 160ms ease !important;
+      }
+
+      #${IDS.copyTools} button.primary {
+        color: var(--djt-text) !important;
+        background: var(--djt-accent-soft) !important;
+        border-color: rgba(127, 146, 166, 0.22) !important;
+      }
+
+      #${IDS.copyTools} button:hover,
+      #${IDS.copyTools} button:focus-visible,
+      #${IDS.nativeActions}
+      > .us-sign-native-action:hover,
+      #${IDS.nativeActions}
+      > .us-sign-native-action:focus-visible {
+        color: var(--djt-text) !important;
+        background: var(--djt-hover) !important;
+        border-color: rgba(255, 255, 255, 0.15) !important;
+        outline: none !important;
+      }
+
+      #${IDS.copyTools} button.error,
+      #${IDS.nativeActions}
+      > .us-sign-native-action.error {
+        color: #ead7d7 !important;
+        background: rgba(199, 163, 163, 0.10) !important;
+        border-color: rgba(199, 163, 163, 0.22) !important;
+      }
+
+      #${IDS.copyTools} button:disabled,
+      #${IDS.nativeActions}
+      > .us-sign-native-action:disabled {
+        color: var(--djt-text-muted) !important;
+        background: rgba(255, 255, 255, 0.018) !important;
+        opacity: 0.48 !important;
+      }
+
+      /* Job overview */
+
+      #${IDS.overview} {
+        background: var(--djt-surface) !important;
+        background-image: none !important;
+        border: 1px solid var(--djt-border) !important;
+        border-top: 0 !important;
+        border-bottom-color: var(--djt-border) !important;
+        box-shadow: none !important;
+      }
+
+      #${IDS.overview}
+      .us-sign-overview-title {
+        padding: 0 12px !important;
+        color: var(--djt-text-muted) !important;
+        background: rgba(255, 255, 255, 0.018) !important;
+        border-right: 1px solid var(--djt-border) !important;
+        font-size: 10px !important;
+        font-weight: 600 !important;
+        letter-spacing: 0 !important;
+        text-transform: none !important;
+      }
+
+      #${IDS.overview}
+      .us-sign-overview-field {
+        gap: 3px !important;
+        min-height: 48px !important;
+        padding: 7px 10px !important;
+        color: var(--djt-text) !important;
+        background: transparent !important;
+        background-image: none !important;
+        border: 0 !important;
+        border-right: 1px solid var(--djt-border) !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        text-transform: none !important;
+        transition: background 160ms ease !important;
+      }
+
+      #${IDS.overview}
+      .us-sign-overview-field:hover,
+      #${IDS.overview}
+      .us-sign-overview-field:focus-visible {
+        background: var(--djt-hover) !important;
+        outline: none !important;
+      }
+
+      #${IDS.overview}
+      .us-sign-overview-field:disabled {
+        opacity: 0.55 !important;
+      }
+
+      #${IDS.overview}
+      .us-sign-overview-label {
+        color: var(--djt-text-muted) !important;
+        font-size: 9px !important;
+        font-weight: 550 !important;
+        letter-spacing: 0 !important;
+        text-transform: none !important;
+      }
+
+      #${IDS.overview}
+      .us-sign-overview-value {
+        color: var(--djt-text-soft) !important;
+        font-size: 11px !important;
+        font-weight: 550 !important;
+        letter-spacing: 0 !important;
+      }
+
+      /* Design summary */
+
+      #${IDS.summary} {
+        min-height: 58px !important;
+        background: var(--djt-surface) !important;
+        background-image: none !important;
+        border: 1px solid var(--djt-border) !important;
+        border-top: 0 !important;
+        border-bottom-color: var(--djt-border) !important;
+        border-radius:
+          0
+          0
+          var(--djt-radius-lg)
+          var(--djt-radius-lg) !important;
+        box-shadow: none !important;
+      }
+
+      #${IDS.summary}
+      > .us-sign-djt-summary-cell {
+        min-height: 58px !important;
+        gap: 4px !important;
+        padding: 8px 11px !important;
+        background: transparent !important;
+        border-right: 1px solid var(--djt-border) !important;
+      }
+
+      #${IDS.summary}
+      .us-sign-djt-summary-label {
+        color: var(--djt-text-muted) !important;
+        font-size: 9px !important;
+        font-weight: 550 !important;
+        line-height: 1.15 !important;
+        letter-spacing: 0 !important;
+        text-transform: none !important;
+      }
+
+      #${IDS.summary}
+      .us-sign-djt-summary-value {
+        color: var(--djt-text) !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        line-height: 1.25 !important;
+        letter-spacing: 0 !important;
+        text-transform: none !important;
+      }
+
+      #${IDS.summary}
+      > [data-summary-kind="hours"]
+      .us-sign-djt-summary-value {
+        font-size: 16px !important;
+        font-weight: 600 !important;
+      }
+
+      #${IDS.summary}
+      > [data-summary-kind="priority"]
+      .us-sign-djt-summary-value,
+      #${IDS.summary}
+      > [data-summary-kind="status"]
+      .us-sign-djt-summary-value {
+        padding: 3px 7px !important;
+        color: var(--djt-text-soft) !important;
+        background: rgba(255, 255, 255, 0.035) !important;
+        border: 1px solid var(--djt-border-strong) !important;
+        border-radius: 999px !important;
+        font-size: 10px !important;
+        font-weight: 550 !important;
+        letter-spacing: 0 !important;
+        text-transform: none !important;
+      }
+
+      #${IDS.summary}
+      > [data-due-state="overdue"]
+      .us-sign-djt-summary-value {
+        color: var(--djt-danger) !important;
+      }
+
+      #${IDS.summary}
+      > [data-due-state="critical"]
+      .us-sign-djt-summary-value {
+        color: var(--djt-warning) !important;
+      }
+
+      /* Lower panel spacing */
+
+      #${IDS.bottomGrid} {
+        column-gap: 12px !important;
+        margin-top: 12px !important;
+      }
+
+      #${IDS.rightStack}
+      > .us-sign-files-panel {
+        margin-top: 12px !important;
+      }
+
+      #${IDS.bottomGrid}
+      > .us-sign-description-panel,
+      #${IDS.rightStack}
+      > .us-sign-designs-panel,
+      #${IDS.rightStack}
+      > .us-sign-files-panel {
+        border-color: var(--djt-border) !important;
+        box-shadow: none !important;
+      }
+
+      /* Responsive refinement */
+
+      @media (max-width: 1180px) {
+        #${IDS.overview}
+        .us-sign-overview-title {
+          display: none !important;
+        }
+
+        #${IDS.overview} {
+          grid-template-columns: minmax(0, 1fr) !important;
+        }
+
+        #${IDS.actionbar} {
+          overflow-x: auto !important;
+        }
+      }
+
+      @media (max-width: 900px) {
+        #${IDS.bottomGrid} {
+          grid-template-columns: minmax(0, 1fr) !important;
+          row-gap: 12px !important;
+        }
+
+        #${IDS.bottomGrid}
+        > .us-sign-description-panel,
+        #${IDS.rightStack} {
+          grid-column: 1 !important;
+        }
+
+        #${IDS.rightStack} {
+          grid-row: 2 !important;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        #${IDS.lookup},
+        #${IDS.copyTools} button,
+        #${IDS.nativeActions}
+        > .us-sign-native-action,
+        #${IDS.overview}
+        .us-sign-overview-field {
+          transition: none !important;
+        }
+      }
+
+    `;
+  }
+
+  /* =========================================================
+     LOOKUP BUTTON
+  ========================================================= */
+
+  function findSearchContext() {
+    const candidates = [
+      ...document.querySelectorAll(
+        [
+          "input[placeholder*='search' i]",
+          "input[name*='search' i]",
+          "input[id*='search' i]",
+          ".navbar input[type='search']",
+          ".navbar input[type='text']"
+        ].join(", ")
+      )
+    ].filter((input) => {
+      const rect =
+        input.getBoundingClientRect();
+
+      return (
+        !input.disabled &&
+        input.type !== "hidden" &&
+        rect.width > 80 &&
+        rect.height > 18 &&
+        rect.top >= 0 &&
+        rect.top < 130
+      );
+    });
+
+    const input =
+      candidates[0] ||
+      null;
+
+    if (!input) {
+      return null;
+    }
+
+    return {
+      input,
+      form:
+        input.closest("form"),
+      mount:
+        input.parentElement
+    };
+  }
+
+  function submitSearch(context) {
+    context.input.dispatchEvent(
+      new Event(
+        "input",
+        { bubbles: true }
+      )
+    );
+
+    context.input.dispatchEvent(
+      new Event(
+        "change",
+        { bubbles: true }
+      )
+    );
+
+    window.setTimeout(() => {
+      if (
+        context.form &&
+        typeof context.form.requestSubmit ===
+          "function"
+      ) {
+        context.form.requestSubmit();
+        return;
+      }
+
+      context.input.dispatchEvent(
+        new KeyboardEvent(
+          "keydown",
+          {
+            key: "Enter",
+            code: "Enter",
+            keyCode: 13,
+            which: 13,
+            bubbles: true,
+            cancelable: true
+          }
+        )
+      );
+    }, 80);
+  }
+
+  function ensureLookupButton(data) {
+    const context =
+      findSearchContext();
+
+    if (!context?.mount) {
+      return;
+    }
+
+    context.mount.classList.add(
+      "us-sign-search-with-lookup"
+    );
+
+    let button =
+      document.getElementById(
+        IDS.lookup
+      );
+
+    if (!button) {
+      button =
+        document.createElement(
+          "button"
+        );
+
+      button.id = IDS.lookup;
+      button.type = "button";
+      button.textContent =
+        "Look Up Job #";
+
+      button.addEventListener(
+        "click",
+        () => {
+          const number = clean(
+            state.data?.designNumber ||
+            state.data?.projectNumber
+          );
+
+          const current =
+            findSearchContext();
+
+          if (
+            !number ||
+            !current
+          ) {
+            flash(
+              button,
+              "Not found",
+              true
+            );
+
+            return;
+          }
+
+          current.input.value =
+            number;
+
+          current.input.focus();
+
+          flash(
+            button,
+            "Searching..."
+          );
+
+          submitSearch(current);
+        }
+      );
+    }
+
+    if (
+      button.parentElement !==
+      context.mount
+    ) {
+      context.mount.insertBefore(
+        button,
+        context.input.nextSibling
+      );
+    }
+
+    button.disabled =
+      !clean(
+        data.designNumber ||
+        data.projectNumber
+      );
+  }
+
+  /* =========================================================
+     ACTION BAR
+  ========================================================= */
+
+  function nativeActionLabel(control) {
+    return clean(
+      control?.innerText ||
+      control?.textContent ||
+      control?.value ||
+      control?.getAttribute?.(
+        "aria-label"
+      ) ||
+      control?.getAttribute?.(
+        "title"
+      )
+    ).toUpperCase();
+  }
+
+  function styleNativeAction(control) {
+    control.classList.add(
+      "us-sign-native-action"
+    );
+
+    setImportant(
+      control,
+      "position",
+      "static"
+    );
+
+    setImportant(
+      control,
+      "inset",
+      "auto"
+    );
+
+    setImportant(
+      control,
+      "float",
+      "none"
+    );
+
+    setImportant(
+      control,
+      "display",
+      "inline-flex"
+    );
+
+    setImportant(
+      control,
+      "align-items",
+      "center"
+    );
+
+    setImportant(
+      control,
+      "justify-content",
+      "center"
+    );
+
+    setImportant(
+      control,
+      "flex",
+      "0 0 auto"
+    );
+
+    setImportant(
+      control,
+      "width",
+      "auto"
+    );
+
+    setImportant(
+      control,
+      "min-width",
+      "max-content"
+    );
+
+    setImportant(
+      control,
+      "height",
+      "28px"
+    );
+
+    setImportant(
+      control,
+      "margin",
+      "0"
+    );
+
+    setImportant(
+      control,
+      "transform",
+      "none"
+    );
+  }
+
+  function collectNativeActions(workspace) {
+    const group =
+      document.getElementById(
+        IDS.nativeActions
+      );
+
+    const existing =
+      group
+        ? [
+          ...group.querySelectorAll(
+            "a, button, input[type='button'], input[type='submit']"
+          )
+        ]
+        : [];
+
+    const pageControls = [
+      ...workspace.workspacePanel
+        .querySelectorAll(
+          "a, button, input[type='button'], input[type='submit']"
+        )
+    ].filter((control) => {
+      return (
+        !control.closest(
+          `#${IDS.copyTools}, #${IDS.nativeActions}`
+        ) &&
+        !control.closest(
+          ".modal, .mfp-hide, .popup-modal, .popup-basic"
+        )
+      );
+    });
+
+    return NATIVE_ACTION_ORDER
+      .map((label) => {
+        return (
+          pageControls.find(
+            (control) => {
+              return (
+                nativeActionLabel(control) ===
+                label
+              );
+            }
+          ) ||
+          existing.find(
+            (control) => {
+              return (
+                nativeActionLabel(control) ===
+                label
+              );
+            }
+          )
+        );
+      })
+      .filter(Boolean);
+  }
+
+  function createCopyToolbar() {
+    const host =
+      document.createElement("div");
+
+    host.id = IDS.copyTools;
+
+    host.innerHTML = `
+      <div class="us-sign-copy-toolbar">
+        <button
+          class="primary"
+          type="button"
+          data-copy="fullBrief"
+        >
+          Copy Brief
+        </button>
+
+        <button
+          type="button"
+          data-copy="description"
+        >
+          Copy Desc
+        </button>
+
+        <button
+          type="button"
+          data-action="maps"
+        >
+          Maps
+        </button>
+      </div>
+    `;
+
+    host.addEventListener(
+      "click",
+      async (event) => {
+        const button =
+          event.target.closest("button");
+
+        if (
+          !button ||
+          button.disabled
+        ) {
+          return;
+        }
+
+        try {
+          if (
+            button.dataset.action ===
+            "maps"
+          ) {
+            openMaps(
+              state.data?.fullAddress
+            );
+
+            flash(
+              button,
+              "Opened ✓"
+            );
+
+            return;
+          }
+
+          const value =
+            button.dataset.copy ===
+              "fullBrief"
+              ? buildFullBrief(
+                state.data || {}
+              )
+              : state.data?.description;
+
+          await copyText(value);
+
+          flash(
+            button,
+            "Copied ✓"
+          );
+        } catch (_error) {
+          flash(
+            button,
+            "Not found",
+            true
+          );
+        }
+      }
+    );
+
+    return host;
+  }
+
+  function forceActionbarLayout(
+    actionbar,
+    copyTools,
+    nativeGroup
+  ) {
+    setImportant(
+      actionbar,
+      "display",
+      "flex"
+    );
+
+    setImportant(
+      actionbar,
+      "flex-direction",
+      "row"
+    );
+
+    setImportant(
+      actionbar,
+      "flex-wrap",
+      "nowrap"
+    );
+
+    setImportant(
+      actionbar,
+      "align-items",
+      "center"
+    );
+
+    setImportant(
+      actionbar,
+      "width",
+      "100%"
+    );
+
+    setImportant(
+      actionbar,
+      "min-width",
+      "0"
+    );
+
+    setImportant(
+      copyTools,
+      "display",
+      "inline-flex"
+    );
+
+    setImportant(
+      copyTools,
+      "flex",
+      "0 0 auto"
+    );
+
+    setImportant(
+      copyTools,
+      "width",
+      "max-content"
+    );
+
+    setImportant(
+      copyTools,
+      "min-width",
+      "max-content"
+    );
+
+    setImportant(
+      nativeGroup,
+      "display",
+      "inline-flex"
+    );
+
+    setImportant(
+      nativeGroup,
+      "flex-direction",
+      "row"
+    );
+
+    setImportant(
+      nativeGroup,
+      "flex-wrap",
+      "nowrap"
+    );
+
+    setImportant(
+      nativeGroup,
+      "flex",
+      "0 0 auto"
+    );
+
+    setImportant(
+      nativeGroup,
+      "width",
+      "max-content"
+    );
+
+    setImportant(
+      nativeGroup,
+      "min-width",
+      "max-content"
+    );
+
+    setImportant(
+      nativeGroup,
+      "margin-left",
+      "auto"
+    );
+  }
+
+  function ensureActionbar(workspace) {
+    let actionbar =
+      document.getElementById(
+        IDS.actionbar
+      );
+
+    if (!actionbar) {
+      actionbar =
+        document.createElement(
+          "div"
+        );
+
+      actionbar.id =
+        IDS.actionbar;
+    }
+
+    let copyTools =
+      document.getElementById(
+        IDS.copyTools
+      );
+
+    if (!copyTools) {
+      copyTools =
+        createCopyToolbar();
+    }
+
+    let nativeGroup =
+      document.getElementById(
+        IDS.nativeActions
+      );
+
+    if (!nativeGroup) {
+      nativeGroup =
+        document.createElement(
+          "div"
+        );
+
+      nativeGroup.id =
+        IDS.nativeActions;
+    }
+
+    const controls =
+      collectNativeActions(
+        workspace
+      );
+
+    for (const control of controls) {
+      styleNativeAction(control);
+      nativeGroup.appendChild(control);
+    }
+
+    actionbar.append(
+      copyTools,
+      nativeGroup
+    );
+
+    forceActionbarLayout(
+      actionbar,
+      copyTools,
+      nativeGroup
+    );
+
+    const heading =
+      workspace.workspacePanel
+        .querySelector(
+          ":scope > .panel-heading"
+        );
+
+    if (heading) {
+      heading.classList.add(
+        "us-sign-empty-native-heading",
+        "us-sign-native-workspace-heading-hidden"
+      );
+    }
+
+    return {
+      actionbar,
+      copyTools
+    };
+  }
+
+  /* =========================================================
+     OVERVIEW
+  ========================================================= */
+
+  function overviewField(
+    label,
+    key,
+    action = ""
+  ) {
+    const attribute =
+      action
+        ? `data-action="${action}"`
+        : `data-copy="${key}"`;
+
+    return `
+      <button
+        class="us-sign-overview-field"
+        type="button"
+        ${attribute}
+      >
+        <span class="us-sign-overview-label">
+          ${label}
+        </span>
+
+        <span
+          class="us-sign-overview-value"
+          data-value="${key}"
+        ></span>
+      </button>
+    `;
+  }
+
+  function createOverview() {
+    const host =
+      document.createElement("div");
+
+    host.id = IDS.overview;
+
+    host.innerHTML = `
+      <div class="us-sign-overview-title">
+        Job Overview
+      </div>
+
+      <div class="us-sign-overview-stack">
+        <div class="us-sign-overview-row">
+          ${overviewField("Project", "projectRevision")}
+          ${overviewField("Linked Job", "projectReference")}
+          ${overviewField("Plaza", "plazaName")}
+          ${overviewField("Open Date", "openDate")}
+          ${overviewField("Project Manager", "projectManager")}
+          ${overviewField("Designer", "designer")}
+        </div>
+
+        <div class="us-sign-overview-row">
+          ${overviewField("Full Address", "fullAddress")}
+          ${overviewField("Street", "streetAddress")}
+          ${overviewField("City", "city")}
+          ${overviewField("State + ZIP", "stateZip")}
+        </div>
+      </div>
+    `;
+
+    host.addEventListener(
+      "click",
+      async (event) => {
+        const button =
+          event.target.closest("button");
+
+        if (
+          !button ||
+          button.disabled
+        ) {
+          return;
+        }
+
+        try {
+          await copyText(
+            state.data?.[
+              button.dataset.copy
+            ]
+          );
+
+          flash(
+            button,
+            "Copied ✓"
+          );
+        } catch (_error) {
+          flash(
+            button,
+            "Not found",
+            true
+          );
+        }
+      }
+    );
+
+    return host;
+  }
+
+  function updateOverview(host, data) {
+    host.querySelectorAll(
+      "[data-value]"
+    ).forEach((element) => {
+      const value =
+        clean(
+          data[
+            element.dataset.value
+          ]
+        );
+
+      element.textContent =
+        value || "Not found";
+
+      const button =
+        element.closest("button");
+
+      if (button) {
+        button.disabled = !value;
+      }
+    });
+  }
+
+  /* =========================================================
+     SUMMARY
+  ========================================================= */
+
+  function createSummaryCell(
+    field,
+    index
+  ) {
+    const cell =
+      document.createElement("div");
+
+    cell.className =
+      "us-sign-djt-summary-cell";
+
+    cell.dataset.summaryKind =
+      field.kind;
+
+    cell.dataset.summaryKey =
+      field.key;
+
+    const label =
+      document.createElement("span");
+
+    label.className =
+      "us-sign-djt-summary-label";
+
+    label.textContent =
+      field.label;
+
+    const value =
+      document.createElement("span");
+
+    value.className =
+      "us-sign-djt-summary-value";
+
+    value.dataset.summaryValue =
+      field.key;
+
+    cell.append(
+      label,
+      value
+    );
+
+    setImportant(
+      cell,
+      "grid-column",
+      String(index + 1)
+    );
+
+    setImportant(
+      cell,
+      "grid-row",
+      "1"
+    );
+
+    return cell;
+  }
+
+  function forceSummaryLayout(host) {
+    setImportant(
+      host,
+      "display",
+      "grid"
+    );
+
+    setImportant(
+      host,
+      "grid-template-columns",
+      "minmax(190px, 2.2fr) minmax(112px, 1fr) minmax(94px, 0.85fr) minmax(72px, 0.55fr) minmax(112px, 0.95fr)"
+    );
+
+    setImportant(
+      host,
+      "grid-template-rows",
+      "minmax(56px, auto)"
+    );
+
+    setImportant(
+      host,
+      "width",
+      "100%"
+    );
+
+    setImportant(
+      host,
+      "min-width",
+      "0"
+    );
+
+    setImportant(
+      host,
+      "min-height",
+      "56px"
+    );
+
+    setImportant(
+      host,
+      "margin",
+      "0"
+    );
+
+    setImportant(
+      host,
+      "padding",
+      "0"
+    );
+
+    [
+      ...host.querySelectorAll(
+        ":scope > .us-sign-djt-summary-cell"
+      )
+    ].forEach((cell, index) => {
+      setImportant(
+        cell,
+        "position",
+        "static"
+      );
+
+      setImportant(
+        cell,
+        "display",
+        "grid"
+      );
+
+      setImportant(
+        cell,
+        "grid-column",
+        String(index + 1)
+      );
+
+      setImportant(
+        cell,
+        "grid-row",
+        "1"
+      );
+
+      setImportant(
+        cell,
+        "align-content",
+        "center"
+      );
+
+      setImportant(
+        cell,
+        "min-width",
+        "0"
+      );
+
+      setImportant(
+        cell,
+        "min-height",
+        "56px"
+      );
+
+      setImportant(
+        cell,
+        "margin",
+        "0"
+      );
+
+      setImportant(
+        cell,
+        "padding",
+        "8px 10px"
+      );
+
+      setImportant(
+        cell,
+        "transform",
+        "none"
+      );
+    });
+  }
+
+  function ensureSummaryHost() {
+    const matches = [
+      ...document.querySelectorAll(
+        `#${IDS.summary}`
+      )
+    ];
+
+    let host =
+      matches.shift() ||
+      document.createElement("div");
+
+    for (const duplicate of matches) {
+      duplicate.remove();
+    }
+
+    host.id = IDS.summary;
+
+    const valid =
+      host.dataset.scriptVersion ===
+        VERSION &&
+      host.querySelectorAll(
+        ":scope > .us-sign-djt-summary-cell"
+      ).length ===
+        SUMMARY_FIELDS.length;
+
+    if (!valid) {
+      host.replaceChildren();
+
+      SUMMARY_FIELDS.forEach(
+        (field, index) => {
+          host.appendChild(
+            createSummaryCell(
+              field,
+              index
+            )
+          );
+        }
+      );
+
+      host.dataset.scriptVersion =
+        VERSION;
+    }
+
+    forceSummaryLayout(host);
+
+    return host;
+  }
+
+  function daysUntilDate(value) {
+    const match = clean(value).match(
+      /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/
+    );
+
+    if (!match) {
+      return null;
+    }
+
+    const year =
+      match[3].length === 2
+        ? Number(`20${match[3]}`)
+        : Number(match[3]);
+
+    const due = new Date(
+      year,
+      Number(match[1]) - 1,
+      Number(match[2])
+    );
+
+    const today = new Date();
+
+    due.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+
+    return Math.round(
+      (due - today) /
+      86400000
+    );
+  }
+
+  function updateSummary(host, data) {
+    forceSummaryLayout(host);
+
+    host.querySelectorAll(
+      "[data-summary-value]"
+    ).forEach((element) => {
+      const value =
+        clean(
+          data[
+            element.dataset.summaryValue
+          ]
+        );
+
+      element.textContent =
+        value || "Not set";
+    });
+
+    const dueCell =
+      host.querySelector(
+        '[data-summary-kind="due"]'
+      );
+
+    if (dueCell) {
+      const days =
+        daysUntilDate(
+          data.dateRequired
+        );
+
+      dueCell.dataset.dueState =
+        days === null
+          ? "normal"
+          : days < 0
+            ? "overdue"
+            : days <= 3
+              ? "critical"
+              : "normal";
+    }
+  }
+
+  /* =========================================================
+     LOWER PANELS
+  ========================================================= */
+
+  function ensureBottomGrid(workspace) {
+    const sections =
+      findNativeSections(workspace);
+
+    const designsPanel =
+      findDesignsPanel(workspace);
+
+    if (
+      !sections ||
+      !designsPanel
+    ) {
+      return;
+    }
+
+    let grid =
+      document.getElementById(
+        IDS.bottomGrid
+      );
+
+    if (!grid) {
+      grid =
+        document.createElement(
+          "section"
+        );
+
+      grid.id =
+        IDS.bottomGrid;
+    }
+
+    let rightStack =
+      document.getElementById(
+        IDS.rightStack
+      );
+
+    if (!rightStack) {
+      rightStack =
+        document.createElement(
+          "section"
+        );
+
+      rightStack.id =
+        IDS.rightStack;
+    }
+
+    const {
+      descriptionPanel,
+      filesPanel
+    } = sections;
+
+    descriptionPanel.classList.add(
+      "us-sign-description-panel"
+    );
+
+    designsPanel.classList.add(
+      "us-sign-designs-panel"
+    );
+
+    filesPanel.classList.add(
+      "us-sign-files-panel"
+    );
+
+    setImportant(
+      descriptionPanel,
+      "margin-top",
+      "0"
+    );
+
+    setImportant(
+      designsPanel,
+      "margin-top",
+      "0"
+    );
+
+    setImportant(
+      filesPanel,
+      "margin-top",
+      "15px"
+    );
+
+    grid.append(
+      descriptionPanel,
+      rightStack
+    );
+
+    rightStack.append(
+      designsPanel,
+      filesPanel
+    );
+
+    workspace.workspaceBody
+      .appendChild(grid);
+
+    workspace.row.classList.add(
+      "us-sign-design-workbench"
+    );
+
+    workspace.sourceColumn
+      .classList.add(
+        "us-sign-design-source-column"
+      );
+
+    workspace.workspaceColumn
+      .classList.add(
+        "us-sign-design-workspace-column"
+      );
+
+    setImportant(
+      workspace.row,
+      "display",
+      "grid"
+    );
+
+    setImportant(
+      workspace.row,
+      "grid-template-columns",
+      "minmax(0, 1fr)"
+    );
+
+    setImportant(
+      workspace.row,
+      "gap",
+      "0"
+    );
+
+    setImportant(
+      workspace.workspaceColumn,
+      "grid-column",
+      "1 / -1"
+    );
+
+    setImportant(
+      workspace.workspaceColumn,
+      "width",
+      "100%"
+    );
+
+    setImportant(
+      workspace.workspaceColumn,
+      "margin-left",
+      "0"
+    );
+
+    setImportant(
+      workspace.sourceColumn,
+      "display",
+      "none"
+    );
+  }
+
+  function hideSourceRecord(table) {
+    setImportant(
+      table,
+      "display",
+      "none"
+    );
+
+    table.setAttribute(
+      "aria-hidden",
+      "true"
+    );
+
+    const wrapper =
+      table.closest(
+        ".table-responsive"
+      );
+
+    if (
+      wrapper &&
+      wrapper.querySelectorAll(
+        "table"
+      ).length === 1
+    ) {
+      setImportant(
+        wrapper,
+        "display",
+        "none"
+      );
+    }
+  }
+
+  /* =========================================================
+     TOOL ORDER + UPDATES
+  ========================================================= */
+
+  function ensureOrderedBefore(
+    parent,
+    anchor,
+    elements
+  ) {
+    const children = [
+      ...parent.children
+    ];
+
+    const startIndex =
+      children.indexOf(
+        elements[0]
+      );
+
+    const anchorIndex =
+      children.indexOf(anchor);
+
+    const alreadyCorrect =
+      startIndex >= 0 &&
+      anchorIndex ===
+        startIndex +
+        elements.length &&
+      elements.every(
+        (element, index) => {
+          return (
+            children[
+              startIndex + index
+            ] === element
+          );
+        }
+      );
+
+    if (alreadyCorrect) {
+      return;
+    }
+
+    const fragment =
+      document.createDocumentFragment();
+
+    for (const element of elements) {
+      fragment.appendChild(element);
+    }
+
+    parent.insertBefore(
+      fragment,
+      anchor
+    );
+  }
+
+  function updateCopyButtons(
+    host,
+    data
+  ) {
+    const brief =
+      host.querySelector(
+        '[data-copy="fullBrief"]'
+      );
+
+    const description =
+      host.querySelector(
+        '[data-copy="description"]'
+      );
+
+    const maps =
+      host.querySelector(
+        '[data-action="maps"]'
+      );
+
+    if (brief) {
+      brief.disabled =
+        !data.projectNumber;
+    }
+
+    if (description) {
+      description.disabled =
+        !data.description;
+    }
+
+    if (maps) {
+      maps.disabled =
+        !data.fullAddress;
+    }
+  }
+
+  /* =========================================================
+     REBUILD
+  ========================================================= */
+
+  function refreshData() {
+    if (
+      !state.table?.isConnected ||
+      !state.workspace
+        ?.workspaceBody
+        ?.isConnected
+    ) {
+      scheduleRebuild(60);
+      return;
+    }
+
+    const data =
+      collectJobData(
+        state.table,
+        state.workspace
+      );
+
+    state.data = data;
+
+    const overview =
+      document.getElementById(
+        IDS.overview
+      );
+
+    const copyTools =
+      document.getElementById(
+        IDS.copyTools
+      );
+
+    const summary =
+      ensureSummaryHost();
+
+    if (overview) {
+      updateOverview(
+        overview,
+        data
+      );
+    }
+
+    updateSummary(
+      summary,
+      data
+    );
+
+    if (copyTools) {
+      updateCopyButtons(
+        copyTools,
+        data
+      );
+    }
+
+    ensureLookupButton(data);
+  }
+
+  function disconnectObservers() {
+    state.structureObserver
+      ?.disconnect();
+
+    state.dataObserver
+      ?.disconnect();
+  }
+
+  function connectObservers() {
+    const content =
+      document.querySelector("#content");
+
+    if (
+      content &&
+      state.structureObserver
+    ) {
+      state.structureObserver.observe(
+        content,
+        {
+          childList: true,
+          subtree: true
+        }
+      );
+    }
+
+    if (!state.dataObserver) {
+      return;
+    }
+
+    const roots = [
+      state.table,
+      document.querySelector(
+        "#customer-name"
+      ),
+      document.querySelector(
+        "#customer-info"
+      ),
+      document.querySelector("#pmlt")
+    ].filter(Boolean);
+
+    for (const root of roots) {
+      state.dataObserver.observe(
+        root,
+        {
+          childList: true,
+          subtree: true,
+          characterData: true
+        }
+      );
+    }
+  }
+
+  function rebuild() {
+    if (state.mounting) {
+      return;
+    }
+
+    state.mounting = true;
+    disconnectObservers();
+
+    try {
+      installStyles();
+
+      const table =
+        findDesignTable();
+
+      if (!table) {
+        state.table = null;
+        state.workspace = null;
+        scheduleRebuild(400);
+        return;
+      }
+
+      const workspace =
+        findWorkspace(table);
+
+      if (!workspace) {
+        scheduleRebuild(300);
+        return;
+      }
+
+      state.table = table;
+      state.workspace = workspace;
+
+      const {
+        actionbar,
+        copyTools
+      } = ensureActionbar(
+        workspace
+      );
+
+      let overview =
+        document.getElementById(
+          IDS.overview
+        );
+
+      if (!overview) {
+        overview =
+          createOverview();
+      }
+
+      const summary =
+        ensureSummaryHost();
+
+      ensureOrderedBefore(
+        workspace.workspaceBody,
+        workspace.tableAnchor,
+        [
+          actionbar,
+          overview,
+          summary
+        ]
+      );
+
+      ensureBottomGrid(workspace);
+      hideSourceRecord(table);
+
+      const data =
+        collectJobData(
+          table,
+          workspace
+        );
+
+      state.data = data;
+
+      updateOverview(
+        overview,
+        data
+      );
+
+      updateSummary(
+        summary,
+        data
+      );
+
+      updateCopyButtons(
+        copyTools,
+        data
+      );
+
+      ensureLookupButton(data);
+    } finally {
+      state.mounting = false;
+      connectObservers();
+    }
+  }
+
+  function scheduleRebuild(
+    delay = 120
+  ) {
+    window.clearTimeout(
+      state.rebuildTimer
+    );
+
+    state.rebuildTimer =
+      window.setTimeout(
+        rebuild,
+        delay
+      );
+  }
+
+  function scheduleRefresh(
+    delay = 100
+  ) {
+    window.clearTimeout(
+      state.refreshTimer
+    );
+
+    state.refreshTimer =
+      window.setTimeout(
+        refreshData,
+        delay
+      );
+  }
+
+  function createObservers() {
+    state.structureObserver =
+      new MutationObserver(() => {
+        if (!state.mounting) {
+          scheduleRebuild(140);
+        }
+      });
+
+    state.dataObserver =
+      new MutationObserver(() => {
+        if (!state.mounting) {
+          scheduleRefresh(100);
+        }
+      });
+  }
+
+  function installNavigationEvents() {
+    if (
+      window.__usSignDesignHistoryInstalled
+    ) {
+      return;
+    }
+
+    window.__usSignDesignHistoryInstalled =
+      true;
+
+    for (const methodName of [
+      "pushState",
+      "replaceState"
+    ]) {
+      const original =
+        history[methodName];
+
+      history[methodName] =
+        function (...args) {
+          const result =
+            original.apply(
+              this,
+              args
+            );
+
+          window.dispatchEvent(
+            new Event(
+              "us-sign-location-change"
+            )
+          );
+
+          return result;
+        };
+    }
+
+    window.addEventListener(
+      "popstate",
+      () => scheduleRebuild(40)
+    );
+
+    window.addEventListener(
+      "us-sign-location-change",
+      () => scheduleRebuild(40)
+    );
+
+    window.addEventListener(
+      "pageshow",
+      () => scheduleRebuild(40)
+    );
+  }
+
+  function start() {
+    createObservers();
+    installNavigationEvents();
+    rebuild();
+  }
+
+  if (
+    document.readyState === "loading"
+  ) {
+    document.addEventListener(
+      "DOMContentLoaded",
+      start,
+      { once: true }
+    );
+  } else {
+    start();
   }
 })();
