@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Menu Cleanup and Reorder
 // @namespace    us-sign-full-modules
-// @version      2.8.0
-// @description  Lightweight sidebar cleanup, stable project-link ordering, and compact project-rail controls without a permanent mutation observer.
+// @version      2.9.0
+// @description  Lightweight sidebar cleanup, stable project-link ordering, and deterministic compact project-rail controls.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-idle
 // @grant        none
@@ -36,12 +36,6 @@
 
   const HIDDEN_CLASS = "us-sign-menu-link-hidden";
   const ROW_HIDDEN_CLASS = "us-sign-menu-row-hidden";
-  const ACTION_CLASS = "us-sign-rail-action";
-  const ACTION_GROUP_CLASS = "us-sign-rail-actions";
-  const NAV_HOST_CLASS = "us-sign-rail-nav-host";
-  const NAV_CLASS = "us-sign-rail-nav";
-  const COUNTER_CLASS = "us-sign-rail-counter";
-  const CLOCK_CLASS = "us-sign-rail-clock";
 
   const style = document.createElement("style");
   style.id = "us-sign-menu-cleanup-style";
@@ -53,23 +47,120 @@
       cursor: pointer !important;
     }
 
-    /* Project action buttons: one compact layer, no Bootstrap stacking. */
-    #pmlt .${ACTION_GROUP_CLASS} {
+    #us-sign-rail-nav-group,
+    #us-sign-rail-action-group {
+      box-sizing: border-box !important;
+      position: relative !important;
+      float: none !important;
+      clear: both !important;
+      transform: none !important;
+      isolation: isolate !important;
+      z-index: 2 !important;
+    }
+
+    #us-sign-rail-nav-group {
+      display: inline-flex !important;
+      flex-flow: row nowrap !important;
+      align-items: center !important;
+      justify-content: flex-start !important;
+      gap: 1px !important;
+      width: auto !important;
+      min-width: 0 !important;
+      height: 29px !important;
+      margin: 5px 0 10px !important;
+      padding: 2px !important;
+      background: #171b20 !important;
+      border: 1px solid #2d343c !important;
+      border-radius: 7px !important;
+      box-shadow: none !important;
+      white-space: nowrap !important;
+    }
+
+    #us-sign-rail-nav-group > * {
+      box-sizing: border-box !important;
+      position: relative !important;
+      inset: auto !important;
+      float: none !important;
+      flex: 0 0 auto !important;
+      margin: 0 !important;
+      box-shadow: none !important;
+      text-shadow: none !important;
+      transform: none !important;
+      vertical-align: middle !important;
+    }
+
+    #us-sign-rail-nav-group > a,
+    #us-sign-rail-nav-group > button,
+    #us-sign-rail-nav-group > input[type="button"],
+    #us-sign-rail-nav-group > input[type="submit"] {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: 22px !important;
+      min-width: 22px !important;
+      max-width: 22px !important;
+      height: 23px !important;
+      min-height: 23px !important;
+      padding: 0 !important;
+      color: #aeb8c3 !important;
+      background: transparent !important;
+      background-image: none !important;
+      border: 0 !important;
+      border-radius: 4px !important;
+      font-size: 14px !important;
+      font-weight: 700 !important;
+      line-height: 1 !important;
+      overflow: hidden !important;
+    }
+
+    #us-sign-rail-nav-group > a:hover,
+    #us-sign-rail-nav-group > button:hover,
+    #us-sign-rail-nav-group > input[type="button"]:hover,
+    #us-sign-rail-nav-group > input[type="submit"]:hover {
+      color: #f5f7f9 !important;
+      background: #262c33 !important;
+    }
+
+    #us-sign-rail-counter {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      width: auto !important;
+      min-width: 40px !important;
+      max-width: 58px !important;
+      height: 23px !important;
+      min-height: 23px !important;
+      padding: 0 6px !important;
+      color: #d4dbe3 !important;
+      background: #252d35 !important;
+      background-image: none !important;
+      border: 1px solid #3a4652 !important;
+      border-radius: 4px !important;
+      box-shadow: none !important;
+      font-size: 11px !important;
+      font-weight: 600 !important;
+      line-height: 1 !important;
+      white-space: nowrap !important;
+    }
+
+    #us-sign-rail-action-group {
       display: flex !important;
       flex-flow: row nowrap !important;
       align-items: center !important;
-      gap: 6px !important;
+      justify-content: flex-start !important;
+      gap: 5px !important;
       width: 100% !important;
-      max-width: 190px !important;
-      margin: 10px 0 10px !important;
+      max-width: 212px !important;
+      margin: 0 0 12px !important;
       padding: 0 !important;
-      position: relative !important;
-      z-index: 1 !important;
       background: transparent !important;
       border: 0 !important;
+      box-shadow: none !important;
+      overflow: visible !important;
     }
 
-    #pmlt .${ACTION_CLASS} {
+    #us-sign-rail-action-group > * {
+      box-sizing: border-box !important;
       appearance: none !important;
       -webkit-appearance: none !important;
       position: relative !important;
@@ -82,142 +173,38 @@
       width: auto !important;
       min-width: 0 !important;
       max-width: none !important;
-      height: 31px !important;
-      min-height: 31px !important;
+      height: 29px !important;
+      min-height: 29px !important;
       margin: 0 !important;
-      padding: 0 8px !important;
-      overflow: hidden !important;
-      color: #c8d0d9 !important;
+      padding: 0 7px !important;
+      color: #d1d7de !important;
       background: #1d2228 !important;
       background-image: none !important;
-      border: 1px solid #353d46 !important;
+      border: 1px solid #353e48 !important;
       border-radius: 6px !important;
       box-shadow: none !important;
-      font-size: 11px !important;
-      font-weight: 600 !important;
+      font-size: 10.5px !important;
+      font-weight: 650 !important;
       line-height: 1 !important;
       letter-spacing: 0 !important;
       text-transform: none !important;
       text-shadow: none !important;
       transform: none !important;
-      isolation: auto !important;
-      z-index: auto !important;
+      overflow: hidden !important;
     }
 
-    #pmlt .${ACTION_CLASS}::before,
-    #pmlt .${ACTION_CLASS}::after {
+    #us-sign-rail-action-group > *:hover {
+      color: #f5f7f9 !important;
+      background: #282e35 !important;
+      border-color: #4b5662 !important;
+    }
+
+    #us-sign-rail-action-group > *::before,
+    #us-sign-rail-action-group > *::after,
+    #us-sign-rail-nav-group > *::before,
+    #us-sign-rail-nav-group > *::after {
       content: none !important;
       display: none !important;
-    }
-
-    #pmlt .${ACTION_CLASS}:hover,
-    #pmlt .${ACTION_CLASS}:focus-visible {
-      color: #f5f7f9 !important;
-      background: #272d34 !important;
-      border-color: #4a5561 !important;
-      outline: none !important;
-    }
-
-    /* Project navigator: neutral charcoal, not bright blue. */
-    #pmlt .${NAV_HOST_CLASS} {
-      display: inline-flex !important;
-      flex-flow: row nowrap !important;
-      align-items: center !important;
-      gap: 2px !important;
-      margin: 6px 0 4px !important;
-      padding: 0 !important;
-      background: transparent !important;
-      border: 0 !important;
-      white-space: nowrap !important;
-    }
-
-    #pmlt .${NAV_CLASS} {
-      appearance: none !important;
-      -webkit-appearance: none !important;
-      position: relative !important;
-      inset: auto !important;
-      float: none !important;
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      width: 18px !important;
-      min-width: 18px !important;
-      max-width: 18px !important;
-      height: 24px !important;
-      min-height: 24px !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      color: #aeb8c3 !important;
-      background: transparent !important;
-      background-image: none !important;
-      border: 0 !important;
-      border-radius: 4px !important;
-      box-shadow: none !important;
-      font-size: 15px !important;
-      line-height: 1 !important;
-      text-shadow: none !important;
-      transform: none !important;
-    }
-
-    #pmlt .${NAV_CLASS}:hover,
-    #pmlt .${NAV_CLASS}:focus-visible {
-      color: #f4f6f8 !important;
-      background: #242a31 !important;
-      outline: none !important;
-    }
-
-    #pmlt .${COUNTER_CLASS} {
-      appearance: none !important;
-      -webkit-appearance: none !important;
-      position: relative !important;
-      display: inline-flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      min-width: 38px !important;
-      width: auto !important;
-      height: 25px !important;
-      min-height: 25px !important;
-      margin: 0 2px !important;
-      padding: 0 6px !important;
-      color: #d4dbe3 !important;
-      background: #26303a !important;
-      background-image: none !important;
-      border: 1px solid #3c4855 !important;
-      border-radius: 5px !important;
-      box-shadow: none !important;
-      font-size: 11px !important;
-      font-weight: 600 !important;
-      line-height: 1 !important;
-      text-shadow: none !important;
-      transform: none !important;
-    }
-
-    #pmlt .${CLOCK_CLASS} {
-      appearance: none !important;
-      -webkit-appearance: none !important;
-      position: relative !important;
-      inset: auto !important;
-      float: none !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      width: 100% !important;
-      max-width: 190px !important;
-      height: 38px !important;
-      min-height: 38px !important;
-      margin: 10px 0 12px !important;
-      padding: 0 12px !important;
-      color: #dfd5c3 !important;
-      background: #2c271f !important;
-      background-image: none !important;
-      border: 1px solid #55472f !important;
-      border-radius: 6px !important;
-      box-shadow: none !important;
-      font-size: 12px !important;
-      font-weight: 650 !important;
-      line-height: 1 !important;
-      text-shadow: none !important;
-      transform: none !important;
     }
   `;
   (document.head || document.documentElement).appendChild(style);
@@ -347,7 +334,9 @@
 
     const parent = orderedAnchors[0].parentElement;
     if (!parent || !orderedAnchors.every((anchor) => anchor.parentElement === parent)) return;
-    const current = Array.from(parent.children).filter((node) => node.tagName === "A" && orderedAnchors.includes(node));
+    const current = Array.from(parent.children)
+      .filter((node) => node.tagName === "A" && orderedAnchors.includes(node));
+
     if (current.length === orderedAnchors.length && current.every((anchor, index) => anchor === orderedAnchors[index])) return;
 
     const marker = document.createComment("us-sign-project-flat-order");
@@ -358,77 +347,119 @@
     marker.remove();
   }
 
-  function findControl(rail, label) {
+  function clickableControls(rail) {
     return [...rail.querySelectorAll("a, button, input[type='button'], input[type='submit']")]
-      .find((element) => textFor(element) === label) || null;
+      .filter((element) => !element.hidden && element.getClientRects().length);
   }
 
-  function removeAdjacentBreak(control) {
-    if (!control) return;
-    const next = control.nextSibling;
-    if (next?.nodeType === Node.ELEMENT_NODE && next.tagName === "BR") next.remove();
-    const previous = control.previousSibling;
-    if (previous?.nodeType === Node.ELEMENT_NODE && previous.tagName === "BR") previous.remove();
+  function findClickable(rail, label) {
+    return clickableControls(rail).find((element) => textFor(element) === label) || null;
   }
 
-  function normalizeActionButtons(rail) {
-    const controls = ["EDIT", "LIST", "DUPLICATE"].map((label) => findControl(rail, label));
-    controls.filter(Boolean).forEach((control) => control.classList.add(ACTION_CLASS));
-    if (controls.some((control) => !control)) return;
+  function removeNeighborBreaks(element) {
+    if (!element) return;
+    for (const side of ["previousSibling", "nextSibling"]) {
+      const node = element[side];
+      if (node?.nodeType === Node.ELEMENT_NODE && node.tagName === "BR") node.remove();
+    }
+  }
+
+  function normalizeActions(rail) {
+    const edit = findClickable(rail, "EDIT");
+    const list = findClickable(rail, "LIST");
+    const duplicate = findClickable(rail, "DUPLICATE");
+    const controls = [edit, list, duplicate];
+    if (controls.some((control) => !control)) return false;
+
+    if (document.getElementById("us-sign-rail-action-group")) return true;
+
+    const parents = new Set(controls.map((control) => control.parentElement));
+    if (parents.size !== 1) return false;
 
     const parent = controls[0].parentElement;
-    if (!parent || !controls.every((control) => control.parentElement === parent)) return;
+    const ordered = [...controls].sort((a, b) => {
+      const position = a.compareDocumentPosition(b);
+      return position & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+    });
 
-    let group = parent.querySelector(`:scope > .${ACTION_GROUP_CLASS}`);
-    if (!group) {
-      group = document.createElement("div");
-      group.className = ACTION_GROUP_CLASS;
-      parent.insertBefore(group, controls[0]);
-    }
+    const group = document.createElement("div");
+    group.id = "us-sign-rail-action-group";
+    parent.insertBefore(group, ordered[0]);
 
     for (const control of controls) {
-      removeAdjacentBreak(control);
+      removeNeighborBreaks(control);
       group.appendChild(control);
     }
+
+    return true;
   }
 
-  function findCounter(rail) {
-    const candidates = rail.querySelectorAll(
-      "span, small, strong, em, b, a, button, input[type='button'], input[type='submit']"
-    );
-    for (const element of candidates) {
-      if (/^OF\s*\d+$/i.test(textFor(element))) return element;
-    }
-    return null;
+  function counterCandidates(rail) {
+    return [...rail.querySelectorAll("span, small, strong, em, b, a, button, div")]
+      .filter((element) => {
+        if (element.id === "us-sign-rail-nav-group") return false;
+        return /^OF\s*\d+$/i.test(textFor(element));
+      })
+      .sort((a, b) => a.children.length - b.children.length);
   }
 
   function normalizeNavigator(rail) {
-    const counter = findCounter(rail);
-    if (!counter) return;
-    counter.classList.add(COUNTER_CLASS);
+    if (document.getElementById("us-sign-rail-nav-group")) return true;
 
-    let host = counter.parentElement;
-    while (host && host !== rail) {
-      const interactives = [...host.querySelectorAll("a, button, input[type='button'], input[type='submit']")];
-      const hasAction = interactives.some((element) => ["EDIT", "LIST", "DUPLICATE", "CLOCK IN", "CLOCK OUT"].includes(textFor(element)));
-      if (!hasAction && interactives.length >= 2 && interactives.length <= 8) break;
-      host = host.parentElement;
+    const counter = counterCandidates(rail)[0];
+    if (!counter || !counter.getClientRects().length) return false;
+
+    const counterRect = counter.getBoundingClientRect();
+    const centerY = counterRect.top + counterRect.height / 2;
+
+    const nearby = clickableControls(rail)
+      .filter((element) => {
+        if (element === counter || element.contains(counter) || counter.contains(element)) return false;
+        const label = textFor(element);
+        if (["EDIT", "LIST", "DUPLICATE", "CLOCK IN", "CLOCK OUT"].includes(label)) return false;
+        if (PROJECT_LINKS.has(label)) return false;
+
+        const rect = element.getBoundingClientRect();
+        const elementCenterY = rect.top + rect.height / 2;
+        const horizontalDistance = rect.right < counterRect.left
+          ? counterRect.left - rect.right
+          : rect.left > counterRect.right
+            ? rect.left - counterRect.right
+            : 0;
+
+        return Math.abs(elementCenterY - centerY) <= 14 && horizontalDistance <= 70;
+      })
+      .sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+
+    if (nearby.length < 2) return false;
+
+    const nodes = [...nearby, counter]
+      .sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+
+    const parent = nodes[0].parentElement;
+    if (!parent || !nodes.every((node) => node.parentElement === parent)) {
+      // Even when SquareCoil nests the counter differently, remove the blue styling directly.
+      counter.id = "us-sign-rail-counter";
+      counter.style.setProperty("background", "#252d35", "important");
+      counter.style.setProperty("background-color", "#252d35", "important");
+      counter.style.setProperty("background-image", "none", "important");
+      counter.style.setProperty("color", "#d4dbe3", "important");
+      counter.style.setProperty("border", "1px solid #3a4652", "important");
+      counter.style.setProperty("box-shadow", "none", "important");
+      return true;
     }
-    if (!host || host === rail) host = counter.parentElement;
-    if (!host) return;
 
-    host.classList.add(NAV_HOST_CLASS);
-    for (const element of host.querySelectorAll("a, button, input[type='button'], input[type='submit']")) {
-      if (element !== counter) element.classList.add(NAV_CLASS);
+    const group = document.createElement("div");
+    group.id = "us-sign-rail-nav-group";
+    parent.insertBefore(group, nodes[0]);
+
+    for (const node of nodes) {
+      removeNeighborBreaks(node);
+      if (node === counter) node.id = "us-sign-rail-counter";
+      group.appendChild(node);
     }
-    for (const br of host.querySelectorAll(":scope > br")) br.remove();
-  }
 
-  function normalizeClock(rail) {
-    const clock = ["CLOCK IN", "CLOCK OUT"]
-      .map((label) => findControl(rail, label))
-      .find(Boolean);
-    if (clock) clock.classList.add(CLOCK_CLASS);
+    return true;
   }
 
   function apply() {
@@ -438,15 +469,12 @@
 
     const rail = document.getElementById("pmlt");
     if (!rail) return;
-    normalizeActionButtons(rail);
     normalizeNavigator(rail);
-    normalizeClock(rail);
+    normalizeActions(rail);
   }
 
-  /* Bounded startup passes only. No permanent MutationObserver. */
   apply();
-  window.setTimeout(apply, 250);
+  window.setTimeout(apply, 300);
   window.setTimeout(apply, 900);
-  window.setTimeout(apply, 1800);
   window.addEventListener("pageshow", apply, { once: true });
 })();
