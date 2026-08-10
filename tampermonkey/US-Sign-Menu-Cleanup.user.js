@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Menu Cleanup and Reorder
 // @namespace    us-sign-full-modules
-// @version      2.5.0
-// @description  Keeps the cleaned sidebar and project rail stable with Design, Scope of Work, Project Status, and Tasks ordered for the active workflow.
+// @version      2.6.0
+// @description  Keeps the cleaned sidebar and project rail stable and correctly reorders both wrapped and flat SquareCoil project links.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-idle
 // @grant        none
@@ -40,7 +40,8 @@
     "MACHINE TIME"
   ]);
 
-  const PROJECT_ORDER = [
+  /* Visible project links. */
+  const PROJECT_LINKS = new Set([
     "DESIGN",
     "SCOPE OF WORK",
     "PROJECT STATUS",
@@ -48,6 +49,14 @@
     "DOCUMENTS",
     "PHOTOS",
     "PRODUCTION FILES"
+  ]);
+
+  /* Only reorder the upper workflow group. The Documents divider stays untouched. */
+  const PRIMARY_PROJECT_ORDER = [
+    "DESIGN",
+    "SCOPE OF WORK",
+    "PROJECT STATUS",
+    "TASKS"
   ];
 
   const HIDDEN_CLASS = "us-sign-menu-link-hidden";
@@ -145,7 +154,7 @@
       const label = labelFor(anchor);
       setLinkHidden(anchor, rail, PROJECT_HIDDEN_LINKS.has(label));
 
-      if (PROJECT_ORDER.includes(label)) {
+      if (PROJECT_LINKS.has(label)) {
         anchor.hidden = false;
         anchor.classList.remove(HIDDEN_CLASS);
         anchor.removeAttribute("aria-hidden");
@@ -166,39 +175,107 @@
     }
   }
 
+  function anchorsByLabel(rail) {
+    const map = new Map();
+    for (const anchor of rail.querySelectorAll("a")) {
+      const label = labelFor(anchor);
+      if (PRIMARY_PROJECT_ORDER.includes(label) && !anchor.hidden) {
+        map.set(label, anchor);
+      }
+    }
+    return map;
+  }
+
+  function reorderWrappedRows(rail, anchors) {
+    const rows = PRIMARY_PROJECT_ORDER
+      .map((label) => semanticRowFor(anchors.get(label), rail))
+      .filter(Boolean);
+
+    if (rows.length !== PRIMARY_PROJECT_ORDER.length) return false;
+    if (new Set(rows).size !== rows.length) return false;
+
+    const parent = rows[0].parentElement;
+    if (!parent || !rows.every((row) => row.parentElement === parent)) return false;
+
+    const current = Array.from(parent.children).filter((child) => rows.includes(child));
+    const alreadyOrdered = current.length === rows.length &&
+      current.every((row, index) => row === rows[index]);
+
+    if (alreadyOrdered) return true;
+
+    const marker = document.createComment("us-sign-primary-project-order");
+    const firstInDom = current[0] || rows[0];
+    parent.insertBefore(marker, firstInDom);
+
+    const fragment = document.createDocumentFragment();
+    rows.forEach((row) => fragment.appendChild(row));
+    parent.insertBefore(fragment, marker);
+    marker.remove();
+    return true;
+  }
+
+  function flatUnitFor(anchor) {
+    const nodes = [anchor];
+    let node = anchor.nextSibling;
+
+    /* Keep whitespace and the line break attached to the link when it moves. */
+    while (node && node.nodeType === Node.TEXT_NODE && !node.textContent.trim()) {
+      nodes.push(node);
+      node = node.nextSibling;
+    }
+
+    if (node && node.nodeType === Node.ELEMENT_NODE && node.tagName === "BR") {
+      nodes.push(node);
+    }
+
+    return nodes;
+  }
+
+  function reorderFlatLinks(anchors) {
+    const orderedAnchors = PRIMARY_PROJECT_ORDER.map((label) => anchors.get(label));
+    if (orderedAnchors.some((anchor) => !anchor)) return false;
+
+    const parent = orderedAnchors[0].parentElement;
+    if (!parent || !orderedAnchors.every((anchor) => anchor.parentElement === parent)) {
+      return false;
+    }
+
+    const domAnchors = Array.from(parent.children)
+      .filter((node) => node.tagName === "A" && orderedAnchors.includes(node));
+
+    const alreadyOrdered = domAnchors.length === orderedAnchors.length &&
+      domAnchors.every((anchor, index) => anchor === orderedAnchors[index]);
+
+    if (alreadyOrdered) return true;
+
+    const firstInDom = domAnchors[0] || orderedAnchors[0];
+    const marker = document.createComment("us-sign-primary-flat-project-order");
+    parent.insertBefore(marker, firstInDom);
+
+    const units = orderedAnchors.map(flatUnitFor);
+    const fragment = document.createDocumentFragment();
+
+    for (const unit of units) {
+      for (const node of unit) {
+        fragment.appendChild(node);
+      }
+    }
+
+    parent.insertBefore(fragment, marker);
+    marker.remove();
+    return true;
+  }
+
   function reorderProjectLinksOnce() {
     const rail = document.getElementById("pmlt");
     if (!rail) return;
 
-    const rows = new Map();
+    const anchors = anchorsByLabel(rail);
+    if (anchors.size !== PRIMARY_PROJECT_ORDER.length) return;
 
-    for (const anchor of rail.querySelectorAll("a")) {
-      const label = labelFor(anchor);
-      if (!PROJECT_ORDER.includes(label)) continue;
-
-      const row = semanticRowFor(anchor, rail);
-      if (row && !row.hidden) rows.set(label, row);
-    }
-
-    const ordered = PROJECT_ORDER.map((label) => rows.get(label)).filter(Boolean);
-    if (ordered.length < 2 || new Set(ordered).size !== ordered.length) return;
-
-    const parent = ordered[0].parentElement;
-    if (!parent || !ordered.every((row) => row.parentElement === parent)) return;
-
-    const current = Array.from(parent.children).filter((child) => ordered.includes(child));
-    const alreadyOrdered = current.length === ordered.length &&
-      current.every((row, index) => row === ordered[index]);
-
-    if (alreadyOrdered) return;
-
-    const marker = document.createComment("us-sign-project-order");
-    parent.insertBefore(marker, ordered[0]);
-
-    const fragment = document.createDocumentFragment();
-    ordered.forEach((row) => fragment.appendChild(row));
-    parent.insertBefore(fragment, marker);
-    marker.remove();
+    /* Prefer semantic rows. Fall back to SquareCoil's flat <a><br> rail. */
+    if (reorderWrappedRows(rail, anchors)) return;
+    reorderFlatLinks(anchors);
   }
 
   function apply() {
