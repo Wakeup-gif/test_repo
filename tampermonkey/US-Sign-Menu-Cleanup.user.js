@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Menu Cleanup and Reorder
 // @namespace    us-sign-full-modules
-// @version      2.7.0
-// @description  Keeps the cleaned sidebar and project rail stable, reorders SquareCoil project links, and normalizes project-rail controls.
+// @version      2.8.0
+// @description  Lightweight sidebar cleanup, stable project-link ordering, and compact project-rail controls without a permanent mutation observer.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-idle
 // @grant        none
@@ -15,222 +15,209 @@
   "use strict";
 
   const SIDEBAR_HIDDEN_LINKS = new Set([
-    "LEADS",
-    "QUEUES",
-    "PURCHASING",
-    "SCHEDULE",
-    "INSTALL CALENDAR",
-    "CONTACTS",
-    "ESTIMATES",
-    "SHOP ORDER",
-    "COST TO DATE",
-    "PURCHASE ORDERS",
-    "MATERIALS",
-    "MACHINE TIME",
-    "HELP CENTER"
+    "LEADS", "QUEUES", "PURCHASING", "SCHEDULE", "INSTALL CALENDAR",
+    "CONTACTS", "ESTIMATES", "SHOP ORDER", "COST TO DATE",
+    "PURCHASE ORDERS", "MATERIALS", "MACHINE TIME", "HELP CENTER"
   ]);
 
   const PROJECT_HIDDEN_LINKS = new Set([
-    "CONTACTS",
-    "ESTIMATES",
-    "SHOP ORDER",
-    "COST TO DATE",
-    "PURCHASE ORDERS",
-    "MATERIALS",
-    "MACHINE TIME"
+    "CONTACTS", "ESTIMATES", "SHOP ORDER", "COST TO DATE",
+    "PURCHASE ORDERS", "MATERIALS", "MACHINE TIME"
   ]);
 
   const PROJECT_LINKS = new Set([
-    "DESIGN",
-    "SCOPE OF WORK",
-    "PROJECT STATUS",
-    "TASKS",
-    "DOCUMENTS",
-    "PHOTOS",
-    "PRODUCTION FILES"
+    "DESIGN", "SCOPE OF WORK", "PROJECT STATUS", "TASKS",
+    "DOCUMENTS", "PHOTOS", "PRODUCTION FILES"
   ]);
 
   const PRIMARY_PROJECT_ORDER = [
-    "DESIGN",
-    "SCOPE OF WORK",
-    "PROJECT STATUS",
-    "TASKS"
+    "DESIGN", "SCOPE OF WORK", "PROJECT STATUS", "TASKS"
   ];
-
-  const RAIL_ACTION_LABELS = new Set([
-    "EDIT",
-    "LIST",
-    "DUPLICATE"
-  ]);
 
   const HIDDEN_CLASS = "us-sign-menu-link-hidden";
   const ROW_HIDDEN_CLASS = "us-sign-menu-row-hidden";
-  const RAIL_ACTION_CLASS = "us-sign-rail-action";
-  const RAIL_NAV_CLASS = "us-sign-rail-nav";
-  const RAIL_COUNTER_CLASS = "us-sign-rail-counter";
-  const RAIL_CLOCK_CLASS = "us-sign-rail-clock";
-
-  let scheduled = false;
-  let applying = false;
+  const ACTION_CLASS = "us-sign-rail-action";
+  const ACTION_GROUP_CLASS = "us-sign-rail-actions";
+  const NAV_HOST_CLASS = "us-sign-rail-nav-host";
+  const NAV_CLASS = "us-sign-rail-nav";
+  const COUNTER_CLASS = "us-sign-rail-counter";
+  const CLOCK_CLASS = "us-sign-rail-clock";
 
   const style = document.createElement("style");
   style.id = "us-sign-menu-cleanup-style";
   style.textContent = `
-    .${HIDDEN_CLASS},
-    .${ROW_HIDDEN_CLASS} {
-      display: none !important;
-    }
+    .${HIDDEN_CLASS}, .${ROW_HIDDEN_CLASS} { display: none !important; }
 
     #pmlt a:not(.${HIDDEN_CLASS}) {
       pointer-events: auto !important;
       cursor: pointer !important;
     }
 
-    /* ---------------------------------------------------------
-       Project rail controls
-       --------------------------------------------------------- */
+    /* Project action buttons: one compact layer, no Bootstrap stacking. */
+    #pmlt .${ACTION_GROUP_CLASS} {
+      display: flex !important;
+      flex-flow: row nowrap !important;
+      align-items: center !important;
+      gap: 6px !important;
+      width: 100% !important;
+      max-width: 190px !important;
+      margin: 10px 0 10px !important;
+      padding: 0 !important;
+      position: relative !important;
+      z-index: 1 !important;
+      background: transparent !important;
+      border: 0 !important;
+    }
 
-    #pmlt .${RAIL_ACTION_CLASS},
-    #pmlt .${RAIL_NAV_CLASS},
-    #pmlt .${RAIL_COUNTER_CLASS},
-    #pmlt .${RAIL_CLOCK_CLASS} {
-      box-sizing: border-box !important;
+    #pmlt .${ACTION_CLASS} {
+      appearance: none !important;
+      -webkit-appearance: none !important;
       position: relative !important;
       inset: auto !important;
       float: none !important;
-      transform: none !important;
-      isolation: isolate !important;
-      z-index: 3 !important;
-      box-shadow: none !important;
-      text-shadow: none !important;
-      vertical-align: middle !important;
-    }
-
-    #pmlt .${RAIL_ACTION_CLASS}::before,
-    #pmlt .${RAIL_ACTION_CLASS}::after,
-    #pmlt .${RAIL_NAV_CLASS}::before,
-    #pmlt .${RAIL_NAV_CLASS}::after,
-    #pmlt .${RAIL_CLOCK_CLASS}::before,
-    #pmlt .${RAIL_CLOCK_CLASS}::after {
-      content: none !important;
-      display: none !important;
-    }
-
-    #pmlt .${RAIL_ACTION_CLASS} {
       display: inline-flex !important;
+      flex: 1 1 0 !important;
       align-items: center !important;
       justify-content: center !important;
       width: auto !important;
-      min-width: 58px !important;
-      height: 34px !important;
-      min-height: 34px !important;
-      margin: 0 5px 5px 0 !important;
-      padding: 0 12px !important;
-      color: #cfd6de !important;
-      background: #22272e !important;
+      min-width: 0 !important;
+      max-width: none !important;
+      height: 31px !important;
+      min-height: 31px !important;
+      margin: 0 !important;
+      padding: 0 8px !important;
+      overflow: hidden !important;
+      color: #c8d0d9 !important;
+      background: #1d2228 !important;
       background-image: none !important;
-      border: 1px solid #404852 !important;
-      border-radius: 7px !important;
-      font-size: 13px !important;
+      border: 1px solid #353d46 !important;
+      border-radius: 6px !important;
+      box-shadow: none !important;
+      font-size: 11px !important;
       font-weight: 600 !important;
       line-height: 1 !important;
       letter-spacing: 0 !important;
       text-transform: none !important;
-      overflow: hidden !important;
+      text-shadow: none !important;
+      transform: none !important;
+      isolation: auto !important;
+      z-index: auto !important;
     }
 
-    #pmlt .${RAIL_ACTION_CLASS}:hover,
-    #pmlt .${RAIL_ACTION_CLASS}:focus-visible {
-      color: #f4f6f8 !important;
-      background: #2b3138 !important;
-      border-color: #59636f !important;
+    #pmlt .${ACTION_CLASS}::before,
+    #pmlt .${ACTION_CLASS}::after {
+      content: none !important;
+      display: none !important;
+    }
+
+    #pmlt .${ACTION_CLASS}:hover,
+    #pmlt .${ACTION_CLASS}:focus-visible {
+      color: #f5f7f9 !important;
+      background: #272d34 !important;
+      border-color: #4a5561 !important;
       outline: none !important;
     }
 
-    #pmlt .${RAIL_ACTION_CLASS}:active {
-      color: #ffffff !important;
-      background: #303740 !important;
-      border-color: #687482 !important;
-      transform: translateY(1px) !important;
+    /* Project navigator: neutral charcoal, not bright blue. */
+    #pmlt .${NAV_HOST_CLASS} {
+      display: inline-flex !important;
+      flex-flow: row nowrap !important;
+      align-items: center !important;
+      gap: 2px !important;
+      margin: 6px 0 4px !important;
+      padding: 0 !important;
+      background: transparent !important;
+      border: 0 !important;
+      white-space: nowrap !important;
     }
 
-    #pmlt .${RAIL_NAV_CLASS} {
+    #pmlt .${NAV_CLASS} {
+      appearance: none !important;
+      -webkit-appearance: none !important;
+      position: relative !important;
+      inset: auto !important;
+      float: none !important;
       display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
-      width: 20px !important;
-      min-width: 20px !important;
+      width: 18px !important;
+      min-width: 18px !important;
+      max-width: 18px !important;
       height: 24px !important;
       min-height: 24px !important;
-      margin: 0 1px !important;
+      margin: 0 !important;
       padding: 0 !important;
       color: #aeb8c3 !important;
       background: transparent !important;
       background-image: none !important;
       border: 0 !important;
-      border-radius: 5px !important;
-      font-size: 16px !important;
-      font-weight: 700 !important;
+      border-radius: 4px !important;
+      box-shadow: none !important;
+      font-size: 15px !important;
       line-height: 1 !important;
-      overflow: hidden !important;
+      text-shadow: none !important;
+      transform: none !important;
     }
 
-    #pmlt .${RAIL_NAV_CLASS}:hover,
-    #pmlt .${RAIL_NAV_CLASS}:focus-visible {
-      color: #ffffff !important;
-      background: #272d34 !important;
+    #pmlt .${NAV_CLASS}:hover,
+    #pmlt .${NAV_CLASS}:focus-visible {
+      color: #f4f6f8 !important;
+      background: #242a31 !important;
       outline: none !important;
     }
 
-    #pmlt .${RAIL_COUNTER_CLASS} {
+    #pmlt .${COUNTER_CLASS} {
+      appearance: none !important;
+      -webkit-appearance: none !important;
+      position: relative !important;
       display: inline-flex !important;
       align-items: center !important;
       justify-content: center !important;
-      width: auto !important;
       min-width: 38px !important;
-      height: 26px !important;
-      min-height: 26px !important;
-      margin: 0 3px !important;
-      padding: 0 7px !important;
-      color: #d8e0e8 !important;
-      background: #2c3540 !important;
+      width: auto !important;
+      height: 25px !important;
+      min-height: 25px !important;
+      margin: 0 2px !important;
+      padding: 0 6px !important;
+      color: #d4dbe3 !important;
+      background: #26303a !important;
       background-image: none !important;
-      border: 1px solid #465361 !important;
+      border: 1px solid #3c4855 !important;
       border-radius: 5px !important;
-      font-size: 12px !important;
+      box-shadow: none !important;
+      font-size: 11px !important;
       font-weight: 600 !important;
       line-height: 1 !important;
-      white-space: nowrap !important;
-      overflow: hidden !important;
+      text-shadow: none !important;
+      transform: none !important;
     }
 
-    #pmlt .${RAIL_CLOCK_CLASS} {
-      display: inline-flex !important;
+    #pmlt .${CLOCK_CLASS} {
+      appearance: none !important;
+      -webkit-appearance: none !important;
+      position: relative !important;
+      inset: auto !important;
+      float: none !important;
+      display: flex !important;
       align-items: center !important;
       justify-content: center !important;
       width: 100% !important;
       max-width: 190px !important;
-      min-height: 40px !important;
-      height: 40px !important;
+      height: 38px !important;
+      min-height: 38px !important;
       margin: 10px 0 12px !important;
-      padding: 0 14px !important;
-      color: #e7dcc7 !important;
-      background: #302a20 !important;
+      padding: 0 12px !important;
+      color: #dfd5c3 !important;
+      background: #2c271f !important;
       background-image: none !important;
-      border: 1px solid #5a4a31 !important;
-      border-radius: 7px !important;
-      font-size: 13px !important;
+      border: 1px solid #55472f !important;
+      border-radius: 6px !important;
+      box-shadow: none !important;
+      font-size: 12px !important;
       font-weight: 650 !important;
       line-height: 1 !important;
-      overflow: hidden !important;
-    }
-
-    #pmlt .${RAIL_CLOCK_CLASS}:hover,
-    #pmlt .${RAIL_CLOCK_CLASS}:focus-visible {
-      color: #fff4df !important;
-      background: #3a3124 !important;
-      border-color: #715c3d !important;
-      outline: none !important;
+      text-shadow: none !important;
+      transform: none !important;
     }
   `;
   (document.head || document.documentElement).appendChild(style);
@@ -241,6 +228,16 @@
     .trim()
     .toUpperCase();
 
+  function textFor(element) {
+    return clean(
+      element?.value ||
+      element?.getAttribute?.("aria-label") ||
+      element?.getAttribute?.("title") ||
+      element?.textContent ||
+      ""
+    );
+  }
+
   function labelFor(anchor) {
     const clone = anchor.cloneNode(true);
     clone.querySelectorAll(".badge, .label, small, sup").forEach((node) => node.remove());
@@ -248,30 +245,16 @@
   }
 
   function semanticRowFor(anchor, root) {
-    const row = anchor.closest(
-      "li, .nav-item, .menu-item, .project-menu-item, .list-group-item"
-    );
-
-    if (row && row !== root && root.contains(row)) {
-      return row;
-    }
+    const row = anchor.closest("li, .nav-item, .menu-item, .project-menu-item, .list-group-item");
+    if (row && row !== root && root.contains(row)) return row;
 
     const parent = anchor.parentElement;
-    if (!parent || parent === root) {
-      return null;
-    }
-
-    const directLinks = parent.querySelectorAll(":scope > a");
-    if (directLinks.length === 1) {
-      return parent;
-    }
-
-    return null;
+    if (!parent || parent === root) return null;
+    return parent.querySelectorAll(":scope > a").length === 1 ? parent : null;
   }
 
   function setLinkHidden(anchor, root, hidden) {
     const row = semanticRowFor(anchor, root);
-
     anchor.classList.toggle(HIDDEN_CLASS, hidden);
     anchor.hidden = hidden;
     anchor.setAttribute("aria-hidden", hidden ? "true" : "false");
@@ -279,14 +262,10 @@
     if (row) {
       row.classList.toggle(ROW_HIDDEN_CLASS, hidden);
       row.hidden = hidden;
-      row.dataset.usSignMenuOwned = "true";
-    }
-
-    if (!row) {
+    } else {
       const next = anchor.nextSibling;
-      if (next && next.nodeType === Node.ELEMENT_NODE && next.tagName === "BR") {
+      if (next?.nodeType === Node.ELEMENT_NODE && next.tagName === "BR") {
         next.style.setProperty("display", hidden ? "none" : "", hidden ? "important" : "");
-        next.dataset.usSignMenuBreak = "true";
       }
     }
   }
@@ -294,10 +273,8 @@
   function cleanMainSidebar() {
     const sidebar = document.getElementById("sidebar_left");
     if (!sidebar) return;
-
     for (const anchor of sidebar.querySelectorAll("a")) {
-      const hidden = SIDEBAR_HIDDEN_LINKS.has(labelFor(anchor));
-      setLinkHidden(anchor, sidebar, hidden);
+      setLinkHidden(anchor, sidebar, SIDEBAR_HIDDEN_LINKS.has(labelFor(anchor)));
     }
   }
 
@@ -313,77 +290,12 @@
         anchor.hidden = false;
         anchor.classList.remove(HIDDEN_CLASS);
         anchor.removeAttribute("aria-hidden");
-        anchor.style.removeProperty("display");
-        anchor.style.removeProperty("visibility");
-        anchor.style.removeProperty("opacity");
         anchor.style.setProperty("pointer-events", "auto", "important");
-
         const row = semanticRowFor(anchor, rail);
         if (row) {
           row.hidden = false;
           row.classList.remove(ROW_HIDDEN_CLASS);
-          row.style.removeProperty("display");
-          row.style.removeProperty("visibility");
-          row.style.removeProperty("opacity");
         }
-      }
-    }
-  }
-
-  function markRailControls() {
-    const rail = document.getElementById("pmlt");
-    if (!rail) return;
-
-    const controls = rail.querySelectorAll(
-      "a, button, input[type='button'], input[type='submit']"
-    );
-
-    for (const control of controls) {
-      const label = clean(
-        control.value ||
-        control.getAttribute("aria-label") ||
-        control.getAttribute("title") ||
-        control.textContent ||
-        ""
-      );
-
-      control.classList.remove(
-        RAIL_ACTION_CLASS,
-        RAIL_NAV_CLASS,
-        RAIL_COUNTER_CLASS,
-        RAIL_CLOCK_CLASS
-      );
-
-      if (RAIL_ACTION_LABELS.has(label)) {
-        control.classList.add(RAIL_ACTION_CLASS);
-        continue;
-      }
-
-      if (label === "CLOCK IN" || label === "CLOCK OUT") {
-        control.classList.add(RAIL_CLOCK_CLASS);
-        continue;
-      }
-
-      if (/^OF\s*\d+$/i.test(label)) {
-        control.classList.add(RAIL_COUNTER_CLASS);
-        continue;
-      }
-
-      if (
-        label &&
-        label.length <= 6 &&
-        !/[A-Z0-9]/.test(label) &&
-        /[<>‹›«»◀▶⏮⏭←→|]/.test(label)
-      ) {
-        control.classList.add(RAIL_NAV_CLASS);
-      }
-    }
-
-    /* Counter may be a non-clickable span rather than a button/link. */
-    for (const element of rail.querySelectorAll("span, small, strong, em")) {
-      const label = clean(element.textContent);
-      if (/^OF\s*\d+$/i.test(label)) {
-        element.classList.add(RAIL_COUNTER_CLASS);
       }
     }
   }
@@ -392,141 +304,149 @@
     const map = new Map();
     for (const anchor of rail.querySelectorAll("a")) {
       const label = labelFor(anchor);
-      if (PRIMARY_PROJECT_ORDER.includes(label) && !anchor.hidden) {
-        map.set(label, anchor);
-      }
+      if (PRIMARY_PROJECT_ORDER.includes(label) && !anchor.hidden) map.set(label, anchor);
     }
     return map;
-  }
-
-  function reorderWrappedRows(rail, anchors) {
-    const rows = PRIMARY_PROJECT_ORDER
-      .map((label) => semanticRowFor(anchors.get(label), rail))
-      .filter(Boolean);
-
-    if (rows.length !== PRIMARY_PROJECT_ORDER.length) return false;
-    if (new Set(rows).size !== rows.length) return false;
-
-    const parent = rows[0].parentElement;
-    if (!parent || !rows.every((row) => row.parentElement === parent)) return false;
-
-    const current = Array.from(parent.children).filter((child) => rows.includes(child));
-    const alreadyOrdered = current.length === rows.length &&
-      current.every((row, index) => row === rows[index]);
-
-    if (alreadyOrdered) return true;
-
-    const marker = document.createComment("us-sign-primary-project-order");
-    const firstInDom = current[0] || rows[0];
-    parent.insertBefore(marker, firstInDom);
-
-    const fragment = document.createDocumentFragment();
-    rows.forEach((row) => fragment.appendChild(row));
-    parent.insertBefore(fragment, marker);
-    marker.remove();
-    return true;
   }
 
   function flatUnitFor(anchor) {
     const nodes = [anchor];
     let node = anchor.nextSibling;
-
     while (node && node.nodeType === Node.TEXT_NODE && !node.textContent.trim()) {
       nodes.push(node);
       node = node.nextSibling;
     }
-
-    if (node && node.nodeType === Node.ELEMENT_NODE && node.tagName === "BR") {
-      nodes.push(node);
-    }
-
+    if (node?.nodeType === Node.ELEMENT_NODE && node.tagName === "BR") nodes.push(node);
     return nodes;
   }
 
-  function reorderFlatLinks(anchors) {
-    const orderedAnchors = PRIMARY_PROJECT_ORDER.map((label) => anchors.get(label));
-    if (orderedAnchors.some((anchor) => !anchor)) return false;
-
-    const parent = orderedAnchors[0].parentElement;
-    if (!parent || !orderedAnchors.every((anchor) => anchor.parentElement === parent)) {
-      return false;
-    }
-
-    const domAnchors = Array.from(parent.children)
-      .filter((node) => node.tagName === "A" && orderedAnchors.includes(node));
-
-    const alreadyOrdered = domAnchors.length === orderedAnchors.length &&
-      domAnchors.every((anchor, index) => anchor === orderedAnchors[index]);
-
-    if (alreadyOrdered) return true;
-
-    const firstInDom = domAnchors[0] || orderedAnchors[0];
-    const marker = document.createComment("us-sign-primary-flat-project-order");
-    parent.insertBefore(marker, firstInDom);
-
-    const units = orderedAnchors.map(flatUnitFor);
-    const fragment = document.createDocumentFragment();
-
-    for (const unit of units) {
-      for (const node of unit) {
-        fragment.appendChild(node);
-      }
-    }
-
-    parent.insertBefore(fragment, marker);
-    marker.remove();
-    return true;
-  }
-
-  function reorderProjectLinksOnce() {
+  function reorderProjectLinks() {
     const rail = document.getElementById("pmlt");
     if (!rail) return;
-
     const anchors = anchorsByLabel(rail);
     if (anchors.size !== PRIMARY_PROJECT_ORDER.length) return;
 
-    if (reorderWrappedRows(rail, anchors)) return;
-    reorderFlatLinks(anchors);
+    const orderedAnchors = PRIMARY_PROJECT_ORDER.map((label) => anchors.get(label));
+    const rows = orderedAnchors.map((anchor) => semanticRowFor(anchor, rail));
+
+    if (rows.every(Boolean) && new Set(rows).size === rows.length) {
+      const parent = rows[0].parentElement;
+      if (parent && rows.every((row) => row.parentElement === parent)) {
+        const current = Array.from(parent.children).filter((child) => rows.includes(child));
+        if (!current.every((row, index) => row === rows[index])) {
+          const marker = document.createComment("us-sign-project-order");
+          parent.insertBefore(marker, current[0] || rows[0]);
+          const fragment = document.createDocumentFragment();
+          rows.forEach((row) => fragment.appendChild(row));
+          parent.insertBefore(fragment, marker);
+          marker.remove();
+        }
+        return;
+      }
+    }
+
+    const parent = orderedAnchors[0].parentElement;
+    if (!parent || !orderedAnchors.every((anchor) => anchor.parentElement === parent)) return;
+    const current = Array.from(parent.children).filter((node) => node.tagName === "A" && orderedAnchors.includes(node));
+    if (current.length === orderedAnchors.length && current.every((anchor, index) => anchor === orderedAnchors[index])) return;
+
+    const marker = document.createComment("us-sign-project-flat-order");
+    parent.insertBefore(marker, current[0] || orderedAnchors[0]);
+    const fragment = document.createDocumentFragment();
+    orderedAnchors.map(flatUnitFor).flat().forEach((node) => fragment.appendChild(node));
+    parent.insertBefore(fragment, marker);
+    marker.remove();
   }
 
-  function apply() {
-    scheduled = false;
-    if (applying) return;
+  function findControl(rail, label) {
+    return [...rail.querySelectorAll("a, button, input[type='button'], input[type='submit']")]
+      .find((element) => textFor(element) === label) || null;
+  }
 
-    applying = true;
-    try {
-      cleanMainSidebar();
-      cleanProjectRail();
-      markRailControls();
-      reorderProjectLinksOnce();
-    } finally {
-      applying = false;
+  function removeAdjacentBreak(control) {
+    if (!control) return;
+    const next = control.nextSibling;
+    if (next?.nodeType === Node.ELEMENT_NODE && next.tagName === "BR") next.remove();
+    const previous = control.previousSibling;
+    if (previous?.nodeType === Node.ELEMENT_NODE && previous.tagName === "BR") previous.remove();
+  }
+
+  function normalizeActionButtons(rail) {
+    const controls = ["EDIT", "LIST", "DUPLICATE"].map((label) => findControl(rail, label));
+    controls.filter(Boolean).forEach((control) => control.classList.add(ACTION_CLASS));
+    if (controls.some((control) => !control)) return;
+
+    const parent = controls[0].parentElement;
+    if (!parent || !controls.every((control) => control.parentElement === parent)) return;
+
+    let group = parent.querySelector(`:scope > .${ACTION_GROUP_CLASS}`);
+    if (!group) {
+      group = document.createElement("div");
+      group.className = ACTION_GROUP_CLASS;
+      parent.insertBefore(group, controls[0]);
+    }
+
+    for (const control of controls) {
+      removeAdjacentBreak(control);
+      group.appendChild(control);
     }
   }
 
-  function scheduleApply() {
-    if (scheduled || applying) return;
-    scheduled = true;
-    window.requestAnimationFrame(apply);
+  function findCounter(rail) {
+    const candidates = rail.querySelectorAll(
+      "span, small, strong, em, b, a, button, input[type='button'], input[type='submit']"
+    );
+    for (const element of candidates) {
+      if (/^OF\s*\d+$/i.test(textFor(element))) return element;
+    }
+    return null;
   }
 
-  scheduleApply();
-  window.setTimeout(scheduleApply, 350);
-  window.setTimeout(scheduleApply, 1200);
-  window.addEventListener("pageshow", scheduleApply);
+  function normalizeNavigator(rail) {
+    const counter = findCounter(rail);
+    if (!counter) return;
+    counter.classList.add(COUNTER_CLASS);
 
-  const observer = new MutationObserver((mutations) => {
-    if (applying) return;
+    let host = counter.parentElement;
+    while (host && host !== rail) {
+      const interactives = [...host.querySelectorAll("a, button, input[type='button'], input[type='submit']")];
+      const hasAction = interactives.some((element) => ["EDIT", "LIST", "DUPLICATE", "CLOCK IN", "CLOCK OUT"].includes(textFor(element)));
+      if (!hasAction && interactives.length >= 2 && interactives.length <= 8) break;
+      host = host.parentElement;
+    }
+    if (!host || host === rail) host = counter.parentElement;
+    if (!host) return;
 
-    const changed = mutations.some((mutation) =>
-      mutation.addedNodes.length || mutation.removedNodes.length
-    );
+    host.classList.add(NAV_HOST_CLASS);
+    for (const element of host.querySelectorAll("a, button, input[type='button'], input[type='submit']")) {
+      if (element !== counter) element.classList.add(NAV_CLASS);
+    }
+    for (const br of host.querySelectorAll(":scope > br")) br.remove();
+  }
 
-    if (changed) scheduleApply();
-  });
+  function normalizeClock(rail) {
+    const clock = ["CLOCK IN", "CLOCK OUT"]
+      .map((label) => findControl(rail, label))
+      .find(Boolean);
+    if (clock) clock.classList.add(CLOCK_CLASS);
+  }
 
-  observer.observe(document.documentElement, {
-    childList: true,
-    subtree: true
-  });
+  function apply() {
+    cleanMainSidebar();
+    cleanProjectRail();
+    reorderProjectLinks();
+
+    const rail = document.getElementById("pmlt");
+    if (!rail) return;
+    normalizeActionButtons(rail);
+    normalizeNavigator(rail);
+    normalizeClock(rail);
+  }
+
+  /* Bounded startup passes only. No permanent MutationObserver. */
+  apply();
+  window.setTimeout(apply, 250);
+  window.setTimeout(apply, 900);
+  window.setTimeout(apply, 1800);
+  window.addEventListener("pageshow", apply, { once: true });
 })();
