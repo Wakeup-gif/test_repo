@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Menu Cleanup and Reorder
 // @namespace    us-sign-full-modules
-// @version      2.4.0
-// @description  Keeps the cleaned sidebar and project rail stable without moving links during clicks.
+// @version      2.5.0
+// @description  Keeps the cleaned sidebar and project rail stable with Design, Scope of Work, Project Status, and Tasks ordered for the active workflow.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-idle
 // @grant        none
@@ -41,10 +41,10 @@
   ]);
 
   const PROJECT_ORDER = [
-    "TASKS",
-    "SCOPE OF WORK",
     "DESIGN",
+    "SCOPE OF WORK",
     "PROJECT STATUS",
+    "TASKS",
     "DOCUMENTS",
     "PHOTOS",
     "PRODUCTION FILES"
