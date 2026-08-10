@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Menu Cleanup and Reorder
 // @namespace    us-sign-full-modules
-// @version      2.9.0
-// @description  Lightweight sidebar cleanup, stable project-link ordering, and deterministic compact project-rail controls.
+// @version      3.0.0
+// @description  Lightweight sidebar cleanup, project ordering, compact rail controls, project-page marker, and native sticky rail in one bounded runtime.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-idle
 // @grant        none
@@ -13,6 +13,9 @@
 
 (function () {
   "use strict";
+
+  if (window.__usSignMenuCleanupV300) return;
+  window.__usSignMenuCleanupV300 = true;
 
   const SIDEBAR_HIDDEN_LINKS = new Set([
     "LEADS", "QUEUES", "PURCHASING", "SCHEDULE", "INSTALL CALENDAR",
@@ -41,6 +44,16 @@
   style.id = "us-sign-menu-cleanup-style";
   style.textContent = `
     .${HIDDEN_CLASS}, .${ROW_HIDDEN_CLASS} { display: none !important; }
+
+    html.us-sign-project-page #pmlt {
+      position: sticky !important;
+      top: 58px !important;
+      align-self: flex-start !important;
+      max-height: calc(100vh - 58px) !important;
+      overflow-y: auto !important;
+      overflow-x: hidden !important;
+      scrollbar-width: thin !important;
+    }
 
     #pmlt a:not(.${HIDDEN_CLASS}) {
       pointer-events: auto !important;
@@ -206,6 +219,14 @@
       content: none !important;
       display: none !important;
     }
+
+    @media (max-width: 900px) {
+      html.us-sign-project-page #pmlt {
+        position: static !important;
+        max-height: none !important;
+        overflow: visible !important;
+      }
+    }
   `;
   (document.head || document.documentElement).appendChild(style);
 
@@ -249,12 +270,21 @@
     if (row) {
       row.classList.toggle(ROW_HIDDEN_CLASS, hidden);
       row.hidden = hidden;
-    } else {
-      const next = anchor.nextSibling;
-      if (next?.nodeType === Node.ELEMENT_NODE && next.tagName === "BR") {
-        next.style.setProperty("display", hidden ? "none" : "", hidden ? "important" : "");
-      }
+      return;
     }
+
+    const next = anchor.nextSibling;
+    if (next?.nodeType === Node.ELEMENT_NODE && next.tagName === "BR") {
+      if (hidden) next.style.setProperty("display", "none", "important");
+      else next.style.removeProperty("display");
+    }
+  }
+
+  function markProjectPage() {
+    document.documentElement.classList.toggle(
+      "us-sign-project-page",
+      Boolean(document.getElementById("pmlt"))
+    );
   }
 
   function cleanMainSidebar() {
@@ -310,6 +340,7 @@
   function reorderProjectLinks() {
     const rail = document.getElementById("pmlt");
     if (!rail) return;
+
     const anchors = anchorsByLabel(rail);
     if (anchors.size !== PRIMARY_PROJECT_ORDER.length) return;
 
@@ -334,6 +365,7 @@
 
     const parent = orderedAnchors[0].parentElement;
     if (!parent || !orderedAnchors.every((anchor) => anchor.parentElement === parent)) return;
+
     const current = Array.from(parent.children)
       .filter((node) => node.tagName === "A" && orderedAnchors.includes(node));
 
@@ -365,16 +397,16 @@
   }
 
   function normalizeActions(rail) {
-    const edit = findClickable(rail, "EDIT");
-    const list = findClickable(rail, "LIST");
-    const duplicate = findClickable(rail, "DUPLICATE");
-    const controls = [edit, list, duplicate];
-    if (controls.some((control) => !control)) return false;
-
     if (document.getElementById("us-sign-rail-action-group")) return true;
 
-    const parents = new Set(controls.map((control) => control.parentElement));
-    if (parents.size !== 1) return false;
+    const controls = [
+      findClickable(rail, "EDIT"),
+      findClickable(rail, "LIST"),
+      findClickable(rail, "DUPLICATE")
+    ];
+
+    if (controls.some((control) => !control)) return false;
+    if (new Set(controls.map((control) => control.parentElement)).size !== 1) return false;
 
     const parent = controls[0].parentElement;
     const ordered = [...controls].sort((a, b) => {
@@ -396,10 +428,7 @@
 
   function counterCandidates(rail) {
     return [...rail.querySelectorAll("span, small, strong, em, b, a, button, div")]
-      .filter((element) => {
-        if (element.id === "us-sign-rail-nav-group") return false;
-        return /^OF\s*\d+$/i.test(textFor(element));
-      })
+      .filter((element) => element.id !== "us-sign-rail-nav-group" && /^OF\s*\d+$/i.test(textFor(element)))
       .sort((a, b) => a.children.length - b.children.length);
   }
 
@@ -438,7 +467,6 @@
 
     const parent = nodes[0].parentElement;
     if (!parent || !nodes.every((node) => node.parentElement === parent)) {
-      // Even when SquareCoil nests the counter differently, remove the blue styling directly.
       counter.id = "us-sign-rail-counter";
       counter.style.setProperty("background", "#252d35", "important");
       counter.style.setProperty("background-color", "#252d35", "important");
@@ -463,18 +491,29 @@
   }
 
   function apply() {
+    markProjectPage();
     cleanMainSidebar();
     cleanProjectRail();
     reorderProjectLinks();
 
     const rail = document.getElementById("pmlt");
-    if (!rail) return;
+    if (!rail) return false;
+
     normalizeNavigator(rail);
     normalizeActions(rail);
+    return true;
   }
 
-  apply();
-  window.setTimeout(apply, 300);
-  window.setTimeout(apply, 900);
-  window.addEventListener("pageshow", apply, { once: true });
+  function start() {
+    apply();
+    window.setTimeout(apply, 650);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", start, { once: true });
+  } else {
+    start();
+  }
+
+  window.addEventListener("pageshow", () => requestAnimationFrame(apply));
 })();
