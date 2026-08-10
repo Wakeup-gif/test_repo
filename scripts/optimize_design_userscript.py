@@ -1,3 +1,4 @@
+# Deterministic one-shot transformer for the self-contained Design userscript.
 from pathlib import Path
 import re
 
@@ -294,8 +295,6 @@ if old_start not in text:
     raise SystemExit("Start block not found after lifecycle replacement.")
 text = text.replace(old_start, new_start, 1)
 
-# The lifecycle replacement removes scheduleRebuild/createObservers, so navigation
-# listeners must call startDiscovery instead of the deleted function.
 if "scheduleRebuild(" in text[text.find("function installNavigationEvents"):]:
     raise SystemExit("A navigation scheduleRebuild reference remains.")
 
