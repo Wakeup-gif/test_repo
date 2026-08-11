@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# Trigger one-time theme repair workflow.
 path = Path("tampermonkey/US-Sign-Full-UI-Theme.user.js")
 text = path.read_text(encoding="utf-8")
 
@@ -39,7 +40,7 @@ patch = needle + '''
     html body .tray-left form#form select.input-sm:focus {
       color: var(--us-text) !important;
       -webkit-text-fill-color: var(--us-text) !important;
-      background: rgba(255, 255, 255, 0.055) !important;
+      background: var(--us-bg-soft) !important;
       background-color: var(--us-bg-soft) !important;
       border-color: var(--us-border-focus) !important;
       outline: none !important;
