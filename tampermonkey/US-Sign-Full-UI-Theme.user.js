@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      1.1.0
+// @version      1.1.1
 // @description  Canonical SquareCoil dark UI theme with tray, layout, panel, form, table, dropdown, editor, modal, and readable-text repairs.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
@@ -562,6 +562,46 @@
       padding-right: 10px !important;
       appearance: auto !important;
       -webkit-appearance: auto !important;
+    }
+
+    /* Existing Projects search filters: prevent Chrome's native light select surface. */
+    html body .tray-left form#form .field.select select,
+    html body .tray-left form#form select.input-sm {
+      color-scheme: dark !important;
+      color: var(--us-text-soft) !important;
+      -webkit-text-fill-color: var(--us-text-soft) !important;
+      background: var(--us-bg-soft) !important;
+      background-color: var(--us-bg-soft) !important;
+      background-image: none !important;
+      border: 1px solid var(--us-border) !important;
+      box-shadow: none !important;
+      appearance: none !important;
+      -webkit-appearance: none !important;
+    }
+
+    html body .tray-left form#form .field.select select:hover,
+    html body .tray-left form#form .field.select select:focus,
+    html body .tray-left form#form select.input-sm:hover,
+    html body .tray-left form#form select.input-sm:focus {
+      color: var(--us-text) !important;
+      -webkit-text-fill-color: var(--us-text) !important;
+      background: rgba(255, 255, 255, 0.055) !important;
+      background-color: var(--us-bg-soft) !important;
+      border-color: var(--us-border-focus) !important;
+      outline: none !important;
+    }
+
+    html body .tray-left form#form .field.select > i.arrow.double {
+      color: var(--us-text-muted) !important;
+      opacity: 0.9 !important;
+      pointer-events: none !important;
+    }
+
+    html body .tray-left form#form select option,
+    html body .tray-left form#form select optgroup {
+      color: var(--us-text-soft) !important;
+      background: var(--us-bg-elevated) !important;
+      background-color: var(--us-bg-elevated) !important;
     }
 
     select option,
