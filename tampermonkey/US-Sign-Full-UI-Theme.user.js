@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      1.0.0
+// @version      1.1.0
 // @description  Canonical SquareCoil dark UI theme with tray, layout, panel, form, table, dropdown, editor, modal, and readable-text repairs.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
@@ -768,14 +768,31 @@
 
     html body :is(#descriptionbox, #designbox, .us-sign-description-panel, .us-sign-readable-content)
     :is([style*="color:red" i], [style*="color: red" i], [style*="#ff0000" i], [style*="#f00" i], font[color="red" i], font[color="#ff0000" i]) {
-      color: #d9aaaa !important;
-      -webkit-text-fill-color: #d9aaaa !important;
+      color: #c49a96 !important;
+      -webkit-text-fill-color: #c49a96 !important;
     }
 
     html body :is(#descriptionbox, #designbox, .us-sign-description-panel, .us-sign-readable-content)
     :is([style*="color:green" i], [style*="color: green" i], [style*="#008000" i], [style*="#00ff00" i], font[color="green" i], font[color="#008000" i]) {
       color: #acd0b5 !important;
       -webkit-text-fill-color: #acd0b5 !important;
+    }
+
+    /* Description rich-text cleanup: remove inherited highlight chips while preserving text formatting. */
+    html body :is(#descriptionbox, .us-sign-description-panel)
+    .panel-body :is(
+      mark,
+      .marker,
+      [style*="background:" i],
+      [style*="background-color:" i],
+      [bgcolor]
+    ) {
+      background: transparent !important;
+      background-color: transparent !important;
+      background-image: none !important;
+      box-shadow: none !important;
+      border-radius: 0 !important;
+      text-shadow: none !important;
     }
 
     ::-webkit-scrollbar {
