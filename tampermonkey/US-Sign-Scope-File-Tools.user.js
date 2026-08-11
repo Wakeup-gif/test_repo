@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Scope of Work File Tools
 // @namespace    us-sign-full-modules
-// @version      2.5.1
-// @description  Adds project-folder and reference-link controls from Important Notes.
+// @version      2.6.0
+// @description  Adds project-folder and reference-link controls from Important Notes with reliable OneCommander launching.
 // @match        https://ussignandmill.squarecoil.net/project.php*
 // @run-at       document-idle
 // @grant        GM_addStyle
@@ -13,6 +13,9 @@
 
 (function () {
   "use strict";
+
+  if (window.__usSignScopeFileToolsV260) return;
+  window.__usSignScopeFileToolsV260 = true;
 
   const HOST_ID = "us-sign-scope-file-tools";
   const PROTOCOL = "ussign-onecommander";
@@ -135,7 +138,13 @@
 
   function openPath(path) {
     if (!path) return;
-    location.href = `${PROTOCOL}://open?path=${encodeBase64Url(path)}`;
+    const anchor = document.createElement("a");
+    anchor.href = `${PROTOCOL}://open/${encodeBase64Url(path)}`;
+    anchor.style.display = "none";
+    anchor.setAttribute("aria-hidden", "true");
+    document.body.appendChild(anchor);
+    anchor.click();
+    window.setTimeout(() => anchor.remove(), 800);
   }
 
   function openUrl(url) {
@@ -173,6 +182,10 @@
     host.addEventListener("click", (event) => {
       const button = event.target.closest("button");
       if (!button || button.disabled) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
       const data = parseNotes(textarea.value);
       if (button.dataset.action === "copy") copyText(data.projectPath);
       if (button.dataset.action === "open") openPath(data.projectPath);
