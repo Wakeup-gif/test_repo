@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      1.2.0
-// @description  Canonical SquareCoil dark glass UI with fixed site wallpaper, tray, layout, panel, form, table, dropdown, editor, modal, and readable-text repairs.
+// @version      2.0.0
+// @description  Blue macOS-inspired glass theme for SquareCoil with fixed wallpaper, translucent shells, polished forms, tables, menus, editors, and readable project content.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
 // @grant        GM_addStyle
@@ -15,49 +15,84 @@
   "use strict";
 
   GM_addStyle(String.raw`
-    @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&display=swap");
-
     :root {
-      --us-bg: #111418;
-      --us-bg-elevated: #171b20;
-      --us-bg-soft: #1c2127;
-      --us-glass: rgba(30, 35, 42, 0.78);
-      --us-glass-strong: rgba(25, 29, 35, 0.94);
-      --us-glass-soft: rgba(255, 255, 255, 0.035);
-      --us-hover: rgba(255, 255, 255, 0.065);
-      --us-text: #f4f6f8;
-      --us-text-soft: #c9ced5;
-      --us-text-muted: #8f98a3;
-      --us-accent: #c1ccd7;
-      --us-accent-soft: rgba(155, 172, 189, 0.16);
-      --us-success: #78a88a;
-      --us-warning: #c7a96b;
-      --us-danger: #c47a7a;
-      --us-info: #7d9eb8;
-      --us-border: rgba(255, 255, 255, 0.085);
-      --us-border-strong: rgba(255, 255, 255, 0.14);
-      --us-border-focus: rgba(193, 204, 215, 0.42);
-      --us-shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.18);
-      --us-shadow-md: 0 12px 32px rgba(0, 0, 0, 0.24);
-      --us-shadow-lg: 0 22px 54px rgba(0, 0, 0, 0.34);
-      --us-radius-sm: 7px;
-      --us-radius-md: 10px;
-      --us-radius-lg: 14px;
-      --us-font: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color-scheme: dark;
+
+      --us-bg: #0b1017;
+      --us-bg-deep: #070b10;
+      --us-bg-elevated: rgba(18, 25, 34, 0.82);
+      --us-bg-soft: rgba(27, 36, 47, 0.74);
+
+      --us-glass: rgba(19, 27, 37, 0.62);
+      --us-glass-strong: rgba(15, 22, 31, 0.80);
+      --us-glass-soft: rgba(255, 255, 255, 0.045);
+      --us-glass-hover: rgba(255, 255, 255, 0.075);
+      --us-glass-active: rgba(10, 132, 255, 0.16);
+
+      --us-text: #f5f8fb;
+      --us-text-soft: #d2d9e1;
+      --us-text-muted: #99a6b3;
+      --us-text-faint: #73808d;
+
+      --us-blue: #0a84ff;
+      --us-blue-bright: #64d2ff;
+      --us-blue-soft: rgba(10, 132, 255, 0.16);
+      --us-blue-softer: rgba(100, 210, 255, 0.08);
+      --us-blue-border: rgba(100, 210, 255, 0.25);
+      --us-blue-focus: rgba(10, 132, 255, 0.48);
+
+      --us-success: #79c99e;
+      --us-warning: #d1b46d;
+      --us-danger: #d58d8d;
+      --us-info: #7fc8f8;
+
+      --us-border: rgba(210, 230, 248, 0.10);
+      --us-border-strong: rgba(215, 235, 255, 0.16);
+      --us-border-highlight: rgba(255, 255, 255, 0.13);
+
+      --us-shadow-sm: 0 8px 24px rgba(0, 0, 0, 0.20);
+      --us-shadow-md: 0 18px 48px rgba(0, 0, 0, 0.28);
+      --us-shadow-lg: 0 28px 70px rgba(0, 0, 0, 0.38);
+      --us-inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.055);
+
+      --us-radius-xs: 6px;
+      --us-radius-sm: 9px;
+      --us-radius-md: 13px;
+      --us-radius-lg: 18px;
+
+      --us-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", system-ui, sans-serif;
       --us-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+
+      --us-wallpaper: url("https://www.bing.com/th?id=OBTQ.BTA9ACD46ADE4DF290D5640B661E6A5C8CF666B651507F76309661E06C8AA70FB2&rs=2&c=1");
     }
 
-    html,
-    body {
+    html {
       min-height: 100% !important;
+      color: var(--us-text) !important;
+      background-color: var(--us-bg-deep) !important;
+      background-image:
+        radial-gradient(circle at 78% 0%, rgba(42, 135, 255, 0.22), transparent 38%),
+        radial-gradient(circle at 14% 100%, rgba(100, 210, 255, 0.10), transparent 34%),
+        linear-gradient(rgba(6, 10, 15, 0.42), rgba(7, 11, 16, 0.70)),
+        var(--us-wallpaper) !important;
+      background-position: center center, center center, center center, center center !important;
+      background-size: cover, cover, cover, cover !important;
+      background-repeat: no-repeat !important;
+      background-attachment: fixed !important;
+    }
+
+    body {
+      min-height: 100vh !important;
       margin: 0 !important;
       padding-top: 0 !important;
       color: var(--us-text) !important;
-      background: var(--us-bg) !important;
-      background-color: var(--us-bg) !important;
+      background: rgba(7, 11, 16, 0.20) !important;
+      background-color: rgba(7, 11, 16, 0.20) !important;
       background-image: none !important;
       font-family: var(--us-font) !important;
       letter-spacing: 0 !important;
+      text-rendering: optimizeLegibility;
+      -webkit-font-smoothing: antialiased;
     }
 
     *,
@@ -67,11 +102,11 @@
     }
 
     ::selection {
-      color: var(--us-text) !important;
-      background: rgba(193, 204, 215, 0.28) !important;
+      color: #fff !important;
+      background: rgba(10, 132, 255, 0.42) !important;
     }
 
-    /* Canvas and tray repair. This intentionally overrides native white tray backgrounds. */
+    /* Main canvas stays transparent so the wallpaper reads through the interface. */
     html body #main,
     html body #content_wrapper,
     html body #content,
@@ -101,8 +136,8 @@
     html body .pr15,
     html body .pl15.pr15 {
       color: var(--us-text) !important;
-      background: var(--us-bg) !important;
-      background-color: var(--us-bg) !important;
+      background: transparent !important;
+      background-color: transparent !important;
       background-image: none !important;
     }
 
@@ -118,209 +153,133 @@
 
     #content {
       display: block !important;
-      min-height: calc(100vh - 60px) !important;
+      min-height: calc(100vh - 58px) !important;
     }
 
-    .container,
-    .container-fluid {
-      margin-right: auto;
-      margin-left: auto;
-      padding-right: 11px;
-      padding-left: 11px;
-    }
-
-    .row {
-      margin-right: -11px !important;
-      margin-left: -11px !important;
-    }
-
-    .row::before,
-    .row::after {
-      display: table;
-      content: " ";
-    }
-
-    .row::after {
-      clear: both;
-    }
-
-    [class*="col-xs-"],
-    [class*="col-sm-"],
-    [class*="col-md-"],
-    [class*="col-lg-"],
-    [class*="col-xl-"] {
-      position: relative;
-      min-height: 1px;
-      padding-right: 11px !important;
-      padding-left: 11px !important;
-    }
-
-    body,
-    input,
-    textarea,
-    select,
-    button {
-      font-family: var(--us-font) !important;
-    }
-
-    h1,
-    h2,
-    h3,
-    h4,
-    h5,
-    h6,
-    .panel-title,
-    #pmlt h1,
-    #pmlt h2 {
-      color: var(--us-text) !important;
-      font-family: var(--us-font) !important;
-      font-weight: 650 !important;
-      letter-spacing: -0.015em !important;
-      text-transform: none !important;
-      text-shadow: none !important;
-    }
-
-    p,
-    li,
-    label,
-    td,
-    th,
-    address {
-      color: var(--us-text-soft) !important;
-    }
-
-    small,
-    .text-muted,
-    .help-block,
-    .panel-heading small,
-    #pmlt small {
-      color: var(--us-text-muted) !important;
-    }
-
-    strong,
-    b {
-      color: var(--us-text) !important;
-      font-weight: 650 !important;
-    }
-
-    a,
-    .design-link,
-    .panel-body a,
-    #pmlt a,
-    #project_menu a {
-      color: var(--us-accent) !important;
-      text-decoration: none !important;
-      text-shadow: none !important;
-    }
-
-    a:hover,
-    a:focus,
-    .design-link:hover,
-    .panel-body a:hover,
-    #pmlt a:hover,
-    #project_menu a:hover {
-      color: #fff !important;
-    }
-
-    header,
+    /* High-level macOS style glass shells. */
     header.navbar,
-    .navbar,
-    .navbar-fixed-top,
-    #topbar,
-    .topbar {
-      top: 0 !important;
-      margin-top: 0 !important;
-      color: var(--us-text) !important;
-      background: rgba(20, 24, 29, 0.96) !important;
-      background-image: none !important;
+    .navbar.navbar-default,
+    .navbar.navbar-inverse,
+    #sidebar_left,
+    #pmlt {
+      color: var(--us-text-soft) !important;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)),
+        var(--us-glass-strong) !important;
+      background-color: var(--us-glass-strong) !important;
+      background-image:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)) !important;
+      border-color: var(--us-border) !important;
+      box-shadow: var(--us-inner-highlight), var(--us-shadow-sm) !important;
+    }
+
+    @supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+      header.navbar,
+      .navbar.navbar-default,
+      .navbar.navbar-inverse,
+      #sidebar_left,
+      #pmlt,
+      .panel,
+      .panel-default,
+      .well,
+      .modal-content,
+      .popover,
+      .dropdown-menu,
+      #customer-info,
+      #customer-name,
+      #showbtns,
+      #mapcontainer,
+      #filesbox,
+      #descriptionbox,
+      #projectbox,
+      #designbox,
+      .note-editor,
+      .cke {
+        -webkit-backdrop-filter: blur(18px) saturate(135%);
+        backdrop-filter: blur(18px) saturate(135%);
+      }
+    }
+
+    header.navbar,
+    .navbar.navbar-default,
+    .navbar.navbar-inverse {
       border: 0 !important;
       border-bottom: 1px solid var(--us-border) !important;
-      box-shadow: var(--us-shadow-sm) !important;
-      transform: none !important;
-    }
-
-    header::before,
-    header::after,
-    .navbar::before,
-    .navbar::after,
-    #topbar::before,
-    #topbar::after {
-      content: none !important;
-      display: none !important;
+      box-shadow: var(--us-inner-highlight), 0 10px 30px rgba(0, 0, 0, 0.22) !important;
     }
 
     header.navbar .navbar-brand,
-    header.navbar .navbar-branding,
-    html body #logo,
-    html body .logo,
-    html body .brand {
-      overflow: visible !important;
+    header.navbar .navbar-brand:hover,
+    header.navbar .navbar-brand:focus {
+      color: var(--us-text) !important;
       background: transparent !important;
-      border: 0 !important;
-      box-shadow: none !important;
     }
 
-    header.navbar .navbar-brand img,
-    header.navbar img[src*="US-Sign" i],
-    header.navbar img[src*="USSIGN" i],
-    header.navbar img[src*="logo" i] {
-      position: relative !important;
-      z-index: 20 !important;
-      display: block !important;
-      visibility: visible !important;
-      width: auto !important;
-      max-width: 180px !important;
-      height: auto !important;
-      max-height: 52px !important;
-      object-fit: contain !important;
-      object-position: left center !important;
-      opacity: 1 !important;
-      background: transparent !important;
-      border: 0 !important;
-      box-shadow: none !important;
-      filter: none !important;
+    header.navbar .navbar-brand img {
+      filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.20));
     }
 
-    #sidebar_left {
+    header.navbar a,
+    header.navbar span,
+    header.navbar i,
+    header.navbar .navbar-text {
       color: var(--us-text-soft) !important;
-      background: rgba(18, 22, 27, 0.96) !important;
-      background-image: none !important;
+      text-shadow: none !important;
+    }
+
+    /* Main left navigation. */
+    #sidebar_left {
       border-right: 1px solid var(--us-border) !important;
-      box-shadow: var(--us-shadow-sm) !important;
+      box-shadow: var(--us-inner-highlight), 10px 0 30px rgba(0, 0, 0, 0.12) !important;
+    }
+
+    #sidebar_left .sidebar-title,
+    #sidebar_left .sidebar-label,
+    #sidebar_left h1,
+    #sidebar_left h2,
+    #sidebar_left h3,
+    #sidebar_left h4 {
+      color: var(--us-text-muted) !important;
+      text-shadow: none !important;
     }
 
     #sidebar_left a,
     #sidebar_left .nav > li > a {
-      min-height: 34px !important;
       color: var(--us-text-soft) !important;
       background: transparent !important;
-      border: 0 !important;
+      border: 1px solid transparent !important;
       border-radius: var(--us-radius-sm) !important;
-      font-weight: 500 !important;
-      text-transform: none !important;
+      text-shadow: none !important;
+      transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease !important;
     }
 
     #sidebar_left a:hover,
     #sidebar_left .nav > li > a:hover {
-      color: var(--us-text) !important;
-      background: var(--us-hover) !important;
+      color: #fff !important;
+      background: rgba(255, 255, 255, 0.055) !important;
+      border-color: rgba(255, 255, 255, 0.055) !important;
     }
 
     #sidebar_left .nav > li.active > a,
     #sidebar_left .active > a,
     #sidebar_left a.active {
-      color: var(--us-text) !important;
-      background: var(--us-accent-soft) !important;
-      border: 1px solid rgba(193, 204, 215, 0.12) !important;
+      color: #fff !important;
+      background:
+        linear-gradient(135deg, rgba(10, 132, 255, 0.28), rgba(100, 210, 255, 0.08)) !important;
+      border-color: rgba(100, 210, 255, 0.20) !important;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 6px 18px rgba(10, 132, 255, 0.10) !important;
     }
 
+    #sidebar_left hr,
+    #sidebar_left .sidebar-divider {
+      border-color: var(--us-border) !important;
+      opacity: 1 !important;
+    }
+
+    /* Project rail. */
     #pmlt {
       min-height: calc(100vh - 60px) !important;
-      color: var(--us-text-soft) !important;
-      background: rgba(18, 22, 27, 0.96) !important;
-      background-image: none !important;
       border-right: 1px solid var(--us-border) !important;
-      box-shadow: none !important;
     }
 
     #pmlt::before,
@@ -331,8 +290,8 @@
 
     #pmlt h1,
     #pmlt h1 * {
-      color: var(--us-text) !important;
-      text-shadow: none !important;
+      color: #fff !important;
+      text-shadow: 0 3px 14px rgba(0, 0, 0, 0.22) !important;
     }
 
     #pmlt h2,
@@ -345,6 +304,22 @@
       color: var(--us-text-soft) !important;
     }
 
+    #pmlt a {
+      color: var(--us-text-soft) !important;
+      text-shadow: none !important;
+    }
+
+    #pmlt a:hover,
+    #pmlt a:focus,
+    #pmlt a.active {
+      color: var(--us-blue-bright) !important;
+    }
+
+    #pmlt hr {
+      border-color: var(--us-border-strong) !important;
+    }
+
+    /* Glass cards and panels. */
     .panel,
     .panel-default,
     .well,
@@ -363,11 +338,13 @@
     .cke {
       position: relative !important;
       color: var(--us-text) !important;
-      background: var(--us-glass) !important;
-      background-image: none !important;
+      background:
+        linear-gradient(145deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.014) 42%, rgba(10, 132, 255, 0.018)),
+        var(--us-glass) !important;
+      background-color: var(--us-glass) !important;
       border: 1px solid var(--us-border) !important;
       border-radius: var(--us-radius-lg) !important;
-      box-shadow: var(--us-shadow-sm) !important;
+      box-shadow: var(--us-inner-highlight), var(--us-shadow-sm) !important;
       animation: none !important;
     }
 
@@ -397,10 +374,17 @@
     .cke_bottom,
     .note-toolbar {
       color: var(--us-text) !important;
-      background: rgba(255, 255, 255, 0.025) !important;
-      background-image: none !important;
+      background:
+        linear-gradient(90deg, rgba(10, 132, 255, 0.06), transparent 48%),
+        rgba(255, 255, 255, 0.025) !important;
+      background-color: rgba(255, 255, 255, 0.025) !important;
       border-color: var(--us-border) !important;
       box-shadow: none !important;
+    }
+
+    .panel-heading:first-child,
+    .modal-header:first-child {
+      border-radius: calc(var(--us-radius-lg) - 1px) calc(var(--us-radius-lg) - 1px) 0 0 !important;
     }
 
     .panel-body,
@@ -411,6 +395,56 @@
       border: 0 !important;
     }
 
+    .panel-title,
+    .panel-title a,
+    .modal-title {
+      color: var(--us-text) !important;
+    }
+
+    /* Typography. */
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    strong,
+    b {
+      color: var(--us-text) !important;
+      text-shadow: none !important;
+    }
+
+    p,
+    li,
+    td,
+    th,
+    label,
+    address,
+    .help-block {
+      color: var(--us-text-soft) !important;
+      text-shadow: none !important;
+    }
+
+    small,
+    .text-muted,
+    .muted,
+    .help-block,
+    .subtext,
+    .sub-text {
+      color: var(--us-text-muted) !important;
+    }
+
+    a:not(.btn) {
+      color: #89c8ff !important;
+      text-shadow: none !important;
+    }
+
+    a:not(.btn):hover,
+    a:not(.btn):focus {
+      color: var(--us-blue-bright) !important;
+    }
+
+    /* Tables. */
     html body #content table,
     html body #content .table,
     html body .tray-center table,
@@ -421,20 +455,22 @@
     html body .tab-content .table {
       width: 100%;
       color: var(--us-text) !important;
-      background: rgba(255, 255, 255, 0.018) !important;
+      background: rgba(12, 18, 25, 0.34) !important;
       border: 1px solid var(--us-border) !important;
       border-collapse: separate !important;
       border-spacing: 0 !important;
       border-radius: var(--us-radius-md) !important;
-      box-shadow: none !important;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025) !important;
+      overflow: hidden;
     }
 
     html body #content table thead,
     html body #content table thead tr,
     html body #content table thead th,
     html body .tray-center table thead th {
-      color: var(--us-text-soft) !important;
-      background: rgba(255, 255, 255, 0.035) !important;
+      color: #e4edf6 !important;
+      background:
+        linear-gradient(180deg, rgba(10, 132, 255, 0.10), rgba(255, 255, 255, 0.025)) !important;
       border-color: var(--us-border) !important;
       font-weight: 600 !important;
       text-transform: none !important;
@@ -449,35 +485,41 @@
     html body .tray-center table tbody th {
       color: var(--us-text-soft) !important;
       background: transparent !important;
-      border-color: var(--us-border) !important;
+      border-color: rgba(215, 235, 255, 0.075) !important;
       box-shadow: none !important;
     }
 
     html body #content table tbody tr:hover,
     html body .tray-center table tbody tr:hover {
-      color: var(--us-text) !important;
-      background: var(--us-hover) !important;
+      color: #fff !important;
+      background: rgba(10, 132, 255, 0.075) !important;
     }
 
+    html body #content table tbody tr:hover td,
+    html body .tray-center table tbody tr:hover td {
+      color: #eef7ff !important;
+    }
+
+    /* Buttons: visual treatment only. No forced heights or padding. */
     .btn,
     button,
     input[type="button"],
     input[type="submit"] {
       position: relative !important;
-      overflow: visible !important;
-      min-height: 34px !important;
-      padding: 7px 12px !important;
-      color: var(--us-text) !important;
-      background: rgba(255, 255, 255, 0.055) !important;
-      background-image: none !important;
+      color: var(--us-text-soft) !important;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.035)) !important;
+      background-color: rgba(30, 39, 50, 0.72) !important;
+      background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.035)) !important;
       border: 1px solid var(--us-border-strong) !important;
       border-radius: var(--us-radius-sm) !important;
-      box-shadow: none !important;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 3px 10px rgba(0, 0, 0, 0.12) !important;
       font-weight: 550 !important;
       text-transform: none !important;
       text-shadow: none !important;
       transform: none !important;
       animation: none !important;
+      transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease !important;
     }
 
     .btn::before,
@@ -495,62 +537,91 @@
     input[type="button"]:hover,
     input[type="submit"]:hover {
       color: #fff !important;
-      background: rgba(255, 255, 255, 0.09) !important;
-      border-color: rgba(255, 255, 255, 0.22) !important;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(10, 132, 255, 0.09)) !important;
+      border-color: rgba(100, 210, 255, 0.28) !important;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10), 0 5px 16px rgba(0, 0, 0, 0.16) !important;
+      outline: none !important;
     }
 
     .btn-primary,
-    .btn-info {
-      color: #edf2f6 !important;
-      background: rgba(155, 172, 189, 0.18) !important;
-      border-color: rgba(193, 204, 215, 0.24) !important;
+    .btn-info,
+    .btn.active,
+    button.active {
+      color: #fff !important;
+      background:
+        linear-gradient(180deg, rgba(36, 150, 255, 0.92), rgba(10, 105, 214, 0.90)) !important;
+      border-color: rgba(100, 210, 255, 0.38) !important;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 6px 18px rgba(10, 132, 255, 0.20) !important;
     }
 
     .btn-success {
-      color: #dce9e0 !important;
-      background: rgba(120, 168, 138, 0.17) !important;
-      border-color: rgba(120, 168, 138, 0.28) !important;
+      color: #e8f8ef !important;
+      background: rgba(67, 139, 96, 0.26) !important;
+      border-color: rgba(121, 201, 158, 0.32) !important;
     }
 
     .btn-warning,
     a[href*="clock"],
     .clock-actions,
     .btn[href*="clock"] {
-      color: #eee5d2 !important;
-      background: rgba(199, 169, 107, 0.16) !important;
-      border-color: rgba(199, 169, 107, 0.27) !important;
+      color: #f7eedc !important;
+      background: rgba(169, 132, 61, 0.24) !important;
+      border-color: rgba(209, 180, 109, 0.34) !important;
     }
 
     .btn-danger {
-      color: #f0dcdc !important;
-      background: rgba(196, 122, 122, 0.16) !important;
-      border-color: rgba(196, 122, 122, 0.28) !important;
+      color: #fae9e9 !important;
+      background: rgba(159, 75, 75, 0.25) !important;
+      border-color: rgba(213, 141, 141, 0.34) !important;
     }
 
+    .btn:disabled,
+    button:disabled,
+    input[type="button"]:disabled,
+    input[type="submit"]:disabled {
+      opacity: 0.46 !important;
+      filter: saturate(0.75) !important;
+      cursor: default !important;
+    }
+
+    /* Forms. */
     input,
     textarea,
     select,
     .form-control {
       color: var(--us-text) !important;
-      background: rgba(255, 255, 255, 0.035) !important;
+      background: rgba(10, 16, 23, 0.58) !important;
+      background-color: rgba(10, 16, 23, 0.58) !important;
       background-image: none !important;
       border: 1px solid var(--us-border) !important;
       border-radius: var(--us-radius-sm) !important;
-      box-shadow: none !important;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025) !important;
+      text-shadow: none !important;
+    }
+
+    input:hover,
+    textarea:hover,
+    select:hover,
+    .form-control:hover {
+      border-color: rgba(215, 235, 255, 0.16) !important;
     }
 
     input:focus,
     textarea:focus,
     select:focus,
     .form-control:focus {
-      border-color: var(--us-border-focus) !important;
-      box-shadow: 0 0 0 3px rgba(193, 204, 215, 0.08) !important;
+      color: #fff !important;
+      background-color: rgba(10, 16, 23, 0.72) !important;
+      border-color: var(--us-blue-focus) !important;
+      box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.035) !important;
       outline: none !important;
     }
 
     input::placeholder,
     textarea::placeholder {
-      color: var(--us-text-muted) !important;
+      color: var(--us-text-faint) !important;
+      opacity: 1 !important;
     }
 
     select,
@@ -559,18 +630,24 @@
     #content select,
     .panel select,
     .panel-body select {
+      color-scheme: dark !important;
       padding-right: 10px !important;
-      appearance: auto !important;
-      -webkit-appearance: auto !important;
     }
 
-    /* Existing Projects filters: own the complete select wrapper, not just the native select. */
+    select option,
+    select optgroup {
+      color: var(--us-text-soft) !important;
+      background: #141b24 !important;
+      background-color: #141b24 !important;
+    }
+
+    /* Existing Projects search filters. */
     html body #content .tray-left form#form label.field.select,
     html body #content .tray-left form#form .field.select {
       color-scheme: dark !important;
       color: var(--us-text-soft) !important;
-      background: var(--us-bg-soft) !important;
-      background-color: var(--us-bg-soft) !important;
+      background: rgba(10, 16, 23, 0.62) !important;
+      background-color: rgba(10, 16, 23, 0.62) !important;
       background-image: none !important;
       border-radius: var(--us-radius-sm) !important;
       box-shadow: none !important;
@@ -591,8 +668,8 @@
       forced-color-adjust: none !important;
       color: var(--us-text-soft) !important;
       -webkit-text-fill-color: var(--us-text-soft) !important;
-      background: #1c2127 !important;
-      background-color: #1c2127 !important;
+      background: rgba(10, 16, 23, 0.78) !important;
+      background-color: rgba(10, 16, 23, 0.78) !important;
       background-image: none !important;
       border: 1px solid var(--us-border) !important;
       border-radius: var(--us-radius-sm) !important;
@@ -610,58 +687,21 @@
     html body #content .tray-left form#form select.input-sm[disabled] {
       color: var(--us-text-muted) !important;
       -webkit-text-fill-color: var(--us-text-muted) !important;
-      background: #1c2127 !important;
-      background-color: #1c2127 !important;
+      background: rgba(17, 24, 33, 0.78) !important;
+      background-color: rgba(17, 24, 33, 0.78) !important;
       border-color: var(--us-border) !important;
       opacity: 1 !important;
-      cursor: default !important;
-    }
-
-    html body #content .tray-left form#form .field.select select:hover,
-    html body #content .tray-left form#form .field.select select:focus,
-    html body #content .tray-left form#form select.input-sm:hover,
-    html body #content .tray-left form#form select.input-sm:focus {
-      color: var(--us-text) !important;
-      -webkit-text-fill-color: var(--us-text) !important;
-      background: #242a31 !important;
-      background-color: #242a31 !important;
-      border-color: var(--us-border-focus) !important;
-      outline: none !important;
     }
 
     html body #content .tray-left form#form .field.select > i.arrow.double {
       color: var(--us-text-muted) !important;
       border-top-color: var(--us-text-muted) !important;
       border-bottom-color: var(--us-text-muted) !important;
-      opacity: 0.9 !important;
+      opacity: 0.95 !important;
       pointer-events: none !important;
     }
 
-    html body #content .tray-left form#form select option,
-    html body #content .tray-left form#form select optgroup {
-      color: var(--us-text-soft) !important;
-      background: var(--us-bg-elevated) !important;
-      background-color: var(--us-bg-elevated) !important;
-    }
-
-    select option,
-    select optgroup {
-      color: var(--us-text) !important;
-      background: var(--us-bg-elevated) !important;
-    }
-
-    .alert,
-    .alert-info,
-    .alert-success,
-    .alert-warning,
-    .alert-danger,
-    .alert-micro {
-      background: rgba(255, 255, 255, 0.035) !important;
-      border: 1px solid var(--us-border) !important;
-      border-radius: var(--us-radius-md) !important;
-      box-shadow: none !important;
-    }
-
+    /* Menus, popovers, date pickers and Select2. */
     .dropdown-menu,
     .popover,
     .tooltip-inner,
@@ -678,11 +718,14 @@
     .select2-container .select2-selection--multiple {
       z-index: 2147483000 !important;
       color: var(--us-text) !important;
-      background: rgba(25, 29, 35, 0.99) !important;
-      background-image: none !important;
-      border: 1px solid var(--us-border) !important;
+      background:
+        linear-gradient(145deg, rgba(255, 255, 255, 0.04), transparent 50%),
+        rgba(16, 23, 32, 0.94) !important;
+      background-color: rgba(16, 23, 32, 0.94) !important;
+      background-image: linear-gradient(145deg, rgba(255, 255, 255, 0.04), transparent 50%) !important;
+      border: 1px solid var(--us-border-strong) !important;
       border-radius: var(--us-radius-md) !important;
-      box-shadow: var(--us-shadow-lg) !important;
+      box-shadow: var(--us-inner-highlight), var(--us-shadow-lg) !important;
     }
 
     .dropdown-menu > li > a,
@@ -699,21 +742,55 @@
     .tt-suggestion.tt-cursor,
     .select2-results__option--highlighted,
     .select2-results__option[aria-selected="true"] {
-      color: var(--us-text) !important;
-      background: var(--us-hover) !important;
+      color: #fff !important;
+      background: rgba(10, 132, 255, 0.14) !important;
     }
 
+    /* Alerts. */
+    .alert,
+    .alert-info,
+    .alert-success,
+    .alert-warning,
+    .alert-danger,
+    .alert-micro {
+      color: var(--us-text-soft) !important;
+      background: rgba(18, 25, 34, 0.74) !important;
+      border: 1px solid var(--us-border) !important;
+      border-radius: var(--us-radius-md) !important;
+      box-shadow: var(--us-inner-highlight) !important;
+    }
+
+    .alert-info {
+      border-color: rgba(127, 200, 248, 0.24) !important;
+      background: rgba(42, 121, 174, 0.13) !important;
+    }
+
+    .alert-success {
+      border-color: rgba(121, 201, 158, 0.24) !important;
+      background: rgba(66, 137, 96, 0.13) !important;
+    }
+
+    .alert-warning {
+      border-color: rgba(209, 180, 109, 0.26) !important;
+      background: rgba(148, 115, 47, 0.13) !important;
+    }
+
+    .alert-danger {
+      border-color: rgba(213, 141, 141, 0.26) !important;
+      background: rgba(151, 67, 67, 0.14) !important;
+    }
+
+    /* Tabs. */
     .tab-block,
     .tab-block .tab-content,
     .page-tabs,
     .tabs-bg.nav-tabs,
     .tabs-bg.tabs-below {
       color: var(--us-text) !important;
-      background: var(--us-glass) !important;
-      background-image: none !important;
+      background: rgba(18, 25, 34, 0.64) !important;
       border: 1px solid var(--us-border) !important;
       border-radius: var(--us-radius-lg) !important;
-      box-shadow: var(--us-shadow-sm) !important;
+      box-shadow: var(--us-inner-highlight), var(--us-shadow-sm) !important;
     }
 
     .nav-tabs > li > a,
@@ -732,11 +809,12 @@
     .nav-tabs > li.active > a:hover,
     .nav-tabs > li.active > a:focus,
     .tabs-left > li.active > a {
-      color: var(--us-text) !important;
-      background: var(--us-accent-soft) !important;
-      border-color: rgba(193, 204, 215, 0.14) !important;
+      color: #fff !important;
+      background: rgba(10, 132, 255, 0.14) !important;
+      border-color: rgba(100, 210, 255, 0.20) !important;
     }
 
+    /* Editors. */
     .cke,
     .cke_chrome,
     .admin-skin.cke_chrome,
@@ -745,10 +823,11 @@
     .markItUp,
     .md-editor {
       color: var(--us-text) !important;
-      background: var(--us-glass-strong) !important;
+      background: rgba(15, 22, 31, 0.82) !important;
+      background-color: rgba(15, 22, 31, 0.82) !important;
       background-image: none !important;
       border-color: var(--us-border) !important;
-      box-shadow: var(--us-shadow-sm) !important;
+      box-shadow: var(--us-inner-highlight), var(--us-shadow-sm) !important;
     }
 
     .cke_toolgroup,
@@ -756,7 +835,7 @@
     .note-btn-group,
     .note-editor .btn-group,
     .md-editor > .md-header .btn-group {
-      background: rgba(255, 255, 255, 0.03) !important;
+      background: rgba(255, 255, 255, 0.035) !important;
       border-color: var(--us-border) !important;
       box-shadow: none !important;
     }
@@ -769,11 +848,12 @@
     .md-editor > textarea,
     .md-editor > .md-preview {
       color: var(--us-text) !important;
-      background: rgba(17, 20, 24, 0.92) !important;
+      background: rgba(8, 13, 19, 0.82) !important;
       border-color: var(--us-border) !important;
       text-shadow: none !important;
     }
 
+    /* Pagination. */
     .pagination,
     .dataTables_paginate {
       background: transparent !important;
@@ -784,7 +864,7 @@
     .pagination > li > span,
     .dataTables_paginate .paginate_button {
       color: var(--us-text-soft) !important;
-      background: rgba(255, 255, 255, 0.035) !important;
+      background: rgba(255, 255, 255, 0.045) !important;
       border: 1px solid var(--us-border) !important;
       border-radius: var(--us-radius-sm) !important;
       box-shadow: none !important;
@@ -793,59 +873,30 @@
     .pagination > .active > a,
     .pagination > .active > span,
     .dataTables_paginate .paginate_button.current {
-      color: var(--us-text) !important;
-      background: var(--us-accent-soft) !important;
-      border-color: rgba(193, 204, 215, 0.18) !important;
+      color: #fff !important;
+      background: rgba(10, 132, 255, 0.22) !important;
+      border-color: rgba(100, 210, 255, 0.28) !important;
     }
 
-    .duplicate-modal,
-    .modal-backdrop,
-    #modal-overlay.duplicate-modal-2,
-    .duplicate-modal-2,
-    #time-remaining-popup-container {
-      background: rgba(5, 7, 9, 0.68) !important;
-    }
-
-    .duplicate-modal-content,
-    .modal-content,
-    .bootbox .modal-content,
-    .ui-dialog,
-    .ui-widget-content,
-    .duplicate-modal-content-2,
-    #time-remaining-popup-modal,
-    #remaining-time-in-popup,
-    #show-materials-used-warning-modal {
-      color: var(--us-text) !important;
-      background: var(--us-glass-strong) !important;
-      background-image: none !important;
-      border: 1px solid var(--us-border-strong) !important;
-      border-radius: var(--us-radius-lg) !important;
-      box-shadow: var(--us-shadow-lg) !important;
-    }
-
-    mark,
-    .marker,
-    [style*="background-color: yellow" i],
-    [style*="background: yellow" i],
-    [style*="#ffff00" i],
-    [style*="#ff0" i] {
-      display: inline !important;
-      color: var(--us-text) !important;
-      -webkit-text-fill-color: var(--us-text) !important;
-      background: rgba(211, 186, 134, 0.18) !important;
-      border-radius: 4px !important;
+    /* Labels and badges. */
+    .label,
+    .badge {
+      color: var(--us-text-soft) !important;
+      background: rgba(255, 255, 255, 0.075) !important;
+      border: 1px solid rgba(255, 255, 255, 0.075) !important;
       text-shadow: none !important;
-      box-shadow: inset 0 0 0 1px rgba(211, 186, 134, 0.16) !important;
     }
 
-    html body :is(#descriptionbox, #designbox, .us-sign-description-panel, .us-sign-readable-content)
-    :is([style*="color:blue" i], [style*="color: blue" i], [style*="#0000ff" i], [style*="#00f" i], [style*="rgb(0, 0, 255)" i], font[color="blue" i], font[color="#0000ff" i]) {
-      color: #a9c2d8 !important;
-      -webkit-text-fill-color: #a9c2d8 !important;
-      text-shadow: none !important;
-      filter: none !important;
+    .label-primary,
+    .badge-primary,
+    .label-info,
+    .badge-info {
+      color: #eaf6ff !important;
+      background: rgba(10, 132, 255, 0.22) !important;
+      border-color: rgba(100, 210, 255, 0.18) !important;
     }
 
+    /* Important notes, rich text and Description repairs. */
     html body :is(#descriptionbox, #designbox, .us-sign-description-panel, .us-sign-readable-content)
     :is([style*="color:red" i], [style*="color: red" i], [style*="#ff0000" i], [style*="#f00" i], font[color="red" i], font[color="#ff0000" i]) {
       color: #c49a96 !important;
@@ -858,7 +909,6 @@
       -webkit-text-fill-color: #acd0b5 !important;
     }
 
-    /* Description rich-text cleanup: remove inherited highlight chips while preserving text formatting. */
     html body :is(#descriptionbox, .us-sign-description-panel)
     .panel-body :is(
       mark,
@@ -875,55 +925,16 @@
       text-shadow: none !important;
     }
 
-    /* Site-wide fixed wallpaper. Main canvas wrappers are transparent so the image remains visible behind the UI. */
-    html {
-      background-color: #111418 !important;
-      background-image:
-        linear-gradient(rgba(11, 14, 17, 0.44), rgba(11, 14, 17, 0.62)),
-        url("https://www.bing.com/th?id=OBTQ.BTA9ACD46ADE4DF290D5640B661E6A5C8CF666B651507F76309661E06C8AA70FB2&rs=2&c=1") !important;
-      background-position: center center, center center !important;
-      background-size: cover, cover !important;
-      background-repeat: no-repeat, no-repeat !important;
-      background-attachment: fixed, fixed !important;
-    }
+    /* Keep status colors readable on glass. */
+    .text-success { color: #93d9b2 !important; }
+    .text-warning { color: #dec384 !important; }
+    .text-danger { color: #dfa0a0 !important; }
+    .text-info { color: #91d2ff !important; }
+    .text-primary { color: #8ccaff !important; }
 
-    body {
-      background: rgba(17, 20, 24, 0.30) !important;
-      background-color: rgba(17, 20, 24, 0.30) !important;
-      background-image: none !important;
-    }
-
-    html body #main,
-    html body #content_wrapper,
-    html body #content,
-    html body #content > .tray,
-    html body #content > .tray-left,
-    html body #content > .tray-right,
-    html body #content > .tray-center,
-    html body .tray,
-    html body .tray-left,
-    html body .tray-right,
-    html body .tray-center,
-    html body .tray-inner,
-    html body [class^="tray-"],
-    html body [class*=" tray-"],
-    html body .content,
-    html body .content-wrapper,
-    html body .page-content,
-    html body .content-body,
-    html body .main-content,
-    html body .main-panel,
-    html body .admin-panels,
-    html body .dashboard,
-    html body .dashboard-page,
-    html body .container,
-    html body .container-fluid,
-    html body .pl15,
-    html body .pr15,
-    html body .pl15.pr15 {
-      background: transparent !important;
-      background-color: transparent !important;
-      background-image: none !important;
+    /* Scrollbars. */
+    * {
+      scrollbar-color: rgba(104, 173, 230, 0.42) rgba(7, 11, 16, 0.38);
     }
 
     ::-webkit-scrollbar {
@@ -932,13 +943,17 @@
     }
 
     ::-webkit-scrollbar-track {
-      background: var(--us-bg) !important;
+      background: rgba(7, 11, 16, 0.34) !important;
     }
 
     ::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.16) !important;
-      border: 2px solid var(--us-bg) !important;
+      background: linear-gradient(180deg, rgba(100, 210, 255, 0.38), rgba(10, 132, 255, 0.30)) !important;
+      border: 2px solid rgba(7, 11, 16, 0.42) !important;
       border-radius: 999px !important;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: linear-gradient(180deg, rgba(100, 210, 255, 0.54), rgba(10, 132, 255, 0.46)) !important;
     }
 
     @media (min-width: 992px) {
@@ -983,7 +998,10 @@
       .table {
         color: #000 !important;
         background: #fff !important;
+        background-image: none !important;
         box-shadow: none !important;
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
       }
     }
   `);
