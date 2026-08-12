@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      2.0.8
-// @description  Blue macOS-inspired glass theme for SquareCoil with Design-only layout fixes, native project-page geometry elsewhere, corrected wallpaper stacking, and translucent workspace shells.
+// @version      2.1.0
+// @description  Stable SquareCoil layout from the v1.2.0 restore point with blue macOS-inspired glass colors and a fixed scenic wallpaper. No project geometry overrides.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
 // @grant        GM_addStyle
@@ -16,83 +16,47 @@
 
   GM_addStyle(String.raw`
     :root {
-      color-scheme: dark;
-
-      --us-bg: #0b1017;
-      --us-bg-deep: #070b10;
-      --us-bg-elevated: rgba(18, 25, 34, 0.82);
-      --us-bg-soft: rgba(27, 36, 47, 0.74);
-
-      --us-glass: rgba(19, 27, 37, 0.62);
-      --us-glass-strong: rgba(15, 22, 31, 0.80);
+      --us-bg: rgba(9, 15, 23, 0.46);
+      --us-bg-elevated: rgba(16, 24, 34, 0.80);
+      --us-bg-soft: rgba(22, 31, 42, 0.74);
+      --us-glass: rgba(18, 27, 38, 0.68);
+      --us-glass-strong: rgba(13, 21, 31, 0.84);
       --us-glass-soft: rgba(255, 255, 255, 0.045);
-      --us-glass-hover: rgba(255, 255, 255, 0.075);
-      --us-glass-active: rgba(10, 132, 255, 0.16);
-
+      --us-hover: rgba(100, 180, 255, 0.10);
       --us-text: #f5f8fb;
       --us-text-soft: #d2d9e1;
-      --us-text-muted: #99a6b3;
-      --us-text-faint: #73808d;
-
-      --us-blue: #0a84ff;
-      --us-blue-bright: #64d2ff;
-      --us-blue-soft: rgba(10, 132, 255, 0.16);
-      --us-blue-softer: rgba(100, 210, 255, 0.08);
-      --us-blue-border: rgba(100, 210, 255, 0.25);
-      --us-blue-focus: rgba(10, 132, 255, 0.48);
-
-      --us-success: #79c99e;
-      --us-warning: #d1b46d;
-      --us-danger: #d58d8d;
-      --us-info: #7fc8f8;
-
-      --us-border: rgba(210, 230, 248, 0.10);
-      --us-border-strong: rgba(215, 235, 255, 0.16);
-      --us-border-highlight: rgba(255, 255, 255, 0.13);
-
-      --us-shadow-sm: 0 8px 24px rgba(0, 0, 0, 0.20);
-      --us-shadow-md: 0 18px 48px rgba(0, 0, 0, 0.28);
-      --us-shadow-lg: 0 28px 70px rgba(0, 0, 0, 0.38);
-      --us-inner-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.055);
-
-      --us-radius-xs: 6px;
-      --us-radius-sm: 9px;
-      --us-radius-md: 13px;
-      --us-radius-lg: 18px;
-
+      --us-text-muted: #96a5b5;
+      --us-accent: #8ecbff;
+      --us-accent-soft: rgba(10, 132, 255, 0.18);
+      --us-success: #78a88a;
+      --us-warning: #c7a96b;
+      --us-danger: #c47a7a;
+      --us-info: #78c7ff;
+      --us-border: rgba(169, 211, 247, 0.12);
+      --us-border-strong: rgba(181, 220, 252, 0.19);
+      --us-border-focus: rgba(10, 132, 255, 0.52);
+      --us-shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.18);
+      --us-shadow-md: 0 12px 32px rgba(0, 0, 0, 0.24);
+      --us-shadow-lg: 0 22px 54px rgba(0, 0, 0, 0.34);
+      --us-radius-sm: 7px;
+      --us-radius-md: 10px;
+      --us-radius-lg: 14px;
       --us-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", system-ui, sans-serif;
       --us-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-
-      --us-wallpaper: url("https://bing.gifposter.com/bingImages/LagoPehoe_1920x1080.jpg");
+      --us-wallpaper: url("https://www.bing.com/th?id=OBTQ.BTA9ACD46ADE4DF290D5640B661E6A5C8CF666B651507F76309661E06C8AA70FB2&rs=2&c=1");
     }
 
-    html {
-      min-height: 100% !important;
-      color: var(--us-text) !important;
-      background-color: var(--us-bg-deep) !important;
-      background-image:
-        radial-gradient(circle at 78% 0%, rgba(42, 135, 255, 0.22), transparent 38%),
-        radial-gradient(circle at 14% 100%, rgba(100, 210, 255, 0.10), transparent 34%),
-        linear-gradient(rgba(6, 10, 15, 0.42), rgba(7, 11, 16, 0.70)),
-        var(--us-wallpaper) !important;
-      background-position: center center, center center, center center, center center !important;
-      background-size: cover, cover, cover, cover !important;
-      background-repeat: no-repeat !important;
-      background-attachment: fixed !important;
-    }
-
+    html,
     body {
-      min-height: 100vh !important;
+      min-height: 100% !important;
       margin: 0 !important;
       padding-top: 0 !important;
       color: var(--us-text) !important;
-      background: rgba(7, 11, 16, 0.20) !important;
-      background-color: rgba(7, 11, 16, 0.20) !important;
+      background: var(--us-bg) !important;
+      background-color: var(--us-bg) !important;
       background-image: none !important;
       font-family: var(--us-font) !important;
       letter-spacing: 0 !important;
-      text-rendering: optimizeLegibility;
-      -webkit-font-smoothing: antialiased;
     }
 
     *,
@@ -102,11 +66,11 @@
     }
 
     ::selection {
-      color: #fff !important;
-      background: rgba(10, 132, 255, 0.42) !important;
+      color: var(--us-text) !important;
+      background: rgba(193, 204, 215, 0.28) !important;
     }
 
-    /* Main canvas stays transparent so the wallpaper reads through the interface. */
+    /* Canvas and tray repair. This intentionally overrides native white tray backgrounds. */
     html body #main,
     html body #content_wrapper,
     html body #content,
@@ -136,8 +100,8 @@
     html body .pr15,
     html body .pl15.pr15 {
       color: var(--us-text) !important;
-      background: transparent !important;
-      background-color: transparent !important;
+      background: var(--us-bg) !important;
+      background-color: var(--us-bg) !important;
       background-image: none !important;
     }
 
@@ -153,133 +117,209 @@
 
     #content {
       display: block !important;
-      min-height: calc(100vh - 58px) !important;
+      min-height: calc(100vh - 60px) !important;
     }
 
-    /* High-level macOS style glass shells. */
-    header.navbar,
-    .navbar.navbar-default,
-    .navbar.navbar-inverse,
-    #sidebar_left,
-    #pmlt {
+    .container,
+    .container-fluid {
+      margin-right: auto;
+      margin-left: auto;
+      padding-right: 11px;
+      padding-left: 11px;
+    }
+
+    .row {
+      margin-right: -11px !important;
+      margin-left: -11px !important;
+    }
+
+    .row::before,
+    .row::after {
+      display: table;
+      content: " ";
+    }
+
+    .row::after {
+      clear: both;
+    }
+
+    [class*="col-xs-"],
+    [class*="col-sm-"],
+    [class*="col-md-"],
+    [class*="col-lg-"],
+    [class*="col-xl-"] {
+      position: relative;
+      min-height: 1px;
+      padding-right: 11px !important;
+      padding-left: 11px !important;
+    }
+
+    body,
+    input,
+    textarea,
+    select,
+    button {
+      font-family: var(--us-font) !important;
+    }
+
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    .panel-title,
+    #pmlt h1,
+    #pmlt h2 {
+      color: var(--us-text) !important;
+      font-family: var(--us-font) !important;
+      font-weight: 650 !important;
+      letter-spacing: -0.015em !important;
+      text-transform: none !important;
+      text-shadow: none !important;
+    }
+
+    p,
+    li,
+    label,
+    td,
+    th,
+    address {
       color: var(--us-text-soft) !important;
-      background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)),
-        var(--us-glass-strong) !important;
-      background-color: var(--us-glass-strong) !important;
-      background-image:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)) !important;
-      border-color: var(--us-border) !important;
-      box-shadow: var(--us-inner-highlight), var(--us-shadow-sm) !important;
     }
 
-    @supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-      header.navbar,
-      .navbar.navbar-default,
-      .navbar.navbar-inverse,
-      #sidebar_left,
-      #pmlt,
-      .panel,
-      .panel-default,
-      .well,
-      .modal-content,
-      .popover,
-      .dropdown-menu,
-      #customer-info,
-      #customer-name,
-      #showbtns,
-      #mapcontainer,
-      #filesbox,
-      #descriptionbox,
-      #projectbox,
-      #designbox,
-      .note-editor,
-      .cke {
-        -webkit-backdrop-filter: blur(18px) saturate(135%);
-        backdrop-filter: blur(18px) saturate(135%);
-      }
+    small,
+    .text-muted,
+    .help-block,
+    .panel-heading small,
+    #pmlt small {
+      color: var(--us-text-muted) !important;
     }
 
+    strong,
+    b {
+      color: var(--us-text) !important;
+      font-weight: 650 !important;
+    }
+
+    a,
+    .design-link,
+    .panel-body a,
+    #pmlt a,
+    #project_menu a {
+      color: var(--us-accent) !important;
+      text-decoration: none !important;
+      text-shadow: none !important;
+    }
+
+    a:hover,
+    a:focus,
+    .design-link:hover,
+    .panel-body a:hover,
+    #pmlt a:hover,
+    #project_menu a:hover {
+      color: #fff !important;
+    }
+
+    header,
     header.navbar,
-    .navbar.navbar-default,
-    .navbar.navbar-inverse {
+    .navbar,
+    .navbar-fixed-top,
+    #topbar,
+    .topbar {
+      top: 0 !important;
+      margin-top: 0 !important;
+      color: var(--us-text) !important;
+      background: rgba(20, 24, 29, 0.96) !important;
+      background-image: none !important;
       border: 0 !important;
       border-bottom: 1px solid var(--us-border) !important;
-      box-shadow: var(--us-inner-highlight), 0 10px 30px rgba(0, 0, 0, 0.22) !important;
+      box-shadow: var(--us-shadow-sm) !important;
+      transform: none !important;
+    }
+
+    header::before,
+    header::after,
+    .navbar::before,
+    .navbar::after,
+    #topbar::before,
+    #topbar::after {
+      content: none !important;
+      display: none !important;
     }
 
     header.navbar .navbar-brand,
-    header.navbar .navbar-brand:hover,
-    header.navbar .navbar-brand:focus {
-      color: var(--us-text) !important;
+    header.navbar .navbar-branding,
+    html body #logo,
+    html body .logo,
+    html body .brand {
+      overflow: visible !important;
       background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
     }
 
-    header.navbar .navbar-brand img {
-      filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.20));
+    header.navbar .navbar-brand img,
+    header.navbar img[src*="US-Sign" i],
+    header.navbar img[src*="USSIGN" i],
+    header.navbar img[src*="logo" i] {
+      position: relative !important;
+      z-index: 20 !important;
+      display: block !important;
+      visibility: visible !important;
+      width: auto !important;
+      max-width: 180px !important;
+      height: auto !important;
+      max-height: 52px !important;
+      object-fit: contain !important;
+      object-position: left center !important;
+      opacity: 1 !important;
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      filter: none !important;
     }
 
-    header.navbar a,
-    header.navbar span,
-    header.navbar i,
-    header.navbar .navbar-text {
-      color: var(--us-text-soft) !important;
-      text-shadow: none !important;
-    }
-
-    /* Main left navigation. */
     #sidebar_left {
+      color: var(--us-text-soft) !important;
+      background: rgba(18, 22, 27, 0.96) !important;
+      background-image: none !important;
       border-right: 1px solid var(--us-border) !important;
-      box-shadow: var(--us-inner-highlight), 10px 0 30px rgba(0, 0, 0, 0.12) !important;
-    }
-
-    #sidebar_left .sidebar-title,
-    #sidebar_left .sidebar-label,
-    #sidebar_left h1,
-    #sidebar_left h2,
-    #sidebar_left h3,
-    #sidebar_left h4 {
-      color: var(--us-text-muted) !important;
-      text-shadow: none !important;
+      box-shadow: var(--us-shadow-sm) !important;
     }
 
     #sidebar_left a,
     #sidebar_left .nav > li > a {
+      min-height: 34px !important;
       color: var(--us-text-soft) !important;
       background: transparent !important;
-      border: 1px solid transparent !important;
+      border: 0 !important;
       border-radius: var(--us-radius-sm) !important;
-      text-shadow: none !important;
-      transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease !important;
+      font-weight: 500 !important;
+      text-transform: none !important;
     }
 
     #sidebar_left a:hover,
     #sidebar_left .nav > li > a:hover {
-      color: #fff !important;
-      background: rgba(255, 255, 255, 0.055) !important;
-      border-color: rgba(255, 255, 255, 0.055) !important;
+      color: var(--us-text) !important;
+      background: var(--us-hover) !important;
     }
 
     #sidebar_left .nav > li.active > a,
     #sidebar_left .active > a,
     #sidebar_left a.active {
-      color: #fff !important;
-      background:
-        linear-gradient(135deg, rgba(10, 132, 255, 0.28), rgba(100, 210, 255, 0.08)) !important;
-      border-color: rgba(100, 210, 255, 0.20) !important;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 6px 18px rgba(10, 132, 255, 0.10) !important;
+      color: var(--us-text) !important;
+      background: var(--us-accent-soft) !important;
+      border: 1px solid rgba(193, 204, 215, 0.12) !important;
     }
 
-    #sidebar_left hr,
-    #sidebar_left .sidebar-divider {
-      border-color: var(--us-border) !important;
-      opacity: 1 !important;
-    }
-
-    /* Project rail. */
     #pmlt {
       min-height: calc(100vh - 60px) !important;
+      color: var(--us-text-soft) !important;
+      background: rgba(18, 22, 27, 0.96) !important;
+      background-image: none !important;
       border-right: 1px solid var(--us-border) !important;
+      box-shadow: none !important;
     }
 
     #pmlt::before,
@@ -290,8 +330,8 @@
 
     #pmlt h1,
     #pmlt h1 * {
-      color: #fff !important;
-      text-shadow: 0 3px 14px rgba(0, 0, 0, 0.22) !important;
+      color: var(--us-text) !important;
+      text-shadow: none !important;
     }
 
     #pmlt h2,
@@ -304,22 +344,6 @@
       color: var(--us-text-soft) !important;
     }
 
-    #pmlt a {
-      color: var(--us-text-soft) !important;
-      text-shadow: none !important;
-    }
-
-    #pmlt a:hover,
-    #pmlt a:focus,
-    #pmlt a.active {
-      color: var(--us-blue-bright) !important;
-    }
-
-    #pmlt hr {
-      border-color: var(--us-border-strong) !important;
-    }
-
-    /* Glass cards and panels. */
     .panel,
     .panel-default,
     .well,
@@ -338,13 +362,11 @@
     .cke {
       position: relative !important;
       color: var(--us-text) !important;
-      background:
-        linear-gradient(145deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.014) 42%, rgba(10, 132, 255, 0.018)),
-        var(--us-glass) !important;
-      background-color: var(--us-glass) !important;
+      background: var(--us-glass) !important;
+      background-image: none !important;
       border: 1px solid var(--us-border) !important;
       border-radius: var(--us-radius-lg) !important;
-      box-shadow: var(--us-inner-highlight), var(--us-shadow-sm) !important;
+      box-shadow: var(--us-shadow-sm) !important;
       animation: none !important;
     }
 
@@ -374,17 +396,10 @@
     .cke_bottom,
     .note-toolbar {
       color: var(--us-text) !important;
-      background:
-        linear-gradient(90deg, rgba(10, 132, 255, 0.06), transparent 48%),
-        rgba(255, 255, 255, 0.025) !important;
-      background-color: rgba(255, 255, 255, 0.025) !important;
+      background: rgba(255, 255, 255, 0.025) !important;
+      background-image: none !important;
       border-color: var(--us-border) !important;
       box-shadow: none !important;
-    }
-
-    .panel-heading:first-child,
-    .modal-header:first-child {
-      border-radius: calc(var(--us-radius-lg) - 1px) calc(var(--us-radius-lg) - 1px) 0 0 !important;
     }
 
     .panel-body,
@@ -395,56 +410,6 @@
       border: 0 !important;
     }
 
-    .panel-title,
-    .panel-title a,
-    .modal-title {
-      color: var(--us-text) !important;
-    }
-
-    /* Typography. */
-    h1,
-    h2,
-    h3,
-    h4,
-    h5,
-    h6,
-    strong,
-    b {
-      color: var(--us-text) !important;
-      text-shadow: none !important;
-    }
-
-    p,
-    li,
-    td,
-    th,
-    label,
-    address,
-    .help-block {
-      color: var(--us-text-soft) !important;
-      text-shadow: none !important;
-    }
-
-    small,
-    .text-muted,
-    .muted,
-    .help-block,
-    .subtext,
-    .sub-text {
-      color: var(--us-text-muted) !important;
-    }
-
-    a:not(.btn) {
-      color: #89c8ff !important;
-      text-shadow: none !important;
-    }
-
-    a:not(.btn):hover,
-    a:not(.btn):focus {
-      color: var(--us-blue-bright) !important;
-    }
-
-    /* Tables. */
     html body #content table,
     html body #content .table,
     html body .tray-center table,
@@ -455,22 +420,20 @@
     html body .tab-content .table {
       width: 100%;
       color: var(--us-text) !important;
-      background: rgba(12, 18, 25, 0.34) !important;
+      background: rgba(255, 255, 255, 0.018) !important;
       border: 1px solid var(--us-border) !important;
       border-collapse: separate !important;
       border-spacing: 0 !important;
       border-radius: var(--us-radius-md) !important;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025) !important;
-      overflow: hidden;
+      box-shadow: none !important;
     }
 
     html body #content table thead,
     html body #content table thead tr,
     html body #content table thead th,
     html body .tray-center table thead th {
-      color: #e4edf6 !important;
-      background:
-        linear-gradient(180deg, rgba(10, 132, 255, 0.10), rgba(255, 255, 255, 0.025)) !important;
+      color: var(--us-text-soft) !important;
+      background: rgba(255, 255, 255, 0.035) !important;
       border-color: var(--us-border) !important;
       font-weight: 600 !important;
       text-transform: none !important;
@@ -485,41 +448,35 @@
     html body .tray-center table tbody th {
       color: var(--us-text-soft) !important;
       background: transparent !important;
-      border-color: rgba(215, 235, 255, 0.075) !important;
+      border-color: var(--us-border) !important;
       box-shadow: none !important;
     }
 
     html body #content table tbody tr:hover,
     html body .tray-center table tbody tr:hover {
-      color: #fff !important;
-      background: rgba(10, 132, 255, 0.075) !important;
+      color: var(--us-text) !important;
+      background: var(--us-hover) !important;
     }
 
-    html body #content table tbody tr:hover td,
-    html body .tray-center table tbody tr:hover td {
-      color: #eef7ff !important;
-    }
-
-    /* Buttons: visual treatment only. No forced heights or padding. */
     .btn,
     button,
     input[type="button"],
     input[type="submit"] {
       position: relative !important;
-      color: var(--us-text-soft) !important;
-      background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.035)) !important;
-      background-color: rgba(30, 39, 50, 0.72) !important;
-      background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.085), rgba(255, 255, 255, 0.035)) !important;
+      overflow: visible !important;
+      min-height: 34px !important;
+      padding: 7px 12px !important;
+      color: var(--us-text) !important;
+      background: rgba(255, 255, 255, 0.055) !important;
+      background-image: none !important;
       border: 1px solid var(--us-border-strong) !important;
       border-radius: var(--us-radius-sm) !important;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 3px 10px rgba(0, 0, 0, 0.12) !important;
+      box-shadow: none !important;
       font-weight: 550 !important;
       text-transform: none !important;
       text-shadow: none !important;
       transform: none !important;
       animation: none !important;
-      transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease !important;
     }
 
     .btn::before,
@@ -537,91 +494,62 @@
     input[type="button"]:hover,
     input[type="submit"]:hover {
       color: #fff !important;
-      background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(10, 132, 255, 0.09)) !important;
-      border-color: rgba(100, 210, 255, 0.28) !important;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.10), 0 5px 16px rgba(0, 0, 0, 0.16) !important;
-      outline: none !important;
+      background: rgba(255, 255, 255, 0.09) !important;
+      border-color: rgba(255, 255, 255, 0.22) !important;
     }
 
     .btn-primary,
-    .btn-info,
-    .btn.active,
-    button.active {
-      color: #fff !important;
-      background:
-        linear-gradient(180deg, rgba(36, 150, 255, 0.92), rgba(10, 105, 214, 0.90)) !important;
-      border-color: rgba(100, 210, 255, 0.38) !important;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 6px 18px rgba(10, 132, 255, 0.20) !important;
+    .btn-info {
+      color: #edf2f6 !important;
+      background: rgba(155, 172, 189, 0.18) !important;
+      border-color: rgba(193, 204, 215, 0.24) !important;
     }
 
     .btn-success {
-      color: #e8f8ef !important;
-      background: rgba(67, 139, 96, 0.26) !important;
-      border-color: rgba(121, 201, 158, 0.32) !important;
+      color: #dce9e0 !important;
+      background: rgba(120, 168, 138, 0.17) !important;
+      border-color: rgba(120, 168, 138, 0.28) !important;
     }
 
     .btn-warning,
     a[href*="clock"],
     .clock-actions,
     .btn[href*="clock"] {
-      color: #f7eedc !important;
-      background: rgba(169, 132, 61, 0.24) !important;
-      border-color: rgba(209, 180, 109, 0.34) !important;
+      color: #eee5d2 !important;
+      background: rgba(199, 169, 107, 0.16) !important;
+      border-color: rgba(199, 169, 107, 0.27) !important;
     }
 
     .btn-danger {
-      color: #fae9e9 !important;
-      background: rgba(159, 75, 75, 0.25) !important;
-      border-color: rgba(213, 141, 141, 0.34) !important;
+      color: #f0dcdc !important;
+      background: rgba(196, 122, 122, 0.16) !important;
+      border-color: rgba(196, 122, 122, 0.28) !important;
     }
 
-    .btn:disabled,
-    button:disabled,
-    input[type="button"]:disabled,
-    input[type="submit"]:disabled {
-      opacity: 0.46 !important;
-      filter: saturate(0.75) !important;
-      cursor: default !important;
-    }
-
-    /* Forms. */
     input,
     textarea,
     select,
     .form-control {
       color: var(--us-text) !important;
-      background: rgba(10, 16, 23, 0.58) !important;
-      background-color: rgba(10, 16, 23, 0.58) !important;
+      background: rgba(255, 255, 255, 0.035) !important;
       background-image: none !important;
       border: 1px solid var(--us-border) !important;
       border-radius: var(--us-radius-sm) !important;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025) !important;
-      text-shadow: none !important;
-    }
-
-    input:hover,
-    textarea:hover,
-    select:hover,
-    .form-control:hover {
-      border-color: rgba(215, 235, 255, 0.16) !important;
+      box-shadow: none !important;
     }
 
     input:focus,
     textarea:focus,
     select:focus,
     .form-control:focus {
-      color: #fff !important;
-      background-color: rgba(10, 16, 23, 0.72) !important;
-      border-color: var(--us-blue-focus) !important;
-      box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.035) !important;
+      border-color: var(--us-border-focus) !important;
+      box-shadow: 0 0 0 3px rgba(193, 204, 215, 0.08) !important;
       outline: none !important;
     }
 
     input::placeholder,
     textarea::placeholder {
-      color: var(--us-text-faint) !important;
-      opacity: 1 !important;
+      color: var(--us-text-muted) !important;
     }
 
     select,
@@ -630,24 +558,18 @@
     #content select,
     .panel select,
     .panel-body select {
-      color-scheme: dark !important;
       padding-right: 10px !important;
+      appearance: auto !important;
+      -webkit-appearance: auto !important;
     }
 
-    select option,
-    select optgroup {
-      color: var(--us-text-soft) !important;
-      background: #141b24 !important;
-      background-color: #141b24 !important;
-    }
-
-    /* Existing Projects search filters. */
+    /* Existing Projects filters: own the complete select wrapper, not just the native select. */
     html body #content .tray-left form#form label.field.select,
     html body #content .tray-left form#form .field.select {
       color-scheme: dark !important;
       color: var(--us-text-soft) !important;
-      background: rgba(10, 16, 23, 0.62) !important;
-      background-color: rgba(10, 16, 23, 0.62) !important;
+      background: var(--us-bg-soft) !important;
+      background-color: var(--us-bg-soft) !important;
       background-image: none !important;
       border-radius: var(--us-radius-sm) !important;
       box-shadow: none !important;
@@ -668,8 +590,8 @@
       forced-color-adjust: none !important;
       color: var(--us-text-soft) !important;
       -webkit-text-fill-color: var(--us-text-soft) !important;
-      background: rgba(10, 16, 23, 0.78) !important;
-      background-color: rgba(10, 16, 23, 0.78) !important;
+      background: #1c2127 !important;
+      background-color: #1c2127 !important;
       background-image: none !important;
       border: 1px solid var(--us-border) !important;
       border-radius: var(--us-radius-sm) !important;
@@ -687,21 +609,58 @@
     html body #content .tray-left form#form select.input-sm[disabled] {
       color: var(--us-text-muted) !important;
       -webkit-text-fill-color: var(--us-text-muted) !important;
-      background: rgba(17, 24, 33, 0.78) !important;
-      background-color: rgba(17, 24, 33, 0.78) !important;
+      background: #1c2127 !important;
+      background-color: #1c2127 !important;
       border-color: var(--us-border) !important;
       opacity: 1 !important;
+      cursor: default !important;
+    }
+
+    html body #content .tray-left form#form .field.select select:hover,
+    html body #content .tray-left form#form .field.select select:focus,
+    html body #content .tray-left form#form select.input-sm:hover,
+    html body #content .tray-left form#form select.input-sm:focus {
+      color: var(--us-text) !important;
+      -webkit-text-fill-color: var(--us-text) !important;
+      background: #242a31 !important;
+      background-color: #242a31 !important;
+      border-color: var(--us-border-focus) !important;
+      outline: none !important;
     }
 
     html body #content .tray-left form#form .field.select > i.arrow.double {
       color: var(--us-text-muted) !important;
       border-top-color: var(--us-text-muted) !important;
       border-bottom-color: var(--us-text-muted) !important;
-      opacity: 0.95 !important;
+      opacity: 0.9 !important;
       pointer-events: none !important;
     }
 
-    /* Menus, popovers, date pickers and Select2. */
+    html body #content .tray-left form#form select option,
+    html body #content .tray-left form#form select optgroup {
+      color: var(--us-text-soft) !important;
+      background: var(--us-bg-elevated) !important;
+      background-color: var(--us-bg-elevated) !important;
+    }
+
+    select option,
+    select optgroup {
+      color: var(--us-text) !important;
+      background: var(--us-bg-elevated) !important;
+    }
+
+    .alert,
+    .alert-info,
+    .alert-success,
+    .alert-warning,
+    .alert-danger,
+    .alert-micro {
+      background: rgba(255, 255, 255, 0.035) !important;
+      border: 1px solid var(--us-border) !important;
+      border-radius: var(--us-radius-md) !important;
+      box-shadow: none !important;
+    }
+
     .dropdown-menu,
     .popover,
     .tooltip-inner,
@@ -718,14 +677,11 @@
     .select2-container .select2-selection--multiple {
       z-index: 2147483000 !important;
       color: var(--us-text) !important;
-      background:
-        linear-gradient(145deg, rgba(255, 255, 255, 0.04), transparent 50%),
-        rgba(16, 23, 32, 0.94) !important;
-      background-color: rgba(16, 23, 32, 0.94) !important;
-      background-image: linear-gradient(145deg, rgba(255, 255, 255, 0.04), transparent 50%) !important;
-      border: 1px solid var(--us-border-strong) !important;
+      background: rgba(25, 29, 35, 0.99) !important;
+      background-image: none !important;
+      border: 1px solid var(--us-border) !important;
       border-radius: var(--us-radius-md) !important;
-      box-shadow: var(--us-inner-highlight), var(--us-shadow-lg) !important;
+      box-shadow: var(--us-shadow-lg) !important;
     }
 
     .dropdown-menu > li > a,
@@ -742,55 +698,21 @@
     .tt-suggestion.tt-cursor,
     .select2-results__option--highlighted,
     .select2-results__option[aria-selected="true"] {
-      color: #fff !important;
-      background: rgba(10, 132, 255, 0.14) !important;
+      color: var(--us-text) !important;
+      background: var(--us-hover) !important;
     }
 
-    /* Alerts. */
-    .alert,
-    .alert-info,
-    .alert-success,
-    .alert-warning,
-    .alert-danger,
-    .alert-micro {
-      color: var(--us-text-soft) !important;
-      background: rgba(18, 25, 34, 0.74) !important;
-      border: 1px solid var(--us-border) !important;
-      border-radius: var(--us-radius-md) !important;
-      box-shadow: var(--us-inner-highlight) !important;
-    }
-
-    .alert-info {
-      border-color: rgba(127, 200, 248, 0.24) !important;
-      background: rgba(42, 121, 174, 0.13) !important;
-    }
-
-    .alert-success {
-      border-color: rgba(121, 201, 158, 0.24) !important;
-      background: rgba(66, 137, 96, 0.13) !important;
-    }
-
-    .alert-warning {
-      border-color: rgba(209, 180, 109, 0.26) !important;
-      background: rgba(148, 115, 47, 0.13) !important;
-    }
-
-    .alert-danger {
-      border-color: rgba(213, 141, 141, 0.26) !important;
-      background: rgba(151, 67, 67, 0.14) !important;
-    }
-
-    /* Tabs. */
     .tab-block,
     .tab-block .tab-content,
     .page-tabs,
     .tabs-bg.nav-tabs,
     .tabs-bg.tabs-below {
       color: var(--us-text) !important;
-      background: rgba(18, 25, 34, 0.64) !important;
+      background: var(--us-glass) !important;
+      background-image: none !important;
       border: 1px solid var(--us-border) !important;
       border-radius: var(--us-radius-lg) !important;
-      box-shadow: var(--us-inner-highlight), var(--us-shadow-sm) !important;
+      box-shadow: var(--us-shadow-sm) !important;
     }
 
     .nav-tabs > li > a,
@@ -809,12 +731,11 @@
     .nav-tabs > li.active > a:hover,
     .nav-tabs > li.active > a:focus,
     .tabs-left > li.active > a {
-      color: #fff !important;
-      background: rgba(10, 132, 255, 0.14) !important;
-      border-color: rgba(100, 210, 255, 0.20) !important;
+      color: var(--us-text) !important;
+      background: var(--us-accent-soft) !important;
+      border-color: rgba(193, 204, 215, 0.14) !important;
     }
 
-    /* Editors. */
     .cke,
     .cke_chrome,
     .admin-skin.cke_chrome,
@@ -823,11 +744,10 @@
     .markItUp,
     .md-editor {
       color: var(--us-text) !important;
-      background: rgba(15, 22, 31, 0.82) !important;
-      background-color: rgba(15, 22, 31, 0.82) !important;
+      background: var(--us-glass-strong) !important;
       background-image: none !important;
       border-color: var(--us-border) !important;
-      box-shadow: var(--us-inner-highlight), var(--us-shadow-sm) !important;
+      box-shadow: var(--us-shadow-sm) !important;
     }
 
     .cke_toolgroup,
@@ -835,7 +755,7 @@
     .note-btn-group,
     .note-editor .btn-group,
     .md-editor > .md-header .btn-group {
-      background: rgba(255, 255, 255, 0.035) !important;
+      background: rgba(255, 255, 255, 0.03) !important;
       border-color: var(--us-border) !important;
       box-shadow: none !important;
     }
@@ -848,12 +768,11 @@
     .md-editor > textarea,
     .md-editor > .md-preview {
       color: var(--us-text) !important;
-      background: rgba(8, 13, 19, 0.82) !important;
+      background: rgba(17, 20, 24, 0.92) !important;
       border-color: var(--us-border) !important;
       text-shadow: none !important;
     }
 
-    /* Pagination. */
     .pagination,
     .dataTables_paginate {
       background: transparent !important;
@@ -864,7 +783,7 @@
     .pagination > li > span,
     .dataTables_paginate .paginate_button {
       color: var(--us-text-soft) !important;
-      background: rgba(255, 255, 255, 0.045) !important;
+      background: rgba(255, 255, 255, 0.035) !important;
       border: 1px solid var(--us-border) !important;
       border-radius: var(--us-radius-sm) !important;
       box-shadow: none !important;
@@ -873,30 +792,59 @@
     .pagination > .active > a,
     .pagination > .active > span,
     .dataTables_paginate .paginate_button.current {
-      color: #fff !important;
-      background: rgba(10, 132, 255, 0.22) !important;
-      border-color: rgba(100, 210, 255, 0.28) !important;
+      color: var(--us-text) !important;
+      background: var(--us-accent-soft) !important;
+      border-color: rgba(193, 204, 215, 0.18) !important;
     }
 
-    /* Labels and badges. */
-    .label,
-    .badge {
-      color: var(--us-text-soft) !important;
-      background: rgba(255, 255, 255, 0.075) !important;
-      border: 1px solid rgba(255, 255, 255, 0.075) !important;
+    .duplicate-modal,
+    .modal-backdrop,
+    #modal-overlay.duplicate-modal-2,
+    .duplicate-modal-2,
+    #time-remaining-popup-container {
+      background: rgba(5, 7, 9, 0.68) !important;
+    }
+
+    .duplicate-modal-content,
+    .modal-content,
+    .bootbox .modal-content,
+    .ui-dialog,
+    .ui-widget-content,
+    .duplicate-modal-content-2,
+    #time-remaining-popup-modal,
+    #remaining-time-in-popup,
+    #show-materials-used-warning-modal {
+      color: var(--us-text) !important;
+      background: var(--us-glass-strong) !important;
+      background-image: none !important;
+      border: 1px solid var(--us-border-strong) !important;
+      border-radius: var(--us-radius-lg) !important;
+      box-shadow: var(--us-shadow-lg) !important;
+    }
+
+    mark,
+    .marker,
+    [style*="background-color: yellow" i],
+    [style*="background: yellow" i],
+    [style*="#ffff00" i],
+    [style*="#ff0" i] {
+      display: inline !important;
+      color: var(--us-text) !important;
+      -webkit-text-fill-color: var(--us-text) !important;
+      background: rgba(211, 186, 134, 0.18) !important;
+      border-radius: 4px !important;
       text-shadow: none !important;
+      box-shadow: inset 0 0 0 1px rgba(211, 186, 134, 0.16) !important;
     }
 
-    .label-primary,
-    .badge-primary,
-    .label-info,
-    .badge-info {
-      color: #eaf6ff !important;
-      background: rgba(10, 132, 255, 0.22) !important;
-      border-color: rgba(100, 210, 255, 0.18) !important;
+    html body :is(#descriptionbox, #designbox, .us-sign-description-panel, .us-sign-readable-content)
+    :is([style*="color:blue" i], [style*="color: blue" i], [style*="#0000ff" i], [style*="#00f" i], [style*="rgb(0, 0, 255)" i], font[color="blue" i], font[color="#0000ff" i]) {
+      color: #a9c2d8 !important;
+      -webkit-text-fill-color: #a9c2d8 !important;
+      text-shadow: none !important;
+      filter: none !important;
     }
 
-    /* Important notes, rich text and Description repairs. */
     html body :is(#descriptionbox, #designbox, .us-sign-description-panel, .us-sign-readable-content)
     :is([style*="color:red" i], [style*="color: red" i], [style*="#ff0000" i], [style*="#f00" i], font[color="red" i], font[color="#ff0000" i]) {
       color: #c49a96 !important;
@@ -909,6 +857,7 @@
       -webkit-text-fill-color: #acd0b5 !important;
     }
 
+    /* Description rich-text cleanup: remove inherited highlight chips while preserving text formatting. */
     html body :is(#descriptionbox, .us-sign-description-panel)
     .panel-body :is(
       mark,
@@ -925,16 +874,55 @@
       text-shadow: none !important;
     }
 
-    /* Keep status colors readable on glass. */
-    .text-success { color: #93d9b2 !important; }
-    .text-warning { color: #dec384 !important; }
-    .text-danger { color: #dfa0a0 !important; }
-    .text-info { color: #91d2ff !important; }
-    .text-primary { color: #8ccaff !important; }
+    /* Site-wide fixed wallpaper. Main canvas wrappers are transparent so the image remains visible behind the UI. */
+    html {
+      background-color: #111418 !important;
+      background-image:
+        linear-gradient(rgba(11, 14, 17, 0.44), rgba(11, 14, 17, 0.62)),
+        url("https://www.bing.com/th?id=OBTQ.BTA9ACD46ADE4DF290D5640B661E6A5C8CF666B651507F76309661E06C8AA70FB2&rs=2&c=1") !important;
+      background-position: center center, center center !important;
+      background-size: cover, cover !important;
+      background-repeat: no-repeat, no-repeat !important;
+      background-attachment: fixed, fixed !important;
+    }
 
-    /* Scrollbars. */
-    * {
-      scrollbar-color: rgba(104, 173, 230, 0.42) rgba(7, 11, 16, 0.38);
+    body {
+      background: rgba(17, 20, 24, 0.30) !important;
+      background-color: rgba(17, 20, 24, 0.30) !important;
+      background-image: none !important;
+    }
+
+    html body #main,
+    html body #content_wrapper,
+    html body #content,
+    html body #content > .tray,
+    html body #content > .tray-left,
+    html body #content > .tray-right,
+    html body #content > .tray-center,
+    html body .tray,
+    html body .tray-left,
+    html body .tray-right,
+    html body .tray-center,
+    html body .tray-inner,
+    html body [class^="tray-"],
+    html body [class*=" tray-"],
+    html body .content,
+    html body .content-wrapper,
+    html body .page-content,
+    html body .content-body,
+    html body .main-content,
+    html body .main-panel,
+    html body .admin-panels,
+    html body .dashboard,
+    html body .dashboard-page,
+    html body .container,
+    html body .container-fluid,
+    html body .pl15,
+    html body .pr15,
+    html body .pl15.pr15 {
+      background: transparent !important;
+      background-color: transparent !important;
+      background-image: none !important;
     }
 
     ::-webkit-scrollbar {
@@ -943,17 +931,13 @@
     }
 
     ::-webkit-scrollbar-track {
-      background: rgba(7, 11, 16, 0.34) !important;
+      background: var(--us-bg) !important;
     }
 
     ::-webkit-scrollbar-thumb {
-      background: linear-gradient(180deg, rgba(100, 210, 255, 0.38), rgba(10, 132, 255, 0.30)) !important;
-      border: 2px solid rgba(7, 11, 16, 0.42) !important;
+      background: rgba(255, 255, 255, 0.16) !important;
+      border: 2px solid var(--us-bg) !important;
       border-radius: 999px !important;
-    }
-
-    ::-webkit-scrollbar-thumb:hover {
-      background: linear-gradient(180deg, rgba(100, 210, 255, 0.54), rgba(10, 132, 255, 0.46)) !important;
     }
 
     @media (min-width: 992px) {
@@ -983,25 +967,30 @@
     }
 
 
+
     /* =========================================================
-       v2.0.1 WALLPAPER VISIBILITY + LATE SHELL OWNERSHIP
-       The native Design page and later userscripts can repaint outer
-       workspace layers after the theme starts. These selectors own only
-       structural shells, leaving functional cards and content panels intact.
+       v2.1.0 VISUAL-ONLY WALLPAPER + BLUE GLASS
+       Built on the known-good v1.2.0 layout. These rules intentionally
+       change paint only. No project/tray geometry is modified here.
     ========================================================= */
 
-    html,
-    body {
-      background-color: var(--us-bg-deep) !important;
+    html {
+      background-color: #081019 !important;
       background-image:
         radial-gradient(circle at 78% 0%, rgba(42, 135, 255, 0.18), transparent 38%),
         radial-gradient(circle at 14% 100%, rgba(100, 210, 255, 0.08), transparent 34%),
-        linear-gradient(rgba(5, 9, 14, 0.38), rgba(7, 11, 16, 0.66)),
+        linear-gradient(rgba(4, 8, 13, 0.30), rgba(6, 11, 17, 0.56)),
         var(--us-wallpaper) !important;
       background-position: center center !important;
       background-size: cover !important;
       background-repeat: no-repeat !important;
       background-attachment: fixed !important;
+    }
+
+    body {
+      background: rgba(7, 11, 16, 0.10) !important;
+      background-color: rgba(7, 11, 16, 0.10) !important;
+      background-image: none !important;
     }
 
     html body #main,
@@ -1016,250 +1005,94 @@
     html body .tray-right,
     html body .tray-center,
     html body .tray-inner,
-    html body .tray-center > .pl15,
-    html body .tray-center > .pr15,
-    html body .tray-center > .pl15.pr15,
-    html body #content .us-sign-design-workbench,
-    html body #content .us-sign-design-workspace-column {
-      background: transparent !important;
-      background-color: transparent !important;
-      background-image: none !important;
-      box-shadow: none !important;
-    }
-
-    /* The outer Design panel is a layout shell. Inner panels remain glass. */
-    html body #content .us-sign-design-workspace-column > .panel,
-    html body #content .us-sign-design-workspace-column > .panel > .panel-body {
-      background: transparent !important;
-      background-color: transparent !important;
-      background-image: none !important;
-      border-color: transparent !important;
-      box-shadow: none !important;
-      -webkit-backdrop-filter: none !important;
-      backdrop-filter: none !important;
-    }
-
-    /* Force the project rail to stay dark glass even when later project CSS runs. */
-    html.us-sign-project-page body #pmlt,
-    html body:has(#pmlt) #pmlt {
-      color: var(--us-text-soft) !important;
-      background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012)),
-        rgba(9, 15, 23, 0.70) !important;
-      background-color: rgba(9, 15, 23, 0.70) !important;
-      background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012)) !important;
-      border-right: 1px solid var(--us-blue-border) !important;
-      box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.035), 10px 0 32px rgba(0, 0, 0, 0.18) !important;
-      -webkit-backdrop-filter: blur(20px) saturate(140%) !important;
-      backdrop-filter: blur(20px) saturate(140%) !important;
-    }
-
-    /* Keep the main Design content readable while letting wallpaper breathe around it. */
-    html body #content #us-sign-design-actionbar,
-    html body #content #us-sign-job-overview,
-    html body #content #us-sign-design-summary,
-    html body #content #us-sign-design-bottom-grid .panel,
-    html body #content #customer-name,
-    html body #content #customer-info,
-    html body #content .well {
-      border-color: rgba(165, 210, 245, 0.13) !important;
-    }
-
-    /* =========================================================
-       v2.0.2 DEDICATED WALLPAPER LAYER
-       Keep the image in its own fixed layer so SquareCoil's native table
-       layout cannot replace the viewport background with a flat color.
-    ========================================================= */
-
-    body {
-      position: relative !important;
-      isolation: isolate !important;
-      background: transparent !important;
-      background-color: transparent !important;
+    html body [class^="tray-"],
+    html body [class*=" tray-"],
+    html body .content,
+    html body .content-wrapper,
+    html body .page-content,
+    html body .content-body,
+    html body .main-content,
+    html body .main-panel,
+    html body .admin-panels,
+    html body .dashboard,
+    html body .dashboard-page,
+    html body .container,
+    html body .container-fluid,
+    html body .pl15,
+    html body .pr15,
+    html body .pl15.pr15 {
+      background: var(--us-bg) !important;
+      background-color: var(--us-bg) !important;
       background-image: none !important;
     }
 
-    body::before {
-      content: "" !important;
-      position: fixed !important;
-      inset: 0 !important;
-      z-index: -1 !important;
-      pointer-events: none !important;
-      background-color: #0a1018 !important;
-      background-image:
-        radial-gradient(circle at 78% 0%, rgba(42, 135, 255, 0.18), transparent 38%),
-        radial-gradient(circle at 14% 100%, rgba(100, 210, 255, 0.08), transparent 34%),
-        linear-gradient(rgba(4, 8, 13, 0.34), rgba(6, 11, 17, 0.62)),
-        var(--us-wallpaper) !important;
-      background-position: center center !important;
-      background-size: cover !important;
-      background-repeat: no-repeat !important;
-      background-attachment: fixed !important;
-    }
-
-    html body #main,
-    html body #content_wrapper,
-    html body section#content_wrapper,
-    html body #content,
-    html body section#content,
-    html body #content.table-layout,
-    html body .table-layout,
-    html body #content > .tray,
-    html body #content > aside.tray,
-    html body #content > section.tray,
-    html body #content > .tray-left,
-    html body #content > .tray-right,
-    html body #content > .tray-center,
-    html body #content .tray-center,
-    html body #content .tray-left,
-    html body #content .tray-right,
-    html body .tray-inner,
-    html body .tray-center > .pl15,
-    html body .tray-center > .pr15,
-    html body .tray-center > .pl15.pr15,
-    html body #content .us-sign-design-workbench,
-    html body #content .us-sign-design-workspace-column {
-      background: transparent !important;
-      background-color: transparent !important;
-      background-image: none !important;
-    }
-
-    html body #main::before,
-    html body #main::after,
-    html body #content_wrapper::before,
-    html body #content_wrapper::after,
-    html body #content::before,
-    html body #content::after,
-    html body #content.table-layout::before,
-    html body #content.table-layout::after,
-    html body .tray-center::before,
-    html body .tray-center::after {
-      background: transparent !important;
-      background-color: transparent !important;
-      background-image: none !important;
-      box-shadow: none !important;
-    }
-
-    /* Project rail remains translucent instead of reverting to native gray. */
-    html.us-sign-project-page body #pmlt,
-    html body:has(#pmlt) #pmlt {
-      background:
-        linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012)),
-        rgba(8, 14, 22, 0.67) !important;
-      background-color: rgba(8, 14, 22, 0.67) !important;
-      border-right-color: rgba(100, 210, 255, 0.22) !important;
-    }
-
-    /* =========================================================
-       v2.0.3 WALLPAPER STACKING FIX
-       v2.0.2 used body::before with a negative stack level inside an
-       isolated body. Move the image to the root stacking context instead.
-    ========================================================= */
-
-    html {
-      position: relative !important;
-      isolation: isolate !important;
-      background: #081019 !important;
-      background-color: #081019 !important;
-      background-image: none !important;
-    }
-
-    html::before {
-      content: "" !important;
-      position: fixed !important;
-      inset: 0 !important;
-      z-index: 0 !important;
-      display: block !important;
-      pointer-events: none !important;
-      background-color: #0a1018 !important;
-      background-image:
-        radial-gradient(circle at 78% 0%, rgba(42, 135, 255, 0.20), transparent 38%),
-        radial-gradient(circle at 14% 100%, rgba(100, 210, 255, 0.10), transparent 34%),
-        linear-gradient(rgba(4, 8, 13, 0.30), rgba(6, 11, 17, 0.58)),
-        url("https://www.bing.com/th?id=OBTQ.BTA9ACD46ADE4DF290D5640B661E6A5C8CF666B651507F76309661E06C8AA70FB2&rs=2&c=1"),
-        url("https://bing.gifposter.com/bingImages/LagoPehoe_1920x1080.jpg") !important;
-      background-position: center center !important;
-      background-size: cover !important;
-      background-repeat: no-repeat !important;
-      background-attachment: fixed !important;
-    }
-
-    body {
-      position: relative !important;
-      z-index: 1 !important;
-      isolation: auto !important;
-      background: transparent !important;
-      background-color: transparent !important;
-      background-image: none !important;
-    }
-
-    body::before {
-      content: none !important;
-      display: none !important;
-      background: none !important;
-    }
-
-    /* Keep the real app above the root wallpaper layer. */
+    header,
     header.navbar,
-    #main,
-    #content_wrapper,
-    #content {
-      position: relative !important;
-      z-index: 1 !important;
+    .navbar,
+    .navbar-fixed-top,
+    #topbar,
+    .topbar {
+      background: rgba(11, 18, 28, 0.84) !important;
+      background-color: rgba(11, 18, 28, 0.84) !important;
+      border-bottom-color: rgba(100, 210, 255, 0.13) !important;
     }
 
-    /* Structural shells only. Functional cards keep their glass surfaces. */
-    html body #main,
-    html body #content_wrapper,
-    html body #content,
-    html body #content.table-layout,
-    html body #content > .tray,
-    html body #content > aside.tray,
-    html body #content > section.tray,
-    html body #content .tray-center,
-    html body #content .tray-left,
-    html body #content .tray-right,
-    html body #content .tray-inner,
-    html body #content .tray-center > .pl15,
-    html body #content .tray-center > .pr15,
-    html body #content .tray-center > .pl15.pr15,
-    html body #content .us-sign-design-workbench,
-    html body #content .us-sign-design-workspace-column,
-    html body #content .us-sign-design-workspace-column > .panel,
-    html body #content .us-sign-design-workspace-column > .panel > .panel-body {
-      background: transparent !important;
-      background-color: transparent !important;
-      background-image: none !important;
+    #sidebar_left,
+    #pmlt {
+      background: rgba(10, 17, 26, 0.82) !important;
+      background-color: rgba(10, 17, 26, 0.82) !important;
+      border-color: rgba(100, 210, 255, 0.13) !important;
     }
 
-
-
-    /* =========================================================
-       v2.0.8 DESIGN-ONLY LAYOUT REPAIR
-       Scope of Work / Project Status / Tasks keep native SquareCoil geometry.
-       Only the Design workspace removes the native 60px wrapper offset.
-    ========================================================= */
-
-    html.us-sign-design-page body section#content_wrapper,
-    html.us-sign-design-page body #content_wrapper,
-    html.us-sign-design-page body #content {
-      margin-top: 0 !important;
-      padding-top: 0 !important;
+    .panel,
+    .panel-default,
+    .well,
+    .modal-content,
+    .popover,
+    .dropdown-menu,
+    #customer-info,
+    #customer-name,
+    #showbtns,
+    #mapcontainer,
+    #filesbox,
+    #descriptionbox,
+    #projectbox,
+    #designbox,
+    .note-editor,
+    .cke {
+      background: var(--us-glass) !important;
+      background-color: var(--us-glass) !important;
+      border-color: var(--us-border) !important;
     }
 
-    html.us-sign-design-page body #content > .tray,
-    html.us-sign-design-page body #content > .tray-left,
-    html.us-sign-design-page body #content > .tray-center,
-    html.us-sign-design-page body #content > .tray-right {
-      margin-top: 0 !important;
-      padding-top: 10px !important;
+    @supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+      header.navbar,
+      #sidebar_left,
+      #pmlt,
+      .panel,
+      .panel-default,
+      .well,
+      .modal-content,
+      .popover,
+      .dropdown-menu,
+      #customer-info,
+      #customer-name,
+      #filesbox,
+      #descriptionbox,
+      #projectbox,
+      #designbox {
+        -webkit-backdrop-filter: blur(16px) saturate(130%) !important;
+        backdrop-filter: blur(16px) saturate(130%) !important;
+      }
     }
 
-    html.us-sign-design-page body #content .tray-center > .pl15,
-    html.us-sign-design-page body #content .tray-center > .pr15,
-    html.us-sign-design-page body #content .tray-center > .pl15.pr15 {
-      margin-top: 0 !important;
-      padding-top: 0 !important;
+    #sidebar_left .nav > li.active > a,
+    #sidebar_left .active > a,
+    #sidebar_left a.active,
+    .pagination > .active > a,
+    .pagination > .active > span {
+      background: rgba(10, 132, 255, 0.20) !important;
+      border-color: rgba(100, 210, 255, 0.20) !important;
     }
 
     @media print {
@@ -1278,90 +1111,8 @@
       .table {
         color: #000 !important;
         background: #fff !important;
-        background-image: none !important;
         box-shadow: none !important;
-        -webkit-backdrop-filter: none !important;
-        backdrop-filter: none !important;
       }
     }
   `);
-
-
-  /* v2.0.3: bounded late-shell cleanup. Design Job Tools mounts after this
-     theme, so clear only its outer ancestor shells a few times during startup.
-     No observer and no recurring interval. */
-  function usSignClearWallpaperShell(element) {
-    if (!(element instanceof Element)) return;
-    element.style.setProperty("background", "transparent", "important");
-    element.style.setProperty("background-color", "transparent", "important");
-    element.style.setProperty("background-image", "none", "important");
-  }
-
-
-  function usSignMarkDesignPage() {
-    const isDesignPage = Boolean(
-      document.getElementById("us-sign-design-actionbar") ||
-      document.querySelector(".us-sign-design-workbench, .us-sign-design-workspace-column")
-    );
-    document.documentElement.classList.toggle("us-sign-design-page", isDesignPage);
-    return isDesignPage;
-  }
-
-  function usSignWallpaperPass() {
-    usSignMarkDesignPage();
-
-    [
-      "#main",
-      "#content_wrapper",
-      "#content",
-      "#content.table-layout",
-      "#content > .tray",
-      "#content .tray-center",
-      "#content .tray-left",
-      "#content .tray-right",
-      "#content .tray-inner",
-      "#content .tray-center > .pl15",
-      "#content .tray-center > .pr15",
-      "#content .tray-center > .pl15.pr15",
-      "#content .us-sign-design-workbench",
-      "#content .us-sign-design-workspace-column"
-    ].forEach((selector) => {
-      document.querySelectorAll(selector).forEach(usSignClearWallpaperShell);
-    });
-
-    const actionbar = document.getElementById("us-sign-design-actionbar");
-    if (actionbar) {
-      let current = actionbar.parentElement;
-      while (current && current !== document.body) {
-        usSignClearWallpaperShell(current);
-        if (current.id === "content") break;
-        current = current.parentElement;
-      }
-    }
-
-    const rail = document.getElementById("pmlt");
-    if (rail) {
-      rail.style.setProperty(
-        "background",
-        "linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.012)), rgba(8,14,22,.67)",
-        "important"
-      );
-      rail.style.setProperty("background-color", "rgba(8,14,22,.67)", "important");
-    }
-  }
-
-  function usSignScheduleWallpaperPasses() {
-    [0, 220, 650, 1300, 2400, 3600].forEach((delay) => {
-      window.setTimeout(usSignWallpaperPass, delay);
-    });
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", usSignScheduleWallpaperPasses, { once: true });
-  } else {
-    usSignScheduleWallpaperPasses();
-  }
-  window.addEventListener("pageshow", usSignScheduleWallpaperPasses);
-
-
 })();
