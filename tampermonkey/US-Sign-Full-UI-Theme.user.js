@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      2.0.5
-// @description  Blue macOS-inspired glass theme for SquareCoil with corrected wallpaper stacking, removed native content-wrapper top gap, translucent workspace shells, polished forms, tables, menus, editors, and readable project content.
+// @version      2.0.6
+// @description  Blue macOS-inspired glass theme for SquareCoil with corrected wallpaper stacking, compact project positioning, translucent workspace shells, polished forms, tables, menus, editors, and readable project content.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
 // @grant        GM_addStyle
@@ -1293,6 +1293,26 @@
     html body:has(#pmlt) #content_wrapper {
       margin-top: 0 !important;
       padding-top: 0 !important;
+    }
+
+    /* =========================================================
+       v2.0.6 PROJECT HORIZONTAL OFFSET FIX
+       The wallpaper stacking pass makes content_wrapper/content positioned.
+       Neutralize SquareCoil's native left/right offsets so the project rail
+       begins directly after the main sidebar instead of leaving a dead column.
+    ========================================================= */
+
+    html.us-sign-project-page body section#content_wrapper,
+    html body:has(#pmlt) section#content_wrapper,
+    html.us-sign-project-page body #content_wrapper,
+    html body:has(#pmlt) #content_wrapper,
+    html.us-sign-project-page body section#content,
+    html body:has(#pmlt) section#content,
+    html.us-sign-project-page body #content,
+    html body:has(#pmlt) #content {
+      left: 0 !important;
+      right: auto !important;
+      transform: none !important;
     }
 
     @media print {
