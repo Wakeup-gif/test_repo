@@ -1,0 +1,35 @@
+name: Patch Full UI project top gap v2.0.4
+
+on:
+  push:
+    paths:
+      - "scripts/patch_full_ui_project_gap_v204.py"
+      - ".github/workflows/patch-full-ui-project-gap-v204.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch Full UI Theme v2.0.4
+        run: python scripts/patch_full_ui_project_gap_v204.py
+      - name: Validate JavaScript syntax
+        run: node --check tampermonkey/US-Sign-Full-UI-Theme.user.js
+      - name: Check diff
+        run: git diff --check
+      - name: Commit updated Full UI Theme
+        shell: bash
+        run: |
+          if git diff --quiet -- tampermonkey/US-Sign-Full-UI-Theme.user.js; then
+            echo "No Full UI Theme changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tampermonkey/US-Sign-Full-UI-Theme.user.js
+          git commit -m "Fix SquareCoil project page top gap v2.0.4"
+          git push
