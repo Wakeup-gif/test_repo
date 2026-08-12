@@ -1,0 +1,37 @@
+name: Rebuild Full UI from v1.1.2 v2.1.1
+
+on:
+  push:
+    paths:
+      - "scripts/rebuild_full_ui_from_v112_v211.py"
+      - ".github/workflows/rebuild-full-ui-from-v112-v211.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Rebuild from pre-wallpaper stable source
+        run: python scripts/rebuild_full_ui_from_v112_v211.py
+      - name: Validate userscript syntax
+        run: node --check tampermonkey/US-Sign-Full-UI-Theme.user.js
+      - name: Check diff
+        run: git diff --check
+      - name: Commit clean visual-only theme
+        shell: bash
+        run: |
+          if git diff --quiet -- tampermonkey/US-Sign-Full-UI-Theme.user.js; then
+            echo "No theme changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tampermonkey/US-Sign-Full-UI-Theme.user.js
+          git commit -m "Rebuild theme from pre-wallpaper stable layout v2.1.1"
+          git push
