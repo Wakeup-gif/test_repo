@@ -1,13 +1,11 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      2.0.1
-// @description  Blue macOS-inspired glass theme for SquareCoil with reliably loaded wallpaper, translucent workspace shells, polished forms, tables, menus, editors, and readable project content.
+// @version      2.0.2
+// @description  Blue macOS-inspired glass theme for SquareCoil with a dedicated fixed wallpaper layer, translucent workspace shells, polished forms, tables, menus, editors, and readable project content.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
 // @grant        GM_addStyle
-// @grant        GM_xmlhttpRequest
-// @connect      www.bing.com
 // @noframes
 // @updateURL    https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/US-Sign-Full-UI-Theme.user.js
 // @downloadURL  https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/US-Sign-Full-UI-Theme.user.js
@@ -65,7 +63,7 @@
       --us-font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Segoe UI", system-ui, sans-serif;
       --us-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 
-      --us-wallpaper: url("https://www.bing.com/th?id=OBTQ.BTA9ACD46ADE4DF290D5640B661E6A5C8CF666B651507F76309661E06C8AA70FB2&rs=2&c=1");
+      --us-wallpaper: url("https://bing.gifposter.com/bingImages/LagoPehoe_1920x1080.jpg");
     }
 
     html {
@@ -1067,6 +1065,91 @@
       border-color: rgba(165, 210, 245, 0.13) !important;
     }
 
+    /* =========================================================
+       v2.0.2 DEDICATED WALLPAPER LAYER
+       Keep the image in its own fixed layer so SquareCoil's native table
+       layout cannot replace the viewport background with a flat color.
+    ========================================================= */
+
+    body {
+      position: relative !important;
+      isolation: isolate !important;
+      background: transparent !important;
+      background-color: transparent !important;
+      background-image: none !important;
+    }
+
+    body::before {
+      content: "" !important;
+      position: fixed !important;
+      inset: 0 !important;
+      z-index: -1 !important;
+      pointer-events: none !important;
+      background-color: #0a1018 !important;
+      background-image:
+        radial-gradient(circle at 78% 0%, rgba(42, 135, 255, 0.18), transparent 38%),
+        radial-gradient(circle at 14% 100%, rgba(100, 210, 255, 0.08), transparent 34%),
+        linear-gradient(rgba(4, 8, 13, 0.34), rgba(6, 11, 17, 0.62)),
+        var(--us-wallpaper) !important;
+      background-position: center center !important;
+      background-size: cover !important;
+      background-repeat: no-repeat !important;
+      background-attachment: fixed !important;
+    }
+
+    html body #main,
+    html body #content_wrapper,
+    html body section#content_wrapper,
+    html body #content,
+    html body section#content,
+    html body #content.table-layout,
+    html body .table-layout,
+    html body #content > .tray,
+    html body #content > aside.tray,
+    html body #content > section.tray,
+    html body #content > .tray-left,
+    html body #content > .tray-right,
+    html body #content > .tray-center,
+    html body #content .tray-center,
+    html body #content .tray-left,
+    html body #content .tray-right,
+    html body .tray-inner,
+    html body .tray-center > .pl15,
+    html body .tray-center > .pr15,
+    html body .tray-center > .pl15.pr15,
+    html body #content .us-sign-design-workbench,
+    html body #content .us-sign-design-workspace-column {
+      background: transparent !important;
+      background-color: transparent !important;
+      background-image: none !important;
+    }
+
+    html body #main::before,
+    html body #main::after,
+    html body #content_wrapper::before,
+    html body #content_wrapper::after,
+    html body #content::before,
+    html body #content::after,
+    html body #content.table-layout::before,
+    html body #content.table-layout::after,
+    html body .tray-center::before,
+    html body .tray-center::after {
+      background: transparent !important;
+      background-color: transparent !important;
+      background-image: none !important;
+      box-shadow: none !important;
+    }
+
+    /* Project rail remains translucent instead of reverting to native gray. */
+    html.us-sign-project-page body #pmlt,
+    html body:has(#pmlt) #pmlt {
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012)),
+        rgba(8, 14, 22, 0.67) !important;
+      background-color: rgba(8, 14, 22, 0.67) !important;
+      border-right-color: rgba(100, 210, 255, 0.22) !important;
+    }
+
     @media print {
       html,
       body,
@@ -1091,33 +1174,5 @@
     }
   `);
 
-  /* Load the supplied Bing wallpaper through Tampermonkey so page CSP/hotlinking
-     cannot leave the interface with only the fallback background. */
-  const US_SIGN_WALLPAPER_URL = "https://www.bing.com/th?id=OBTQ.BTA9ACD46ADE4DF290D5640B661E6A5C8CF666B651507F76309661E06C8AA70FB2&rs=2&c=1";
-
-  function installWallpaperDataUrl() {
-    if (typeof GM_xmlhttpRequest !== "function") return;
-
-    GM_xmlhttpRequest({
-      method: "GET",
-      url: US_SIGN_WALLPAPER_URL,
-      responseType: "blob",
-      onload(response) {
-        if (!response.response || response.status < 200 || response.status >= 400) return;
-        const reader = new FileReader();
-        reader.onload = () => {
-          const dataUrl = String(reader.result || "");
-          if (!dataUrl.startsWith("data:image/")) return;
-          document.documentElement.style.setProperty(
-            "--us-wallpaper",
-            `url("${dataUrl}")`
-          );
-        };
-        reader.readAsDataURL(response.response);
-      }
-    });
-  }
-
-  installWallpaperDataUrl();
 
 })();
