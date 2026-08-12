@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      2.0.4
-// @description  Blue macOS-inspired glass theme for SquareCoil with corrected wallpaper stacking, compact project-page top spacing, translucent workspace shells, polished forms, tables, menus, editors, and readable project content.
+// @version      2.0.5
+// @description  Blue macOS-inspired glass theme for SquareCoil with corrected wallpaper stacking, removed native content-wrapper top gap, translucent workspace shells, polished forms, tables, menus, editors, and readable project content.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
 // @grant        GM_addStyle
@@ -1278,6 +1278,21 @@
     html body:has(#pmlt) #content .tray-center > .pr15 > :first-child,
     html body:has(#pmlt) #content .tray-center > .pl15.pr15 > :first-child {
       margin-top: 0 !important;
+    }
+
+    /* =========================================================
+       v2.0.5 NATIVE CONTENT WRAPPER GAP FIX
+       DevTools confirmed SquareCoil keeps padding-top:60px on
+       section#content_wrapper. Remove that native offset on project pages;
+       v2.0.4 already provides the intended 10px tray breathing room.
+    ========================================================= */
+
+    html.us-sign-project-page body section#content_wrapper,
+    html body:has(#pmlt) section#content_wrapper,
+    html.us-sign-project-page body #content_wrapper,
+    html body:has(#pmlt) #content_wrapper {
+      margin-top: 0 !important;
+      padding-top: 0 !important;
     }
 
     @media print {
