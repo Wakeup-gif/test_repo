@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      2.1.0
-// @description  Stable SquareCoil layout from the v1.2.0 restore point with blue macOS-inspired glass colors and a fixed scenic wallpaper. No project geometry overrides.
+// @version      2.1.1
+// @description  Stable pre-wallpaper SquareCoil layout with blue macOS-inspired glass colors and scenic wallpaper applied through translucent paint only. No project geometry overrides.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
 // @grant        GM_addStyle
@@ -16,11 +16,11 @@
 
   GM_addStyle(String.raw`
     :root {
-      --us-bg: rgba(9, 15, 23, 0.46);
-      --us-bg-elevated: rgba(16, 24, 34, 0.80);
-      --us-bg-soft: rgba(22, 31, 42, 0.74);
-      --us-glass: rgba(18, 27, 38, 0.68);
-      --us-glass-strong: rgba(13, 21, 31, 0.84);
+      --us-bg: rgba(9, 15, 23, 0.52);
+      --us-bg-elevated: rgba(16, 24, 34, 0.82);
+      --us-bg-soft: rgba(22, 31, 42, 0.76);
+      --us-glass: rgba(18, 27, 38, 0.70);
+      --us-glass-strong: rgba(13, 21, 31, 0.86);
       --us-glass-soft: rgba(255, 255, 255, 0.045);
       --us-hover: rgba(100, 180, 255, 0.10);
       --us-text: #f5f8fb;
@@ -874,57 +874,6 @@
       text-shadow: none !important;
     }
 
-    /* Site-wide fixed wallpaper. Main canvas wrappers are transparent so the image remains visible behind the UI. */
-    html {
-      background-color: #111418 !important;
-      background-image:
-        linear-gradient(rgba(11, 14, 17, 0.44), rgba(11, 14, 17, 0.62)),
-        url("https://www.bing.com/th?id=OBTQ.BTA9ACD46ADE4DF290D5640B661E6A5C8CF666B651507F76309661E06C8AA70FB2&rs=2&c=1") !important;
-      background-position: center center, center center !important;
-      background-size: cover, cover !important;
-      background-repeat: no-repeat, no-repeat !important;
-      background-attachment: fixed, fixed !important;
-    }
-
-    body {
-      background: rgba(17, 20, 24, 0.30) !important;
-      background-color: rgba(17, 20, 24, 0.30) !important;
-      background-image: none !important;
-    }
-
-    html body #main,
-    html body #content_wrapper,
-    html body #content,
-    html body #content > .tray,
-    html body #content > .tray-left,
-    html body #content > .tray-right,
-    html body #content > .tray-center,
-    html body .tray,
-    html body .tray-left,
-    html body .tray-right,
-    html body .tray-center,
-    html body .tray-inner,
-    html body [class^="tray-"],
-    html body [class*=" tray-"],
-    html body .content,
-    html body .content-wrapper,
-    html body .page-content,
-    html body .content-body,
-    html body .main-content,
-    html body .main-panel,
-    html body .admin-panels,
-    html body .dashboard,
-    html body .dashboard-page,
-    html body .container,
-    html body .container-fluid,
-    html body .pl15,
-    html body .pr15,
-    html body .pl15.pr15 {
-      background: transparent !important;
-      background-color: transparent !important;
-      background-image: none !important;
-    }
-
     ::-webkit-scrollbar {
       width: 10px;
       height: 10px;
@@ -969,9 +918,10 @@
 
 
     /* =========================================================
-       v2.1.0 VISUAL-ONLY WALLPAPER + BLUE GLASS
-       Built on the known-good v1.2.0 layout. These rules intentionally
-       change paint only. No project/tray geometry is modified here.
+       v2.1.1 VISUAL-ONLY WALLPAPER + BLUE GLASS
+       Source layout is the known-good v1.1.2 immediately before the
+       wallpaper commit. Paint changes only: no display/position/spacing,
+       tray geometry, widths, transforms, or runtime DOM mutation.
     ========================================================= */
 
     html {
@@ -993,39 +943,6 @@
       background-image: none !important;
     }
 
-    html body #main,
-    html body #content_wrapper,
-    html body #content,
-    html body #content > .tray,
-    html body #content > .tray-left,
-    html body #content > .tray-right,
-    html body #content > .tray-center,
-    html body .tray,
-    html body .tray-left,
-    html body .tray-right,
-    html body .tray-center,
-    html body .tray-inner,
-    html body [class^="tray-"],
-    html body [class*=" tray-"],
-    html body .content,
-    html body .content-wrapper,
-    html body .page-content,
-    html body .content-body,
-    html body .main-content,
-    html body .main-panel,
-    html body .admin-panels,
-    html body .dashboard,
-    html body .dashboard-page,
-    html body .container,
-    html body .container-fluid,
-    html body .pl15,
-    html body .pr15,
-    html body .pl15.pr15 {
-      background: var(--us-bg) !important;
-      background-color: var(--us-bg) !important;
-      background-image: none !important;
-    }
-
     header,
     header.navbar,
     .navbar,
@@ -1039,8 +956,8 @@
 
     #sidebar_left,
     #pmlt {
-      background: rgba(10, 17, 26, 0.82) !important;
-      background-color: rgba(10, 17, 26, 0.82) !important;
+      background: rgba(10, 17, 26, 0.84) !important;
+      background-color: rgba(10, 17, 26, 0.84) !important;
       border-color: rgba(100, 210, 255, 0.13) !important;
     }
 
