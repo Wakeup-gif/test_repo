@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      2.0.7
-// @description  Blue macOS-inspired glass theme for SquareCoil with measured project-rail gap repair, corrected wallpaper stacking, translucent workspace shells, polished forms, tables, menus, editors, and readable project content.
+// @version      2.0.8
+// @description  Blue macOS-inspired glass theme for SquareCoil with Design-only layout fixes, native project-page geometry elsewhere, corrected wallpaper stacking, and translucent workspace shells.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
 // @grant        GM_addStyle
@@ -1232,65 +1232,32 @@
       background-image: none !important;
     }
 
+
+
     /* =========================================================
-       v2.0.4 PROJECT PAGE TOP-GAP CLEANUP
-       Native tray padding plus project-wrapper margins were stacking into
-       the large empty band below the navbar. Keep one small consistent gap.
+       v2.0.8 DESIGN-ONLY LAYOUT REPAIR
+       Scope of Work / Project Status / Tasks keep native SquareCoil geometry.
+       Only the Design workspace removes the native 60px wrapper offset.
     ========================================================= */
 
-    html.us-sign-project-page body #content,
-    html body:has(#pmlt) #content {
+    html.us-sign-design-page body section#content_wrapper,
+    html.us-sign-design-page body #content_wrapper,
+    html.us-sign-design-page body #content {
       margin-top: 0 !important;
       padding-top: 0 !important;
     }
 
-    html.us-sign-project-page body #content > .tray,
-    html.us-sign-project-page body #content > .tray-left,
-    html.us-sign-project-page body #content > .tray-center,
-    html.us-sign-project-page body #content > .tray-right,
-    html body:has(#pmlt) #content > .tray,
-    html body:has(#pmlt) #content > .tray-left,
-    html body:has(#pmlt) #content > .tray-center,
-    html body:has(#pmlt) #content > .tray-right {
+    html.us-sign-design-page body #content > .tray,
+    html.us-sign-design-page body #content > .tray-left,
+    html.us-sign-design-page body #content > .tray-center,
+    html.us-sign-design-page body #content > .tray-right {
       margin-top: 0 !important;
       padding-top: 10px !important;
     }
 
-    html.us-sign-project-page body #pmlt,
-    html body:has(#pmlt) #pmlt {
-      margin-top: 0 !important;
-    }
-
-    html.us-sign-project-page body #content .tray-center > .pl15,
-    html.us-sign-project-page body #content .tray-center > .pr15,
-    html.us-sign-project-page body #content .tray-center > .pl15.pr15,
-    html body:has(#pmlt) #content .tray-center > .pl15,
-    html body:has(#pmlt) #content .tray-center > .pr15,
-    html body:has(#pmlt) #content .tray-center > .pl15.pr15 {
-      margin-top: 0 !important;
-      padding-top: 0 !important;
-    }
-
-    html.us-sign-project-page body #content .tray-center > .pl15 > :first-child,
-    html.us-sign-project-page body #content .tray-center > .pr15 > :first-child,
-    html.us-sign-project-page body #content .tray-center > .pl15.pr15 > :first-child,
-    html body:has(#pmlt) #content .tray-center > .pl15 > :first-child,
-    html body:has(#pmlt) #content .tray-center > .pr15 > :first-child,
-    html body:has(#pmlt) #content .tray-center > .pl15.pr15 > :first-child {
-      margin-top: 0 !important;
-    }
-
-    /* =========================================================
-       v2.0.5 NATIVE CONTENT WRAPPER GAP FIX
-       DevTools confirmed SquareCoil keeps padding-top:60px on
-       section#content_wrapper. Remove that native offset on project pages;
-       v2.0.4 already provides the intended 10px tray breathing room.
-    ========================================================= */
-
-    html.us-sign-project-page body section#content_wrapper,
-    html body:has(#pmlt) section#content_wrapper,
-    html.us-sign-project-page body #content_wrapper,
-    html body:has(#pmlt) #content_wrapper {
+    html.us-sign-design-page body #content .tray-center > .pl15,
+    html.us-sign-design-page body #content .tray-center > .pr15,
+    html.us-sign-design-page body #content .tray-center > .pl15.pr15 {
       margin-top: 0 !important;
       padding-top: 0 !important;
     }
@@ -1330,93 +1297,18 @@
     element.style.setProperty("background-image", "none", "important");
   }
 
-  function usSignCollapseEmptyProjectRailGap() {
-    const sidebar = document.getElementById("sidebar_left");
-    const rail = document.getElementById("pmlt");
-    const content = document.getElementById("content");
-    if (!sidebar || !rail || !content) return;
 
-    const sidebarRect = sidebar.getBoundingClientRect();
-    let railRect = rail.getBoundingClientRect();
-    let gap = railRect.left - sidebarRect.right;
-    if (gap <= 18) return;
-
-    /* First repair padding/margin on an ancestor that already begins where the
-       main sidebar ends but pushes #pmlt inward. */
-    let current = rail.parentElement;
-    while (current && current !== content && current !== document.body) {
-      const rect = current.getBoundingClientRect();
-      if (
-        rect.width > 0 &&
-        rect.left <= sidebarRect.right + 8 &&
-        railRect.left - rect.left > 18
-      ) {
-        current.style.setProperty("padding-left", "0", "important");
-        current.style.setProperty("margin-left", "0", "important");
-        current.style.setProperty("text-indent", "0", "important");
-      }
-      current = current.parentElement;
-    }
-
-    railRect = rail.getBoundingClientRect();
-    gap = railRect.left - sidebarRect.right;
-    if (gap <= 18) return;
-
-    /* If the gap is a separate empty tray/cell, identify the direct #content
-       child before the rail and collapse only empty structural siblings. */
-    let railCell = rail;
-    while (railCell.parentElement && railCell.parentElement !== content) {
-      railCell = railCell.parentElement;
-    }
-
-    if (railCell.parentElement === content) {
-      const siblings = Array.from(content.children);
-      const railIndex = siblings.indexOf(railCell);
-      for (let index = 0; index < railIndex; index += 1) {
-        const sibling = siblings[index];
-        if (!(sibling instanceof Element)) continue;
-        const rect = sibling.getBoundingClientRect();
-        if (rect.width < 20 || rect.right <= sidebarRect.right + 2) continue;
-
-        const hasVisibleControl = Array.from(
-          sibling.querySelectorAll("a,button,input,select,textarea,img,svg,canvas,iframe")
-        ).some((element) => {
-          const r = element.getBoundingClientRect();
-          const s = getComputedStyle(element);
-          return r.width > 1 && r.height > 1 && s.display !== "none" && s.visibility !== "hidden";
-        });
-        const meaningfulText = (sibling.textContent || "").replace(/\s+/g, " ").trim();
-
-        if (!hasVisibleControl && !meaningfulText) {
-          sibling.style.setProperty("display", "none", "important");
-          sibling.style.setProperty("width", "0", "important");
-          sibling.style.setProperty("min-width", "0", "important");
-          sibling.style.setProperty("max-width", "0", "important");
-          sibling.style.setProperty("margin", "0", "important");
-          sibling.style.setProperty("padding", "0", "important");
-          sibling.style.setProperty("border", "0", "important");
-        }
-      }
-    }
-
-    railRect = rail.getBoundingClientRect();
-    gap = railRect.left - sidebarRect.right;
-    if (gap <= 18) return;
-
-    /* Last structural case: the direct rail cell itself starts after the
-       sidebar because of a native left margin/padding. Remove only those two
-       offsets, never translate the rail or alter its width. */
-    if (railCell instanceof Element) {
-      railCell.style.setProperty("margin-left", "0", "important");
-      railCell.style.setProperty("padding-left", "0", "important");
-      rail.style.setProperty("margin-left", "0", "important");
-      rail.style.setProperty("left", "auto", "important");
-      rail.style.setProperty("transform", "none", "important");
-    }
+  function usSignMarkDesignPage() {
+    const isDesignPage = Boolean(
+      document.getElementById("us-sign-design-actionbar") ||
+      document.querySelector(".us-sign-design-workbench, .us-sign-design-workspace-column")
+    );
+    document.documentElement.classList.toggle("us-sign-design-page", isDesignPage);
+    return isDesignPage;
   }
 
   function usSignWallpaperPass() {
-    usSignCollapseEmptyProjectRailGap();
+    usSignMarkDesignPage();
 
     [
       "#main",
