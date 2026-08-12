@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Adobe Acrobat - US Sign Colors
 // @namespace    us-sign-local-tools
-// @version      1.1.0
-// @description  Dark graphite Acrobat Web colors with visible comment selection and Copy Comments. Leaves Adobe button styling untouched.
+// @version      1.2.0
+// @description  Dark graphite Acrobat Web colors with native comment layout, color-only comment states, and Copy Comments. Leaves Adobe button styling untouched.
 // @match        https://acrobat.adobe.com/*
 // @match        https://documentcloud.adobe.com/*
 // @run-at       document-start
@@ -179,27 +179,44 @@
       background-color: var(--us-acrobat-border) !important;
     }
 
-    /* Comment cards stay dark, but selected/focused comments are visibly distinct. */
+    /* Comments: preserve Acrobat's native structure. Color changes only. */
     .${COMMENT_CARD} {
-      background-color: #171b20 !important;
-      border-color: var(--us-acrobat-border) !important;
-      transition: background-color 120ms ease, border-color 120ms ease !important;
+      color: var(--us-acrobat-text-soft) !important;
+      background-color: #1a1f25 !important;
+      border-color: rgba(255, 255, 255, 0.09) !important;
     }
 
     .${COMMENT_CARD}:hover {
+      color: var(--us-acrobat-text) !important;
       background-color: #20262d !important;
-      border-left-color: rgba(193, 204, 215, 0.55) !important;
+      border-color: rgba(255, 255, 255, 0.13) !important;
     }
 
     .${COMMENT_CARD}.${COMMENT_SELECTED},
     .${COMMENT_CARD}:focus-within {
-      background:
-        linear-gradient(90deg, rgba(193, 204, 215, 0.13), transparent 76%),
-        #1c2229 !important;
-      background-color: #1c2229 !important;
-      border-color: rgba(193, 204, 215, 0.34) !important;
-      border-left: 3px solid var(--us-acrobat-accent) !important;
-      box-shadow: inset 3px 0 0 rgba(193, 204, 215, 0.12) !important;
+      color: var(--us-acrobat-text) !important;
+      background-color: #252c34 !important;
+      border-color: rgba(193, 204, 215, 0.30) !important;
+    }
+
+    .${COMMENT_CARD} :where(
+      strong,
+      b,
+      [class*="author" i],
+      [data-testid*="author" i]
+    ) {
+      color: #eef2f5 !important;
+    }
+
+    .${COMMENT_CARD} :where(
+      time,
+      [class*="time" i],
+      [class*="date" i],
+      [data-testid*="timestamp" i],
+      [class*="resolved" i],
+      [data-testid*="resolved" i]
+    ) {
+      color: #9ba5af !important;
     }
 
     /* Preserve Acrobat PDF text highlights, annotations, ink and comment markers. */
