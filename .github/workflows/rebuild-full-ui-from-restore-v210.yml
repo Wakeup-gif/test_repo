@@ -1,0 +1,39 @@
+name: Rebuild Full UI from restore v2.1.0
+
+on:
+  push:
+    paths:
+      - "scripts/rebuild_full_ui_from_restore_v210.py"
+      - ".github/workflows/rebuild-full-ui-from-restore-v210.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fetch restore point
+        run: git fetch origin restore/squarecoil-pre-macos-glass-v1.2.0-2026-08-12
+      - name: Rebuild theme from stable restore source
+        run: python scripts/rebuild_full_ui_from_restore_v210.py
+      - name: Validate userscript syntax
+        run: node --check tampermonkey/US-Sign-Full-UI-Theme.user.js
+      - name: Check diff
+        run: git diff --check
+      - name: Commit stable visual-only theme
+        shell: bash
+        run: |
+          if git diff --quiet -- tampermonkey/US-Sign-Full-UI-Theme.user.js; then
+            echo "No theme changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tampermonkey/US-Sign-Full-UI-Theme.user.js
+          git commit -m "Rebuild Full UI Theme from stable restore v2.1.0"
+          git push
