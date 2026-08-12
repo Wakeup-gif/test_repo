@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      2.0.3
-// @description  Blue macOS-inspired glass theme for SquareCoil with corrected wallpaper stacking, bounded shell cleanup, translucent workspace shells, polished forms, tables, menus, editors, and readable project content.
+// @version      2.0.4
+// @description  Blue macOS-inspired glass theme for SquareCoil with corrected wallpaper stacking, compact project-page top spacing, translucent workspace shells, polished forms, tables, menus, editors, and readable project content.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
 // @grant        GM_addStyle
@@ -1230,6 +1230,54 @@
       background: transparent !important;
       background-color: transparent !important;
       background-image: none !important;
+    }
+
+    /* =========================================================
+       v2.0.4 PROJECT PAGE TOP-GAP CLEANUP
+       Native tray padding plus project-wrapper margins were stacking into
+       the large empty band below the navbar. Keep one small consistent gap.
+    ========================================================= */
+
+    html.us-sign-project-page body #content,
+    html body:has(#pmlt) #content {
+      margin-top: 0 !important;
+      padding-top: 0 !important;
+    }
+
+    html.us-sign-project-page body #content > .tray,
+    html.us-sign-project-page body #content > .tray-left,
+    html.us-sign-project-page body #content > .tray-center,
+    html.us-sign-project-page body #content > .tray-right,
+    html body:has(#pmlt) #content > .tray,
+    html body:has(#pmlt) #content > .tray-left,
+    html body:has(#pmlt) #content > .tray-center,
+    html body:has(#pmlt) #content > .tray-right {
+      margin-top: 0 !important;
+      padding-top: 10px !important;
+    }
+
+    html.us-sign-project-page body #pmlt,
+    html body:has(#pmlt) #pmlt {
+      margin-top: 0 !important;
+    }
+
+    html.us-sign-project-page body #content .tray-center > .pl15,
+    html.us-sign-project-page body #content .tray-center > .pr15,
+    html.us-sign-project-page body #content .tray-center > .pl15.pr15,
+    html body:has(#pmlt) #content .tray-center > .pl15,
+    html body:has(#pmlt) #content .tray-center > .pr15,
+    html body:has(#pmlt) #content .tray-center > .pl15.pr15 {
+      margin-top: 0 !important;
+      padding-top: 0 !important;
+    }
+
+    html.us-sign-project-page body #content .tray-center > .pl15 > :first-child,
+    html.us-sign-project-page body #content .tray-center > .pr15 > :first-child,
+    html.us-sign-project-page body #content .tray-center > .pl15.pr15 > :first-child,
+    html body:has(#pmlt) #content .tray-center > .pl15 > :first-child,
+    html body:has(#pmlt) #content .tray-center > .pr15 > :first-child,
+    html body:has(#pmlt) #content .tray-center > .pl15.pr15 > :first-child {
+      margin-top: 0 !important;
     }
 
     @media print {
