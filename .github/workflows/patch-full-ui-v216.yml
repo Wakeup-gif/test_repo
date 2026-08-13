@@ -1,0 +1,25 @@
+name: Patch Full UI v2.1.6
+on:
+  push:
+    paths:
+      - "scripts/rebuild_full_ui_from_restore_v210.py"
+      - ".github/workflows/patch-full-ui-v216.yml"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python scripts/rebuild_full_ui_from_restore_v210.py
+      - run: node --check tampermonkey/US-Sign-Full-UI-Theme.user.js
+      - run: git diff --check
+      - shell: bash
+        run: |
+          if git diff --quiet -- tampermonkey/US-Sign-Full-UI-Theme.user.js; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tampermonkey/US-Sign-Full-UI-Theme.user.js
+          git commit -m "Lighten SquareCoil glass transparency v2.1.6"
+          git push
