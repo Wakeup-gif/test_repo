@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      2.1.14
-// @description  Stable SquareCoil layout with Roxborough display typography, blue glass chrome, subtle center blur, highlight-free Description rich text, and frosted Project Search panels.
+// @version      2.1.15
+// @description  Stable SquareCoil layout with Roxborough display typography, blue glass chrome, frosted Project Search panels, and corrected Task-page text contrast.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
 // @grant        GM_addStyle
@@ -2026,6 +2026,62 @@
       color: #f6fbff !important;
     }
 
+
+    /* =========================================================
+       v2.1.15 TASK PAGE TEXT CONTRAST
+       Task-page only. Fix native black task copy without changing
+       layout, geometry, or the red completion/status messaging.
+    ========================================================= */
+    html.us-sign-task-page #content .panel-body,
+    html.us-sign-task-page #content .panel-body td,
+    html.us-sign-task-page #content .panel-body th,
+    html.us-sign-task-page #content .panel-body p,
+    html.us-sign-task-page #content .panel-body div,
+    html.us-sign-task-page #content .panel-body span,
+    html.us-sign-task-page #content .panel-body li,
+    html.us-sign-task-page #content .panel-body label,
+    html.us-sign-task-page #content .panel-body small,
+    html.us-sign-task-page #content .panel-body strong,
+    html.us-sign-task-page #content .panel-body b {
+      color: rgba(232, 239, 247, 0.90) !important;
+      -webkit-text-fill-color: currentColor !important;
+      text-shadow: none !important;
+    }
+
+    html.us-sign-task-page #content .panel-body a:not(.btn) {
+      color: rgba(174, 216, 250, 0.94) !important;
+      -webkit-text-fill-color: currentColor !important;
+    }
+
+    html.us-sign-task-page #content .panel-body :is(
+      [style*="color: black" i],
+      [style*="color:black" i],
+      [style*="color: #000" i],
+      [style*="color:#000" i],
+      [style*="color: rgb(0" i],
+      font[color="black" i],
+      font[color="#000" i],
+      font[color="#000000" i]
+    ) {
+      color: rgba(232, 239, 247, 0.90) !important;
+      -webkit-text-fill-color: rgba(232, 239, 247, 0.90) !important;
+    }
+
+    /* Preserve completion/error emphasis after the broad task text repair. */
+    html.us-sign-task-page #content .panel-body :is(
+      .text-danger,
+      .danger,
+      [style*="color: red" i],
+      [style*="color:red" i],
+      [style*="color: #ff0000" i],
+      [style*="color:#ff0000" i],
+      font[color="red" i],
+      font[color="#ff0000" i]
+    ) {
+      color: #ff6257 !important;
+      -webkit-text-fill-color: #ff6257 !important;
+    }
+
     @media print {
       html,
       body,
@@ -2084,5 +2140,28 @@
   if (/\/search\.php$/i.test(window.location.pathname)) {
     document.documentElement.classList.add("us-sign-search-page");
   }
+
+
+  // v2.1.15: mark the project Task page from its own native UI.
+  // One DOM-ready check plus pageshow; no observer and no polling.
+  function usSignMarkTaskPage() {
+    const taskSearch = document.querySelector('input[placeholder*="Search Tasks" i]');
+    if (!taskSearch) return;
+
+    const headings = document.querySelectorAll('.panel-heading, .panel-title, h1, h2, h3, h4');
+    const hasSelectedTask = Array.from(headings).some((el) => /Selected\s+Task/i.test(el.textContent || ''));
+    const hasTasksPanel = Array.from(headings).some((el) => /^\s*Tasks\s*$/i.test(el.textContent || ''));
+
+    if (hasSelectedTask || hasTasksPanel) {
+      document.documentElement.classList.add('us-sign-task-page');
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', usSignMarkTaskPage, { once: true });
+  } else {
+    usSignMarkTaskPage();
+  }
+  window.addEventListener('pageshow', usSignMarkTaskPage);
 
 })();
