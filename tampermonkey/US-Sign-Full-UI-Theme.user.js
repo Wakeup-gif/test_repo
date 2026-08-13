@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      2.1.13
-// @description  Stable SquareCoil layout with restored icons, Roxborough display typography, blue glass chrome, subtle center blur, and hard-removed Description highlight paint.
+// @version      2.1.14
+// @description  Stable SquareCoil layout with Roxborough display typography, blue glass chrome, subtle center blur, highlight-free Description rich text, and frosted Project Search panels.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
 // @grant        GM_addStyle
@@ -1924,6 +1924,108 @@
     /* v2.1.13 final Description highlight neutralizer */
     html body :is(#descriptionbox,.us-sign-description-panel,.us-sign-readable-content) :is(mark,.marker,.highlight,[class*="highlight" i],[style*="background" i],[bgcolor]){background:transparent!important;background-color:transparent!important;background-image:none!important;box-shadow:none!important;text-shadow:none!important;border:0!important;border-radius:0!important;padding:0!important;}
 
+
+    /* =========================================================
+       v2.1.14 PROJECT SEARCH GLASS
+       Search-page paint only. No geometry, widths, positioning, or polling.
+    ========================================================= */
+    html.us-sign-search-page #content > .tray320 .admin-form > .panel,
+    html.us-sign-search-page #push-down > .pl20.pr50 > .panel,
+    html.us-sign-search-page #push-down .panel.heading-border.panel-primary {
+      background:
+        linear-gradient(145deg, rgba(132, 198, 248, 0.045), transparent 34%),
+        linear-gradient(180deg, rgba(8, 18, 30, 0.19), rgba(4, 11, 20, 0.13)) !important;
+      background-color: rgba(7, 16, 27, 0.15) !important;
+      border: 1px solid rgba(220, 239, 255, 0.10) !important;
+      box-shadow:
+        0 10px 28px rgba(0, 0, 0, 0.09),
+        inset 0 1px 0 rgba(255, 255, 255, 0.045) !important;
+      -webkit-backdrop-filter: blur(7px) saturate(126%) !important;
+      backdrop-filter: blur(7px) saturate(126%) !important;
+    }
+
+    html.us-sign-search-page #content > .tray320 .panel-body.bg-light,
+    html.us-sign-search-page #push-down .panel-body.bg-light,
+    html.us-sign-search-page #push-down .panel-body {
+      background: transparent !important;
+      background-color: transparent !important;
+      background-image: none !important;
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
+    }
+
+    html.us-sign-search-page #push-down .alert.alert-success {
+      color: rgba(238, 247, 255, 0.95) !important;
+      background:
+        linear-gradient(90deg, rgba(78, 165, 235, 0.11), rgba(255, 255, 255, 0.025)) !important;
+      background-color: rgba(8, 18, 30, 0.12) !important;
+      border: 1px solid rgba(170, 219, 255, 0.12) !important;
+      box-shadow:
+        0 8px 22px rgba(0, 0, 0, 0.065),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+      -webkit-backdrop-filter: blur(6px) saturate(124%) !important;
+      backdrop-filter: blur(6px) saturate(124%) !important;
+    }
+
+    html.us-sign-search-page #form .gui-input,
+    html.us-sign-search-page #form select,
+    html.us-sign-search-page #form .field.select > select {
+      color: rgba(238, 244, 250, 0.92) !important;
+      background: rgba(5, 13, 23, 0.34) !important;
+      background-color: rgba(5, 13, 23, 0.34) !important;
+      border: 1px solid rgba(206, 232, 255, 0.10) !important;
+      box-shadow:
+        inset 0 1px 2px rgba(0, 0, 0, 0.16),
+        inset 0 1px 0 rgba(255, 255, 255, 0.025) !important;
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
+    }
+
+    html.us-sign-search-page #form select option {
+      color: #e9f0f6 !important;
+      background: #101a25 !important;
+    }
+
+    html.us-sign-search-page #form .field.select .arrow,
+    html.us-sign-search-page #form .field.select .arrow:before,
+    html.us-sign-search-page #form .field.select .arrow:after {
+      color: rgba(190, 211, 230, 0.72) !important;
+      border-color: rgba(190, 211, 230, 0.72) transparent transparent !important;
+    }
+
+    html.us-sign-search-page #datatable1,
+    html.us-sign-search-page #datatable1 > thead,
+    html.us-sign-search-page #datatable1 > tbody,
+    html.us-sign-search-page #datatable1 > tbody > tr,
+    html.us-sign-search-page #datatable1 > tbody > tr > td {
+      background-color: transparent !important;
+      background-image: none !important;
+    }
+
+    html.us-sign-search-page #datatable1 > thead > tr > th {
+      color: rgba(216, 229, 241, 0.90) !important;
+      background: rgba(112, 177, 230, 0.055) !important;
+      border-color: rgba(220, 239, 255, 0.065) !important;
+    }
+
+    html.us-sign-search-page #datatable1 > tbody > tr:hover > td {
+      background: rgba(91, 174, 242, 0.06) !important;
+    }
+
+    html.us-sign-search-page .pagination > li > a,
+    html.us-sign-search-page .pagination > li > span {
+      background: rgba(7, 16, 27, 0.24) !important;
+      border-color: rgba(220, 239, 255, 0.09) !important;
+      color: rgba(215, 228, 240, 0.88) !important;
+    }
+
+    html.us-sign-search-page .pagination > .active > a,
+    html.us-sign-search-page .pagination > .active > span {
+      background: rgba(72, 160, 231, 0.26) !important;
+      border-color: rgba(125, 199, 255, 0.18) !important;
+      color: #f6fbff !important;
+    }
+
     @media print {
       html,
       body,
@@ -1976,5 +2078,11 @@
     usSignScheduleDescriptionCleanup();
   }
   window.addEventListener('pageshow', usSignScheduleDescriptionCleanup);
+
+
+  // v2.1.14: URL-scoped Project Search marker. No observer or polling.
+  if (/\/search\.php$/i.test(window.location.pathname)) {
+    document.documentElement.classList.add("us-sign-search-page");
+  }
 
 })();
