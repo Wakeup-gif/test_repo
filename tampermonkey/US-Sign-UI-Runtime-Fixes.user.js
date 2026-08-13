@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign - UI Runtime Fixes
 // @namespace    us-sign-local-tools
-// @version      3.1.1
-// @description  Lightweight cached logo and CKEditor iframe styling with transparent mark/highlight backgrounds. No page-wide observers, color crawlers, or Scope DOM ownership.
+// @version      3.1.2
+// @description  Lightweight cached logo, CKEditor iframe styling, and native sidebar icon-font repair. No page-wide observers, color crawlers, or Scope DOM ownership.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-idle
 // @grant        GM_xmlhttpRequest
@@ -17,10 +17,10 @@
 (function () {
   "use strict";
 
-  if (window.__usSignUiRuntimeV311) return;
-  window.__usSignUiRuntimeV311 = true;
+  if (window.__usSignUiRuntimeV312) return;
+  window.__usSignUiRuntimeV312 = true;
 
-  const VERSION = "3.1.1";
+  const VERSION = "3.1.2";
   const CUSTOM_LOGO_URL = "https://i.imgur.com/7I1u2iF.png";
   const LOGO_CACHE_KEY = "us-sign-custom-logo-data-v1";
   const processedIframes = new WeakSet();
@@ -43,19 +43,8 @@
   function applyLogo(dataUrl) {
     const logo = findHeaderLogo();
     if (!logo || !dataUrl) return false;
-
-    if (
-      logo.dataset.usSignCustomLogo === "true" &&
-      logo.src === dataUrl
-    ) {
-      return true;
-    }
-
-    logo.dataset.usSignOriginalSrc =
-      logo.dataset.usSignOriginalSrc ||
-      logo.getAttribute("src") ||
-      "";
-
+    if (logo.dataset.usSignCustomLogo === "true" && logo.src === dataUrl) return true;
+    logo.dataset.usSignOriginalSrc = logo.dataset.usSignOriginalSrc || logo.getAttribute("src") || "";
     logo.src = dataUrl;
     logo.removeAttribute("srcset");
     logo.dataset.usSignCustomLogo = "true";
@@ -78,31 +67,15 @@
 
   function requestLogoBlob() {
     return new Promise((resolve) => {
-      if (typeof GM_xmlhttpRequest !== "function") {
-        resolve("");
-        return;
-      }
-
+      if (typeof GM_xmlhttpRequest !== "function") return resolve("");
       GM_xmlhttpRequest({
         method: "GET",
         url: CUSTOM_LOGO_URL,
         responseType: "blob",
         timeout: 12000,
         onload: async (response) => {
-          if (
-            response.status < 200 ||
-            response.status >= 300 ||
-            !response.response
-          ) {
-            resolve("");
-            return;
-          }
-
-          try {
-            resolve(await blobToDataUrl(response.response));
-          } catch (_) {
-            resolve("");
-          }
+          if (response.status < 200 || response.status >= 300 || !response.response) return resolve("");
+          try { resolve(await blobToDataUrl(response.response)); } catch (_) { resolve(""); }
         },
         onerror: () => resolve(""),
         ontimeout: () => resolve("")
@@ -113,7 +86,6 @@
   function getLogoData() {
     if (cachedLogoData) return Promise.resolve(cachedLogoData);
     if (logoTask) return logoTask;
-
     logoTask = (async () => {
       try {
         const stored = await GM_getValue(LOGO_CACHE_KEY, "");
@@ -121,24 +93,13 @@
           cachedLogoData = String(stored);
           return cachedLogoData;
         }
-      } catch (_) {
-        /* Cache is optional. */
-      }
-
+      } catch (_) {}
       const downloaded = await requestLogoBlob();
       if (!downloaded) return "";
-
       cachedLogoData = downloaded;
-      try {
-        await GM_setValue(LOGO_CACHE_KEY, downloaded);
-      } catch (_) {
-        /* Cache write is optional. */
-      }
+      try { await GM_setValue(LOGO_CACHE_KEY, downloaded); } catch (_) {}
       return downloaded;
-    })().finally(() => {
-      logoTask = null;
-    });
-
+    })().finally(() => { logoTask = null; });
     return logoTask;
   }
 
@@ -148,13 +109,7 @@
   }
 
   function injectEditorStyle(editorDocument) {
-    if (
-      !editorDocument ||
-      editorDocument.getElementById("us-sign-editor-readable-style")
-    ) {
-      return;
-    }
-
+    if (!editorDocument || editorDocument.getElementById("us-sign-editor-readable-style")) return;
     const style = editorDocument.createElement("style");
     style.id = "us-sign-editor-readable-style";
     style.textContent = `
@@ -166,10 +121,7 @@
       body { padding: 12px 16px !important; line-height: 1.55 !important; }
       a { color: #9bb8d2 !important; }
       strong, b, h1, h2, h3, h4, h5, h6 { color: #f4f6f8 !important; }
-      mark,
-      .marker,
-      .highlight,
-      [class*="highlight" i] {
+      mark, .marker, .highlight, [class*="highlight" i] {
         background: transparent !important;
         background-color: transparent !important;
         background-image: none !important;
@@ -186,29 +138,33 @@
 
   function processEditorIframe(iframe) {
     if (!iframe || processedIframes.has(iframe)) return;
-
     const process = () => {
       try {
         const editorDocument = iframe.contentDocument;
         if (!editorDocument?.body) return;
         processedIframes.add(iframe);
         injectEditorStyle(editorDocument);
-      } catch (_) {
-        /* Cross-origin or not ready yet. */
-      }
+      } catch (_) {}
     };
-
     iframe.addEventListener("load", process, { once: true });
     process();
   }
 
   function scanEditors() {
-    for (const iframe of document.querySelectorAll("iframe.cke_wysiwyg_frame")) {
-      processEditorIframe(iframe);
+    for (const iframe of document.querySelectorAll("iframe.cke_wysiwyg_frame")) processEditorIframe(iframe);
+  }
+
+  function repairSidebarIconFontCascade() {
+    const brokenSelector = "html body #sidebar_left *";
+    for (const style of document.querySelectorAll("style")) {
+      const css = style.textContent || "";
+      if (!css.includes("v2.1.9 ROXBOROUGH") || !css.includes(brokenSelector)) continue;
+      style.textContent = css.replace(/\s*html body #sidebar_left \*,/g, "");
     }
   }
 
   function runPass() {
+    repairSidebarIconFontCascade();
     restoreCustomLogo();
     scanEditors();
   }
