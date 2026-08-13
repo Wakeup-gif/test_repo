@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      2.1.3
+// @version      2.1.4
 // @description  Stable pre-wallpaper SquareCoil layout with visible scenic wallpaper, blue macOS-inspired glass colors, and translucent canvas paint only. No project geometry overrides.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
@@ -996,14 +996,12 @@
     }
 
     /* =========================================================
-       v2.1.3 CANVAS WALLPAPER STACK
+       v2.1.4 CANVAS WALLPAPER STACK
        Keep the v1.1.2 geometry untouched. These structural wrappers retain
        their normal dimensions and flow; only their paint is made lighter so
        the root wallpaper remains visible through stacked canvas layers.
     ========================================================= */
 
-    html body #main,
-    html body #content_wrapper,
     html body #content,
     html body #content > .tray,
     html body #content > .tray-left,
