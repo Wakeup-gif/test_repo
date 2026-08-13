@@ -1,17 +1,113 @@
 from pathlib import Path
-import subprocess
 
-scope = Path('tampermonkey/US-Sign-Project-Scope-Workspace.user.js')
-subprocess.run(['python', 'scripts/patch_scope_workspace_v120.tmp'], check=True)
+p = Path('tampermonkey/US-Sign-Full-UI-Theme.user.js')
+s = p.read_text(encoding='utf-8')
 
-result = subprocess.run(['git', 'diff', '--quiet', '--', str(scope)])
-if result.returncode == 0:
+if '// @version      2.1.15' in s:
     raise SystemExit(0)
+if '// @version      2.1.14' not in s:
+    raise SystemExit('Expected Full UI Theme v2.1.14')
 
-subprocess.run(['node', '--check', str(scope)], check=True)
-subprocess.run(['git', 'diff', '--check'], check=True)
-subprocess.run(['git', 'config', 'user.name', 'github-actions[bot]'], check=True)
-subprocess.run(['git', 'config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com'], check=True)
-subprocess.run(['git', 'add', str(scope)], check=True)
-subprocess.run(['git', 'commit', '-m', 'Polish Scope Workspace glass v1.2.0'], check=True)
-subprocess.run(['git', 'push'], check=True)
+s = s.replace('// @version      2.1.14', '// @version      2.1.15', 1)
+s = s.replace(
+    'Stable SquareCoil layout with Roxborough display typography, blue glass chrome, subtle center blur, highlight-free Description rich text, and frosted Project Search panels.',
+    'Stable SquareCoil layout with Roxborough display typography, blue glass chrome, frosted Project Search panels, and corrected Task-page text contrast.',
+    1,
+)
+
+css = r'''
+
+    /* =========================================================
+       v2.1.15 TASK PAGE TEXT CONTRAST
+       Task-page only. Fix native black task copy without changing
+       layout, geometry, or the red completion/status messaging.
+    ========================================================= */
+    html.us-sign-task-page #content .panel-body,
+    html.us-sign-task-page #content .panel-body td,
+    html.us-sign-task-page #content .panel-body th,
+    html.us-sign-task-page #content .panel-body p,
+    html.us-sign-task-page #content .panel-body div,
+    html.us-sign-task-page #content .panel-body span,
+    html.us-sign-task-page #content .panel-body li,
+    html.us-sign-task-page #content .panel-body label,
+    html.us-sign-task-page #content .panel-body small,
+    html.us-sign-task-page #content .panel-body strong,
+    html.us-sign-task-page #content .panel-body b {
+      color: rgba(232, 239, 247, 0.90) !important;
+      -webkit-text-fill-color: currentColor !important;
+      text-shadow: none !important;
+    }
+
+    html.us-sign-task-page #content .panel-body a:not(.btn) {
+      color: rgba(174, 216, 250, 0.94) !important;
+      -webkit-text-fill-color: currentColor !important;
+    }
+
+    html.us-sign-task-page #content .panel-body :is(
+      [style*="color: black" i],
+      [style*="color:black" i],
+      [style*="color: #000" i],
+      [style*="color:#000" i],
+      [style*="color: rgb(0" i],
+      font[color="black" i],
+      font[color="#000" i],
+      font[color="#000000" i]
+    ) {
+      color: rgba(232, 239, 247, 0.90) !important;
+      -webkit-text-fill-color: rgba(232, 239, 247, 0.90) !important;
+    }
+
+    /* Preserve completion/error emphasis after the broad task text repair. */
+    html.us-sign-task-page #content .panel-body :is(
+      .text-danger,
+      .danger,
+      [style*="color: red" i],
+      [style*="color:red" i],
+      [style*="color: #ff0000" i],
+      [style*="color:#ff0000" i],
+      font[color="red" i],
+      font[color="#ff0000" i]
+    ) {
+      color: #ff6257 !important;
+      -webkit-text-fill-color: #ff6257 !important;
+    }
+'''
+
+marker = '\n    @media print {'
+pos = s.rfind(marker)
+if pos < 0:
+    raise SystemExit('Print marker missing')
+s = s[:pos] + css + s[pos:]
+
+js = r'''
+
+  // v2.1.15: mark the project Task page from its own native UI.
+  // One DOM-ready check plus pageshow; no observer and no polling.
+  function usSignMarkTaskPage() {
+    const taskSearch = document.querySelector('input[placeholder*="Search Tasks" i]');
+    if (!taskSearch) return;
+
+    const headings = document.querySelectorAll('.panel-heading, .panel-title, h1, h2, h3, h4');
+    const hasSelectedTask = Array.from(headings).some((el) => /Selected\s+Task/i.test(el.textContent || ''));
+    const hasTasksPanel = Array.from(headings).some((el) => /^\s*Tasks\s*$/i.test(el.textContent || ''));
+
+    if (hasSelectedTask || hasTasksPanel) {
+      document.documentElement.classList.add('us-sign-task-page');
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', usSignMarkTaskPage, { once: true });
+  } else {
+    usSignMarkTaskPage();
+  }
+  window.addEventListener('pageshow', usSignMarkTaskPage);
+'''
+
+end = '\n})();'
+pos = s.rfind(end)
+if pos < 0:
+    raise SystemExit('Script end missing')
+s = s[:pos] + js + s[pos:]
+
+p.write_text(s, encoding='utf-8')
