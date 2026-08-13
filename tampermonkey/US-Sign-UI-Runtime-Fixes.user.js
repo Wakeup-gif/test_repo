@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign - UI Runtime Fixes
 // @namespace    us-sign-local-tools
-// @version      3.1.0
-// @description  Lightweight cached logo and CKEditor iframe styling only. No page-wide observers, color crawlers, or Scope DOM ownership.
+// @version      3.1.1
+// @description  Lightweight cached logo and CKEditor iframe styling with transparent mark/highlight backgrounds. No page-wide observers, color crawlers, or Scope DOM ownership.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-idle
 // @grant        GM_xmlhttpRequest
@@ -17,10 +17,10 @@
 (function () {
   "use strict";
 
-  if (window.__usSignUiRuntimeV310) return;
-  window.__usSignUiRuntimeV310 = true;
+  if (window.__usSignUiRuntimeV311) return;
+  window.__usSignUiRuntimeV311 = true;
 
-  const VERSION = "3.1.0";
+  const VERSION = "3.1.1";
   const CUSTOM_LOGO_URL = "https://i.imgur.com/7I1u2iF.png";
   const LOGO_CACHE_KEY = "us-sign-custom-logo-data-v1";
   const processedIframes = new WeakSet();
@@ -166,11 +166,16 @@
       body { padding: 12px 16px !important; line-height: 1.55 !important; }
       a { color: #9bb8d2 !important; }
       strong, b, h1, h2, h3, h4, h5, h6 { color: #f4f6f8 !important; }
-      mark {
-        color: #f4f6f8 !important;
-        background: rgba(211, 186, 134, 0.18) !important;
-        border-radius: 4px !important;
-        padding: 0 .12em !important;
+      mark,
+      .marker,
+      .highlight,
+      [class*="highlight" i] {
+        background: transparent !important;
+        background-color: transparent !important;
+        background-image: none !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        padding: 0 !important;
       }
       font[color="blue"], [style*="color: blue" i], [style*="#0000ff" i] { color: #a9c2d8 !important; }
       font[color="red"], [style*="color: red" i], [style*="#ff0000" i] { color: #d9aaaa !important; }
