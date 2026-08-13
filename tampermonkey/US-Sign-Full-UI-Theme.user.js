@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      2.1.9
-// @description  Stable SquareCoil layout with Roxborough display typography, transparent blue gradient chrome, matched blue-black navigation glass, and performance-safe scrolling surfaces. Paint only, no geometry overrides.
+// @version      2.1.10
+// @description  Stable SquareCoil layout with Roxborough display typography, transparent blue glass chrome, performance-safe scrolling, and clean Description text with no pasted highlight backgrounds.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
 // @grant        GM_addStyle
@@ -1862,6 +1862,44 @@
     html body #project_menu a:hover {
       color: #ffffff !important;
       text-shadow: 0 0 14px rgba(103, 190, 255, 0.16) !important;
+    }
+
+
+    /* =========================================================
+       v2.1.10 DESCRIPTION TEXT CLEANUP
+       Preserve rich-text color and emphasis, but remove pasted/highlighter
+       background paint from Description content only.
+    ========================================================= */
+
+    html body #descriptionbox .panel-body mark,
+    html body #descriptionbox .panel-body .highlight,
+    html body #descriptionbox .panel-body [class*="highlight" i],
+    html body #descriptionbox .panel-body [style*="background" i],
+    html body .us-sign-description-panel .panel-body mark,
+    html body .us-sign-description-panel .panel-body .highlight,
+    html body .us-sign-description-panel .panel-body [class*="highlight" i],
+    html body .us-sign-description-panel .panel-body [style*="background" i] {
+      background: transparent !important;
+      background-color: transparent !important;
+      background-image: none !important;
+      box-shadow: none !important;
+      text-shadow: none !important;
+    }
+
+    /* Keep warning/markup copy readable without the tan/yellow block. */
+    html body #descriptionbox .panel-body .text-danger,
+    html body #descriptionbox .panel-body font[color="red" i],
+    html body #descriptionbox .panel-body [style*="color: red" i],
+    html body #descriptionbox .panel-body [style*="color:red" i],
+    html body .us-sign-description-panel .panel-body .text-danger,
+    html body .us-sign-description-panel .panel-body font[color="red" i],
+    html body .us-sign-description-panel .panel-body [style*="color: red" i],
+    html body .us-sign-description-panel .panel-body [style*="color:red" i] {
+      color: #c98b8b !important;
+      background: transparent !important;
+      background-color: transparent !important;
+      box-shadow: none !important;
+      text-shadow: none !important;
     }
 
     @media print {
