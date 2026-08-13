@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      2.1.11
-// @description  Stable SquareCoil layout with restored icon glyphs, Roxborough display typography, blue glass chrome, and subtle center-panel blur.
+// @version      2.1.12
+// @description  Stable SquareCoil layout with restored icons, Roxborough display typography, blue glass chrome, subtle center blur, and highlight-free Description rich text.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
 // @grant        GM_addStyle
@@ -1910,6 +1910,15 @@
     html body .imoon,html body [class^="imoon-"],html body [class*=" imoon-"],html body i[class^="icon-"],html body i[class*=" icon-"],html body span[class^="icon-"],html body span[class*=" icon-"]{font-family:"icomoon"!important;font-style:normal!important;font-weight:normal!important;line-height:1!important;}
     html body #customer-name,html body #customer-info,html body #projectbox,html body #showbtns,html body #descriptionbox,html body #designbox,html body #filesbox,html body #us-sign-design-actionbar,html body #us-sign-job-overview,html body #us-sign-design-summary,html body #us-sign-design-bottom-grid>.us-sign-description-panel,html body #us-sign-design-right-stack>.us-sign-designs-panel,html body #us-sign-design-right-stack>.us-sign-files-panel{-webkit-backdrop-filter:blur(4px) saturate(112%)!important;backdrop-filter:blur(4px) saturate(112%)!important;}
     html body #descriptionbox .panel-body,html body #designbox .panel-body,html body #filesbox .panel-body,html body #projectbox .panel-body,html body #customer-info .panel-body,html body #content table,html body #content .table{-webkit-backdrop-filter:none!important;backdrop-filter:none!important;}
+
+
+    /* v2.1.12 remove Description rich-text highlight paint */
+    html body #descriptionbox :is(mark,.marker,.highlight,[class*="highlight" i],span[style*="background" i],font[style*="background" i],strong[style*="background" i],b[style*="background" i],em[style*="background" i],u[style*="background" i],[bgcolor]),
+    html body .us-sign-description-panel :is(mark,.marker,.highlight,[class*="highlight" i],span[style*="background" i],font[style*="background" i],strong[style*="background" i],b[style*="background" i],em[style*="background" i],u[style*="background" i],[bgcolor]),
+    html body .us-sign-readable-content :is(mark,.marker,.highlight,[class*="highlight" i],span[style*="background" i],font[style*="background" i],strong[style*="background" i],b[style*="background" i],em[style*="background" i],u[style*="background" i],[bgcolor]){background:transparent!important;background-color:transparent!important;background-image:none!important;box-shadow:none!important;text-shadow:none!important;border:0!important;border-radius:0!important;padding:0!important;}
+    html body #descriptionbox :is([style*="color:red" i],[style*="color: red" i],font[color="red" i],font[color="#ff0000" i]),
+    html body .us-sign-description-panel :is([style*="color:red" i],[style*="color: red" i],font[color="red" i],font[color="#ff0000" i]),
+    html body .us-sign-readable-content :is([style*="color:red" i],[style*="color: red" i],font[color="red" i],font[color="#ff0000" i]){color:#c98b8b!important;-webkit-text-fill-color:#c98b8b!important;background:transparent!important;background-color:transparent!important;background-image:none!important;box-shadow:none!important;text-shadow:none!important;border:0!important;border-radius:0!important;padding:0!important;}
 
     @media print {
       html,
