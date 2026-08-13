@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      2.1.10
-// @description  Stable SquareCoil layout with Roxborough display typography, transparent blue glass chrome, performance-safe scrolling, and clean Description text with no pasted highlight backgrounds.
+// @version      2.1.11
+// @description  Stable SquareCoil layout with restored icon glyphs, Roxborough display typography, blue glass chrome, and subtle center-panel blur.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
 // @grant        GM_addStyle
@@ -1901,6 +1901,15 @@
       box-shadow: none !important;
       text-shadow: none !important;
     }
+
+
+    /* v2.1.11 icon restore and light center blur */
+    html body .fa,html body i.fa,html body span.fa,html body [class^="fa-"],html body [class*=" fa-"]{font-family:"FontAwesome"!important;font-style:normal!important;font-weight:normal!important;line-height:1!important;}
+    html body .glyphicon,html body [class^="glyphicon-"],html body [class*=" glyphicon-"]{font-family:"Glyphicons Halflings"!important;font-style:normal!important;font-weight:normal!important;line-height:1!important;}
+    html body .glyphicons,html body [class^="glyphicons-"],html body [class*=" glyphicons-"]{font-family:"Glyphicons"!important;font-style:normal!important;font-weight:normal!important;line-height:1!important;}
+    html body .imoon,html body [class^="imoon-"],html body [class*=" imoon-"],html body i[class^="icon-"],html body i[class*=" icon-"],html body span[class^="icon-"],html body span[class*=" icon-"]{font-family:"icomoon"!important;font-style:normal!important;font-weight:normal!important;line-height:1!important;}
+    html body #customer-name,html body #customer-info,html body #projectbox,html body #showbtns,html body #descriptionbox,html body #designbox,html body #filesbox,html body #us-sign-design-actionbar,html body #us-sign-job-overview,html body #us-sign-design-summary,html body #us-sign-design-bottom-grid>.us-sign-description-panel,html body #us-sign-design-right-stack>.us-sign-designs-panel,html body #us-sign-design-right-stack>.us-sign-files-panel{-webkit-backdrop-filter:blur(4px) saturate(112%)!important;backdrop-filter:blur(4px) saturate(112%)!important;}
+    html body #descriptionbox .panel-body,html body #designbox .panel-body,html body #filesbox .panel-body,html body #projectbox .panel-body,html body #customer-info .panel-body,html body #content table,html body #content .table{-webkit-backdrop-filter:none!important;backdrop-filter:none!important;}
 
     @media print {
       html,
