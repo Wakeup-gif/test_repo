@@ -3,208 +3,178 @@ from pathlib import Path
 p = Path('tampermonkey/US-Sign-Full-UI-Theme.user.js')
 s = p.read_text(encoding='utf-8')
 
-if '// @version      2.1.8' in s:
+if '// @version      2.1.9' in s:
     raise SystemExit(0)
 
-if '// @version      2.1.7' not in s:
-    raise SystemExit('Expected v2.1.7 canonical theme')
+if '// @version      2.1.8' not in s:
+    raise SystemExit('Expected v2.1.8 canonical theme')
 
-s = s.replace('// @version      2.1.7', '// @version      2.1.8', 1)
+s = s.replace('// @version      2.1.8', '// @version      2.1.9', 1)
 s = s.replace(
-    '// @description  Stable SquareCoil layout with ChatGPT-inspired translucent panels, macOS-style frosted glass, Manrope typography, and visible scenic wallpaper. Paint only, no project geometry overrides.',
     '// @description  Stable SquareCoil layout with lighter true-glass surfaces, Design workspace transparency fixes, and performance-safe blur limited to fixed chrome. Paint only, no geometry overrides.',
+    '// @description  Stable SquareCoil layout with Roxborough display typography, transparent blue gradient chrome, matched blue-black navigation glass, and performance-safe scrolling surfaces. Paint only, no geometry overrides.',
     1,
 )
 
 block = r'''
 
     /* =========================================================
-       v2.1.8 PERFORMANCE TRUE GLASS
-       Keep the wallpaper and layout. Remove expensive blur from scrolling
-       content and override Design Job Tools' opaque runtime surfaces.
+       v2.1.9 ROXBOROUGH + MATCHED GLASS CHROME
+       Typography and paint only. Roxborough CF is loaded locally when the
+       licensed font is installed; elegant serif fallbacks keep the intent.
     ========================================================= */
 
+    @font-face {
+      font-family: "US Roxborough";
+      src:
+        local("Roxborough CF"),
+        local("RoxboroughCF"),
+        local("Roxborough");
+      font-style: normal;
+      font-weight: 300 800;
+      font-display: swap;
+    }
+
     :root {
-      --us-perf-glass: rgba(7, 15, 25, 0.13);
-      --us-perf-glass-soft: rgba(9, 18, 30, 0.10);
-      --us-perf-glass-readable: rgba(7, 15, 25, 0.20);
-      --us-perf-hairline: rgba(226, 242, 255, 0.09);
-      --us-perf-highlight: rgba(255, 255, 255, 0.035);
+      --us-display-font: "US Roxborough", "Iowan Old Style", "Baskerville", "Times New Roman", serif;
+      --us-chrome-blue: rgba(7, 22, 37, 0.50);
+      --us-chrome-blue-deep: rgba(4, 13, 23, 0.58);
+      --us-chrome-line: rgba(150, 207, 255, 0.12);
+      --us-chrome-line-bright: rgba(176, 220, 255, 0.17);
     }
 
-    /* Scrolling content gets transparent paint only. Backdrop-filter on
-       large moving surfaces is the main source of scroll/compositing jank. */
-    html body #customer-name,
+    /* Display serif is deliberate and sparse: project identity, not UI data. */
+    html body #customer-name h1,
+    html body #customer-name h2,
+    html body #customer-name h3,
+    html body #customer-name .panel-title,
+    html body #pmlt h1,
+    html body #pmlt h2,
+    html body #pmlt .project-number,
+    html body #pmlt [class*="project-number" i] {
+      font-family: var(--us-display-font) !important;
+      font-weight: 500 !important;
+      letter-spacing: -0.028em !important;
+      font-variant-numeric: lining-nums tabular-nums !important;
+      text-rendering: optimizeLegibility !important;
+    }
+
+    /* Keep operational UI crisp and modern. */
     html body #customer-info,
-    html body #projectbox,
-    html body #showbtns,
-    html body #descriptionbox,
-    html body #designbox,
-    html body #filesbox,
-    html body #content .panel,
-    html body #content .panel-default,
-    html body #content .well,
-    html body #content .modal-content,
-    html body #content .popover,
-    html body #content .dropdown-menu {
-      -webkit-backdrop-filter: none !important;
-      backdrop-filter: none !important;
-    }
-
-    html body #descriptionbox,
-    html body #designbox,
-    html body #filesbox,
-    html body #content .panel,
-    html body #content .panel-default,
-    html body #content .well {
-      background:
-        linear-gradient(145deg, rgba(128, 194, 246, 0.028), transparent 32%),
-        linear-gradient(180deg, rgba(8, 17, 28, 0.13), rgba(4, 10, 18, 0.09)) !important;
-      background-color: var(--us-perf-glass) !important;
-      border-color: var(--us-perf-hairline) !important;
-      box-shadow:
-        0 8px 24px rgba(0, 0, 0, 0.055),
-        inset 0 1px 0 var(--us-perf-highlight) !important;
-    }
-
-    html body #customer-name {
-      background:
-        linear-gradient(110deg, rgba(255, 255, 255, 0.055), transparent 30%),
-        linear-gradient(180deg, rgba(103, 174, 232, 0.07), rgba(7, 15, 25, 0.08)) !important;
-      background-color: rgba(8, 16, 27, 0.10) !important;
-      border-color: rgba(226, 242, 255, 0.12) !important;
-      box-shadow:
-        0 8px 26px rgba(0, 0, 0, 0.055),
-        inset 0 1px 0 rgba(255, 255, 255, 0.055) !important;
-    }
-
-    html body #customer-info,
-    html body #projectbox,
-    html body #showbtns {
-      background:
-        linear-gradient(145deg, rgba(104, 176, 236, 0.026), transparent 36%),
-        linear-gradient(180deg, rgba(6, 14, 24, 0.20), rgba(4, 10, 18, 0.15)) !important;
-      background-color: var(--us-perf-glass-readable) !important;
-      border-color: var(--us-perf-hairline) !important;
-      box-shadow:
-        0 8px 24px rgba(0, 0, 0, 0.065),
-        inset 0 1px 0 rgba(255, 255, 255, 0.028) !important;
-    }
-
-    html body #content .panel-heading,
-    html body #descriptionbox > .panel-heading,
-    html body #designbox > .panel-heading,
-    html body #filesbox > .panel-heading {
-      background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.028), rgba(91, 168, 230, 0.014)) !important;
-      background-color: rgba(255, 255, 255, 0.010) !important;
-      border-color: var(--us-perf-hairline) !important;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025) !important;
-    }
-
-    html body #content .panel-body,
-    html body #descriptionbox .panel-body,
-    html body #designbox .panel-body,
-    html body #filesbox .panel-body,
-    html body #projectbox .panel-body,
-    html body #customer-info .panel-body {
-      background: transparent !important;
-      background-color: transparent !important;
-      background-image: none !important;
-    }
-
-    html body #content table,
-    html body #content .table,
-    html body #content .panel table,
-    html body #content .panel .table {
-      background: rgba(5, 12, 20, 0.055) !important;
-      background-color: rgba(5, 12, 20, 0.055) !important;
-      border-color: rgba(226, 242, 255, 0.05) !important;
-      box-shadow: none !important;
-    }
-
-    /* Design Job Tools injects its CSS after the theme and defines .90/.96
-       surfaces. Higher specificity + !important keeps those runtime cards
-       aligned with the global glass system without editing layout behavior. */
+    html body #customer-info *,
     html body #us-sign-design-actionbar,
     html body #us-sign-job-overview,
     html body #us-sign-design-summary,
-    html body #us-sign-design-bottom-grid,
-    html body #us-sign-design-right-stack {
-      --djt-surface: rgba(7, 15, 25, 0.14) !important;
-      --djt-surface-strong: rgba(7, 15, 25, 0.17) !important;
-      --djt-surface-soft: rgba(255, 255, 255, 0.018) !important;
-      --djt-hover: rgba(118, 190, 246, 0.055) !important;
-      --djt-border: rgba(226, 242, 255, 0.07) !important;
-      --djt-border-strong: rgba(226, 242, 255, 0.105) !important;
-      --djt-accent-soft: rgba(80, 165, 238, 0.10) !important;
-      --djt-font: var(--us-font) !important;
-    }
-
-    html body #us-sign-design-actionbar {
-      background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(77, 151, 213, 0.012)),
-        rgba(7, 15, 25, 0.16) !important;
-      background-color: rgba(7, 15, 25, 0.16) !important;
-      border-color: rgba(226, 242, 255, 0.075) !important;
-      -webkit-backdrop-filter: none !important;
-      backdrop-filter: none !important;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.026) !important;
-    }
-
-    html body #us-sign-job-overview,
-    html body #us-sign-design-summary {
-      background:
-        linear-gradient(180deg, rgba(111, 181, 237, 0.018), rgba(5, 12, 20, 0.105)) !important;
-      background-color: rgba(7, 15, 25, 0.13) !important;
-      border-color: rgba(226, 242, 255, 0.065) !important;
-      box-shadow: none !important;
-      -webkit-backdrop-filter: none !important;
-      backdrop-filter: none !important;
-    }
-
-    html body #us-sign-job-overview .us-sign-overview-title,
-    html body #us-sign-job-overview .us-sign-overview-field,
-    html body #us-sign-design-summary > .us-sign-djt-summary-cell {
-      background: transparent !important;
-      background-color: transparent !important;
-      border-color: rgba(226, 242, 255, 0.05) !important;
-    }
-
-    html body #us-sign-design-bottom-grid,
-    html body #us-sign-design-right-stack,
-    html body .us-sign-design-workbench,
-    html body .us-sign-design-workspace-column {
-      background: transparent !important;
-      background-color: transparent !important;
-      background-image: none !important;
-      -webkit-backdrop-filter: none !important;
-      backdrop-filter: none !important;
-      box-shadow: none !important;
-    }
-
-    html body #us-sign-design-bottom-grid > .us-sign-description-panel,
-    html body #us-sign-design-right-stack > .us-sign-designs-panel,
-    html body #us-sign-design-right-stack > .us-sign-files-panel {
-      background:
-        linear-gradient(145deg, rgba(119, 187, 241, 0.024), transparent 32%),
-        rgba(6, 14, 24, 0.105) !important;
-      background-color: rgba(6, 14, 24, 0.105) !important;
-      border-color: rgba(226, 242, 255, 0.07) !important;
-      -webkit-backdrop-filter: none !important;
-      backdrop-filter: none !important;
-      box-shadow:
-        0 7px 22px rgba(0, 0, 0, 0.045),
-        inset 0 1px 0 rgba(255, 255, 255, 0.025) !important;
-    }
-
-    /* Keep real blur on fixed chrome only. This preserves the macOS feel
-       without forcing the GPU to continuously re-blur long scrolling cards. */
-    html body header.navbar,
     html body #sidebar_left,
+    html body #sidebar_left *,
+    html body button,
+    html body input,
+    html body select,
+    html body textarea,
+    html body table,
+    html body th,
+    html body td {
+      font-family: var(--us-font) !important;
+    }
+
+    /* Top chrome: transparent macOS-style gradient instead of a dark slab. */
+    html body header.navbar,
+    html body .navbar-fixed-top,
+    html body #topbar,
+    html body .topbar {
+      background:
+        linear-gradient(110deg,
+          rgba(4, 12, 22, 0.56) 0%,
+          rgba(8, 27, 47, 0.43) 32%,
+          rgba(14, 48, 72, 0.31) 63%,
+          rgba(8, 27, 45, 0.36) 82%,
+          rgba(4, 13, 23, 0.50) 100%),
+        linear-gradient(180deg,
+          rgba(255, 255, 255, 0.055) 0%,
+          rgba(255, 255, 255, 0.012) 42%,
+          rgba(0, 0, 0, 0.045) 100%) !important;
+      background-color: rgba(6, 18, 31, 0.42) !important;
+      border-bottom: 1px solid var(--us-chrome-line) !important;
+      box-shadow:
+        0 8px 24px rgba(0, 0, 0, 0.10),
+        inset 0 1px 0 rgba(255, 255, 255, 0.052),
+        inset 0 -1px 0 rgba(75, 167, 236, 0.028) !important;
+      -webkit-backdrop-filter: blur(14px) saturate(138%) !important;
+      backdrop-filter: blur(14px) saturate(138%) !important;
+    }
+
+    /* Main left menu: blue-black glass, not neutral gray. */
+    html body #sidebar_left {
+      background:
+        radial-gradient(circle at 4% 10%, rgba(62, 151, 219, 0.14), transparent 34%),
+        linear-gradient(180deg,
+          rgba(7, 25, 41, 0.69) 0%,
+          rgba(5, 18, 31, 0.63) 48%,
+          rgba(3, 13, 23, 0.68) 100%) !important;
+      background-color: rgba(5, 18, 30, 0.65) !important;
+      border-right: 1px solid var(--us-chrome-line) !important;
+      box-shadow:
+        10px 0 30px rgba(0, 0, 0, 0.09),
+        inset -1px 0 0 rgba(255, 255, 255, 0.025),
+        inset 0 1px 0 rgba(125, 192, 244, 0.025) !important;
+      -webkit-backdrop-filter: blur(12px) saturate(132%) !important;
+      backdrop-filter: blur(12px) saturate(132%) !important;
+    }
+
+    html body #sidebar_left .nav > li > a,
+    html body #sidebar_left a {
+      color: rgba(211, 225, 238, 0.82) !important;
+    }
+
+    html body #sidebar_left .nav > li > a:hover,
+    html body #sidebar_left a:hover {
+      color: rgba(248, 251, 255, 0.97) !important;
+      background:
+        linear-gradient(90deg, rgba(79, 169, 240, 0.11), rgba(79, 169, 240, 0.035)) !important;
+    }
+
+    html body #sidebar_left .nav > li.active > a,
+    html body #sidebar_left .active > a,
+    html body #sidebar_left a.active {
+      color: #f5faff !important;
+      background:
+        linear-gradient(90deg,
+          rgba(50, 151, 234, 0.22),
+          rgba(27, 102, 177, 0.105) 72%,
+          rgba(18, 71, 126, 0.055)) !important;
+      border-color: rgba(127, 202, 255, 0.17) !important;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.032),
+        inset 3px 0 0 rgba(108, 191, 255, 0.38) !important;
+    }
+
+    /* Project rail uses the same family, but is lighter so the two rails
+       separate without looking like unrelated gray/red columns. */
     html body #pmlt {
-      -webkit-backdrop-filter: blur(12px) saturate(130%) !important;
-      backdrop-filter: blur(12px) saturate(130%) !important;
+      background:
+        radial-gradient(circle at 0 18%, rgba(70, 155, 220, 0.075), transparent 38%),
+        linear-gradient(180deg,
+          rgba(7, 22, 37, 0.39) 0%,
+          rgba(5, 16, 28, 0.31) 52%,
+          rgba(4, 13, 23, 0.37) 100%) !important;
+      background-color: rgba(5, 17, 29, 0.34) !important;
+      border-right: 1px solid rgba(156, 208, 250, 0.10) !important;
+      box-shadow:
+        8px 0 26px rgba(0, 0, 0, 0.055),
+        inset -1px 0 0 rgba(255, 255, 255, 0.022) !important;
+      -webkit-backdrop-filter: blur(10px) saturate(126%) !important;
+      backdrop-filter: blur(10px) saturate(126%) !important;
+    }
+
+    html body #pmlt a,
+    html body #project_menu a {
+      color: rgba(211, 227, 241, 0.88) !important;
+    }
+
+    html body #pmlt a:hover,
+    html body #project_menu a:hover {
+      color: #ffffff !important;
+      text-shadow: 0 0 14px rgba(103, 190, 255, 0.16) !important;
     }
 '''
 
