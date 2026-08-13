@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      2.1.17
+// @version      2.1.18
 // @description  Stable SquareCoil layout with Roxborough display typography, blue glass chrome, frosted Project Search panels, corrected Task-page text contrast, blurred Job Dashboard glass, and a lightweight custom cursor.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
@@ -2109,7 +2109,7 @@
     @media (pointer: fine) {
       html,
       body {
-        cursor: url("https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/assets/us-sign-cursor-arrow.svg") 5 4, default !important;
+        cursor: url("https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/assets/us-sign-cursor-arrow-elegant-v218.svg") 4 3, default !important;
       }
 
       a,
@@ -2124,7 +2124,7 @@
       input[type="reset"],
       input[type="checkbox"],
       input[type="radio"] {
-        cursor: url("https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/assets/us-sign-cursor-pointer.svg") 5 4, pointer !important;
+        cursor: url("https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/assets/us-sign-cursor-pointer-elegant-v218b.svg") 4 3, pointer !important;
       }
 
       input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]),
