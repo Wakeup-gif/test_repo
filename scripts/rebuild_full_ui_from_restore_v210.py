@@ -1,61 +1,14 @@
 from pathlib import Path
 
-path = Path('tampermonkey/US-Sign-Full-UI-Theme.user.js')
-text = path.read_text(encoding='utf-8')
-
-text = text.replace('// @version      2.1.1', '// @version      2.1.2', 1)
-text = text.replace(
-    '// @description  Stable pre-wallpaper SquareCoil layout with blue macOS-inspired glass colors and scenic wallpaper applied through translucent paint only. No project geometry overrides.',
-    '// @description  Stable pre-wallpaper SquareCoil layout with visible scenic wallpaper, blue macOS-inspired glass colors, and translucent canvas paint only. No project geometry overrides.',
-    1,
-)
-
-marker = '''    @supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {\n'''
-css = r'''    /* =========================================================
-       v2.1.2 CANVAS OPACITY TUNING
-       Keep the v1.1.2 geometry untouched. These structural wrappers retain
-       their normal dimensions and flow; only their paint is made lighter so
-       the root wallpaper remains visible through stacked canvas layers.
-    ========================================================= */
-
-    html body #main,
-    html body #content_wrapper,
-    html body #content,
-    html body #content > .tray,
-    html body #content > .tray-left,
-    html body #content > .tray-right,
-    html body #content > .tray-center,
-    html body .tray,
-    html body .tray-left,
-    html body .tray-right,
-    html body .tray-center,
-    html body .tray-inner,
-    html body [class^="tray-"],
-    html body [class*=" tray-"],
-    html body .content,
-    html body .content-wrapper,
-    html body .page-content,
-    html body .content-body,
-    html body .main-content,
-    html body .main-panel,
-    html body .admin-panels,
-    html body .dashboard,
-    html body .dashboard-page,
-    html body .container,
-    html body .container-fluid,
-    html body .pl15,
-    html body .pr15,
-    html body .pl15.pr15 {
-      background: rgba(8, 14, 22, 0.075) !important;
-      background-color: rgba(8, 14, 22, 0.075) !important;
-      background-image: none !important;
-    }
-
-'''
-
-if 'v2.1.2 CANVAS OPACITY TUNING' not in text:
-    if marker not in text:
-        raise SystemExit('insertion marker not found')
-    text = text.replace(marker, css + marker, 1)
-
-path.write_text(text, encoding='utf-8')
+p = Path('tampermonkey/US-Sign-Full-UI-Theme.user.js')
+s = p.read_text(encoding='utf-8')
+s = s.replace('// @version      2.1.2', '// @version      2.1.3', 1)
+s = s.replace('v2.1.2 CANVAS OPACITY TUNING', 'v2.1.3 CANVAS WALLPAPER STACK', 1)
+s = s.replace('background: rgba(8, 14, 22, 0.075) !important;\n      background-color: rgba(8, 14, 22, 0.075) !important;\n      background-image: none !important;', 'background: rgba(8, 14, 22, 0.10) !important;\n      background-color: rgba(8, 14, 22, 0.10) !important;\n      background-image: none !important;', 1)
+insert = '''\n    html body #main,\n    html body #content_wrapper {\n      background-color: #081019 !important;\n      background-image:\n        linear-gradient(rgba(4, 8, 13, 0.28), rgba(6, 11, 17, 0.54)),\n        var(--us-wallpaper) !important;\n      background-position: center center !important;\n      background-size: cover !important;\n      background-repeat: no-repeat !important;\n      background-attachment: fixed !important;\n    }\n\n'''
+marker = '    /* =========================================================\n       v2.1.3 CANVAS WALLPAPER STACK\n'
+idx = s.find(marker)
+if idx < 0:
+    raise SystemExit('canvas block not found')
+s = s[:idx] + insert + s[idx:]
+p.write_text(s, encoding='utf-8')
