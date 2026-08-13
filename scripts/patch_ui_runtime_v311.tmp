@@ -1,0 +1,14 @@
+from pathlib import Path
+p=Path('tampermonkey/US-Sign-UI-Runtime-Fixes.user.js')
+s=p.read_text(encoding='utf-8')
+if '// @version      3.1.1' in s: raise SystemExit(0)
+if '// @version      3.1.0' not in s: raise SystemExit('Expected v3.1.0')
+s=s.replace('// @version      3.1.0','// @version      3.1.1',1)
+s=s.replace('Lightweight cached logo and CKEditor iframe styling only. No page-wide observers, color crawlers, or Scope DOM ownership.','Lightweight cached logo and CKEditor iframe styling with transparent mark/highlight backgrounds. No page-wide observers, color crawlers, or Scope DOM ownership.',1)
+s=s.replace('window.__usSignUiRuntimeV310','window.__usSignUiRuntimeV311')
+s=s.replace('const VERSION = "3.1.0";','const VERSION = "3.1.1";',1)
+old='''      mark {\n        color: #f4f6f8 !important;\n        background: rgba(211, 186, 134, 0.18) !important;\n        border-radius: 4px !important;\n        padding: 0 .12em !important;\n      }'''
+new='''      mark,\n      .marker,\n      .highlight,\n      [class*="highlight" i] {\n        background: transparent !important;\n        background-color: transparent !important;\n        background-image: none !important;\n        border-radius: 0 !important;\n        box-shadow: none !important;\n        padding: 0 !important;\n      }'''
+if old not in s: raise SystemExit('mark rule not found')
+s=s.replace(old,new,1)
+p.write_text(s,encoding='utf-8')
