@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      2.1.15
-// @description  Stable SquareCoil layout with Roxborough display typography, blue glass chrome, frosted Project Search panels, and corrected Task-page text contrast.
+// @version      2.1.16
+// @description  Stable SquareCoil layout with Roxborough display typography, blue glass chrome, frosted Project Search panels, corrected Task-page text contrast, and blurred Job Dashboard glass.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
 // @grant        GM_addStyle
@@ -2082,6 +2082,25 @@
       -webkit-text-fill-color: #ff6257 !important;
     }
 
+
+    /* v2.1.16 JOB DASHBOARD GLASS BLUR */
+    html.us-sign-job-dashboard #customer-name,
+    html.us-sign-job-dashboard #customer-info,
+    html.us-sign-job-dashboard #content .tray-center > .pl15.pr15 > .well:has(.important-notes) {
+      background: linear-gradient(145deg, rgba(115,188,244,.040), transparent 34%), linear-gradient(180deg, rgba(7,16,28,.17), rgba(4,10,18,.11)) !important;
+      background-color: rgba(7,15,26,.13) !important;
+      border-color: rgba(216,238,255,.105) !important;
+      box-shadow: 0 12px 30px rgba(0,0,0,.085), inset 0 1px 0 rgba(255,255,255,.042) !important;
+      -webkit-backdrop-filter: blur(8px) saturate(120%) !important;
+      backdrop-filter: blur(8px) saturate(120%) !important;
+    }
+
+    html.us-sign-job-dashboard #customer-info :is(.panel-heading,.panel-body,button,a.btn),
+    html.us-sign-job-dashboard #content .tray-center > .pl15.pr15 > .well:has(.important-notes) :is(.panel,.panel-heading,.panel-body,input,textarea,button,a.btn) {
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
+    }
+
     @media print {
       html,
       body,
@@ -2163,5 +2182,17 @@
     usSignMarkTaskPage();
   }
   window.addEventListener('pageshow', usSignMarkTaskPage);
+
+
+  function usSignMarkJobDashboard() {
+    const hasCustomer = !!document.querySelector('#customer-info');
+    const hasImportantNotes = !!document.querySelector('.important-notes');
+    const isScope = !!document.querySelector('#ps-select, .us-sign-scope-enhanced');
+    const isDesign = !!document.querySelector('#us-sign-design-actionbar, #us-sign-design-bottom-grid');
+    if (hasCustomer && hasImportantNotes && !isScope && !isDesign) document.documentElement.classList.add('us-sign-job-dashboard');
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', usSignMarkJobDashboard, { once: true });
+  else usSignMarkJobDashboard();
+  window.addEventListener('pageshow', usSignMarkJobDashboard);
 
 })();
