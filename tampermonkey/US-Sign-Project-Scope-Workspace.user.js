@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Project and Scope Workspace
 // @namespace    us-sign-full-modules
-// @version      1.1.0
-// @description  Organizes the project overview and Scope of Work while preserving the native customer-panel hierarchy.
+// @version      1.2.0
+// @description  Preserves the working Scope layout while adding performance-conscious blue glass surfaces, lighter editor chrome, and matched project cards.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
 // @grant        GM_addStyle
@@ -16,17 +16,17 @@
 
   GM_addStyle(String.raw`
     :root {
-      --us-ws-bg: rgba(16, 20, 25, 0.92);
-      --us-ws-soft-bg: rgba(255, 255, 255, 0.025);
-      --us-ws-line: var(--us-border, rgba(255, 255, 255, 0.085));
-      --us-ws-line-strong: var(--us-border-strong, rgba(255, 255, 255, 0.14));
+      --us-ws-bg: rgba(7, 16, 27, 0.16);
+      --us-ws-soft-bg: rgba(122, 190, 244, 0.035);
+      --us-ws-line: var(--us-border, rgba(214, 237, 255, 0.09));
+      --us-ws-line-strong: var(--us-border-strong, rgba(220, 241, 255, 0.15));
       --us-ws-text: var(--us-text, #f4f6f8);
       --us-ws-soft: var(--us-text-soft, #c9ced5);
       --us-ws-muted: var(--us-text-muted, #8f98a3);
-      --us-ws-accent: var(--us-accent-soft, rgba(155, 172, 189, 0.16));
+      --us-ws-accent: var(--us-accent-soft, rgba(72, 160, 231, 0.18));
       --us-ws-radius: var(--us-radius-lg, 14px);
       --us-ws-radius-sm: var(--us-radius-sm, 7px);
-      --us-ws-shadow: var(--us-shadow-sm, 0 4px 14px rgba(0, 0, 0, 0.18));
+      --us-ws-shadow: 0 10px 28px rgba(0, 0, 0, 0.085), inset 0 1px 0 rgba(255, 255, 255, 0.035);
     }
 
     /* =====================================================
@@ -667,7 +667,7 @@
       padding: 6px !important;
       overflow-x: hidden !important;
       overflow-y: auto !important;
-      background: rgba(17, 21, 26, 0.995) !important;
+      background: rgba(7, 15, 25, 0.94) !important;
       border: 1px solid var(--us-ws-line-strong) !important;
       border-radius: 10px !important;
       box-shadow: 0 22px 54px rgba(0, 0, 0, 0.34) !important;
@@ -691,7 +691,7 @@
       max-width: none !important;
       min-width: 0 !important;
       margin: 0 !important;
-      background: #0b0e12 !important;
+      background: rgba(5, 12, 20, 0.34) !important;
       border-color: var(--us-ws-line) !important;
       border-radius: 10px !important;
       box-shadow: none !important;
@@ -728,7 +728,7 @@
       min-height: 250px !important;
       max-height: 340px !important;
       overflow: hidden !important;
-      background: #0b0e12 !important;
+      background: rgba(5, 12, 20, 0.24) !important;
       border: 0 !important;
     }
 
@@ -785,6 +785,79 @@
       width: 100% !important;
       min-width: 0 !important;
       margin: 10px 0 0 !important;
+    }
+
+
+    /* =====================================================
+       v1.2.0 SCOPE GLASS POLISH
+       Paint only. Keep the proven v1.1.0 grid and geometry untouched.
+    ===================================================== */
+
+    html body:has(#pmlt) #customer-info,
+    html body:has(#pmlt) #content .tray-center > .pl15.pr15 > .well:has(.important-notes),
+    html body:has(#pmlt) #content .tray-center > .pl15.pr15 > .well.us-sign-scope-enhanced {
+      background:
+        linear-gradient(145deg, rgba(118, 188, 244, 0.040), transparent 34%),
+        linear-gradient(180deg, rgba(8, 18, 30, 0.18), rgba(4, 11, 20, 0.12)) !important;
+      background-color: var(--us-ws-bg) !important;
+      border-color: var(--us-ws-line) !important;
+      box-shadow: var(--us-ws-shadow) !important;
+    }
+
+    @supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+      html body:has(#pmlt) #customer-info,
+      html body:has(#pmlt) #content .tray-center > .pl15.pr15 > .well:has(.important-notes),
+      html body:has(#pmlt) #content .tray-center > .pl15.pr15 > .well.us-sign-scope-enhanced {
+        -webkit-backdrop-filter: blur(6px) saturate(118%) !important;
+        backdrop-filter: blur(6px) saturate(118%) !important;
+      }
+
+      html body:has(#pmlt) .well.us-sign-scope-enhanced :is(.cke, .cke_chrome, .cke_inner, .cke_top, .cke_contents),
+      html body:has(#pmlt) .well:has(.important-notes) :is(input, textarea, button),
+      html body:has(#pmlt) #customer-info :is(.panel-heading, .panel-body, button, a.btn) {
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+      }
+    }
+
+    html body:has(#pmlt) #customer-info > .panel-heading,
+    html body:has(#pmlt) #us-sign-scope-header,
+    html body:has(#pmlt) .well.us-sign-scope-enhanced .cke_top {
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(92, 170, 232, 0.018)) !important;
+      background-color: rgba(255, 255, 255, 0.012) !important;
+    }
+
+    html body:has(#pmlt) .well:has(.important-notes) textarea,
+    html body:has(#pmlt) .well:has(.important-notes) input[type="text"],
+    html body:has(#pmlt) .well.us-sign-scope-enhanced button.multiselect,
+    html body:has(#pmlt) .well.us-sign-scope-enhanced .multiselect-native-select > .btn-group > .btn {
+      background: rgba(5, 13, 23, 0.24) !important;
+      background-color: rgba(5, 13, 23, 0.24) !important;
+      border-color: var(--us-ws-line-strong) !important;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025) !important;
+    }
+
+    html body:has(#pmlt) .well.us-sign-scope-enhanced :is(.cke, .cke_chrome, .cke_inner) {
+      background:
+        linear-gradient(180deg, rgba(9, 19, 31, 0.32), rgba(4, 10, 18, 0.24)) !important;
+      background-color: rgba(5, 12, 20, 0.30) !important;
+      border-color: var(--us-ws-line) !important;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025) !important;
+    }
+
+    html body:has(#pmlt) .well.us-sign-scope-enhanced .cke_contents {
+      background: rgba(5, 12, 20, 0.22) !important;
+      background-color: rgba(5, 12, 20, 0.22) !important;
+    }
+
+    html body:has(#pmlt) #us-sign-scope-header #insert-btn,
+    html body:has(#pmlt) .well.us-sign-scope-enhanced .us-sign-scope-footer .btn {
+      background:
+        linear-gradient(180deg, rgba(77, 164, 235, 0.16), rgba(27, 95, 158, 0.08)),
+        rgba(7, 15, 25, 0.20) !important;
+      border-color: rgba(131, 203, 255, 0.16) !important;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03) !important;
     }
 
     /* =====================================================
