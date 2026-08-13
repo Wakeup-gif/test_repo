@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      2.1.12
-// @description  Stable SquareCoil layout with restored icons, Roxborough display typography, blue glass chrome, subtle center blur, and highlight-free Description rich text.
+// @version      2.1.13
+// @description  Stable SquareCoil layout with restored icons, Roxborough display typography, blue glass chrome, subtle center blur, and hard-removed Description highlight paint.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
 // @grant        GM_addStyle
@@ -1920,6 +1920,10 @@
     html body .us-sign-description-panel :is([style*="color:red" i],[style*="color: red" i],font[color="red" i],font[color="#ff0000" i]),
     html body .us-sign-readable-content :is([style*="color:red" i],[style*="color: red" i],font[color="red" i],font[color="#ff0000" i]){color:#c98b8b!important;-webkit-text-fill-color:#c98b8b!important;background:transparent!important;background-color:transparent!important;background-image:none!important;box-shadow:none!important;text-shadow:none!important;border:0!important;border-radius:0!important;padding:0!important;}
 
+
+    /* v2.1.13 final Description highlight neutralizer */
+    html body :is(#descriptionbox,.us-sign-description-panel,.us-sign-readable-content) :is(mark,.marker,.highlight,[class*="highlight" i],[style*="background" i],[bgcolor]){background:transparent!important;background-color:transparent!important;background-image:none!important;box-shadow:none!important;text-shadow:none!important;border:0!important;border-radius:0!important;padding:0!important;}
+
     @media print {
       html,
       body,
@@ -1940,4 +1944,37 @@
       }
     }
   `);
+
+  // v2.1.13: bounded cleanup for inline rich-text highlight paint that can
+  // outrank stylesheet rules. No observer and no recurring interval.
+  function usSignClearDescriptionHighlightPaint() {
+    const roots = document.querySelectorAll('#descriptionbox, .us-sign-description-panel, .us-sign-readable-content');
+    roots.forEach((root) => {
+      root.querySelectorAll('mark, .marker, .highlight, [class*="highlight" i], [style*="background" i], [bgcolor]').forEach((el) => {
+        if (el.hasAttribute('bgcolor')) el.removeAttribute('bgcolor');
+        el.style.setProperty('background', 'transparent', 'important');
+        el.style.setProperty('background-color', 'transparent', 'important');
+        el.style.setProperty('background-image', 'none', 'important');
+        el.style.setProperty('box-shadow', 'none', 'important');
+        el.style.setProperty('text-shadow', 'none', 'important');
+        el.style.setProperty('border', '0', 'important');
+        el.style.setProperty('border-radius', '0', 'important');
+        el.style.setProperty('padding', '0', 'important');
+      });
+    });
+  }
+
+  function usSignScheduleDescriptionCleanup() {
+    [0, 180, 500, 1100, 2200, 3600].forEach((delay) => {
+      window.setTimeout(usSignClearDescriptionHighlightPaint, delay);
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', usSignScheduleDescriptionCleanup, { once: true });
+  } else {
+    usSignScheduleDescriptionCleanup();
+  }
+  window.addEventListener('pageshow', usSignScheduleDescriptionCleanup);
+
 })();
