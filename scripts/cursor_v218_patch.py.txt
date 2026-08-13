@@ -1,7 +1,0 @@
-from pathlib import Path
-p=Path('tampermonkey/US-Sign-Full-UI-Theme.user.js')
-s=p.read_text()
-s=s.replace('// @version      2.1.17','// @version      2.1.18',1)
-s=s.replace('us-sign-cursor-arrow.svg\") 5 4','us-sign-cursor-arrow-elegant-v218.svg\") 4 3')
-s=s.replace('us-sign-cursor-pointer.svg\") 5 4','us-sign-cursor-pointer-elegant-v218b.svg\") 4 3')
-p.write_text(s)
