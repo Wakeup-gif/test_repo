@@ -1,0 +1,34 @@
+name: Patch Full UI Theme v2.1.24 Design glass
+on:
+  push:
+    paths:
+      - "scripts/patch_design_glass_v2124.py"
+      - ".github/workflows/patch-design-glass-v2124.yml"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python scripts/patch_design_glass_v2124.py
+      - run: grep -q "@version      2.1.24" tampermonkey/US-Sign-Full-UI-Theme.user.js
+      - run: grep -q "v2.1.24 DESIGN PAGE GLASS SYSTEM" tampermonkey/US-Sign-Full-UI-Theme.user.js
+      - run: grep -q "@version      4.1.4" tampermonkey/US-Sign-Design-Job-Tools.user.js
+      - run: grep -q "us-sign-design-page" tampermonkey/US-Sign-Design-Job-Tools.user.js
+      - run: node --check tampermonkey/US-Sign-Full-UI-Theme.user.js
+      - run: node --check tampermonkey/US-Sign-Design-Job-Tools.user.js
+      - run: git diff --check
+      - name: Commit canonical userscripts only
+        shell: bash
+        run: |
+          if git diff --quiet -- tampermonkey/US-Sign-Full-UI-Theme.user.js tampermonkey/US-Sign-Design-Job-Tools.user.js; then
+            echo "No canonical changes produced"
+            exit 1
+          fi
+          git config user.name "Wakeup-gif"
+          git config user.email "cristianeliocastro@gmail.com"
+          git add tampermonkey/US-Sign-Full-UI-Theme.user.js tampermonkey/US-Sign-Design-Job-Tools.user.js
+          git commit -m "Unify Design page glass UI v2.1.24"
+          git push origin HEAD:main
