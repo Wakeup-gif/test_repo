@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      2.1.18
+// @version      2.1.19
 // @description  Stable SquareCoil layout with Roxborough display typography, blue glass chrome, frosted Project Search panels, corrected Task-page text contrast, blurred Job Dashboard glass, and a lightweight custom cursor.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
