@@ -13,10 +13,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python scripts/patch_glass_blur_restore_v2125.py
-      - run: grep -q "@version      2.1.25" tampermonkey/US-Sign-Full-UI-Theme.user.js
-      - run: grep -q "v2.1.25 VISIBLE GLASS BLUR RESTORE" tampermonkey/US-Sign-Full-UI-Theme.user.js
-      - run: grep -q "backdrop-filter: blur(14px) saturate(132%)" tampermonkey/US-Sign-Full-UI-Theme.user.js
-      - run: grep -q "backdrop-filter: blur(11px) saturate(126%)" tampermonkey/US-Sign-Full-UI-Theme.user.js
+      - run: 'grep -q "@version      2.1.25" tampermonkey/US-Sign-Full-UI-Theme.user.js'
+      - run: 'grep -q "v2.1.25 VISIBLE GLASS BLUR RESTORE" tampermonkey/US-Sign-Full-UI-Theme.user.js'
+      - run: 'grep -q "backdrop-filter: blur(14px) saturate(132%)" tampermonkey/US-Sign-Full-UI-Theme.user.js'
+      - run: 'grep -q "backdrop-filter: blur(11px) saturate(126%)" tampermonkey/US-Sign-Full-UI-Theme.user.js'
       - run: node --check tampermonkey/US-Sign-Full-UI-Theme.user.js
       - run: git diff --check
       - run: |
