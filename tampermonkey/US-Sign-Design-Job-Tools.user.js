@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         US Sign - Design Job Tools
 // @namespace    us-sign-local-tools
-// @version      4.1.3
+// @version      4.1.4
 // @description  Stable Design workspace with bounded startup discovery, one scoped data observer, and no permanent content watcher.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-idle
@@ -27,7 +27,7 @@
     lookup: "us-sign-job-lookup-button"
   };
 
-  const VERSION = "4.1.3";
+  const VERSION = "4.1.4";
 
   const NATIVE_ACTION_ORDER = [
     "EDIT",
@@ -957,6 +957,8 @@
       if (!workspace) return false;
       state.table = table;
       state.workspace = workspace;
+      document.documentElement.classList.add("us-sign-design-page");
+      document.documentElement.classList.remove("us-sign-job-dashboard");
       const { actionbar, copyTools } = ensureActionbar(workspace);
       let overview = document.getElementById(IDS.overview);
       if (!overview) overview = createOverview();
@@ -997,6 +999,7 @@
   }
 
   function startDiscovery() {
+    document.documentElement.classList.remove("us-sign-design-page");
     stopDiscovery();
     disconnectDataObserver();
     state.lastDataSignature = "";
