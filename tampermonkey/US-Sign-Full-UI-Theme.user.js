@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      2.1.31
-// @description  Stable SquareCoil frosted-glass UI with aligned native top chrome, source-targeted true-blur main Dashboard, rotating curated Bing wallpapers every 30 minutes with subtle pointer parallax, unified Job Dashboard and Design workspaces, corrected Task-page contrast, and a cutout geometric triangle cursor.
+// @version      2.1.32
+// @description  Stable SquareCoil frosted-glass UI with aligned native top chrome, source-targeted true-blur main Dashboard, rotating curated Bing UHD wallpapers every 30 minutes with subtle pointer parallax, unified Job Dashboard and Design workspaces, corrected Task-page contrast, and a cutout geometric triangle cursor.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
 // @grant        GM_addStyle
@@ -2952,13 +2952,13 @@
 
     /* =========================================================
        v2.1.31 BING WALLPAPER PARALLAX
-       Slight overscan plus pointer-driven background position. The runtime
+       Reduced overscan plus pointer-driven background position for sharper UHD rendering. The runtime
        updates only CSS variables; touch and reduced-motion stay centered.
     ========================================================= */
     :root {
       --us-wallpaper-x: 50%;
       --us-wallpaper-y: 50%;
-      --us-wallpaper-size: auto 110vh;
+      --us-wallpaper-size: auto 106vh;
     }
 
     html,
@@ -2985,7 +2985,7 @@
   // =========================================================
   const US_SIGN_BING_ROTATE_MS = 30 * 60 * 1000;
   const US_SIGN_BING_CACHE_MS = 6 * 60 * 60 * 1000;
-  const US_SIGN_BING_CACHE_KEY = 'us-sign-bing-wallpaper-pool-v1';
+  const US_SIGN_BING_CACHE_KEY = 'us-sign-bing-wallpaper-pool-v2';
   const US_SIGN_BING_MARKETS = ['en-US', 'en-GB', 'en-AU', 'ja-JP'];
   let usSignBingPool = [];
   let usSignBingRotateTimer = 0;
@@ -3060,7 +3060,7 @@
         return;
       }
 
-      const endpoint = `https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=${encodeURIComponent(market)}`;
+      const endpoint = `https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=${encodeURIComponent(market)}&uhd=1&uhdwidth=3840&uhdheight=2160`;
       GM_xmlhttpRequest({
         method: 'GET',
         url: endpoint,
@@ -3160,7 +3160,7 @@
     const ratio = Math.max(1, window.innerWidth) / Math.max(1, window.innerHeight);
     document.documentElement.style.setProperty(
       '--us-wallpaper-size',
-      ratio >= (16 / 9) ? '110vw auto' : 'auto 110vh'
+      ratio >= (16 / 9) ? '106vw auto' : 'auto 106vh'
     );
   }
 
