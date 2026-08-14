@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         US Sign Menu Cleanup and Reorder
 // @namespace    us-sign-full-modules
-// @version      3.0.0
+// @version      3.0.1
 // @description  Lightweight sidebar cleanup, project ordering, compact rail controls, project-page marker, and native sticky rail in one bounded runtime.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-idle
@@ -14,8 +14,8 @@
 (function () {
   "use strict";
 
-  if (window.__usSignMenuCleanupV300) return;
-  window.__usSignMenuCleanupV300 = true;
+  if (window.__usSignMenuCleanupV301) return;
+  window.__usSignMenuCleanupV301 = true;
 
   const SIDEBAR_HIDDEN_LINKS = new Set([
     "LEADS", "QUEUES", "PURCHASING", "SCHEDULE", "INSTALL CALENDAR",
@@ -82,8 +82,8 @@
       height: 29px !important;
       margin: 5px 0 10px !important;
       padding: 2px !important;
-      background: #171b20 !important;
-      border: 1px solid #2d343c !important;
+      background: var(--us-glass-strong, #171b20) !important;
+      border: 1px solid var(--us-border, #2d343c) !important;
       border-radius: 7px !important;
       box-shadow: none !important;
       white-space: nowrap !important;
@@ -115,7 +115,7 @@
       height: 23px !important;
       min-height: 23px !important;
       padding: 0 !important;
-      color: #aeb8c3 !important;
+      color: var(--us-text-soft, #aeb8c3) !important;
       background: transparent !important;
       background-image: none !important;
       border: 0 !important;
@@ -130,8 +130,8 @@
     #us-sign-rail-nav-group > button:hover,
     #us-sign-rail-nav-group > input[type="button"]:hover,
     #us-sign-rail-nav-group > input[type="submit"]:hover {
-      color: #f5f7f9 !important;
-      background: #262c33 !important;
+      color: var(--us-text, #f5f7f9) !important;
+      background: var(--us-hover, #262c33) !important;
     }
 
     #us-sign-rail-counter {
@@ -144,10 +144,10 @@
       height: 23px !important;
       min-height: 23px !important;
       padding: 0 6px !important;
-      color: #d4dbe3 !important;
-      background: #252d35 !important;
+      color: var(--us-text-soft, #d4dbe3) !important;
+      background: var(--us-bg-soft, #252d35) !important;
       background-image: none !important;
-      border: 1px solid #3a4652 !important;
+      border: 1px solid var(--us-border-strong, #3a4652) !important;
       border-radius: 4px !important;
       box-shadow: none !important;
       font-size: 11px !important;
@@ -190,10 +190,10 @@
       min-height: 29px !important;
       margin: 0 !important;
       padding: 0 7px !important;
-      color: #d1d7de !important;
-      background: #1d2228 !important;
+      color: var(--us-text-soft, #d1d7de) !important;
+      background: var(--us-glass, #1d2228) !important;
       background-image: none !important;
-      border: 1px solid #353e48 !important;
+      border: 1px solid var(--us-border, #353e48) !important;
       border-radius: 6px !important;
       box-shadow: none !important;
       font-size: 10.5px !important;
@@ -207,9 +207,9 @@
     }
 
     #us-sign-rail-action-group > *:hover {
-      color: #f5f7f9 !important;
-      background: #282e35 !important;
-      border-color: #4b5662 !important;
+      color: var(--us-text, #f5f7f9) !important;
+      background: var(--us-hover, #282e35) !important;
+      border-color: var(--us-border-strong, #4b5662) !important;
     }
 
     #us-sign-rail-action-group > *::before,
@@ -468,12 +468,6 @@
     const parent = nodes[0].parentElement;
     if (!parent || !nodes.every((node) => node.parentElement === parent)) {
       counter.id = "us-sign-rail-counter";
-      counter.style.setProperty("background", "#252d35", "important");
-      counter.style.setProperty("background-color", "#252d35", "important");
-      counter.style.setProperty("background-image", "none", "important");
-      counter.style.setProperty("color", "#d4dbe3", "important");
-      counter.style.setProperty("border", "1px solid #3a4652", "important");
-      counter.style.setProperty("box-shadow", "none", "important");
       return true;
     }
 

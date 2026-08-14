@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         US Sign - Design Job Tools
 // @namespace    us-sign-local-tools
-// @version      4.1.2
+// @version      4.1.3
 // @description  Stable Design workspace with bounded startup discovery, one scoped data observer, and no permanent content watcher.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-idle
@@ -27,7 +27,7 @@
     lookup: "us-sign-job-lookup-button"
   };
 
-  const VERSION = "4.1.2";
+  const VERSION = "4.1.3";
 
   const NATIVE_ACTION_ORDER = [
     "EDIT",
@@ -526,8 +526,8 @@
       html body:has(#pmlt) #content .row.us-sign-design-workbench>.us-sign-design-source-column { display:none!important;width:0!important;max-width:0!important;min-width:0!important;margin:0!important;padding:0!important; }
       html body:has(#pmlt) #content .row.us-sign-design-workbench>.us-sign-design-workspace-column { grid-column:1/-1!important;float:none!important;width:100%!important;max-width:none!important;min-width:0!important;margin:0!important;padding:0!important; }
       .us-sign-empty-native-heading,.us-sign-native-workspace-heading-hidden { display:none!important;height:0!important;min-height:0!important;max-height:0!important;margin:0!important;padding:0!important;overflow:hidden!important;border:0!important; }
-      #${IDS.actionbar},#${IDS.overview},#${IDS.summary},#${IDS.copyTools},#${IDS.nativeActions},#${IDS.bottomGrid},#${IDS.rightStack},#${IDS.lookup},.us-sign-search-with-lookup { --djt-surface:rgba(16,20,25,.90);--djt-surface-strong:rgba(13,17,22,.96);--djt-surface-soft:rgba(255,255,255,.025);--djt-hover:rgba(255,255,255,.045);--djt-border:rgba(255,255,255,.06);--djt-border-strong:rgba(255,255,255,.10);--djt-text:#e8edf2;--djt-text-soft:#bcc4cd;--djt-text-muted:#87919c;--djt-accent-soft:rgba(127,146,166,.13);--djt-danger:#c7a3a3;--djt-warning:#d0b786;--djt-radius-sm:7px;--djt-radius-lg:14px;--djt-font:var(--font-ui,"Inter",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif);font-family:var(--djt-font)!important;text-shadow:none!important; }
-      #${IDS.actionbar} { display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;align-items:center!important;justify-content:flex-start!important;gap:8px!important;width:100%!important;max-width:none!important;min-width:0!important;min-height:46px!important;margin:0!important;padding:7px 9px!important;overflow-x:auto!important;overflow-y:hidden!important;background:var(--djt-surface-strong)!important;background-image:none!important;border:1px solid var(--djt-border)!important;border-radius:var(--djt-radius-lg) var(--djt-radius-lg) 0 0!important;box-shadow:none!important;white-space:nowrap!important;scrollbar-width:none!important;backdrop-filter:blur(14px) saturate(1.02)!important;-webkit-backdrop-filter:blur(14px) saturate(1.02)!important; }
+      #${IDS.actionbar},#${IDS.overview},#${IDS.summary},#${IDS.copyTools},#${IDS.nativeActions},#${IDS.bottomGrid},#${IDS.rightStack},#${IDS.lookup},.us-sign-search-with-lookup { --djt-surface:var(--us-design-surface,rgba(16,20,25,.90));--djt-surface-strong:var(--us-design-surface-strong,rgba(13,17,22,.96));--djt-surface-soft:var(--us-design-surface-soft,rgba(255,255,255,.025));--djt-hover:var(--us-design-hover,var(--us-hover,rgba(255,255,255,.045)));--djt-border:var(--us-design-border,var(--us-border,rgba(255,255,255,.06)));--djt-border-strong:var(--us-design-border-strong,var(--us-border-strong,rgba(255,255,255,.10)));--djt-text:var(--us-text,#e8edf2);--djt-text-soft:var(--us-text-soft,#bcc4cd);--djt-text-muted:var(--us-text-muted,#87919c);--djt-accent-soft:var(--us-design-accent-soft,var(--us-accent-soft,rgba(127,146,166,.13)));--djt-danger:var(--us-danger,#c7a3a3);--djt-warning:var(--us-warning,#d0b786);--djt-radius-sm:var(--us-radius-sm,7px);--djt-radius-lg:var(--us-radius-lg,14px);--djt-font:var(--us-font,var(--font-ui,"Inter",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif));font-family:var(--djt-font)!important;text-shadow:none!important; }
+      #${IDS.actionbar} { display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;align-items:center!important;justify-content:flex-start!important;gap:8px!important;width:100%!important;max-width:none!important;min-width:0!important;min-height:46px!important;margin:0!important;padding:7px 9px!important;overflow-x:auto!important;overflow-y:hidden!important;background:var(--djt-surface-strong)!important;background-image:none!important;border:1px solid var(--djt-border)!important;border-radius:var(--djt-radius-lg) var(--djt-radius-lg) 0 0!important;box-shadow:none!important;white-space:nowrap!important;scrollbar-width:none!important; }
       #${IDS.actionbar}::-webkit-scrollbar { display:none!important; }
       #${IDS.copyTools},#${IDS.copyTools} .us-sign-copy-toolbar,#${IDS.nativeActions} { display:inline-flex!important;flex-direction:row!important;flex-wrap:nowrap!important;align-items:center!important;gap:6px!important;flex:0 0 auto!important;width:max-content!important;min-width:max-content!important;margin:0!important;padding:0!important; }
       #${IDS.nativeActions} { margin-left:auto!important; }

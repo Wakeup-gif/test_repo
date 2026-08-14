@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      2.1.19
+// @version      2.1.20
 // @description  Stable SquareCoil layout with Roxborough display typography, blue glass chrome, frosted Project Search panels, corrected Task-page text contrast, blurred Job Dashboard glass, and a lightweight custom cursor.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
@@ -30,6 +30,13 @@
       --us-text-muted: #96a5b5;
       --us-accent: #8ecbff;
       --us-accent-soft: rgba(10, 132, 255, 0.18);
+      --us-design-surface: rgba(7, 15, 25, 0.14);
+      --us-design-surface-strong: rgba(7, 15, 25, 0.17);
+      --us-design-surface-soft: rgba(255, 255, 255, 0.018);
+      --us-design-hover: rgba(118, 190, 246, 0.055);
+      --us-design-border: rgba(226, 242, 255, 0.07);
+      --us-design-border-strong: rgba(226, 242, 255, 0.105);
+      --us-design-accent-soft: rgba(80, 165, 238, 0.10);
       --us-success: #78a88a;
       --us-warning: #c7a96b;
       --us-danger: #c47a7a;
@@ -1620,23 +1627,7 @@
       box-shadow: none !important;
     }
 
-    /* Design Job Tools injects its CSS after the theme and defines .90/.96
-       surfaces. Higher specificity + !important keeps those runtime cards
-       aligned with the global glass system without editing layout behavior. */
-    html body #us-sign-design-actionbar,
-    html body #us-sign-job-overview,
-    html body #us-sign-design-summary,
-    html body #us-sign-design-bottom-grid,
-    html body #us-sign-design-right-stack {
-      --djt-surface: rgba(7, 15, 25, 0.14) !important;
-      --djt-surface-strong: rgba(7, 15, 25, 0.17) !important;
-      --djt-surface-soft: rgba(255, 255, 255, 0.018) !important;
-      --djt-hover: rgba(118, 190, 246, 0.055) !important;
-      --djt-border: rgba(226, 242, 255, 0.07) !important;
-      --djt-border-strong: rgba(226, 242, 255, 0.105) !important;
-      --djt-accent-soft: rgba(80, 165, 238, 0.10) !important;
-      --djt-font: var(--us-font) !important;
-    }
+    /* Design Job Tools consumes theme-owned paint tokens. Layout remains owned by Design Job Tools. */
 
     html body #us-sign-design-actionbar {
       background:
@@ -1753,7 +1744,6 @@
     html body #us-sign-job-overview,
     html body #us-sign-design-summary,
     html body #sidebar_left,
-    html body #sidebar_left *,
     html body button,
     html body input,
     html body select,
