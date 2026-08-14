@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      2.1.21
-// @description  Stable SquareCoil layout with Roxborough display typography, blue glass chrome, frosted Project Search panels, corrected Task-page text contrast, blurred Job Dashboard glass, and a dynamic expanding crosshair cursor.
+// @version      2.1.22
+// @description  Stable SquareCoil layout with Roxborough display typography, blue glass chrome, frosted Project Search panels, corrected Task-page text contrast, blurred Job Dashboard glass, and a outline-free dynamic triangle cursor.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
 // @grant        GM_addStyle
@@ -2093,14 +2093,14 @@
 
 
     /* =========================================================
-       v2.1.21 DYNAMIC CROSSHAIR CURSOR
-       CSS-only cursor assets. The crosshair expands over interactive
+       v2.1.22 DYNAMIC TRIANGLE CURSOR
+       CSS-only cursor assets. The triangle grows over interactive
        controls with no mouse tracking, DOM overlay, or animation loop.
     ========================================================= */
     @media (pointer: fine) {
       html,
       body {
-        cursor: url("https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/assets/us-sign-cursor-crosshair-v2121.svg") 12 12, crosshair !important;
+        cursor: url("https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/assets/us-sign-cursor-triangle-v2122.svg") 6 4, default !important;
       }
 
       a,
@@ -2115,7 +2115,7 @@
       input[type="reset"],
       input[type="checkbox"],
       input[type="radio"] {
-        cursor: url("https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/assets/us-sign-cursor-crosshair-hover-v2121.svg") 17 17, pointer !important;
+        cursor: url("https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/assets/us-sign-cursor-triangle-hover-v2122.svg") 7 5, pointer !important;
       }
 
       input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]),
