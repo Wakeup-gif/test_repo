@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      2.1.27
-// @description  Stable SquareCoil frosted-glass UI with aligned native top chrome, a true-blur main Dashboard, unified Job Dashboard and Design workspaces, corrected Task-page contrast, and a cutout geometric triangle cursor.
+// @version      2.1.28
+// @description  Stable SquareCoil frosted-glass UI with aligned native top chrome, reliable true-blur main Dashboard detection, unified Job Dashboard and Design workspaces, corrected Task-page contrast, and a cutout geometric triangle cursor.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
 // @grant        GM_addStyle
@@ -2948,7 +2948,8 @@
   window.addEventListener('pageshow', usSignMarkTaskPage);
 
 
-  // v2.1.27: distinguish the landing Dashboard from project/job dashboards.
+  // v2.1.28: reliably distinguish the landing Dashboard from project/job pages.
+  // The three native .panel-tile summary cards are the strongest signature.
   // Bounded checks only; no permanent observer or polling loop.
   function usSignMarkMainDashboard() {
     document.documentElement.classList.remove('us-sign-main-dashboard');
@@ -2958,6 +2959,12 @@
     );
     if (projectContext) return;
 
+    const tileCount = document.querySelectorAll('#content .panel-tile').length;
+
+    const dashboardNavActive = Array.from(
+      document.querySelectorAll('#sidebar_left li.active > a, #sidebar_left .active a, #sidebar_left a.selected')
+    ).some((el) => /^\s*Dashboard\s*$/i.test(el.textContent || ''));
+
     const headingNodes = document.querySelectorAll(
       '#topbar h1, #topbar h2, #topbar h3, #content h1, #content h2, #content h3, .content-header h1, .content-header h2'
     );
@@ -2965,13 +2972,13 @@
       (el) => /^\s*Dashboard\s*$/i.test(el.textContent || '')
     );
 
-    if (hasDashboardHeading) {
+    if (tileCount >= 3 || dashboardNavActive || hasDashboardHeading) {
       document.documentElement.classList.add('us-sign-main-dashboard');
     }
   }
 
   function usSignScheduleMainDashboardMark() {
-    [0, 180, 600, 1400].forEach((delay) => window.setTimeout(usSignMarkMainDashboard, delay));
+    [0, 120, 350, 700, 1400, 2600, 4200].forEach((delay) => window.setTimeout(usSignMarkMainDashboard, delay));
   }
 
   if (document.readyState === 'loading') {
