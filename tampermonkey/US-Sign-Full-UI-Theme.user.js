@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      2.1.30
-// @description  Stable SquareCoil frosted-glass UI with aligned native top chrome, source-targeted true-blur main Dashboard, rotating curated Bing wallpapers every 30 minutes, unified Job Dashboard and Design workspaces, corrected Task-page contrast, and a cutout geometric triangle cursor.
+// @version      2.1.31
+// @description  Stable SquareCoil frosted-glass UI with aligned native top chrome, source-targeted true-blur main Dashboard, rotating curated Bing wallpapers every 30 minutes with subtle pointer parallax, unified Job Dashboard and Design workspaces, corrected Task-page contrast, and a cutout geometric triangle cursor.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
 // @grant        GM_addStyle
@@ -2948,6 +2948,33 @@
         box-shadow: none !important;
       }
     }
+
+
+    /* =========================================================
+       v2.1.31 BING WALLPAPER PARALLAX
+       Slight overscan plus pointer-driven background position. The runtime
+       updates only CSS variables; touch and reduced-motion stay centered.
+    ========================================================= */
+    :root {
+      --us-wallpaper-x: 50%;
+      --us-wallpaper-y: 50%;
+      --us-wallpaper-size: auto 110vh;
+    }
+
+    html,
+    html body #main,
+    html body #content_wrapper {
+      background-position: var(--us-wallpaper-x) var(--us-wallpaper-y) !important;
+      background-size: var(--us-wallpaper-size) !important;
+    }
+
+    @media (pointer: coarse), (prefers-reduced-motion: reduce) {
+      :root {
+        --us-wallpaper-x: 50%;
+        --us-wallpaper-y: 50%;
+      }
+    }
+
   `);
 
   // =========================================================
@@ -3112,6 +3139,84 @@
   }
 
   usSignInitBingWallpapers();
+
+
+  // =========================================================
+  // v2.1.31 SUBTLE POINTER PARALLAX
+  // One passive pointer listener. RAF runs only while easing toward a target,
+  // then stops. No permanent animation loop or DOM overlay.
+  // =========================================================
+  const US_SIGN_PARALLAX_X = 6;
+  const US_SIGN_PARALLAX_Y = 4;
+  const US_SIGN_PARALLAX_EASE = 0.14;
+  let usSignParallaxTargetX = 50;
+  let usSignParallaxTargetY = 50;
+  let usSignParallaxCurrentX = 50;
+  let usSignParallaxCurrentY = 50;
+  let usSignParallaxRaf = 0;
+
+  function usSignUpdateWallpaperOverscan() {
+    if (!document.documentElement) return;
+    const ratio = Math.max(1, window.innerWidth) / Math.max(1, window.innerHeight);
+    document.documentElement.style.setProperty(
+      '--us-wallpaper-size',
+      ratio >= (16 / 9) ? '110vw auto' : 'auto 110vh'
+    );
+  }
+
+  function usSignRenderParallax() {
+    usSignParallaxRaf = 0;
+    const dx = usSignParallaxTargetX - usSignParallaxCurrentX;
+    const dy = usSignParallaxTargetY - usSignParallaxCurrentY;
+
+    usSignParallaxCurrentX += dx * US_SIGN_PARALLAX_EASE;
+    usSignParallaxCurrentY += dy * US_SIGN_PARALLAX_EASE;
+
+    document.documentElement.style.setProperty('--us-wallpaper-x', `${usSignParallaxCurrentX.toFixed(3)}%`);
+    document.documentElement.style.setProperty('--us-wallpaper-y', `${usSignParallaxCurrentY.toFixed(3)}%`);
+
+    if (Math.abs(dx) > 0.025 || Math.abs(dy) > 0.025) {
+      usSignParallaxRaf = window.requestAnimationFrame(usSignRenderParallax);
+    }
+  }
+
+  function usSignRequestParallaxFrame() {
+    if (!usSignParallaxRaf) {
+      usSignParallaxRaf = window.requestAnimationFrame(usSignRenderParallax);
+    }
+  }
+
+  function usSignCenterParallax() {
+    usSignParallaxTargetX = 50;
+    usSignParallaxTargetY = 50;
+    usSignRequestParallaxFrame();
+  }
+
+  function usSignInitWallpaperParallax() {
+    const motionQuery = window.matchMedia('(pointer: fine) and (prefers-reduced-motion: no-preference)');
+    usSignUpdateWallpaperOverscan();
+
+    window.addEventListener('resize', usSignUpdateWallpaperOverscan, { passive: true });
+
+    if (!motionQuery.matches) return;
+
+    window.addEventListener('pointermove', (event) => {
+      if (event.pointerType && event.pointerType !== 'mouse' && event.pointerType !== 'pen') return;
+      const nx = (event.clientX / Math.max(1, window.innerWidth)) * 2 - 1;
+      const ny = (event.clientY / Math.max(1, window.innerHeight)) * 2 - 1;
+
+      // Positive background-position moves an oversized image opposite the pointer,
+      // giving the glass a restrained depth/parallax effect.
+      usSignParallaxTargetX = 50 + (nx * US_SIGN_PARALLAX_X);
+      usSignParallaxTargetY = 50 + (ny * US_SIGN_PARALLAX_Y);
+      usSignRequestParallaxFrame();
+    }, { passive: true });
+
+    document.addEventListener('mouseleave', usSignCenterParallax, { passive: true });
+    window.addEventListener('blur', usSignCenterParallax, { passive: true });
+  }
+
+  usSignInitWallpaperParallax();
 
   // v2.1.13: bounded cleanup for inline rich-text highlight paint that can
   // outrank stylesheet rules. No observer and no recurring interval.
