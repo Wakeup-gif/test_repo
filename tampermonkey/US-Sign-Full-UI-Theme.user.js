@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      2.1.25
-// @description  Stable SquareCoil frosted-glass UI with unified Job Dashboard and Design workspaces, corrected Task-page contrast, and a cutout geometric triangle cursor.
+// @version      2.1.26
+// @description  Stable SquareCoil frosted-glass UI with aligned native top chrome, unified Job Dashboard and Design workspaces, corrected Task-page contrast, and a cutout geometric triangle cursor.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
 // @grant        GM_addStyle
@@ -2642,6 +2642,97 @@
         -webkit-backdrop-filter: none !important;
         backdrop-filter: none !important;
       }
+    }
+
+
+
+    /* =========================================================
+       v2.1.26 TOPBAR GEOMETRY REPAIR
+       Restore SquareCoil's native 60px navbar rhythm, then center content
+       inside those native boxes. Horizontal positioning remains native.
+    ========================================================= */
+    html body header.navbar,
+    html body .navbar.navbar-fixed-top {
+      height: 60px !important;
+      min-height: 60px !important;
+      margin-bottom: 0 !important;
+    }
+
+    html body header.navbar .navbar-branding {
+      height: 60px !important;
+    }
+
+    html body header.navbar .navbar-branding .navbar-brand {
+      display: flex !important;
+      align-items: center !important;
+      height: 60px !important;
+      line-height: 58px !important;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+    }
+
+    html body header.navbar .navbar-branding .navbar-brand img {
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+      align-self: center !important;
+    }
+
+    html body header.navbar #toggle_sidemenu_l,
+    html body header.navbar #toggle_sidemenu_t {
+      height: 60px !important;
+      max-height: 60px !important;
+      line-height: 58px !important;
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+    }
+
+    html body header.navbar .navbar-nav.navbar-left {
+      max-height: 60px !important;
+    }
+
+    html body header.navbar .navbar-nav > li {
+      height: 60px !important;
+      max-height: 60px !important;
+    }
+
+    html body header.navbar .navbar-nav > li > a {
+      display: flex !important;
+      align-items: center !important;
+      height: 59px !important;
+      max-height: 59px !important;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+      line-height: 1.2 !important;
+    }
+
+    html body header.navbar .navbar-form {
+      display: flex !important;
+      align-items: center !important;
+      height: 60px !important;
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+    }
+
+    html body header.navbar .navbar-form.navbar-search.square input {
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+    }
+
+    html body header.navbar .navbar-text {
+      display: flex !important;
+      align-items: center !important;
+      height: 60px !important;
+      margin-top: 0 !important;
+      margin-bottom: 0 !important;
+      line-height: 1.2 !important;
+    }
+
+    html body header.navbar .navbar-btn {
+      margin-top: 15px !important;
+      margin-bottom: 15px !important;
+      vertical-align: middle !important;
     }
 
 
