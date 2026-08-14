@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign - UI Runtime Fixes
 // @namespace    us-sign-local-tools
-// @version      3.1.2
-// @description  Lightweight cached logo, CKEditor iframe styling, and native sidebar icon-font repair. No page-wide observers, color crawlers, or Scope DOM ownership.
+// @version      3.1.3
+// @description  Lightweight cached logo and CKEditor iframe styling. No page-wide observers, color crawlers, or Scope DOM ownership.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-idle
 // @grant        GM_xmlhttpRequest
@@ -17,10 +17,10 @@
 (function () {
   "use strict";
 
-  if (window.__usSignUiRuntimeV312) return;
-  window.__usSignUiRuntimeV312 = true;
+  if (window.__usSignUiRuntimeV313) return;
+  window.__usSignUiRuntimeV313 = true;
 
-  const VERSION = "3.1.2";
+  const VERSION = "3.1.3";
   const CUSTOM_LOGO_URL = "https://i.imgur.com/7I1u2iF.png";
   const LOGO_CACHE_KEY = "us-sign-custom-logo-data-v1";
   const processedIframes = new WeakSet();
@@ -154,17 +154,7 @@
     for (const iframe of document.querySelectorAll("iframe.cke_wysiwyg_frame")) processEditorIframe(iframe);
   }
 
-  function repairSidebarIconFontCascade() {
-    const brokenSelector = "html body #sidebar_left *";
-    for (const style of document.querySelectorAll("style")) {
-      const css = style.textContent || "";
-      if (!css.includes("v2.1.9 ROXBOROUGH") || !css.includes(brokenSelector)) continue;
-      style.textContent = css.replace(/\s*html body #sidebar_left \*,/g, "");
-    }
-  }
-
   function runPass() {
-    repairSidebarIconFontCascade();
     restoreCustomLogo();
     scanEditors();
   }
