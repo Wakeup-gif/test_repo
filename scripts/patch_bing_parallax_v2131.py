@@ -1,4 +1,4 @@
-# trigger: v2.1.31 Bing parallax release
+# trigger: v2.1.31 Bing parallax release (retry after workflow YAML fix)
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
