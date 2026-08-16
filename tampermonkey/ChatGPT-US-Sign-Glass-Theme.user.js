@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT - US Sign Glass Theme
 // @namespace    us-sign-full-modules
-// @version      2.0.5
-// @description  US Sign-inspired ChatGPT theme with rotating Bing UHD wallpaper, optimized parallax, translucent sidebar glass, a wallpaper-only frosted reading rail, brighter menus, and a cutout geometric cursor.
+// @version      2.0.6
+// @description  US Sign-inspired ChatGPT theme with resilient 30-minute Bing UHD rotation, optimized parallax, translucent sidebar glass, a wallpaper-only frosted reading rail, brighter menus, and a cutout geometric cursor.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @run-at       document-start
@@ -17,8 +17,8 @@
 (function () {
   "use strict";
 
-  if (window.__chatgptUsSignGlassThemeV205) return;
-  window.__chatgptUsSignGlassThemeV205 = true;
+  if (window.__chatgptUsSignGlassThemeV206) return;
+  window.__chatgptUsSignGlassThemeV206 = true;
 
   GM_addStyle(String.raw`
     @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;650;700&display=swap");
@@ -524,11 +524,14 @@
 
   const ROTATE_MS = 30 * 60 * 1000;
   const CACHE_MS = 6 * 60 * 60 * 1000;
-  const CACHE_KEY = "chatgpt-us-sign-bing-wallpaper-pool-v2";
+  const CACHE_KEY = "chatgpt-us-sign-bing-wallpaper-pool-v3";
+  const MIN_ROTATION_POOL = 2;
   const MARKETS = ["en-US", "en-GB", "en-AU", "ja-JP"];
   let wallpaperPool = [];
   let rotateTimer = 0;
   let refreshInFlight = false;
+  let lastAppliedSlot = -1;
+  let lastWallpaperKey = "";
 
   function hashString(value) {
     const text = String(value || "");
@@ -544,7 +547,14 @@
     try {
       const raw = localStorage.getItem(CACHE_KEY);
       const parsed = raw ? JSON.parse(raw) : null;
-      return parsed && Array.isArray(parsed.images) ? parsed : null;
+      if (!parsed || !Array.isArray(parsed.images)) return null;
+      const unique = new Map();
+      parsed.images.forEach((image) => {
+        if (image?.url && image?.key && !unique.has(image.key)) unique.set(image.key, image);
+      });
+      const images = Array.from(unique.values());
+      if (images.length < MIN_ROTATION_POOL) return null;
+      return { ...parsed, images };
     } catch (_) {
       return null;
     }
@@ -565,6 +575,7 @@
         url: url.href,
         key: String(image.urlbase || url.pathname),
         title: String(image.title || image.copyright || "Bing wallpaper"),
+        startdate: String(image.startdate || ""),
         market: String(market || "")
       };
     } catch (_) {
@@ -573,14 +584,26 @@
   }
 
   function applyWallpaper(images = wallpaperPool) {
-    if (!Array.isArray(images) || !images.length) return;
+    if (!Array.isArray(images) || images.length < MIN_ROTATION_POOL || !document.documentElement) return;
     const slot = Math.floor(Date.now() / ROTATE_MS);
-    const image = images[slot % images.length];
+    let index = slot % images.length;
+    let image = images[index];
     if (!image?.url) return;
+
+    // If Bing ever returns duplicate-looking entries under different metadata,
+    // guarantee that a new half-hour slot still advances visually.
+    if (slot !== lastAppliedSlot && images.length > 1 && image.key === lastWallpaperKey) {
+      index = (index + 1) % images.length;
+      image = images[index];
+    }
 
     document.documentElement.style.setProperty("--us-wallpaper", `url("${image.url.replace(/"/g, "%22")}")`);
     document.documentElement.dataset.usBingWallpaper = image.title || "Bing wallpaper";
     document.documentElement.dataset.usBingMarket = image.market || "";
+    document.documentElement.dataset.usBingPoolSize = String(images.length);
+    document.documentElement.dataset.usBingSlot = String(slot);
+    lastAppliedSlot = slot;
+    lastWallpaperKey = image.key || image.url;
   }
 
   function requestMarket(market) {
@@ -637,7 +660,7 @@
       const images = Array.from(unique.values())
         .sort((a, b) => hashString(a.key) - hashString(b.key));
 
-      if (images.length) {
+      if (images.length >= MIN_ROTATION_POOL) {
         wallpaperPool = images;
         writeCache(images);
         applyWallpaper();
@@ -658,14 +681,29 @@
     }, untilNext);
   }
 
+  function syncWallpaperRotation() {
+    applyWallpaper();
+    refreshPool(false);
+    scheduleRotation();
+  }
+
   function initWallpapers() {
     const cached = readCache();
-    if (cached?.images?.length) {
+    if (cached?.images?.length >= MIN_ROTATION_POOL) {
       wallpaperPool = cached.images;
       applyWallpaper();
     }
     refreshPool(false);
     scheduleRotation();
+
+    // Browsers aggressively throttle background tabs. Re-sync immediately
+    // whenever ChatGPT becomes active so a missed half-hour boundary cannot
+    // leave the wallpaper stuck on an old slot.
+    window.addEventListener("pageshow", syncWallpaperRotation, { passive: true });
+    window.addEventListener("focus", syncWallpaperRotation, { passive: true });
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) syncWallpaperRotation();
+    }, { passive: true });
   }
 
   initWallpapers();
