@@ -1,0 +1,76 @@
+name: Patch ChatGPT Glass Theme v2.0.14 snapshot audit
+on:
+  push:
+    paths:
+      - "scripts/patch_chatgpt_glass_v214.py"
+      - ".github/workflows/patch-chatgpt-glass-v214.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply snapshot audit patch
+        run: python scripts/patch_chatgpt_glass_v214.py
+
+      - name: Verify version
+        run: grep -Fq "@version      2.0.14" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+
+      - name: Verify viewport bounded rear glass
+        run: |
+          grep -Fq "position: sticky !important" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          grep -Fq "height: calc(100dvh - 152px) !important" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          grep -Fq "background: rgba(10, 23, 36, 0.64) !important" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          grep -Fq "blur(16px) saturate(120%)" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          ! grep -Fq "bottom: 0 !important;" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js || true
+
+      - name: Verify single layer sidebar and composer
+        run: |
+          grep -Fq "#stage-slideover-sidebar" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          grep -Fq "#stage-sidebar-tiny-bar" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          grep -Fq -- "--composer-surface-primary" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          grep -Fq 'form[class*="group/composer"] [class*="bg-(--composer-surface-primary)"]' tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          ! grep -Fq 'div:has(> textarea#prompt-textarea)' tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+
+      - name: Verify visual contrast repairs
+        run: |
+          grep -Fq "#conversation-header-actions" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          grep -Fq "#thread-bottom-container::after" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          grep -Fq -- "--us-text-soft: #eaf0f5" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          ! grep -Fq '[class*="bg-token-main-surface-primary"],' tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+
+      - name: Verify low overhead parallax
+        run: |
+          grep -Fq "PARALLAX_X_PX = 14" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          grep -Fq -- "--us-wallpaper-transform" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          ! grep -Fq "PARALLAX_EASE" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          ! grep -Fq "renderParallax" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+
+      - name: Preserve Bing rotation
+        run: |
+          grep -Fq "const ROTATE_MS = 30 * 60 * 1000" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          grep -Fq "uhdwidth=3840&uhdheight=2160" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+
+      - name: Syntax check
+        run: node --check tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+
+      - name: Diff check
+        run: git diff --check
+
+      - name: Commit canonical update
+        run: |
+          if git diff --quiet -- tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js; then
+            echo "No canonical theme changes generated" >&2
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          git commit -m "Optimize ChatGPT glass theme from visual snapshot in v2.0.14"
+          git push origin HEAD:main
