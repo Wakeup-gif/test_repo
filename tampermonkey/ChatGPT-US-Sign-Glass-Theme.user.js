@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT - US Sign Glass Theme
 // @namespace    us-sign-full-modules
-// @version      2.0.8
-// @description  US Sign-inspired ChatGPT theme with resilient 30-minute Bing UHD rotation, optimized parallax, translucent sidebar glass, main-scoped frosted reading glass, brighter menus, and a cutout geometric cursor.
+// @version      2.0.9
+// @description  US Sign-inspired ChatGPT theme with resilient 30-minute Bing UHD rotation, optimized parallax, translucent sidebar glass, native-aligned paint-only reading glass, brighter menus, and a cutout geometric cursor.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @run-at       document-start
@@ -17,8 +17,8 @@
 (function () {
   "use strict";
 
-  if (window.__chatgptUsSignGlassThemeV208) return;
-  window.__chatgptUsSignGlassThemeV208 = true;
+  if (window.__chatgptUsSignGlassThemeV209) return;
+  window.__chatgptUsSignGlassThemeV209 = true;
 
   GM_addStyle(String.raw`
     @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;650;700&display=swap");
@@ -149,31 +149,25 @@
       backdrop-filter: none !important;
     }
 
-    /* v2.0.8: keep the frosted reading rail inside the real <main> stacking
-       context. No body-level fixed backdrop layer, so message links and
-       ChatGPT portals keep their native hit-testing behavior. */
+    /* v2.0.9: paint-only center glass. Do not change ChatGPT's main/header
+       geometry, positioning, isolation, or z-index. The real main surface
+       owns one broad frost layer; the native conversation list only adds
+       a centered translucent reading tint on top. */
     main {
-      position: relative !important;
-      isolation: isolate !important;
+      background: rgba(10, 20, 31, 0.10) !important;
+      background-image: linear-gradient(180deg, rgba(173, 216, 248, 0.018), rgba(255,255,255,0.004)) !important;
+      -webkit-backdrop-filter: blur(14px) saturate(118%) !important;
+      backdrop-filter: blur(14px) saturate(118%) !important;
     }
 
-    main::before {
-      content: "" !important;
-      position: fixed !important;
-      top: 48px !important;
-      bottom: 0 !important;
-      left: calc(var(--us-chat-sidebar-edge, 0px) + ((100vw - var(--us-chat-sidebar-edge, 0px)) / 2)) !important;
-      width: min(860px, calc(100vw - var(--us-chat-sidebar-edge, 0px) - 52px)) !important;
-      transform: translateX(-50%) !important;
-      pointer-events: none !important;
-      z-index: -1 !important;
-      background: rgba(15, 29, 43, 0.20) !important;
-      background-image: linear-gradient(180deg, rgba(183, 220, 249, 0.034), rgba(255,255,255,0.008)) !important;
-      border-left: 1px solid rgba(195, 225, 249, 0.070) !important;
-      border-right: 1px solid rgba(195, 225, 249, 0.070) !important;
-      box-shadow: 0 0 54px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.024) !important;
-      -webkit-backdrop-filter: blur(22px) saturate(122%) !important;
-      backdrop-filter: blur(22px) saturate(122%) !important;
+    [data-testid="conversation-turn-list"] {
+      background: rgba(15, 29, 43, 0.18) !important;
+      background-image: linear-gradient(180deg, rgba(183, 220, 249, 0.028), rgba(255,255,255,0.006)) !important;
+      border-left: 1px solid rgba(195, 225, 249, 0.055) !important;
+      border-right: 1px solid rgba(195, 225, 249, 0.055) !important;
+      box-shadow: 0 0 42px rgba(0,0,0,0.065), inset 0 1px 0 rgba(255,255,255,0.018) !important;
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
     }
 
     nav,
