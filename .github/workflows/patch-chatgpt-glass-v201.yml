@@ -16,25 +16,35 @@ jobs:
         with:
           fetch-depth: 0
       - name: Apply patch
-        run: python scripts/patch_chatgpt_glass_v201.py
+        run: |
+          python scripts/patch_chatgpt_glass_v201.py
       - name: Verify version
-        run: grep -q "@version      2.0.1" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+        run: |
+          grep -q "@version      2.0.1" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
       - name: Verify fixed wallpaper layer
-        run: grep -q "v2.0.1: one fixed, compositor-friendly wallpaper layer" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+        run: |
+          grep -q "v2.0.1: one fixed, compositor-friendly wallpaper layer" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
       - name: Verify conversation rail
-        run: grep -q "conversation rail" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+        run: |
+          grep -q "conversation rail" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
       - name: Verify transform parallax
-        run: grep -q -- "--us-wallpaper-shift-x" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+        run: |
+          grep -q -- "--us-wallpaper-shift-x" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
       - name: Verify brighter menus
-        run: grep -q "rgba(28, 43, 58, 0.54)" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+        run: |
+          grep -q "rgba(28, 43, 58, 0.54)" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
       - name: Verify nested blur removed
-        run: grep -q "backdrop-filter: none" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+        run: |
+          grep -q "backdrop-filter: none" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
       - name: Preserve Bing UHD rotation
-        run: grep -q "uhdwidth=3840&uhdheight=2160" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+        run: |
+          grep -q "uhdwidth=3840&uhdheight=2160" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
       - name: Syntax check
-        run: node --check tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+        run: |
+          node --check tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
       - name: Diff check
-        run: git diff --check
+        run: |
+          git diff --check
       - name: Commit canonical update
         run: |
           if git diff --quiet -- tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js; then
