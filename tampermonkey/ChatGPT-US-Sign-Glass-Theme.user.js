@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT - US Sign Glass Theme
 // @namespace    us-sign-full-modules
-// @version      2.0.2
-// @description  US Sign-inspired ChatGPT theme with rotating Bing UHD wallpaper, optimized fixed-layer parallax, brighter smoky sidebar glass, a stronger frosted conversation rail, brighter menus, and a cutout geometric cursor.
+// @version      2.0.3
+// @description  US Sign-inspired ChatGPT theme with rotating Bing UHD wallpaper, optimized parallax, truly translucent sidebar glass, a dedicated frosted center reading rail, brighter menus, and a cutout geometric cursor.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @run-at       document-start
@@ -17,8 +17,8 @@
 (function () {
   "use strict";
 
-  if (window.__chatgptUsSignGlassThemeV202) return;
-  window.__chatgptUsSignGlassThemeV202 = true;
+  if (window.__chatgptUsSignGlassThemeV203) return;
+  window.__chatgptUsSignGlassThemeV203 = true;
 
   GM_addStyle(String.raw`
     @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;650;700&display=swap");
@@ -57,9 +57,9 @@
       --main-surface-primary: rgba(8, 14, 22, 0.12) !important;
       --main-surface-secondary: rgba(15, 23, 33, 0.30) !important;
       --main-surface-tertiary: rgba(21, 31, 43, 0.34) !important;
-      --sidebar-surface-primary: rgba(27, 43, 58, 0.46) !important;
-      --sidebar-surface-secondary: rgba(34, 51, 68, 0.42) !important;
-      --sidebar-surface-tertiary: rgba(42, 60, 78, 0.38) !important;
+      --sidebar-surface-primary: rgba(29, 45, 61, 0.18) !important;
+      --sidebar-surface-secondary: rgba(34, 52, 69, 0.14) !important;
+      --sidebar-surface-tertiary: rgba(42, 60, 78, 0.12) !important;
       --composer-surface: rgba(12, 20, 30, 0.46) !important;
       --composer-blue-bg: rgba(80, 165, 238, 0.12) !important;
       --message-surface: rgba(255, 255, 255, 0.035) !important;
@@ -136,17 +136,45 @@
       background-image: none !important;
     }
 
-    /* v2.0.2: stronger single-layer conversation frost for readability.
-       Keep one blur layer only; nested messages/code remain paint-only. */
+    /* v2.0.3: ChatGPT changes the conversation list wrapper frequently.
+       Do not depend on it for the visual frost; the dedicated fixed reading
+       rail below owns the one center backdrop-filter layer. */
     [data-testid="conversation-turn-list"] {
       position: relative !important;
-      background: rgba(12, 25, 38, 0.32) !important;
-      background-image: linear-gradient(180deg, rgba(171, 215, 248, 0.035), rgba(255,255,255,0.010)) !important;
-      border-left: 1px solid rgba(196, 226, 251, 0.070) !important;
-      border-right: 1px solid rgba(196, 226, 251, 0.070) !important;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.025), 0 0 48px rgba(0,0,0,0.08) !important;
-      -webkit-backdrop-filter: blur(16px) saturate(126%) !important;
-      backdrop-filter: blur(16px) saturate(126%) !important;
+      background: transparent !important;
+      background-image: none !important;
+      border-color: transparent !important;
+      box-shadow: none !important;
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
+    }
+
+    #us-chatgpt-center-glass {
+      position: fixed !important;
+      top: 48px !important;
+      bottom: 0 !important;
+      left: calc(var(--us-chat-sidebar-edge, 0px) + ((100vw - var(--us-chat-sidebar-edge, 0px)) / 2)) !important;
+      width: min(860px, calc(100vw - var(--us-chat-sidebar-edge, 0px) - 52px)) !important;
+      transform: translateX(-50%) !important;
+      pointer-events: none !important;
+      z-index: 1 !important;
+      background: rgba(10, 21, 32, 0.30) !important;
+      background-image: linear-gradient(180deg, rgba(183, 220, 249, 0.042), rgba(255,255,255,0.010)) !important;
+      border-left: 1px solid rgba(195, 225, 249, 0.075) !important;
+      border-right: 1px solid rgba(195, 225, 249, 0.075) !important;
+      box-shadow: 0 0 60px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.028) !important;
+      -webkit-backdrop-filter: blur(22px) saturate(124%) !important;
+      backdrop-filter: blur(22px) saturate(124%) !important;
+    }
+
+    body {
+      z-index: auto !important;
+    }
+
+    body > #__next,
+    body > #root {
+      position: relative !important;
+      z-index: 2 !important;
     }
 
     nav,
@@ -155,12 +183,23 @@
     [data-testid="sidebar"],
     [data-testid="navigation-sidebar"] {
       color: var(--us-text-soft) !important;
-      background: rgba(27, 43, 58, 0.42) !important;
-      background-image: linear-gradient(180deg, rgba(169, 214, 248, 0.040), rgba(255,255,255,0.010)) !important;
-      border-color: rgba(182, 219, 247, 0.13) !important;
-      box-shadow: 10px 0 32px rgba(0, 0, 0, 0.14), inset -1px 0 0 rgba(255,255,255,0.025) !important;
-      -webkit-backdrop-filter: blur(18px) saturate(126%) !important;
-      backdrop-filter: blur(18px) saturate(126%) !important;
+      background: rgba(25, 40, 55, 0.20) !important;
+      background-image: linear-gradient(180deg, rgba(175, 216, 247, 0.028), rgba(255,255,255,0.006)) !important;
+      border-color: rgba(182, 219, 247, 0.11) !important;
+      box-shadow: 10px 0 32px rgba(0, 0, 0, 0.11), inset -1px 0 0 rgba(255,255,255,0.022) !important;
+      -webkit-backdrop-filter: blur(18px) saturate(124%) !important;
+      backdrop-filter: blur(18px) saturate(124%) !important;
+    }
+
+    nav [class*="bg-token-sidebar-surface"],
+    aside [class*="bg-token-sidebar-surface"],
+    [data-testid="left-sidebar"] [class*="bg-token-sidebar-surface"],
+    [data-testid="sidebar"] [class*="bg-token-sidebar-surface"],
+    [data-testid="navigation-sidebar"] [class*="bg-token-sidebar-surface"] {
+      background-color: rgba(34, 52, 70, 0.075) !important;
+      background-image: none !important;
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
     }
 
     nav a,
@@ -632,6 +671,44 @@
   }
 
   initWallpapers();
+
+  /* v2.0.3 dedicated center glass rail. Keeping this as a stable theme-owned
+     layer avoids relying on ChatGPT's frequently changing conversation wrappers. */
+  function mountCenterGlassRail() {
+    if (!document.body) return false;
+    let rail = document.getElementById("us-chatgpt-center-glass");
+    if (!rail) {
+      rail = document.createElement("div");
+      rail.id = "us-chatgpt-center-glass";
+      rail.setAttribute("aria-hidden", "true");
+      document.body.prepend(rail);
+    }
+
+    const updateSidebarEdge = () => {
+      const candidates = Array.from(document.querySelectorAll(
+        'aside, [data-testid="left-sidebar"], [data-testid="sidebar"], [data-testid="navigation-sidebar"], nav'
+      ));
+      const sidebar = candidates
+        .map((node) => ({ node, rect: node.getBoundingClientRect() }))
+        .filter(({ rect }) => rect.width >= 170 && rect.width <= 420 && rect.height >= window.innerHeight * 0.55 && rect.left <= 8)
+        .sort((a, b) => b.rect.height - a.rect.height)[0];
+      const edge = sidebar ? Math.max(0, Math.round(sidebar.rect.right)) : 0;
+      document.documentElement.style.setProperty("--us-chat-sidebar-edge", `${edge}px`);
+      return sidebar?.node || null;
+    };
+
+    const sidebarNode = updateSidebarEdge();
+    window.addEventListener("resize", updateSidebarEdge, { passive: true });
+    if (sidebarNode && typeof ResizeObserver === "function") {
+      const ro = new ResizeObserver(updateSidebarEdge);
+      ro.observe(sidebarNode);
+    }
+    return true;
+  }
+
+  if (!mountCenterGlassRail()) {
+    window.addEventListener("DOMContentLoaded", mountCenterGlassRail, { once: true });
+  }
 
   const PARALLAX_X = 5;
   const PARALLAX_Y = 3.5;
