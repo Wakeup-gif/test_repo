@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT - US Sign Glass Theme
 // @namespace    us-sign-full-modules
-// @version      2.0.13
-// @description  US Sign-inspired ChatGPT theme with resilient 30-minute Bing UHD rotation, optimized parallax, translucent sidebar glass, snapshot-grounded #thread reading glass, native document stacking, brighter menus, and a cutout geometric cursor.
+// @version      2.0.14
+// @description  US Sign-inspired ChatGPT theme with snapshot-audited viewport glass, resilient Bing UHD rotation, low-overhead parallax, single-layer sidebar/composer frost, improved contrast, native layout, and a cutout geometric cursor.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @run-at       document-start
@@ -17,8 +17,8 @@
 (function () {
   "use strict";
 
-  if (window.__chatgptUsSignGlassThemeV213) return;
-  window.__chatgptUsSignGlassThemeV213 = true;
+  if (window.__chatgptUsSignGlassThemeV214) return;
+  window.__chatgptUsSignGlassThemeV214 = true;
 
   GM_addStyle(String.raw`
     @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;650;700&display=swap");
@@ -27,49 +27,48 @@
     html.dark,
     html[data-theme="dark"] {
       --us-bg: rgba(9, 15, 23, 0.18);
-      --us-bg-elevated: rgba(16, 24, 34, 0.42);
-      --us-bg-soft: rgba(22, 31, 42, 0.34);
-      --us-glass: rgba(18, 27, 38, 0.42);
-      --us-glass-strong: rgba(13, 21, 31, 0.62);
-      --us-glass-soft: rgba(255, 255, 255, 0.045);
-      --us-hover: rgba(100, 180, 255, 0.10);
-      --us-text: #f5f8fb;
-      --us-text-soft: #d2d9e1;
-      --us-text-muted: #96a5b5;
-      --us-accent: #8ecbff;
-      --us-accent-soft: rgba(10, 132, 255, 0.18);
-      --us-border: rgba(169, 211, 247, 0.12);
-      --us-border-strong: rgba(181, 220, 252, 0.19);
-      --us-border-focus: rgba(10, 132, 255, 0.52);
-      --us-shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.18);
-      --us-shadow-md: 0 16px 42px rgba(0, 0, 0, 0.26);
-      --us-shadow-lg: 0 26px 70px rgba(0, 0, 0, 0.34);
+      --us-bg-elevated: rgba(20, 31, 43, 0.62);
+      --us-bg-soft: rgba(24, 37, 50, 0.46);
+      --us-glass: rgba(18, 30, 43, 0.54);
+      --us-glass-strong: rgba(14, 25, 37, 0.76);
+      --us-glass-soft: rgba(255, 255, 255, 0.05);
+      --us-hover: rgba(123, 194, 255, 0.12);
+      --us-text: #f6f9fc;
+      --us-text-soft: #eaf0f5;
+      --us-text-muted: #b6c2ce;
+      --us-accent: #9bd3ff;
+      --us-accent-soft: rgba(72, 166, 244, 0.18);
+      --us-border: rgba(184, 220, 249, 0.14);
+      --us-border-strong: rgba(195, 227, 252, 0.22);
+      --us-border-focus: rgba(111, 190, 255, 0.62);
+      --us-shadow-sm: 0 5px 16px rgba(0, 0, 0, 0.18);
+      --us-shadow-md: 0 16px 42px rgba(0, 0, 0, 0.24);
       --us-radius-sm: 8px;
       --us-radius-md: 12px;
-      --us-radius-lg: 18px;
+      --us-radius-lg: 20px;
       --us-font: "Manrope", "Avenir Next", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
       --us-wallpaper: url("https://www.bing.com/th?id=OBTQ.BTA9ACD46ADE4DF290D5640B661E6A5C8CF666B651507F76309661E06C8AA70FB2&rs=2&c=1");
-      --us-wallpaper-x: 50%;
-      --us-wallpaper-y: 50%;
-      --us-wallpaper-size: 106vw auto;
-      --us-wallpaper-shift-x: 0px;
-      --us-wallpaper-shift-y: 0px;
-      --main-surface-primary: rgba(8, 14, 22, 0.12) !important;
-      --main-surface-secondary: rgba(15, 23, 33, 0.30) !important;
-      --main-surface-tertiary: rgba(21, 31, 43, 0.34) !important;
-      --sidebar-surface-primary: rgba(29, 45, 61, 0.18) !important;
-      --sidebar-surface-secondary: rgba(34, 52, 69, 0.14) !important;
-      --sidebar-surface-tertiary: rgba(42, 60, 78, 0.12) !important;
-      --composer-surface: rgba(12, 20, 30, 0.46) !important;
-      --composer-blue-bg: rgba(80, 165, 238, 0.12) !important;
-      --message-surface: rgba(255, 255, 255, 0.035) !important;
+      --us-wallpaper-transform: translate3d(0px, 0px, 0) scale(1.06);
+
+      /* Keep incidental ChatGPT surfaces readable while the actual page/thread
+         stay transparent over the wallpaper. */
+      --main-surface-primary: rgba(17, 29, 42, 0.30) !important;
+      --main-surface-secondary: rgba(23, 37, 51, 0.40) !important;
+      --main-surface-tertiary: rgba(29, 45, 60, 0.48) !important;
+      --sidebar-surface-primary: rgba(27, 43, 58, 0.12) !important;
+      --sidebar-surface-secondary: rgba(38, 58, 76, 0.13) !important;
+      --sidebar-surface-tertiary: rgba(48, 68, 86, 0.11) !important;
+      --composer-surface: rgba(15, 28, 40, 0.70) !important;
+      --composer-surface-primary: rgba(15, 28, 40, 0.70) !important;
+      --composer-blue-bg: rgba(80, 165, 238, 0.14) !important;
+      --message-surface: rgba(20, 34, 48, 0.30) !important;
       --text-primary: var(--us-text) !important;
       --text-secondary: var(--us-text-soft) !important;
       --text-tertiary: var(--us-text-muted) !important;
       --border-light: var(--us-border) !important;
       --border-medium: var(--us-border-strong) !important;
-      --interactive-bg-secondary-default: rgba(255, 255, 255, 0.035) !important;
-      --interactive-bg-secondary-hover: rgba(100, 180, 255, 0.085) !important;
+      --interactive-bg-secondary-default: rgba(255, 255, 255, 0.045) !important;
+      --interactive-bg-secondary-hover: rgba(123, 194, 255, 0.10) !important;
     }
 
     html {
@@ -78,9 +77,8 @@
       background: #081019 !important;
     }
 
-    /* v2.0.1: one fixed, compositor-friendly wallpaper layer.
-       Parallax moves this layer with transform instead of repainting the
-       root background-position on every pointer frame / scroll. */
+    /* One compositor-friendly wallpaper plane. Mouse parallax only changes
+       this transform variable once per pointer animation frame. */
     html::before {
       content: "" !important;
       position: fixed !important;
@@ -88,15 +86,16 @@
       z-index: 0 !important;
       pointer-events: none !important;
       background-image:
-        radial-gradient(circle at 78% 0%, rgba(42, 135, 255, 0.15), transparent 38%),
-        radial-gradient(circle at 14% 100%, rgba(100, 210, 255, 0.07), transparent 34%),
-        linear-gradient(rgba(4, 8, 13, 0.24), rgba(6, 11, 17, 0.48)),
+        radial-gradient(circle at 78% 0%, rgba(42, 135, 255, 0.12), transparent 38%),
+        radial-gradient(circle at 14% 100%, rgba(100, 210, 255, 0.055), transparent 34%),
+        linear-gradient(rgba(4, 8, 13, 0.20), rgba(6, 11, 17, 0.38)),
         var(--us-wallpaper) !important;
       background-position: center !important;
       background-size: auto, auto, auto, cover !important;
       background-repeat: no-repeat !important;
-      transform: translate3d(var(--us-wallpaper-shift-x), var(--us-wallpaper-shift-y), 0) scale(1.06) !important;
+      transform: var(--us-wallpaper-transform) !important;
       transform-origin: center center !important;
+      transition: transform 170ms cubic-bezier(.2,.7,.2,1) !important;
       will-change: transform !important;
       backface-visibility: hidden !important;
     }
@@ -113,7 +112,7 @@
     }
 
     body {
-      scrollbar-color: rgba(210, 231, 248, 0.18) transparent !important;
+      scrollbar-color: rgba(210, 231, 248, 0.20) transparent !important;
     }
 
     body,
@@ -124,159 +123,122 @@
       font-family: var(--us-font) !important;
     }
 
-    main,
-    [role="main"],
-    [data-testid="conversation-turn-list"] > div,
-    [class*="bg-token-main-surface-primary"],
-    [class*="bg-token-main-surface-secondary"] {
+    /* Snapshot-grounded page ownership. Do not globally erase every
+       bg-token-main-surface class: those small native surfaces are useful for
+       contrast. Only the real page/scroll/thread canvas is transparent. */
+    #main,
+    #thread,
+    [class~="group/scroll-root"] {
+      background: transparent !important;
       background-color: transparent !important;
       background-image: none !important;
     }
 
-    /* v2.0.3: ChatGPT changes the conversation list wrapper frequently.
-       Do not depend on it for the visual frost; the dedicated fixed reading
-       rail below owns the one center backdrop-filter layer. */
-    [data-testid="conversation-turn-list"] {
-      background: transparent !important;
-      background-image: none !important;
-      border-color: transparent !important;
-      box-shadow: none !important;
-      -webkit-backdrop-filter: none !important;
-      backdrop-filter: none !important;
-    }
-
-    /* v2.0.12: DOM-grounded rear reading glass. The live ChatGPT build
-       exposes full-width turn sections with a 768px centered message column.
-       Mark the shared thread wrapper and paint one centered rail behind all
-       turns. No fixed viewport overlay and no header/main positioning changes. */
-    main {
-      background: transparent !important;
-      background-image: none !important;
-      -webkit-backdrop-filter: none !important;
-      backdrop-filter: none !important;
-    }
-
-    [data-testid="conversation-turn-list"] {
-      background: transparent !important;
-      border: 0 !important;
-      box-shadow: none !important;
-      -webkit-backdrop-filter: none !important;
-      backdrop-filter: none !important;
-    }
-
-    /* v2.0.13: the visual snapshot confirms ChatGPT exposes a stable #thread
-       container (1630px wide in the captured desktop build) around the 768px
-       message column. Isolate only this thread stacking context so the frost is
-       guaranteed behind the messages, without touching header/main geometry. */
+    /* PERFORMANCE: the old rear rail was ~920px x 58,000px and carried a
+       backdrop-filter across the entire conversation. This sticky pseudo-item
+       is viewport bounded, so Chrome only maintains roughly one screen of
+       frosted pixels while the thread scrolls underneath it. */
     #thread {
       position: relative !important;
       isolation: isolate !important;
-      background: transparent !important;
-      background-image: none !important;
     }
 
     #thread::before {
       content: "" !important;
-      position: absolute !important;
-      top: 0 !important;
-      bottom: 0 !important;
-      left: 50% !important;
+      display: block !important;
+      position: sticky !important;
+      top: 60px !important;
+      align-self: center !important;
+      flex: 0 0 auto !important;
+      box-sizing: border-box !important;
       width: min(920px, calc(100% - 56px)) !important;
-      transform: translateX(-50%) !important;
+      height: calc(100dvh - 152px) !important;
+      margin-bottom: calc(-100dvh + 152px) !important;
       pointer-events: none !important;
       z-index: -1 !important;
-      background: rgba(10, 23, 36, 0.50) !important;
-      background-image: linear-gradient(180deg, rgba(194, 228, 253, 0.085), rgba(255,255,255,0.018)) !important;
-      border-left: 1px solid rgba(201, 230, 252, 0.16) !important;
-      border-right: 1px solid rgba(201, 230, 252, 0.16) !important;
-      box-shadow: 0 0 72px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.055) !important;
-      -webkit-backdrop-filter: blur(20px) saturate(126%) !important;
-      backdrop-filter: blur(20px) saturate(126%) !important;
+      background: rgba(10, 23, 36, 0.64) !important;
+      background-image: linear-gradient(180deg, rgba(198, 229, 252, 0.075), rgba(3, 10, 17, 0.035)) !important;
+      border: 1px solid rgba(202, 230, 251, 0.16) !important;
+      border-radius: 24px !important;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.055) !important;
+      -webkit-backdrop-filter: blur(16px) saturate(120%) !important;
+      backdrop-filter: blur(16px) saturate(120%) !important;
     }
 
-    nav,
-    aside,
-    [data-testid="left-sidebar"],
-    [data-testid="sidebar"],
-    [data-testid="navigation-sidebar"] {
+    /* ChatGPT's native footer fade was an 80% solid-black strip in the
+       snapshot. Keep the fade, but make it atmospheric instead of a black bar. */
+    #thread-bottom-container::after {
+      background: linear-gradient(180deg, rgba(5, 12, 20, 0), rgba(5, 12, 20, 0.46)) !important;
+      opacity: 1 !important;
+    }
+
+    /* One sidebar frost layer only. The previous generic nav/aside selector
+       blurred both the visible 260px nav and the invisible 52px tiny rail. */
+    #stage-slideover-sidebar {
       color: var(--us-text-soft) !important;
-      background: rgba(25, 40, 55, 0.20) !important;
-      background-image: linear-gradient(180deg, rgba(175, 216, 247, 0.028), rgba(255,255,255,0.006)) !important;
-      border-color: rgba(182, 219, 247, 0.11) !important;
-      box-shadow: 10px 0 32px rgba(0, 0, 0, 0.11), inset -1px 0 0 rgba(255,255,255,0.022) !important;
-      -webkit-backdrop-filter: blur(18px) saturate(124%) !important;
-      backdrop-filter: blur(18px) saturate(124%) !important;
+      background: rgba(22, 38, 53, 0.46) !important;
+      background-image: linear-gradient(180deg, rgba(190, 222, 247, 0.040), rgba(255,255,255,0.008)) !important;
+      border-inline-end: 1px solid rgba(190, 224, 250, 0.13) !important;
+      box-shadow: 10px 0 32px rgba(0,0,0,0.12), inset -1px 0 0 rgba(255,255,255,0.025) !important;
+      -webkit-backdrop-filter: blur(14px) saturate(116%) !important;
+      backdrop-filter: blur(14px) saturate(116%) !important;
     }
 
-    nav [class*="bg-token-sidebar-surface"],
-    aside [class*="bg-token-sidebar-surface"],
-    [data-testid="left-sidebar"] [class*="bg-token-sidebar-surface"],
-    [data-testid="sidebar"] [class*="bg-token-sidebar-surface"],
-    [data-testid="navigation-sidebar"] [class*="bg-token-sidebar-surface"] {
-      background-color: rgba(34, 52, 70, 0.075) !important;
+    #stage-slideover-sidebar nav,
+    #stage-sidebar-tiny-bar {
+      background: transparent !important;
       background-image: none !important;
+      box-shadow: none !important;
       -webkit-backdrop-filter: none !important;
       backdrop-filter: none !important;
     }
 
-    nav a,
-    aside a,
-    [data-testid="left-sidebar"] a,
-    [data-testid="sidebar"] a {
+    #stage-slideover-sidebar [class*="bg-token-sidebar-surface-primary"] {
+      background-color: transparent !important;
+      background-image: none !important;
+    }
+
+    #stage-slideover-sidebar a {
       border-radius: var(--us-radius-sm) !important;
     }
 
-    nav a:hover,
-    aside a:hover,
-    [data-testid="left-sidebar"] a:hover,
-    [data-testid="sidebar"] a:hover,
-    nav button:hover,
-    aside button:hover {
+    #stage-slideover-sidebar a:hover,
+    #stage-slideover-sidebar button:hover,
+    #stage-slideover-sidebar [aria-current="page"] {
       background: var(--us-hover) !important;
     }
 
-    header {
+    /* Preserve ChatGPT's native sticky header geometry. Only paint the small
+       action capsule that otherwise reads as a near-black island. */
+    #page-header {
       color: var(--us-text) !important;
-      background: rgba(9, 16, 25, 0.30) !important;
+      background: transparent !important;
       background-image: none !important;
-      border-color: var(--us-border) !important;
-      box-shadow: 0 1px 0 rgba(255, 255, 255, 0.035) !important;
+      box-shadow: none !important;
       -webkit-backdrop-filter: none !important;
       backdrop-filter: none !important;
     }
 
-    [data-testid="model-switcher-dropdown-button"],
-    [data-testid="accounts-profile-button"] {
-      border-color: var(--us-border) !important;
+    #conversation-header-actions {
+      background: rgba(20, 34, 48, 0.62) !important;
+      border: 1px solid rgba(192, 224, 249, 0.16) !important;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.035) !important;
+      -webkit-backdrop-filter: blur(12px) saturate(118%) !important;
+      backdrop-filter: blur(12px) saturate(118%) !important;
+    }
+
+    #conversation-header-actions button:hover {
+      background: rgba(123, 194, 255, 0.11) !important;
     }
 
     [data-message-author-role="assistant"],
-    [data-message-author-role="assistant"] *,
-    [data-message-author-role="user"],
-    [data-message-author-role="user"] * {
-      text-shadow: none !important;
-    }
-
-    [data-message-author-role="assistant"] {
-      color: var(--us-text-soft) !important;
-    }
-
-    [data-message-author-role="user"] > div,
-    [data-message-author-role="user"] .whitespace-pre-wrap,
-    [data-message-author-role="user"] [class*="bg-token-message-surface"] {
-      color: var(--us-text) !important;
-      background: rgba(11, 21, 32, 0.30) !important;
-      border: 1px solid var(--us-border) !important;
-      border-radius: 18px !important;
-      box-shadow: var(--us-shadow-sm) !important;
-      -webkit-backdrop-filter: none !important;
-      backdrop-filter: none !important;
-    }
-
     .markdown,
-    .prose,
-    [data-message-author-role="assistant"] {
+    .prose {
       color: var(--us-text-soft) !important;
+    }
+
+    [data-message-author-role="user"] {
+      color: var(--us-text) !important;
     }
 
     .markdown h1,
@@ -290,11 +252,7 @@
     .prose h3,
     .prose h4,
     .prose h5,
-    .prose h6 {
-      color: var(--us-text) !important;
-      letter-spacing: -0.018em !important;
-    }
-
+    .prose h6,
     .markdown strong,
     .markdown b,
     .prose strong,
@@ -302,10 +260,20 @@
       color: var(--us-text) !important;
     }
 
+    .markdown h1,
+    .markdown h2,
+    .markdown h3,
+    .prose h1,
+    .prose h2,
+    .prose h3 {
+      letter-spacing: -0.018em !important;
+    }
+
     .markdown a,
     .prose a {
       color: var(--us-accent) !important;
-      text-decoration-color: rgba(142, 203, 255, 0.42) !important;
+      text-decoration-color: rgba(155, 211, 255, 0.50) !important;
+      text-underline-offset: 2px !important;
     }
 
     .markdown hr,
@@ -315,17 +283,17 @@
 
     blockquote {
       color: var(--us-text-soft) !important;
-      border-color: rgba(142, 203, 255, 0.26) !important;
-      background: rgba(12, 22, 33, 0.20) !important;
+      border-color: rgba(155, 211, 255, 0.32) !important;
+      background: rgba(13, 27, 41, 0.42) !important;
       border-radius: 0 var(--us-radius-sm) var(--us-radius-sm) 0 !important;
     }
 
     .markdown pre,
     .prose pre,
     [data-testid="code-block"] {
-      color: #e0e8ef !important;
-      background: rgba(5, 11, 18, 0.72) !important;
-      border: 1px solid var(--us-border) !important;
+      color: #e8eff5 !important;
+      background: rgba(5, 11, 18, 0.84) !important;
+      border: 1px solid rgba(184, 220, 249, 0.15) !important;
       border-radius: var(--us-radius-md) !important;
       box-shadow: var(--us-shadow-sm) !important;
       -webkit-backdrop-filter: none !important;
@@ -334,9 +302,9 @@
 
     .markdown :not(pre) > code,
     .prose :not(pre) > code {
-      color: #e4edf5 !important;
-      background: rgba(255, 255, 255, 0.06) !important;
-      border: 1px solid rgba(190, 225, 255, 0.08) !important;
+      color: #edf4fa !important;
+      background: rgba(255, 255, 255, 0.09) !important;
+      border: 1px solid rgba(190, 225, 255, 0.10) !important;
       border-radius: 5px !important;
       padding: 0.08em 0.32em !important;
     }
@@ -345,13 +313,13 @@
     .prose table {
       border: 1px solid var(--us-border) !important;
       border-radius: var(--us-radius-md) !important;
-      background: rgba(9, 18, 28, 0.24) !important;
+      background: rgba(10, 22, 34, 0.52) !important;
     }
 
     .markdown th,
     .prose th {
       color: var(--us-text) !important;
-      background: rgba(255, 255, 255, 0.04) !important;
+      background: rgba(255, 255, 255, 0.055) !important;
       border-color: var(--us-border) !important;
     }
 
@@ -361,26 +329,16 @@
       border-color: var(--us-border) !important;
     }
 
-    form,
-    [data-testid="composer"],
-    [data-testid="composer-container"],
-    [data-testid="composer-footer-actions"] {
-      border-color: var(--us-border) !important;
-    }
-
-    [data-testid="composer"],
-    [data-testid="composer-container"],
-    div:has(> textarea#prompt-textarea),
-    div:has(> div > textarea#prompt-textarea),
-    div:has(> #prompt-textarea) {
+    /* Snapshot-grounded composer shell. Style the real 768px native surface,
+       not the inner ProseMirror scroller, and avoid broad :has() selectors. */
+    form[class*="group/composer"] [class*="bg-(--composer-surface-primary)"] {
       color: var(--us-text) !important;
-      background: rgba(10, 18, 28, 0.40) !important;
-      background-image: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.012)) !important;
-      border-color: var(--us-border-strong) !important;
-      box-shadow: 0 18px 46px rgba(0,0,0,0.27), inset 0 1px 0 rgba(255,255,255,0.035) !important;
-      border-radius: 22px !important;
-      -webkit-backdrop-filter: blur(24px) saturate(138%) !important;
-      backdrop-filter: blur(24px) saturate(138%) !important;
+      background: rgba(15, 28, 40, 0.70) !important;
+      background-image: linear-gradient(180deg, rgba(201, 229, 250, 0.045), rgba(255,255,255,0.010)) !important;
+      border: 1px solid rgba(195, 227, 252, 0.19) !important;
+      box-shadow: 0 14px 38px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.040) !important;
+      -webkit-backdrop-filter: blur(14px) saturate(120%) !important;
+      backdrop-filter: blur(14px) saturate(120%) !important;
     }
 
     #prompt-textarea,
@@ -396,53 +354,44 @@
       color: var(--us-text-muted) !important;
     }
 
-    button,
-    [role="button"] {
-      text-shadow: none !important;
-      box-shadow: none !important;
-    }
-
-    button:not([disabled]):hover,
-    [role="button"]:not([aria-disabled="true"]):hover {
-      border-color: var(--us-border-strong) !important;
-    }
-
     button[aria-label*="Send" i],
     button[data-testid*="send" i] {
       color: #07111b !important;
-      background: linear-gradient(180deg, #d9efff, #9fcdf2) !important;
-      border-color: rgba(213, 238, 255, 0.82) !important;
+      background: linear-gradient(180deg, #e1f3ff, #a7d5f6) !important;
+      border-color: rgba(218, 240, 255, 0.86) !important;
     }
 
     button[aria-label*="Send" i]:hover,
     button[data-testid*="send" i]:hover {
-      background: linear-gradient(180deg, #edf8ff, #b7dcf7) !important;
+      background: linear-gradient(180deg, #f0f9ff, #bce0f8) !important;
     }
 
+    /* Menus should be clearly readable, but only transient surfaces pay a
+       modest blur cost. */
     [role="menu"],
-    [role="dialog"],
     [data-radix-popper-content-wrapper] > div,
     [data-headlessui-state] [role="menu"],
-    [data-testid*="modal" i] {
-      color: var(--us-text-soft) !important;
-      background: rgba(28, 43, 58, 0.54) !important;
-      background-image: linear-gradient(180deg, rgba(167, 216, 255, 0.055), rgba(255,255,255,0.012)) !important;
-      border: 1px solid rgba(191, 225, 252, 0.18) !important;
-      box-shadow: 0 18px 48px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.045) !important;
-      -webkit-backdrop-filter: blur(18px) saturate(128%) !important;
-      backdrop-filter: blur(18px) saturate(128%) !important;
-    }
-
     [data-radix-popper-content-wrapper] [role="listbox"],
     [data-radix-popper-content-wrapper] [data-radix-menu-content],
     [data-radix-popper-content-wrapper] [data-radix-select-content],
     [role="listbox"] {
       color: var(--us-text-soft) !important;
-      background: rgba(28, 43, 58, 0.54) !important;
-      border: 1px solid rgba(191, 225, 252, 0.18) !important;
-      box-shadow: 0 18px 48px rgba(0,0,0,0.28) !important;
-      -webkit-backdrop-filter: blur(18px) saturate(128%) !important;
-      backdrop-filter: blur(18px) saturate(128%) !important;
+      background: rgba(28, 44, 59, 0.76) !important;
+      background-image: linear-gradient(180deg, rgba(176, 218, 249, 0.055), rgba(255,255,255,0.012)) !important;
+      border: 1px solid rgba(196, 226, 250, 0.20) !important;
+      box-shadow: 0 18px 44px rgba(0,0,0,0.26), inset 0 1px 0 rgba(255,255,255,0.045) !important;
+      -webkit-backdrop-filter: blur(12px) saturate(120%) !important;
+      backdrop-filter: blur(12px) saturate(120%) !important;
+    }
+
+    [role="dialog"],
+    [data-testid*="modal" i] {
+      color: var(--us-text-soft) !important;
+      background: rgba(24, 38, 52, 0.90) !important;
+      border: 1px solid rgba(196, 226, 250, 0.20) !important;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.32) !important;
+      -webkit-backdrop-filter: blur(8px) saturate(112%) !important;
+      backdrop-filter: blur(8px) saturate(112%) !important;
     }
 
     [role="menuitem"] {
@@ -453,21 +402,6 @@
     [role="option"]:hover,
     [data-highlighted] {
       background: var(--us-hover) !important;
-    }
-
-    input,
-    select,
-    textarea {
-      border-color: var(--us-border) !important;
-      box-shadow: none !important;
-    }
-
-    input:focus,
-    select:focus,
-    textarea:focus,
-    [contenteditable="true"]:focus {
-      outline: none !important;
-      border-color: var(--us-border-focus) !important;
     }
 
     html,
@@ -508,35 +442,45 @@
     }
 
     ::-webkit-scrollbar-thumb {
-      background: rgba(205, 229, 247, 0.16) !important;
+      background: rgba(205, 229, 247, 0.18) !important;
       border: 2px solid transparent !important;
       background-clip: padding-box !important;
       border-radius: 999px !important;
     }
 
     ::-webkit-scrollbar-thumb:hover {
-      background: rgba(205, 229, 247, 0.26) !important;
+      background: rgba(205, 229, 247, 0.30) !important;
       background-clip: padding-box !important;
     }
 
     ::selection {
       color: var(--us-text) !important;
-      background: rgba(142, 203, 255, 0.28) !important;
+      background: rgba(142, 203, 255, 0.30) !important;
     }
 
     @media (max-width: 768px) {
-      [data-testid="composer"],
-      [data-testid="composer-container"],
-      div:has(> textarea#prompt-textarea),
-      div:has(> div > textarea#prompt-textarea) {
+      #thread::before {
+        top: 52px !important;
+        width: calc(100% - 18px) !important;
+        height: calc(100dvh - 132px) !important;
+        margin-bottom: calc(-100dvh + 132px) !important;
         border-radius: 16px !important;
+        background: rgba(10, 23, 36, 0.70) !important;
+        -webkit-backdrop-filter: blur(10px) saturate(112%) !important;
+        backdrop-filter: blur(10px) saturate(112%) !important;
+      }
+
+      form[class*="group/composer"] [class*="bg-(--composer-surface-primary)"] {
+        border-radius: 18px !important;
       }
     }
 
     @media (pointer: coarse), (prefers-reduced-motion: reduce) {
       :root {
-        --us-wallpaper-x: 50%;
-        --us-wallpaper-y: 50%;
+        --us-wallpaper-transform: translate3d(0px, 0px, 0) scale(1.06);
+      }
+      html::before {
+        transition: none !important;
       }
     }
   `);
@@ -730,57 +674,49 @@
   /* v2.0.13: no thread discovery observer is needed. The uploaded visual
      snapshot exposes the stable native #thread container directly. */
 
-  const PARALLAX_X = 5;
-  const PARALLAX_Y = 3.5;
-  const PARALLAX_EASE = 0.14;
-  let targetX = 50;
-  let targetY = 50;
-  let currentX = 50;
-  let currentY = 50;
+  /* v2.0.14: one JS update per pointer animation frame. CSS handles the
+     easing on the compositor; there is no recursive RAF easing loop. */
+  const PARALLAX_X_PX = 14;
+  const PARALLAX_Y_PX = 9;
   let parallaxRaf = 0;
+  let pendingShiftX = 0;
+  let pendingShiftY = 0;
+  let lastPointerX = -9999;
+  let lastPointerY = -9999;
 
-  function updateOverscan() {
-    document.documentElement.style.setProperty("--us-wallpaper-size", "cover");
-  }
-
-  function renderParallax() {
+  function commitParallax() {
     parallaxRaf = 0;
-    const dx = targetX - currentX;
-    const dy = targetY - currentY;
-    currentX += dx * PARALLAX_EASE;
-    currentY += dy * PARALLAX_EASE;
-    const shiftX = (currentX - 50) * 3.2;
-    const shiftY = (currentY - 50) * 3.2;
-    document.documentElement.style.setProperty("--us-wallpaper-shift-x", `${shiftX.toFixed(2)}px`);
-    document.documentElement.style.setProperty("--us-wallpaper-shift-y", `${shiftY.toFixed(2)}px`);
-    if (Math.abs(dx) > 0.025 || Math.abs(dy) > 0.025) {
-      parallaxRaf = window.requestAnimationFrame(renderParallax);
-    }
+    document.documentElement.style.setProperty(
+      "--us-wallpaper-transform",
+      `translate3d(${pendingShiftX.toFixed(2)}px, ${pendingShiftY.toFixed(2)}px, 0) scale(1.06)`
+    );
   }
 
-  function requestParallaxFrame() {
-    if (!parallaxRaf) parallaxRaf = window.requestAnimationFrame(renderParallax);
+  function queueParallax() {
+    if (!parallaxRaf) parallaxRaf = window.requestAnimationFrame(commitParallax);
   }
 
   function centerParallax() {
-    targetX = 50;
-    targetY = 50;
-    requestParallaxFrame();
+    pendingShiftX = 0;
+    pendingShiftY = 0;
+    queueParallax();
   }
 
   function initParallax() {
     const motionQuery = window.matchMedia("(pointer: fine) and (prefers-reduced-motion: no-preference)");
-    updateOverscan();
-    window.addEventListener("resize", updateOverscan, { passive: true });
     if (!motionQuery.matches) return;
 
     window.addEventListener("pointermove", (event) => {
       if (event.pointerType && event.pointerType !== "mouse" && event.pointerType !== "pen") return;
+      if (Math.abs(event.clientX - lastPointerX) < 2 && Math.abs(event.clientY - lastPointerY) < 2) return;
+      lastPointerX = event.clientX;
+      lastPointerY = event.clientY;
+
       const nx = (event.clientX / Math.max(1, window.innerWidth)) * 2 - 1;
       const ny = (event.clientY / Math.max(1, window.innerHeight)) * 2 - 1;
-      targetX = 50 + (nx * PARALLAX_X);
-      targetY = 50 + (ny * PARALLAX_Y);
-      requestParallaxFrame();
+      pendingShiftX = -(nx * PARALLAX_X_PX);
+      pendingShiftY = -(ny * PARALLAX_Y_PX);
+      queueParallax();
     }, { passive: true });
 
     document.addEventListener("mouseleave", centerParallax, { passive: true });
