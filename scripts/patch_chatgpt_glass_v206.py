@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# Triggered release for resilient ChatGPT Bing wallpaper rotation.
 ROOT = Path(__file__).resolve().parents[1]
 TARGET = ROOT / "tampermonkey" / "ChatGPT-US-Sign-Glass-Theme.user.js"
 text = TARGET.read_text(encoding="utf-8")
