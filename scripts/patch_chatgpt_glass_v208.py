@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# trigger v2.0.8 validated release
 ROOT = Path(__file__).resolve().parents[1]
 TARGET = ROOT / "tampermonkey" / "ChatGPT-US-Sign-Glass-Theme.user.js"
 text = TARGET.read_text(encoding="utf-8")
