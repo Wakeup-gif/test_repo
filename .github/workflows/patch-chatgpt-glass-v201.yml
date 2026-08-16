@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - "scripts/patch_chatgpt_glass_v201.py"
+      - ".github/workflows/patch-chatgpt-glass-v201.yml"
 
 permissions:
   contents: write
@@ -23,7 +24,7 @@ jobs:
       - name: Verify conversation rail
         run: grep -q "conversation rail" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
       - name: Verify transform parallax
-        run: grep -q "--us-wallpaper-shift-x" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+        run: grep -q -- "--us-wallpaper-shift-x" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
       - name: Verify brighter menus
         run: grep -q "rgba(28, 43, 58, 0.54)" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
       - name: Verify nested blur removed
