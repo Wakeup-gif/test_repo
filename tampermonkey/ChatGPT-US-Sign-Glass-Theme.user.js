@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT - US Sign Glass Theme
 // @namespace    us-sign-full-modules
-// @version      2.0.4
-// @description  US Sign-inspired ChatGPT theme with rotating Bing UHD wallpaper, optimized parallax, translucent sidebar glass, a correctly layered frosted reading rail, brighter menus, and a cutout geometric cursor.
+// @version      2.0.5
+// @description  US Sign-inspired ChatGPT theme with rotating Bing UHD wallpaper, optimized parallax, translucent sidebar glass, a wallpaper-only frosted reading rail, brighter menus, and a cutout geometric cursor.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @run-at       document-start
@@ -17,8 +17,8 @@
 (function () {
   "use strict";
 
-  if (window.__chatgptUsSignGlassThemeV204) return;
-  window.__chatgptUsSignGlassThemeV204 = true;
+  if (window.__chatgptUsSignGlassThemeV205) return;
+  window.__chatgptUsSignGlassThemeV205 = true;
 
   GM_addStyle(String.raw`
     @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;650;700&display=swap");
@@ -149,16 +149,9 @@
       backdrop-filter: none !important;
     }
 
-    /* v2.0.4: put the frost inside ChatGPT's main stacking context and
-       behind the actual conversation. The wallpaper is blurred; text is not. */
-    main,
-    [role="main"] {
-      position: relative !important;
-      isolation: isolate !important;
-    }
-
-    main::before,
-    [role="main"]:not(main)::before {
+    /* v2.0.5: body-owned glass rail. It sits above only the Bing wallpaper
+       and below every top-level ChatGPT app layer, so it cannot blur chat text. */
+    body::before {
       content: "" !important;
       position: fixed !important;
       top: 48px !important;
@@ -167,14 +160,19 @@
       width: min(860px, calc(100vw - var(--us-chat-sidebar-edge, 0px) - 52px)) !important;
       transform: translateX(-50%) !important;
       pointer-events: none !important;
-      z-index: -1 !important;
-      background: rgba(10, 21, 32, 0.30) !important;
-      background-image: linear-gradient(180deg, rgba(183, 220, 249, 0.042), rgba(255,255,255,0.010)) !important;
-      border-left: 1px solid rgba(195, 225, 249, 0.075) !important;
-      border-right: 1px solid rgba(195, 225, 249, 0.075) !important;
-      box-shadow: 0 0 60px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.028) !important;
-      -webkit-backdrop-filter: blur(22px) saturate(124%) !important;
-      backdrop-filter: blur(22px) saturate(124%) !important;
+      z-index: 0 !important;
+      background: rgba(15, 29, 43, 0.20) !important;
+      background-image: linear-gradient(180deg, rgba(183, 220, 249, 0.034), rgba(255,255,255,0.008)) !important;
+      border-left: 1px solid rgba(195, 225, 249, 0.070) !important;
+      border-right: 1px solid rgba(195, 225, 249, 0.070) !important;
+      box-shadow: 0 0 54px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.024) !important;
+      -webkit-backdrop-filter: blur(22px) saturate(122%) !important;
+      backdrop-filter: blur(22px) saturate(122%) !important;
+    }
+
+    body > :not(script):not(style):not(link) {
+      position: relative !important;
+      z-index: 2 !important;
     }
 
     nav,
