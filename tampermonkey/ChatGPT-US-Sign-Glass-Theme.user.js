@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT - US Sign Glass Theme
 // @namespace    us-sign-full-modules
-// @version      2.0.18
-// @description  US Sign-inspired ChatGPT theme with bottom-continuous tapered reading glass, resilient Bing UHD rotation, direct-rule low-overhead parallax, single-layer sidebar/composer frost, improved contrast, native layout, and a cutout geometric cursor.
+// @version      2.0.19
+// @description  US Sign-inspired ChatGPT theme with cached Gaussian reading glass, resilient Bing UHD rotation, smooth low-overhead parallax, lightweight persistent surfaces, improved contrast, native layout, and a cutout geometric cursor.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @run-at       document-start
@@ -17,8 +17,8 @@
 (function () {
   "use strict";
 
-  if (window.__chatgptUsSignGlassThemeV218) return;
-  window.__chatgptUsSignGlassThemeV218 = true;
+  if (window.__chatgptUsSignGlassThemeV219) return;
+  window.__chatgptUsSignGlassThemeV219 = true;
 
   const themeStyle = GM_addStyle(String.raw`
     @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;650;700&display=swap");
@@ -146,31 +146,42 @@
     /* v2.0.15: make the reading atmosphere meet the top of the viewport instead
        of reading like a floating card. The elliptical mask keeps the center
        opaque enough for text while progressively tapering the side/lower frost. */
-    /* v2.0.17: the rear glass now remains present all the way through the
-       disclaimer/composer zone. Only the left/right edges feather away, so
-       there is no horizontal transparency seam behind the footer copy. */
+    /* v2.0.19: real Gaussian-style frost without live backdrop-filter. The
+       panel owns a duplicate of the current Bing image and blurs that cached
+       image directly. The moving wallpaper underneath is no longer re-blurred
+       every pointer frame. The layer extends past both viewport edges so no
+       footer/disclaimer seam can become visible. */
     #thread::before {
       content: "" !important;
       display: block !important;
       position: sticky !important;
-      top: 0 !important;
+      top: -28px !important;
       align-self: center !important;
       flex: 0 0 auto !important;
       box-sizing: border-box !important;
-      width: min(1000px, calc(100% - 32px)) !important;
-      height: 100dvh !important;
-      margin-bottom: -100dvh !important;
+      width: min(1040px, calc(100% - 24px)) !important;
+      height: calc(100dvh + 56px) !important;
+      margin-bottom: calc(-100dvh - 56px) !important;
       pointer-events: none !important;
       z-index: -1 !important;
-      background: rgba(10, 23, 36, 0.69) !important;
-      background-image: linear-gradient(180deg, rgba(198, 229, 252, 0.066), rgba(3, 10, 17, 0.050)) !important;
+      background-image:
+        linear-gradient(180deg, rgba(8, 18, 29, 0.55), rgba(5, 14, 24, 0.66)),
+        var(--us-wallpaper) !important;
+      background-position: center, center !important;
+      background-size: auto, cover !important;
+      background-repeat: no-repeat !important;
       border: 0 !important;
       border-radius: 0 !important;
-      box-shadow: 0 18px 64px rgba(0,0,0,0.11) !important;
-      -webkit-backdrop-filter: blur(9px) saturate(116%) !important;
-      backdrop-filter: blur(9px) saturate(116%) !important;
-      -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.22) 4%, rgba(0,0,0,0.62) 10%, #000 18%, #000 82%, rgba(0,0,0,0.62) 90%, rgba(0,0,0,0.22) 96%, transparent 100%) !important;
-      mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.22) 4%, rgba(0,0,0,0.62) 10%, #000 18%, #000 82%, rgba(0,0,0,0.62) 90%, rgba(0,0,0,0.22) 96%, transparent 100%) !important;
+      box-shadow: none !important;
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
+      -webkit-filter: blur(14px) saturate(114%) brightness(0.92) !important;
+      filter: blur(14px) saturate(114%) brightness(0.92) !important;
+      transform: translateZ(0) scale(1.028) !important;
+      backface-visibility: hidden !important;
+      contain: paint !important;
+      -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.18) 3%, rgba(0,0,0,0.62) 9%, #000 17%, #000 83%, rgba(0,0,0,0.62) 91%, rgba(0,0,0,0.18) 97%, transparent 100%) !important;
+      mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.18) 3%, rgba(0,0,0,0.62) 9%, #000 17%, #000 83%, rgba(0,0,0,0.62) 91%, rgba(0,0,0,0.18) 97%, transparent 100%) !important;
     }
 
     /* ChatGPT's native footer fade was an 80% solid-black strip in the
@@ -184,12 +195,12 @@
        blurred both the visible 260px nav and the invisible 52px tiny rail. */
     #stage-slideover-sidebar {
       color: var(--us-text-soft) !important;
-      background: rgba(22, 38, 53, 0.46) !important;
+      background: rgba(22, 38, 53, 0.64) !important;
       background-image: linear-gradient(180deg, rgba(190, 222, 247, 0.040), rgba(255,255,255,0.008)) !important;
       border-inline-end: 1px solid rgba(190, 224, 250, 0.13) !important;
       box-shadow: 10px 0 32px rgba(0,0,0,0.12), inset -1px 0 0 rgba(255,255,255,0.025) !important;
-      -webkit-backdrop-filter: blur(14px) saturate(116%) !important;
-      backdrop-filter: blur(14px) saturate(116%) !important;
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
     }
 
     #stage-slideover-sidebar nav,
@@ -228,11 +239,11 @@
     }
 
     #conversation-header-actions {
-      background: rgba(20, 34, 48, 0.62) !important;
+      background: rgba(20, 34, 48, 0.74) !important;
       border: 1px solid rgba(192, 224, 249, 0.16) !important;
       box-shadow: 0 8px 24px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.035) !important;
-      -webkit-backdrop-filter: blur(12px) saturate(118%) !important;
-      backdrop-filter: blur(12px) saturate(118%) !important;
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
     }
 
     #conversation-header-actions button:hover {
@@ -341,12 +352,12 @@
        not the inner ProseMirror scroller, and avoid broad :has() selectors. */
     form[class*="group/composer"] [class*="bg-(--composer-surface-primary)"] {
       color: var(--us-text) !important;
-      background: rgba(15, 28, 40, 0.70) !important;
+      background: rgba(15, 28, 40, 0.80) !important;
       background-image: linear-gradient(180deg, rgba(201, 229, 250, 0.045), rgba(255,255,255,0.010)) !important;
       border: 1px solid rgba(195, 227, 252, 0.19) !important;
       box-shadow: 0 14px 38px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.040) !important;
-      -webkit-backdrop-filter: blur(14px) saturate(120%) !important;
-      backdrop-filter: blur(14px) saturate(120%) !important;
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
     }
 
     #prompt-textarea,
@@ -468,16 +479,18 @@
 
     @media (max-width: 768px) {
       #thread::before {
-        top: 0 !important;
-        width: calc(100% - 6px) !important;
-        height: 100dvh !important;
-        margin-bottom: -100dvh !important;
+        top: -18px !important;
+        width: calc(100% - 2px) !important;
+        height: calc(100dvh + 36px) !important;
+        margin-bottom: calc(-100dvh - 36px) !important;
         border-radius: 0 !important;
-        background: rgba(10, 23, 36, 0.72) !important;
-        -webkit-backdrop-filter: blur(7px) saturate(110%) !important;
-        backdrop-filter: blur(7px) saturate(110%) !important;
-        -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.42) 4%, #000 12%, #000 88%, rgba(0,0,0,0.42) 96%, transparent 100%) !important;
-        mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.42) 4%, #000 12%, #000 88%, rgba(0,0,0,0.42) 96%, transparent 100%) !important;
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+        -webkit-filter: blur(10px) saturate(110%) brightness(0.92) !important;
+        filter: blur(10px) saturate(110%) brightness(0.92) !important;
+        transform: translateZ(0) scale(1.022) !important;
+        -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.42) 3%, #000 11%, #000 89%, rgba(0,0,0,0.42) 97%, transparent 100%) !important;
+        mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.42) 3%, #000 11%, #000 89%, rgba(0,0,0,0.42) 97%, transparent 100%) !important;
       }
 
       form[class*="group/composer"] [class*="bg-(--composer-surface-primary)"] {
@@ -684,17 +697,15 @@
   /* v2.0.13: no thread discovery observer is needed. The uploaded visual
      snapshot exposes the stable native #thread container directly. */
 
-  /* v2.0.17: pointer motion is sampled once per animation frame, but the
-     transform is written directly to the one html::before CSS rule instead of
-     mutating an inherited root custom property across the entire ChatGPT tree. */
-  const PARALLAX_X_PX = 9;
-  const PARALLAX_Y_PX = 5;
+  /* v2.0.19: the latest coalesced pointer sample is committed once per
+     animation frame. No 2px dead-zone quantization, no easing loop, and no
+     live backdrop-filter surfaces underneath the moving 4K wallpaper. */
+  const PARALLAX_X_PX = 6;
+  const PARALLAX_Y_PX = 4;
   let wallpaperRule = null;
   let parallaxRaf = 0;
   let pendingShiftX = 0;
   let pendingShiftY = 0;
-  let lastPointerX = -9999;
-  let lastPointerY = -9999;
 
   function resolveWallpaperRule() {
     if (wallpaperRule) return wallpaperRule;
@@ -740,12 +751,10 @@
 
     window.addEventListener("pointermove", (event) => {
       if (event.pointerType && event.pointerType !== "mouse" && event.pointerType !== "pen") return;
-      if (Math.abs(event.clientX - lastPointerX) < 2 && Math.abs(event.clientY - lastPointerY) < 2) return;
-      lastPointerX = event.clientX;
-      lastPointerY = event.clientY;
-
-      const nx = (event.clientX / Math.max(1, window.innerWidth)) * 2 - 1;
-      const ny = (event.clientY / Math.max(1, window.innerHeight)) * 2 - 1;
+      const coalesced = typeof event.getCoalescedEvents === "function" ? event.getCoalescedEvents() : null;
+      const sample = coalesced && coalesced.length ? coalesced[coalesced.length - 1] : event;
+      const nx = (sample.clientX / Math.max(1, window.innerWidth)) * 2 - 1;
+      const ny = (sample.clientY / Math.max(1, window.innerHeight)) * 2 - 1;
       pendingShiftX = -(nx * PARALLAX_X_PX);
       pendingShiftY = -(ny * PARALLAX_Y_PX);
       queueParallax();
