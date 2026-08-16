@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT - US Sign Glass Theme
 // @namespace    us-sign-full-modules
-// @version      2.0.10
-// @description  US Sign-inspired ChatGPT theme with resilient 30-minute Bing UHD rotation, optimized parallax, translucent sidebar glass, native conversation-list frost, click-safe controls, brighter menus, and a cutout geometric cursor.
+// @version      2.0.11
+// @description  US Sign-inspired ChatGPT theme with resilient 30-minute Bing UHD rotation, optimized parallax, translucent sidebar glass, runtime-marked native reading glass, native document stacking, brighter menus, and a cutout geometric cursor.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @run-at       document-start
@@ -17,8 +17,8 @@
 (function () {
   "use strict";
 
-  if (window.__chatgptUsSignGlassThemeV210) return;
-  window.__chatgptUsSignGlassThemeV210 = true;
+  if (window.__chatgptUsSignGlassThemeV211) return;
+  window.__chatgptUsSignGlassThemeV211 = true;
 
   GM_addStyle(String.raw`
     @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;650;700&display=swap");
@@ -76,7 +76,6 @@
       min-height: 100% !important;
       color-scheme: dark !important;
       background: #081019 !important;
-      isolation: isolate !important;
     }
 
     /* v2.0.1: one fixed, compositor-friendly wallpaper layer.
@@ -105,8 +104,6 @@
     body,
     #__next,
     #root {
-      position: relative !important;
-      z-index: 1 !important;
       min-height: 100% !important;
       color: var(--us-text) !important;
       background: transparent !important;
@@ -148,9 +145,9 @@
       backdrop-filter: none !important;
     }
 
-    /* v2.0.10: keep ChatGPT's main/topbar out of any filter context.
-       The native conversation list is already correctly centered by ChatGPT,
-       so it alone owns the readable frosted rear panel. */
+    /* v2.0.11: visible rear reading glass on ChatGPT's native message rail.
+       The runtime marker below finds the real rendered message column when
+       ChatGPT changes test IDs, without changing width, positioning, or z-index. */
     main {
       background: transparent !important;
       background-image: none !important;
@@ -158,14 +155,15 @@
       backdrop-filter: none !important;
     }
 
-    [data-testid="conversation-turn-list"] {
-      background: rgba(15, 29, 43, 0.22) !important;
-      background-image: linear-gradient(180deg, rgba(183, 220, 249, 0.032), rgba(255,255,255,0.008)) !important;
-      border-left: 1px solid rgba(195, 225, 249, 0.060) !important;
-      border-right: 1px solid rgba(195, 225, 249, 0.060) !important;
-      box-shadow: 0 0 42px rgba(0,0,0,0.070), inset 0 1px 0 rgba(255,255,255,0.020) !important;
-      -webkit-backdrop-filter: blur(18px) saturate(120%) !important;
-      backdrop-filter: blur(18px) saturate(120%) !important;
+    [data-testid="conversation-turn-list"],
+    .us-sign-chat-reading-rail {
+      background: rgba(12, 25, 38, 0.38) !important;
+      background-image: linear-gradient(180deg, rgba(190, 224, 250, 0.060), rgba(255,255,255,0.014)) !important;
+      border: 1px solid rgba(195, 225, 249, 0.115) !important;
+      border-radius: 24px !important;
+      box-shadow: 0 18px 64px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.040) !important;
+      -webkit-backdrop-filter: blur(22px) saturate(126%) !important;
+      backdrop-filter: blur(22px) saturate(126%) !important;
     }
 
     nav,
@@ -701,34 +699,99 @@
 
   initWallpapers();
 
-  /* v2.0.4 center rail geometry only. The visual frost is owned by
-     main::before so it always stays behind ChatGPT's conversation content. */
-  function initCenterGlassRailGeometry() {
-    const updateSidebarEdge = () => {
-      const candidates = Array.from(document.querySelectorAll(
-        'aside, [data-testid="left-sidebar"], [data-testid="sidebar"], [data-testid="navigation-sidebar"], nav'
-      ));
-      const sidebar = candidates
-        .map((node) => ({ node, rect: node.getBoundingClientRect() }))
-        .filter(({ rect }) => rect.width >= 170 && rect.width <= 420 && rect.height >= window.innerHeight * 0.55 && rect.left <= 8)
-        .sort((a, b) => b.rect.height - a.rect.height)[0];
-      const edge = sidebar ? Math.max(0, Math.round(sidebar.rect.right)) : 0;
-      document.documentElement.style.setProperty("--us-chat-sidebar-edge", `${edge}px`);
-      return sidebar?.node || null;
-    };
+  /* v2.0.11: mark the real native reading rail without owning geometry. */
+  let readingRailObserver = null;
+  let readingRailStopTimer = 0;
+  let readingRailRaf = 0;
 
-    const sidebarNode = updateSidebarEdge();
-    window.addEventListener("resize", updateSidebarEdge, { passive: true });
-    if (sidebarNode && typeof ResizeObserver === "function") {
-      const ro = new ResizeObserver(updateSidebarEdge);
-      ro.observe(sidebarNode);
+  function findReadingRail() {
+    const main = document.querySelector("main");
+    if (!main) return null;
+
+    const direct = main.querySelector('[data-testid="conversation-turn-list"]');
+    if (direct) return direct;
+
+    const messages = Array.from(main.querySelectorAll('[data-message-author-role]'));
+    if (!messages.length) return null;
+
+    const last = messages[messages.length - 1];
+    let common = messages[0];
+    while (common && common !== main && !common.contains(last)) common = common.parentElement;
+    if (!common || common === main) return null;
+
+    let candidate = common;
+    let node = common;
+    const maxUsefulWidth = Math.min(1100, window.innerWidth * 0.82);
+    while (node?.parentElement && node.parentElement !== main) {
+      const parent = node.parentElement;
+      const rect = parent.getBoundingClientRect();
+      if (rect.width >= 560 && rect.width <= maxUsefulWidth) candidate = parent;
+      if (rect.width > maxUsefulWidth * 1.12) break;
+      node = parent;
     }
+    return candidate;
   }
 
+  function markReadingRail() {
+    const target = findReadingRail();
+    if (!target) return false;
+    document.querySelectorAll(".us-sign-chat-reading-rail").forEach((node) => {
+      if (node !== target) node.classList.remove("us-sign-chat-reading-rail");
+    });
+    target.classList.add("us-sign-chat-reading-rail");
+    return true;
+  }
+
+  function scheduleReadingRailMark() {
+    if (readingRailRaf) return;
+    readingRailRaf = window.requestAnimationFrame(() => {
+      readingRailRaf = 0;
+      markReadingRail();
+    });
+  }
+
+  function startReadingRailDiscovery() {
+    if (readingRailObserver) readingRailObserver.disconnect();
+    if (readingRailStopTimer) window.clearTimeout(readingRailStopTimer);
+    markReadingRail();
+
+    const root = document.querySelector("main");
+    if (!root || typeof MutationObserver !== "function") return;
+    readingRailObserver = new MutationObserver(scheduleReadingRailMark);
+    readingRailObserver.observe(root, { childList: true, subtree: true });
+    readingRailStopTimer = window.setTimeout(() => {
+      readingRailObserver?.disconnect();
+      readingRailObserver = null;
+      readingRailStopTimer = 0;
+      markReadingRail();
+    }, 12000);
+  }
+
+  function queueReadingRailDiscovery() {
+    window.setTimeout(startReadingRailDiscovery, 0);
+    window.setTimeout(markReadingRail, 350);
+    window.setTimeout(markReadingRail, 1200);
+  }
+
+  const nativePushState = history.pushState;
+  history.pushState = function (...args) {
+    const result = nativePushState.apply(this, args);
+    queueReadingRailDiscovery();
+    return result;
+  };
+  const nativeReplaceState = history.replaceState;
+  history.replaceState = function (...args) {
+    const result = nativeReplaceState.apply(this, args);
+    queueReadingRailDiscovery();
+    return result;
+  };
+  window.addEventListener("popstate", queueReadingRailDiscovery, { passive: true });
+  window.addEventListener("pageshow", queueReadingRailDiscovery, { passive: true });
+
   if (document.readyState === "loading") {
-    window.addEventListener("DOMContentLoaded", initCenterGlassRailGeometry, { once: true });
+    window.addEventListener("DOMContentLoaded", queueReadingRailDiscovery, { once: true });
   } else {
-    initCenterGlassRailGeometry();
+    queueReadingRailDiscovery();
   }
 
   const PARALLAX_X = 5;
