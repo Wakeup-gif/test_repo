@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT - US Sign Glass Theme
 // @namespace    us-sign-full-modules
-// @version      2.0.0
-// @description  US Sign-inspired ChatGPT theme with rotating Bing UHD wallpaper, frosted glass surfaces, subtle pointer parallax, and a cutout geometric cursor.
+// @version      2.0.1
+// @description  US Sign-inspired ChatGPT theme with rotating Bing UHD wallpaper, optimized fixed-layer parallax, a frosted conversation rail, brighter menus, and a cutout geometric cursor.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @run-at       document-start
@@ -17,8 +17,8 @@
 (function () {
   "use strict";
 
-  if (window.__chatgptUsSignGlassThemeV200) return;
-  window.__chatgptUsSignGlassThemeV200 = true;
+  if (window.__chatgptUsSignGlassThemeV201) return;
+  window.__chatgptUsSignGlassThemeV201 = true;
 
   GM_addStyle(String.raw`
     @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;650;700&display=swap");
@@ -52,6 +52,8 @@
       --us-wallpaper-x: 50%;
       --us-wallpaper-y: 50%;
       --us-wallpaper-size: 106vw auto;
+      --us-wallpaper-shift-x: 0px;
+      --us-wallpaper-shift-y: 0px;
       --main-surface-primary: rgba(8, 14, 22, 0.12) !important;
       --main-surface-secondary: rgba(15, 23, 33, 0.30) !important;
       --main-surface-tertiary: rgba(21, 31, 43, 0.34) !important;
@@ -73,21 +75,38 @@
     html {
       min-height: 100% !important;
       color-scheme: dark !important;
-      background-color: #081019 !important;
+      background: #081019 !important;
+      isolation: isolate !important;
+    }
+
+    /* v2.0.1: one fixed, compositor-friendly wallpaper layer.
+       Parallax moves this layer with transform instead of repainting the
+       root background-position on every pointer frame / scroll. */
+    html::before {
+      content: "" !important;
+      position: fixed !important;
+      inset: -4vh -4vw !important;
+      z-index: 0 !important;
+      pointer-events: none !important;
       background-image:
         radial-gradient(circle at 78% 0%, rgba(42, 135, 255, 0.15), transparent 38%),
         radial-gradient(circle at 14% 100%, rgba(100, 210, 255, 0.07), transparent 34%),
         linear-gradient(rgba(4, 8, 13, 0.24), rgba(6, 11, 17, 0.48)),
         var(--us-wallpaper) !important;
-      background-position: center, center, center, var(--us-wallpaper-x) var(--us-wallpaper-y) !important;
-      background-size: auto, auto, auto, var(--us-wallpaper-size) !important;
+      background-position: center !important;
+      background-size: auto, auto, auto, cover !important;
       background-repeat: no-repeat !important;
-      background-attachment: fixed !important;
+      transform: translate3d(var(--us-wallpaper-shift-x), var(--us-wallpaper-shift-y), 0) scale(1.06) !important;
+      transform-origin: center center !important;
+      will-change: transform !important;
+      backface-visibility: hidden !important;
     }
 
     body,
     #__next,
     #root {
+      position: relative !important;
+      z-index: 1 !important;
       min-height: 100% !important;
       color: var(--us-text) !important;
       background: transparent !important;
@@ -110,12 +129,23 @@
 
     main,
     [role="main"],
-    [data-testid="conversation-turn-list"],
     [data-testid="conversation-turn-list"] > div,
     [class*="bg-token-main-surface-primary"],
     [class*="bg-token-main-surface-secondary"] {
       background-color: transparent !important;
       background-image: none !important;
+    }
+
+    /* v2.0.1: one restrained blur layer for the actual conversation rail.
+       Nested messages/code are translucent paint only, avoiding stacked blur. */
+    [data-testid="conversation-turn-list"] {
+      position: relative !important;
+      background: rgba(8, 17, 27, 0.20) !important;
+      background-image: linear-gradient(180deg, rgba(255,255,255,0.018), rgba(255,255,255,0.006)) !important;
+      border-left: 1px solid rgba(196, 226, 251, 0.045) !important;
+      border-right: 1px solid rgba(196, 226, 251, 0.045) !important;
+      -webkit-backdrop-filter: blur(10px) saturate(116%) !important;
+      backdrop-filter: blur(10px) saturate(116%) !important;
     }
 
     nav,
@@ -182,8 +212,8 @@
       border: 1px solid var(--us-border) !important;
       border-radius: 18px !important;
       box-shadow: var(--us-shadow-sm) !important;
-      -webkit-backdrop-filter: blur(14px) saturate(124%) !important;
-      backdrop-filter: blur(14px) saturate(124%) !important;
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
     }
 
     .markdown,
@@ -241,8 +271,8 @@
       border: 1px solid var(--us-border) !important;
       border-radius: var(--us-radius-md) !important;
       box-shadow: var(--us-shadow-sm) !important;
-      -webkit-backdrop-filter: blur(12px) saturate(120%) !important;
-      backdrop-filter: blur(12px) saturate(120%) !important;
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
     }
 
     .markdown :not(pre) > code,
@@ -338,12 +368,24 @@
     [data-headlessui-state] [role="menu"],
     [data-testid*="modal" i] {
       color: var(--us-text-soft) !important;
-      background: rgba(10, 18, 28, 0.60) !important;
-      background-image: linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.012)) !important;
-      border: 1px solid var(--us-border-strong) !important;
-      box-shadow: var(--us-shadow-lg) !important;
-      -webkit-backdrop-filter: blur(24px) saturate(136%) !important;
-      backdrop-filter: blur(24px) saturate(136%) !important;
+      background: rgba(28, 43, 58, 0.54) !important;
+      background-image: linear-gradient(180deg, rgba(167, 216, 255, 0.055), rgba(255,255,255,0.012)) !important;
+      border: 1px solid rgba(191, 225, 252, 0.18) !important;
+      box-shadow: 0 18px 48px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.045) !important;
+      -webkit-backdrop-filter: blur(18px) saturate(128%) !important;
+      backdrop-filter: blur(18px) saturate(128%) !important;
+    }
+
+    [data-radix-popper-content-wrapper] [role="listbox"],
+    [data-radix-popper-content-wrapper] [data-radix-menu-content],
+    [data-radix-popper-content-wrapper] [data-radix-select-content],
+    [role="listbox"] {
+      color: var(--us-text-soft) !important;
+      background: rgba(28, 43, 58, 0.54) !important;
+      border: 1px solid rgba(191, 225, 252, 0.18) !important;
+      box-shadow: 0 18px 48px rgba(0,0,0,0.28) !important;
+      -webkit-backdrop-filter: blur(18px) saturate(128%) !important;
+      backdrop-filter: blur(18px) saturate(128%) !important;
     }
 
     [role="menuitem"] {
@@ -600,11 +642,7 @@
   let parallaxRaf = 0;
 
   function updateOverscan() {
-    const ratio = Math.max(1, window.innerWidth) / Math.max(1, window.innerHeight);
-    document.documentElement.style.setProperty(
-      "--us-wallpaper-size",
-      ratio >= (16 / 9) ? "106vw auto" : "auto 106vh"
-    );
+    document.documentElement.style.setProperty("--us-wallpaper-size", "cover");
   }
 
   function renderParallax() {
@@ -613,8 +651,10 @@
     const dy = targetY - currentY;
     currentX += dx * PARALLAX_EASE;
     currentY += dy * PARALLAX_EASE;
-    document.documentElement.style.setProperty("--us-wallpaper-x", `${currentX.toFixed(3)}%`);
-    document.documentElement.style.setProperty("--us-wallpaper-y", `${currentY.toFixed(3)}%`);
+    const shiftX = (currentX - 50) * 3.2;
+    const shiftY = (currentY - 50) * 3.2;
+    document.documentElement.style.setProperty("--us-wallpaper-shift-x", `${shiftX.toFixed(2)}px`);
+    document.documentElement.style.setProperty("--us-wallpaper-shift-y", `${shiftY.toFixed(2)}px`);
     if (Math.abs(dx) > 0.025 || Math.abs(dy) > 0.025) {
       parallaxRaf = window.requestAnimationFrame(renderParallax);
     }
