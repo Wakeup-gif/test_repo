@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT - US Sign Glass Theme
 // @namespace    us-sign-full-modules
-// @version      2.0.9
-// @description  US Sign-inspired ChatGPT theme with resilient 30-minute Bing UHD rotation, optimized parallax, translucent sidebar glass, native-aligned paint-only reading glass, brighter menus, and a cutout geometric cursor.
+// @version      2.0.10
+// @description  US Sign-inspired ChatGPT theme with resilient 30-minute Bing UHD rotation, optimized parallax, translucent sidebar glass, native conversation-list frost, click-safe controls, brighter menus, and a cutout geometric cursor.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @run-at       document-start
@@ -17,8 +17,8 @@
 (function () {
   "use strict";
 
-  if (window.__chatgptUsSignGlassThemeV209) return;
-  window.__chatgptUsSignGlassThemeV209 = true;
+  if (window.__chatgptUsSignGlassThemeV210) return;
+  window.__chatgptUsSignGlassThemeV210 = true;
 
   GM_addStyle(String.raw`
     @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;650;700&display=swap");
@@ -140,7 +140,6 @@
        Do not depend on it for the visual frost; the dedicated fixed reading
        rail below owns the one center backdrop-filter layer. */
     [data-testid="conversation-turn-list"] {
-      position: relative !important;
       background: transparent !important;
       background-image: none !important;
       border-color: transparent !important;
@@ -149,25 +148,24 @@
       backdrop-filter: none !important;
     }
 
-    /* v2.0.9: paint-only center glass. Do not change ChatGPT's main/header
-       geometry, positioning, isolation, or z-index. The real main surface
-       owns one broad frost layer; the native conversation list only adds
-       a centered translucent reading tint on top. */
+    /* v2.0.10: keep ChatGPT's main/topbar out of any filter context.
+       The native conversation list is already correctly centered by ChatGPT,
+       so it alone owns the readable frosted rear panel. */
     main {
-      background: rgba(10, 20, 31, 0.10) !important;
-      background-image: linear-gradient(180deg, rgba(173, 216, 248, 0.018), rgba(255,255,255,0.004)) !important;
-      -webkit-backdrop-filter: blur(14px) saturate(118%) !important;
-      backdrop-filter: blur(14px) saturate(118%) !important;
+      background: transparent !important;
+      background-image: none !important;
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
     }
 
     [data-testid="conversation-turn-list"] {
-      background: rgba(15, 29, 43, 0.18) !important;
-      background-image: linear-gradient(180deg, rgba(183, 220, 249, 0.028), rgba(255,255,255,0.006)) !important;
-      border-left: 1px solid rgba(195, 225, 249, 0.055) !important;
-      border-right: 1px solid rgba(195, 225, 249, 0.055) !important;
-      box-shadow: 0 0 42px rgba(0,0,0,0.065), inset 0 1px 0 rgba(255,255,255,0.018) !important;
-      -webkit-backdrop-filter: none !important;
-      backdrop-filter: none !important;
+      background: rgba(15, 29, 43, 0.22) !important;
+      background-image: linear-gradient(180deg, rgba(183, 220, 249, 0.032), rgba(255,255,255,0.008)) !important;
+      border-left: 1px solid rgba(195, 225, 249, 0.060) !important;
+      border-right: 1px solid rgba(195, 225, 249, 0.060) !important;
+      box-shadow: 0 0 42px rgba(0,0,0,0.070), inset 0 1px 0 rgba(255,255,255,0.020) !important;
+      -webkit-backdrop-filter: blur(18px) saturate(120%) !important;
+      backdrop-filter: blur(18px) saturate(120%) !important;
     }
 
     nav,
@@ -217,8 +215,8 @@
       background-image: none !important;
       border-color: var(--us-border) !important;
       box-shadow: 0 1px 0 rgba(255, 255, 255, 0.035) !important;
-      -webkit-backdrop-filter: blur(16px) saturate(128%) !important;
-      backdrop-filter: blur(16px) saturate(128%) !important;
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
     }
 
     [data-testid="model-switcher-dropdown-button"],
