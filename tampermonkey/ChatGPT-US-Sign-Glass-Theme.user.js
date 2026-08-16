@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT - US Sign Glass Theme
 // @namespace    us-sign-full-modules
-// @version      2.0.3
-// @description  US Sign-inspired ChatGPT theme with rotating Bing UHD wallpaper, optimized parallax, truly translucent sidebar glass, a dedicated frosted center reading rail, brighter menus, and a cutout geometric cursor.
+// @version      2.0.4
+// @description  US Sign-inspired ChatGPT theme with rotating Bing UHD wallpaper, optimized parallax, translucent sidebar glass, a correctly layered frosted reading rail, brighter menus, and a cutout geometric cursor.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @run-at       document-start
@@ -17,8 +17,8 @@
 (function () {
   "use strict";
 
-  if (window.__chatgptUsSignGlassThemeV203) return;
-  window.__chatgptUsSignGlassThemeV203 = true;
+  if (window.__chatgptUsSignGlassThemeV204) return;
+  window.__chatgptUsSignGlassThemeV204 = true;
 
   GM_addStyle(String.raw`
     @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;650;700&display=swap");
@@ -149,7 +149,17 @@
       backdrop-filter: none !important;
     }
 
-    #us-chatgpt-center-glass {
+    /* v2.0.4: put the frost inside ChatGPT's main stacking context and
+       behind the actual conversation. The wallpaper is blurred; text is not. */
+    main,
+    [role="main"] {
+      position: relative !important;
+      isolation: isolate !important;
+    }
+
+    main::before,
+    [role="main"]:not(main)::before {
+      content: "" !important;
       position: fixed !important;
       top: 48px !important;
       bottom: 0 !important;
@@ -157,7 +167,7 @@
       width: min(860px, calc(100vw - var(--us-chat-sidebar-edge, 0px) - 52px)) !important;
       transform: translateX(-50%) !important;
       pointer-events: none !important;
-      z-index: 1 !important;
+      z-index: -1 !important;
       background: rgba(10, 21, 32, 0.30) !important;
       background-image: linear-gradient(180deg, rgba(183, 220, 249, 0.042), rgba(255,255,255,0.010)) !important;
       border-left: 1px solid rgba(195, 225, 249, 0.075) !important;
@@ -165,16 +175,6 @@
       box-shadow: 0 0 60px rgba(0,0,0,0.10), inset 0 1px 0 rgba(255,255,255,0.028) !important;
       -webkit-backdrop-filter: blur(22px) saturate(124%) !important;
       backdrop-filter: blur(22px) saturate(124%) !important;
-    }
-
-    body {
-      z-index: auto !important;
-    }
-
-    body > #__next,
-    body > #root {
-      position: relative !important;
-      z-index: 2 !important;
     }
 
     nav,
@@ -672,18 +672,9 @@
 
   initWallpapers();
 
-  /* v2.0.3 dedicated center glass rail. Keeping this as a stable theme-owned
-     layer avoids relying on ChatGPT's frequently changing conversation wrappers. */
-  function mountCenterGlassRail() {
-    if (!document.body) return false;
-    let rail = document.getElementById("us-chatgpt-center-glass");
-    if (!rail) {
-      rail = document.createElement("div");
-      rail.id = "us-chatgpt-center-glass";
-      rail.setAttribute("aria-hidden", "true");
-      document.body.prepend(rail);
-    }
-
+  /* v2.0.4 center rail geometry only. The visual frost is owned by
+     main::before so it always stays behind ChatGPT's conversation content. */
+  function initCenterGlassRailGeometry() {
     const updateSidebarEdge = () => {
       const candidates = Array.from(document.querySelectorAll(
         'aside, [data-testid="left-sidebar"], [data-testid="sidebar"], [data-testid="navigation-sidebar"], nav'
@@ -703,11 +694,12 @@
       const ro = new ResizeObserver(updateSidebarEdge);
       ro.observe(sidebarNode);
     }
-    return true;
   }
 
-  if (!mountCenterGlassRail()) {
-    window.addEventListener("DOMContentLoaded", mountCenterGlassRail, { once: true });
+  if (document.readyState === "loading") {
+    window.addEventListener("DOMContentLoaded", initCenterGlassRailGeometry, { once: true });
+  } else {
+    initCenterGlassRailGeometry();
   }
 
   const PARALLAX_X = 5;
