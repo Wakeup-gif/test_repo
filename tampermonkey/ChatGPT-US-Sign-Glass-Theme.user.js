@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT - US Sign Glass Theme
 // @namespace    us-sign-full-modules
-// @version      2.0.7
-// @description  US Sign-inspired ChatGPT theme with resilient 30-minute Bing UHD rotation, optimized parallax, translucent sidebar glass, a click-safe wallpaper-only frosted reading rail, brighter menus, and a cutout geometric cursor.
+// @version      2.0.8
+// @description  US Sign-inspired ChatGPT theme with resilient 30-minute Bing UHD rotation, optimized parallax, translucent sidebar glass, main-scoped frosted reading glass, brighter menus, and a cutout geometric cursor.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @run-at       document-start
@@ -17,8 +17,8 @@
 (function () {
   "use strict";
 
-  if (window.__chatgptUsSignGlassThemeV207) return;
-  window.__chatgptUsSignGlassThemeV207 = true;
+  if (window.__chatgptUsSignGlassThemeV208) return;
+  window.__chatgptUsSignGlassThemeV208 = true;
 
   GM_addStyle(String.raw`
     @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;650;700&display=swap");
@@ -149,9 +149,15 @@
       backdrop-filter: none !important;
     }
 
-    /* v2.0.5: body-owned glass rail. It sits above only the Bing wallpaper
-       and below every top-level ChatGPT app layer, so it cannot blur chat text. */
-    body::before {
+    /* v2.0.8: keep the frosted reading rail inside the real <main> stacking
+       context. No body-level fixed backdrop layer, so message links and
+       ChatGPT portals keep their native hit-testing behavior. */
+    main {
+      position: relative !important;
+      isolation: isolate !important;
+    }
+
+    main::before {
       content: "" !important;
       position: fixed !important;
       top: 48px !important;
@@ -160,7 +166,7 @@
       width: min(860px, calc(100vw - var(--us-chat-sidebar-edge, 0px) - 52px)) !important;
       transform: translateX(-50%) !important;
       pointer-events: none !important;
-      z-index: 0 !important;
+      z-index: -1 !important;
       background: rgba(15, 29, 43, 0.20) !important;
       background-image: linear-gradient(180deg, rgba(183, 220, 249, 0.034), rgba(255,255,255,0.008)) !important;
       border-left: 1px solid rgba(195, 225, 249, 0.070) !important;
@@ -168,16 +174,6 @@
       box-shadow: 0 0 54px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.024) !important;
       -webkit-backdrop-filter: blur(22px) saturate(122%) !important;
       backdrop-filter: blur(22px) saturate(122%) !important;
-    }
-
-    /* v2.0.7: only elevate the actual ChatGPT application root.
-       Do not elevate every body child: ChatGPT mounts invisible portals,
-       live regions, and utility layers at body level that can otherwise
-       intercept link/button hit-testing. */
-    body > #root,
-    body > #__next {
-      position: relative !important;
-      z-index: 1 !important;
     }
 
     nav,
