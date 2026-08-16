@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT - US Sign Glass Theme
 // @namespace    us-sign-full-modules
-// @version      2.0.19
-// @description  US Sign-inspired ChatGPT theme with cached Gaussian reading glass, resilient Bing UHD rotation, smooth low-overhead parallax, lightweight persistent surfaces, improved contrast, native layout, and a cutout geometric cursor.
+// @version      2.0.20
+// @description  US Sign-inspired ChatGPT theme with cached Gaussian reading glass, resilient Bing UHD rotation, static low-overhead wallpaper, lightweight persistent surfaces, improved contrast, native layout, and a cutout geometric cursor.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @run-at       document-start
@@ -17,10 +17,10 @@
 (function () {
   "use strict";
 
-  if (window.__chatgptUsSignGlassThemeV219) return;
-  window.__chatgptUsSignGlassThemeV219 = true;
+  if (window.__chatgptUsSignGlassThemeV220) return;
+  window.__chatgptUsSignGlassThemeV220 = true;
 
-  const themeStyle = GM_addStyle(String.raw`
+  GM_addStyle(String.raw`
     @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;650;700&display=swap");
 
     :root,
@@ -48,7 +48,6 @@
       --us-radius-lg: 20px;
       --us-font: "Manrope", "Avenir Next", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
       --us-wallpaper: url("https://www.bing.com/th?id=OBTQ.BTA9ACD46ADE4DF290D5640B661E6A5C8CF666B651507F76309661E06C8AA70FB2&rs=2&c=1");
-      --us-wallpaper-transform: translate3d(0px, 0px, 0) scale(1.06);
 
       /* Keep incidental ChatGPT surfaces readable while the actual page/thread
          stay transparent over the wallpaper. */
@@ -77,8 +76,9 @@
       background: #081019 !important;
     }
 
-    /* One compositor-friendly wallpaper plane. Mouse parallax only changes
-       this transform variable once per pointer animation frame. */
+    /* One static compositor-friendly wallpaper plane. Bing rotation swaps
+       only the image URL; there are no pointer-driven transforms or animation
+       frames. */
     html::before {
       content: "" !important;
       position: fixed !important;
@@ -93,10 +93,9 @@
       background-position: center !important;
       background-size: auto, auto, auto, cover !important;
       background-repeat: no-repeat !important;
-      transform: var(--us-wallpaper-transform) !important;
+      transform: scale(1.06) !important;
       transform-origin: center center !important;
       transition: none !important;
-      will-change: transform !important;
       backface-visibility: hidden !important;
     }
 
@@ -499,9 +498,6 @@
     }
 
     @media (pointer: coarse), (prefers-reduced-motion: reduce) {
-      :root {
-        --us-wallpaper-transform: translate3d(0px, 0px, 0) scale(1.06);
-      }
       html::before {
         transition: none !important;
       }
@@ -694,75 +690,4 @@
 
   initWallpapers();
 
-  /* v2.0.13: no thread discovery observer is needed. The uploaded visual
-     snapshot exposes the stable native #thread container directly. */
-
-  /* v2.0.19: the latest coalesced pointer sample is committed once per
-     animation frame. No 2px dead-zone quantization, no easing loop, and no
-     live backdrop-filter surfaces underneath the moving 4K wallpaper. */
-  const PARALLAX_X_PX = 6;
-  const PARALLAX_Y_PX = 4;
-  let wallpaperRule = null;
-  let parallaxRaf = 0;
-  let pendingShiftX = 0;
-  let pendingShiftY = 0;
-
-  function resolveWallpaperRule() {
-    if (wallpaperRule) return wallpaperRule;
-    try {
-      const sheet = themeStyle?.sheet;
-      if (!sheet) return null;
-      for (const rule of sheet.cssRules) {
-        if (rule?.selectorText === "html::before") {
-          wallpaperRule = rule;
-          return wallpaperRule;
-        }
-      }
-    } catch (_) {}
-    return null;
-  }
-
-  function commitParallax() {
-    parallaxRaf = 0;
-    const transform = `translate3d(${pendingShiftX.toFixed(2)}px, ${pendingShiftY.toFixed(2)}px, 0) scale(1.06)`;
-    const rule = resolveWallpaperRule();
-    if (rule) {
-      rule.style.setProperty("transform", transform, "important");
-      return;
-    }
-    // Rare fallback for userscript engines that do not expose the inserted
-    // stylesheet object. This path is only used if direct-rule mutation fails.
-    document.documentElement.style.setProperty("--us-wallpaper-transform", transform);
-  }
-
-  function queueParallax() {
-    if (!parallaxRaf) parallaxRaf = window.requestAnimationFrame(commitParallax);
-  }
-
-  function centerParallax() {
-    pendingShiftX = 0;
-    pendingShiftY = 0;
-    queueParallax();
-  }
-
-  function initParallax() {
-    const motionQuery = window.matchMedia("(pointer: fine) and (prefers-reduced-motion: no-preference)");
-    if (!motionQuery.matches) return;
-
-    window.addEventListener("pointermove", (event) => {
-      if (event.pointerType && event.pointerType !== "mouse" && event.pointerType !== "pen") return;
-      const coalesced = typeof event.getCoalescedEvents === "function" ? event.getCoalescedEvents() : null;
-      const sample = coalesced && coalesced.length ? coalesced[coalesced.length - 1] : event;
-      const nx = (sample.clientX / Math.max(1, window.innerWidth)) * 2 - 1;
-      const ny = (sample.clientY / Math.max(1, window.innerHeight)) * 2 - 1;
-      pendingShiftX = -(nx * PARALLAX_X_PX);
-      pendingShiftY = -(ny * PARALLAX_Y_PX);
-      queueParallax();
-    }, { passive: true });
-
-    document.addEventListener("mouseleave", centerParallax, { passive: true });
-    window.addEventListener("blur", centerParallax, { passive: true });
-  }
-
-  initParallax();
 })();
