@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT - US Sign Glass Theme
 // @namespace    us-sign-full-modules
-// @version      2.0.1
-// @description  US Sign-inspired ChatGPT theme with rotating Bing UHD wallpaper, optimized fixed-layer parallax, a frosted conversation rail, brighter menus, and a cutout geometric cursor.
+// @version      2.0.2
+// @description  US Sign-inspired ChatGPT theme with rotating Bing UHD wallpaper, optimized fixed-layer parallax, brighter smoky sidebar glass, a stronger frosted conversation rail, brighter menus, and a cutout geometric cursor.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @run-at       document-start
@@ -17,8 +17,8 @@
 (function () {
   "use strict";
 
-  if (window.__chatgptUsSignGlassThemeV201) return;
-  window.__chatgptUsSignGlassThemeV201 = true;
+  if (window.__chatgptUsSignGlassThemeV202) return;
+  window.__chatgptUsSignGlassThemeV202 = true;
 
   GM_addStyle(String.raw`
     @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;650;700&display=swap");
@@ -57,9 +57,9 @@
       --main-surface-primary: rgba(8, 14, 22, 0.12) !important;
       --main-surface-secondary: rgba(15, 23, 33, 0.30) !important;
       --main-surface-tertiary: rgba(21, 31, 43, 0.34) !important;
-      --sidebar-surface-primary: rgba(11, 18, 27, 0.46) !important;
-      --sidebar-surface-secondary: rgba(17, 26, 37, 0.42) !important;
-      --sidebar-surface-tertiary: rgba(24, 34, 47, 0.38) !important;
+      --sidebar-surface-primary: rgba(27, 43, 58, 0.46) !important;
+      --sidebar-surface-secondary: rgba(34, 51, 68, 0.42) !important;
+      --sidebar-surface-tertiary: rgba(42, 60, 78, 0.38) !important;
       --composer-surface: rgba(12, 20, 30, 0.46) !important;
       --composer-blue-bg: rgba(80, 165, 238, 0.12) !important;
       --message-surface: rgba(255, 255, 255, 0.035) !important;
@@ -136,16 +136,17 @@
       background-image: none !important;
     }
 
-    /* v2.0.1: one restrained blur layer for the actual conversation rail.
-       Nested messages/code are translucent paint only, avoiding stacked blur. */
+    /* v2.0.2: stronger single-layer conversation frost for readability.
+       Keep one blur layer only; nested messages/code remain paint-only. */
     [data-testid="conversation-turn-list"] {
       position: relative !important;
-      background: rgba(8, 17, 27, 0.20) !important;
-      background-image: linear-gradient(180deg, rgba(255,255,255,0.018), rgba(255,255,255,0.006)) !important;
-      border-left: 1px solid rgba(196, 226, 251, 0.045) !important;
-      border-right: 1px solid rgba(196, 226, 251, 0.045) !important;
-      -webkit-backdrop-filter: blur(10px) saturate(116%) !important;
-      backdrop-filter: blur(10px) saturate(116%) !important;
+      background: rgba(12, 25, 38, 0.32) !important;
+      background-image: linear-gradient(180deg, rgba(171, 215, 248, 0.035), rgba(255,255,255,0.010)) !important;
+      border-left: 1px solid rgba(196, 226, 251, 0.070) !important;
+      border-right: 1px solid rgba(196, 226, 251, 0.070) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.025), 0 0 48px rgba(0,0,0,0.08) !important;
+      -webkit-backdrop-filter: blur(16px) saturate(126%) !important;
+      backdrop-filter: blur(16px) saturate(126%) !important;
     }
 
     nav,
@@ -154,12 +155,12 @@
     [data-testid="sidebar"],
     [data-testid="navigation-sidebar"] {
       color: var(--us-text-soft) !important;
-      background: rgba(10, 17, 26, 0.40) !important;
-      background-image: none !important;
-      border-color: var(--us-border) !important;
-      box-shadow: 10px 0 32px rgba(0, 0, 0, 0.18) !important;
-      -webkit-backdrop-filter: blur(22px) saturate(132%) !important;
-      backdrop-filter: blur(22px) saturate(132%) !important;
+      background: rgba(27, 43, 58, 0.42) !important;
+      background-image: linear-gradient(180deg, rgba(169, 214, 248, 0.040), rgba(255,255,255,0.010)) !important;
+      border-color: rgba(182, 219, 247, 0.13) !important;
+      box-shadow: 10px 0 32px rgba(0, 0, 0, 0.14), inset -1px 0 0 rgba(255,255,255,0.025) !important;
+      -webkit-backdrop-filter: blur(18px) saturate(126%) !important;
+      backdrop-filter: blur(18px) saturate(126%) !important;
     }
 
     nav a,
