@@ -1,0 +1,63 @@
+name: Patch ChatGPT Glass Theme v2.0.20 no parallax
+on:
+  push:
+    paths:
+      - "scripts/patch_chatgpt_glass_v220.py"
+      - ".github/workflows/patch-chatgpt-glass-v220.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply v2.0.20 patch
+        run: python scripts/patch_chatgpt_glass_v220.py
+
+      - name: Verify version and guard
+        run: |
+          grep -Fq "@version      2.0.20" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          grep -Fq "if (window.__chatgptUsSignGlassThemeV220) return;" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          grep -Fq "window.__chatgptUsSignGlassThemeV220 = true;" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+
+      - name: Verify parallax removal
+        run: |
+          ! grep -Fq "pointermove" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          ! grep -Fq "requestAnimationFrame" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          ! grep -Fq "PARALLAX_X_PX" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          ! grep -Fq "PARALLAX_Y_PX" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          ! grep -Fq "resolveWallpaperRule" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          ! grep -Fq "wallpaperRule" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          ! grep -Fq "--us-wallpaper-transform" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          ! grep -Fq "will-change: transform" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          grep -Fq "transform: scale(1.06) !important" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+
+      - name: Preserve Gaussian glass and Bing rotation
+        run: |
+          grep -Fq "filter: blur(14px) saturate(114%) brightness(0.92) !important" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          grep -Fq "const ROTATE_MS = 30 * 60 * 1000" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          grep -Fq "uhdwidth=3840&uhdheight=2160" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          grep -Fq "pointer-events: none !important" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+
+      - name: Syntax check
+        run: node --check tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+
+      - name: Diff check
+        run: git diff --check
+
+      - name: Commit canonical update
+        run: |
+          if git diff --quiet -- tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js; then
+            echo "No canonical theme changes generated" >&2
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          git commit -m "Remove ChatGPT wallpaper parallax in v2.0.20"
+          git push origin HEAD:main
