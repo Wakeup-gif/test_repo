@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT - US Sign Glass Theme
 // @namespace    us-sign-full-modules
-// @version      2.0.12
-// @description  US Sign-inspired ChatGPT theme with resilient 30-minute Bing UHD rotation, optimized parallax, translucent sidebar glass, DOM-grounded thread reading glass, native document stacking, brighter menus, and a cutout geometric cursor.
+// @version      2.0.13
+// @description  US Sign-inspired ChatGPT theme with resilient 30-minute Bing UHD rotation, optimized parallax, translucent sidebar glass, snapshot-grounded #thread reading glass, native document stacking, brighter menus, and a cutout geometric cursor.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @run-at       document-start
@@ -17,8 +17,8 @@
 (function () {
   "use strict";
 
-  if (window.__chatgptUsSignGlassThemeV212) return;
-  window.__chatgptUsSignGlassThemeV212 = true;
+  if (window.__chatgptUsSignGlassThemeV213) return;
+  window.__chatgptUsSignGlassThemeV213 = true;
 
   GM_addStyle(String.raw`
     @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;650;700&display=swap");
@@ -164,13 +164,18 @@
       backdrop-filter: none !important;
     }
 
-    .us-sign-chat-thread-root {
+    /* v2.0.13: the visual snapshot confirms ChatGPT exposes a stable #thread
+       container (1630px wide in the captured desktop build) around the 768px
+       message column. Isolate only this thread stacking context so the frost is
+       guaranteed behind the messages, without touching header/main geometry. */
+    #thread {
       position: relative !important;
+      isolation: isolate !important;
       background: transparent !important;
       background-image: none !important;
     }
 
-    .us-sign-chat-thread-root::before {
+    #thread::before {
       content: "" !important;
       position: absolute !important;
       top: 0 !important;
@@ -179,19 +184,14 @@
       width: min(920px, calc(100% - 56px)) !important;
       transform: translateX(-50%) !important;
       pointer-events: none !important;
-      z-index: 0 !important;
-      background: rgba(12, 25, 38, 0.42) !important;
-      background-image: linear-gradient(180deg, rgba(190, 224, 250, 0.070), rgba(255,255,255,0.016)) !important;
-      border-left: 1px solid rgba(195, 225, 249, 0.13) !important;
-      border-right: 1px solid rgba(195, 225, 249, 0.13) !important;
-      box-shadow: 0 0 68px rgba(0,0,0,0.17), inset 0 1px 0 rgba(255,255,255,0.045) !important;
-      -webkit-backdrop-filter: blur(18px) saturate(124%) !important;
-      backdrop-filter: blur(18px) saturate(124%) !important;
-    }
-
-    .us-sign-chat-thread-root > * {
-      position: relative !important;
-      z-index: 1 !important;
+      z-index: -1 !important;
+      background: rgba(10, 23, 36, 0.50) !important;
+      background-image: linear-gradient(180deg, rgba(194, 228, 253, 0.085), rgba(255,255,255,0.018)) !important;
+      border-left: 1px solid rgba(201, 230, 252, 0.16) !important;
+      border-right: 1px solid rgba(201, 230, 252, 0.16) !important;
+      box-shadow: 0 0 72px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.055) !important;
+      -webkit-backdrop-filter: blur(20px) saturate(126%) !important;
+      backdrop-filter: blur(20px) saturate(126%) !important;
     }
 
     nav,
@@ -727,89 +727,8 @@
 
   initWallpapers();
 
-  /* v2.0.12: use the real full-width turn sections to find their shared
-     thread wrapper, then mark only that wrapper for the center glass rail. */
-  let threadRailObserver = null;
-  let threadRailStopTimer = 0;
-  let threadRailRaf = 0;
-
-  function findThreadRoot() {
-    const main = document.querySelector("main");
-    if (!main) return null;
-
-    const turns = Array.from(main.querySelectorAll('section[data-testid^="conversation-turn-"]'));
-    if (!turns.length) return null;
-
-    const first = turns[0];
-    const last = turns[turns.length - 1];
-    let common = first;
-    while (common && common !== main && !common.contains(last)) common = common.parentElement;
-    if (!common || common === main) return null;
-
-    return common;
-  }
-
-  function markThreadRoot() {
-    const target = findThreadRoot();
-    if (!target) return false;
-    document.querySelectorAll(".us-sign-chat-thread-root").forEach((node) => {
-      if (node !== target) node.classList.remove("us-sign-chat-thread-root");
-    });
-    target.classList.add("us-sign-chat-thread-root");
-    return true;
-  }
-
-  function scheduleThreadRootMark() {
-    if (threadRailRaf) return;
-    threadRailRaf = window.requestAnimationFrame(() => {
-      threadRailRaf = 0;
-      markThreadRoot();
-    });
-  }
-
-  function startThreadRailDiscovery() {
-    if (threadRailObserver) threadRailObserver.disconnect();
-    if (threadRailStopTimer) window.clearTimeout(threadRailStopTimer);
-    markThreadRoot();
-
-    const root = document.querySelector("main");
-    if (!root || typeof MutationObserver !== "function") return;
-    threadRailObserver = new MutationObserver(scheduleThreadRootMark);
-    threadRailObserver.observe(root, { childList: true, subtree: true });
-    threadRailStopTimer = window.setTimeout(() => {
-      threadRailObserver?.disconnect();
-      threadRailObserver = null;
-      threadRailStopTimer = 0;
-      markThreadRoot();
-    }, 12000);
-  }
-
-  function queueThreadRailDiscovery() {
-    window.setTimeout(startThreadRailDiscovery, 0);
-    window.setTimeout(markThreadRoot, 350);
-    window.setTimeout(markThreadRoot, 1200);
-  }
-
-  const nativePushState = history.pushState;
-  history.pushState = function (...args) {
-    const result = nativePushState.apply(this, args);
-    queueThreadRailDiscovery();
-    return result;
-  };
-  const nativeReplaceState = history.replaceState;
-  history.replaceState = function (...args) {
-    const result = nativeReplaceState.apply(this, args);
-    queueThreadRailDiscovery();
-    return result;
-  };
-  window.addEventListener("popstate", queueThreadRailDiscovery, { passive: true });
-  window.addEventListener("pageshow", queueThreadRailDiscovery, { passive: true });
-
-  if (document.readyState === "loading") {
-    window.addEventListener("DOMContentLoaded", queueThreadRailDiscovery, { once: true });
-  } else {
-    queueThreadRailDiscovery();
-  }
+  /* v2.0.13: no thread discovery observer is needed. The uploaded visual
+     snapshot exposes the stable native #thread container directly. */
 
   const PARALLAX_X = 5;
   const PARALLAX_Y = 3.5;
