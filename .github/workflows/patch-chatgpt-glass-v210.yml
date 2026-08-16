@@ -1,0 +1,58 @@
+name: Patch ChatGPT Glass Theme v2.0.10 center/header repair
+on:
+  push:
+    paths:
+      - "scripts/patch_chatgpt_glass_v210.py"
+      - ".github/workflows/patch-chatgpt-glass-v210.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply patch
+        run: |
+          python scripts/patch_chatgpt_glass_v210.py
+      - name: Verify version
+        run: |
+          grep -q "@version      2.0.10" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+      - name: Verify main and header are not filter contexts
+        run: |
+          grep -q "v2.0.10: keep ChatGPT's main/topbar out of any filter context" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          grep -q -- "-webkit-backdrop-filter: none" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+      - name: Verify conversation rear glass
+        run: |
+          grep -q "blur(18px) saturate(120%)" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          grep -q 'data-testid="conversation-turn-list"' tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+      - name: Verify no conversation positioning override
+        run: |
+          ! grep -A8 'data-testid="conversation-turn-list"' tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js | grep -q "position: relative !important"
+      - name: Preserve click-safe body
+        run: |
+          ! grep -q "body::before" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+      - name: Preserve 30 minute Bing rotation
+        run: |
+          grep -q "const ROTATE_MS = 30 \* 60 \* 1000" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          grep -q "uhdwidth=3840&uhdheight=2160" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+      - name: Syntax check
+        run: |
+          node --check tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+      - name: Diff check
+        run: |
+          git diff --check
+      - name: Commit canonical update
+        run: |
+          if git diff --quiet -- tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js; then
+            echo "No canonical theme changes generated" >&2
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          git commit -m "Restore ChatGPT center glass and topbar alignment in v2.0.10"
+          git push origin HEAD:main
