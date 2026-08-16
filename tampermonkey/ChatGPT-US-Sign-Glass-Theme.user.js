@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT - US Sign Glass Theme
 // @namespace    us-sign-full-modules
-// @version      2.0.11
-// @description  US Sign-inspired ChatGPT theme with resilient 30-minute Bing UHD rotation, optimized parallax, translucent sidebar glass, runtime-marked native reading glass, native document stacking, brighter menus, and a cutout geometric cursor.
+// @version      2.0.12
+// @description  US Sign-inspired ChatGPT theme with resilient 30-minute Bing UHD rotation, optimized parallax, translucent sidebar glass, DOM-grounded thread reading glass, native document stacking, brighter menus, and a cutout geometric cursor.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @run-at       document-start
@@ -17,8 +17,8 @@
 (function () {
   "use strict";
 
-  if (window.__chatgptUsSignGlassThemeV211) return;
-  window.__chatgptUsSignGlassThemeV211 = true;
+  if (window.__chatgptUsSignGlassThemeV212) return;
+  window.__chatgptUsSignGlassThemeV212 = true;
 
   GM_addStyle(String.raw`
     @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;650;700&display=swap");
@@ -145,9 +145,10 @@
       backdrop-filter: none !important;
     }
 
-    /* v2.0.11: visible rear reading glass on ChatGPT's native message rail.
-       The runtime marker below finds the real rendered message column when
-       ChatGPT changes test IDs, without changing width, positioning, or z-index. */
+    /* v2.0.12: DOM-grounded rear reading glass. The live ChatGPT build
+       exposes full-width turn sections with a 768px centered message column.
+       Mark the shared thread wrapper and paint one centered rail behind all
+       turns. No fixed viewport overlay and no header/main positioning changes. */
     main {
       background: transparent !important;
       background-image: none !important;
@@ -155,15 +156,42 @@
       backdrop-filter: none !important;
     }
 
-    [data-testid="conversation-turn-list"],
-    .us-sign-chat-reading-rail {
-      background: rgba(12, 25, 38, 0.38) !important;
-      background-image: linear-gradient(180deg, rgba(190, 224, 250, 0.060), rgba(255,255,255,0.014)) !important;
-      border: 1px solid rgba(195, 225, 249, 0.115) !important;
-      border-radius: 24px !important;
-      box-shadow: 0 18px 64px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.040) !important;
-      -webkit-backdrop-filter: blur(22px) saturate(126%) !important;
-      backdrop-filter: blur(22px) saturate(126%) !important;
+    [data-testid="conversation-turn-list"] {
+      background: transparent !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
+    }
+
+    .us-sign-chat-thread-root {
+      position: relative !important;
+      background: transparent !important;
+      background-image: none !important;
+    }
+
+    .us-sign-chat-thread-root::before {
+      content: "" !important;
+      position: absolute !important;
+      top: 0 !important;
+      bottom: 0 !important;
+      left: 50% !important;
+      width: min(920px, calc(100% - 56px)) !important;
+      transform: translateX(-50%) !important;
+      pointer-events: none !important;
+      z-index: 0 !important;
+      background: rgba(12, 25, 38, 0.42) !important;
+      background-image: linear-gradient(180deg, rgba(190, 224, 250, 0.070), rgba(255,255,255,0.016)) !important;
+      border-left: 1px solid rgba(195, 225, 249, 0.13) !important;
+      border-right: 1px solid rgba(195, 225, 249, 0.13) !important;
+      box-shadow: 0 0 68px rgba(0,0,0,0.17), inset 0 1px 0 rgba(255,255,255,0.045) !important;
+      -webkit-backdrop-filter: blur(18px) saturate(124%) !important;
+      backdrop-filter: blur(18px) saturate(124%) !important;
+    }
+
+    .us-sign-chat-thread-root > * {
+      position: relative !important;
+      z-index: 1 !important;
     }
 
     nav,
@@ -699,99 +727,88 @@
 
   initWallpapers();
 
-  /* v2.0.11: mark the real native reading rail without owning geometry. */
-  let readingRailObserver = null;
-  let readingRailStopTimer = 0;
-  let readingRailRaf = 0;
+  /* v2.0.12: use the real full-width turn sections to find their shared
+     thread wrapper, then mark only that wrapper for the center glass rail. */
+  let threadRailObserver = null;
+  let threadRailStopTimer = 0;
+  let threadRailRaf = 0;
 
-  function findReadingRail() {
+  function findThreadRoot() {
     const main = document.querySelector("main");
     if (!main) return null;
 
-    const direct = main.querySelector('[data-testid="conversation-turn-list"]');
-    if (direct) return direct;
+    const turns = Array.from(main.querySelectorAll('section[data-testid^="conversation-turn-"]'));
+    if (!turns.length) return null;
 
-    const messages = Array.from(main.querySelectorAll('[data-message-author-role]'));
-    if (!messages.length) return null;
-
-    const last = messages[messages.length - 1];
-    let common = messages[0];
+    const first = turns[0];
+    const last = turns[turns.length - 1];
+    let common = first;
     while (common && common !== main && !common.contains(last)) common = common.parentElement;
     if (!common || common === main) return null;
 
-    let candidate = common;
-    let node = common;
-    const maxUsefulWidth = Math.min(1100, window.innerWidth * 0.82);
-    while (node?.parentElement && node.parentElement !== main) {
-      const parent = node.parentElement;
-      const rect = parent.getBoundingClientRect();
-      if (rect.width >= 560 && rect.width <= maxUsefulWidth) candidate = parent;
-      if (rect.width > maxUsefulWidth * 1.12) break;
-      node = parent;
-    }
-    return candidate;
+    return common;
   }
 
-  function markReadingRail() {
-    const target = findReadingRail();
+  function markThreadRoot() {
+    const target = findThreadRoot();
     if (!target) return false;
-    document.querySelectorAll(".us-sign-chat-reading-rail").forEach((node) => {
-      if (node !== target) node.classList.remove("us-sign-chat-reading-rail");
+    document.querySelectorAll(".us-sign-chat-thread-root").forEach((node) => {
+      if (node !== target) node.classList.remove("us-sign-chat-thread-root");
     });
-    target.classList.add("us-sign-chat-reading-rail");
+    target.classList.add("us-sign-chat-thread-root");
     return true;
   }
 
-  function scheduleReadingRailMark() {
-    if (readingRailRaf) return;
-    readingRailRaf = window.requestAnimationFrame(() => {
-      readingRailRaf = 0;
-      markReadingRail();
+  function scheduleThreadRootMark() {
+    if (threadRailRaf) return;
+    threadRailRaf = window.requestAnimationFrame(() => {
+      threadRailRaf = 0;
+      markThreadRoot();
     });
   }
 
-  function startReadingRailDiscovery() {
-    if (readingRailObserver) readingRailObserver.disconnect();
-    if (readingRailStopTimer) window.clearTimeout(readingRailStopTimer);
-    markReadingRail();
+  function startThreadRailDiscovery() {
+    if (threadRailObserver) threadRailObserver.disconnect();
+    if (threadRailStopTimer) window.clearTimeout(threadRailStopTimer);
+    markThreadRoot();
 
     const root = document.querySelector("main");
     if (!root || typeof MutationObserver !== "function") return;
-    readingRailObserver = new MutationObserver(scheduleReadingRailMark);
-    readingRailObserver.observe(root, { childList: true, subtree: true });
-    readingRailStopTimer = window.setTimeout(() => {
-      readingRailObserver?.disconnect();
-      readingRailObserver = null;
-      readingRailStopTimer = 0;
-      markReadingRail();
+    threadRailObserver = new MutationObserver(scheduleThreadRootMark);
+    threadRailObserver.observe(root, { childList: true, subtree: true });
+    threadRailStopTimer = window.setTimeout(() => {
+      threadRailObserver?.disconnect();
+      threadRailObserver = null;
+      threadRailStopTimer = 0;
+      markThreadRoot();
     }, 12000);
   }
 
-  function queueReadingRailDiscovery() {
-    window.setTimeout(startReadingRailDiscovery, 0);
-    window.setTimeout(markReadingRail, 350);
-    window.setTimeout(markReadingRail, 1200);
+  function queueThreadRailDiscovery() {
+    window.setTimeout(startThreadRailDiscovery, 0);
+    window.setTimeout(markThreadRoot, 350);
+    window.setTimeout(markThreadRoot, 1200);
   }
 
   const nativePushState = history.pushState;
   history.pushState = function (...args) {
     const result = nativePushState.apply(this, args);
-    queueReadingRailDiscovery();
+    queueThreadRailDiscovery();
     return result;
   };
   const nativeReplaceState = history.replaceState;
   history.replaceState = function (...args) {
     const result = nativeReplaceState.apply(this, args);
-    queueReadingRailDiscovery();
+    queueThreadRailDiscovery();
     return result;
   };
-  window.addEventListener("popstate", queueReadingRailDiscovery, { passive: true });
-  window.addEventListener("pageshow", queueReadingRailDiscovery, { passive: true });
+  window.addEventListener("popstate", queueThreadRailDiscovery, { passive: true });
+  window.addEventListener("pageshow", queueThreadRailDiscovery, { passive: true });
 
   if (document.readyState === "loading") {
-    window.addEventListener("DOMContentLoaded", queueReadingRailDiscovery, { once: true });
+    window.addEventListener("DOMContentLoaded", queueThreadRailDiscovery, { once: true });
   } else {
-    queueReadingRailDiscovery();
+    queueThreadRailDiscovery();
   }
 
   const PARALLAX_X = 5;
