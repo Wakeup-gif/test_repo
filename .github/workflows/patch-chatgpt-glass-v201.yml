@@ -2,7 +2,7 @@ name: Patch ChatGPT Glass Theme v2.0.1 performance
 on:
   push:
     paths:
-      - "scripts/patch_chatgpt_glass_v201.py"
+      - "scripts/patch_chatgpt_glass_v201_fixed.py"
       - ".github/workflows/patch-chatgpt-glass-v201.yml"
 
 permissions:
@@ -17,7 +17,7 @@ jobs:
           fetch-depth: 0
       - name: Apply patch
         run: |
-          python scripts/patch_chatgpt_glass_v201.py
+          python scripts/patch_chatgpt_glass_v201_fixed.py
       - name: Verify version
         run: |
           grep -q "@version      2.0.1" tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
