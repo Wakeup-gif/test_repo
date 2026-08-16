@@ -34,3 +34,5 @@ if old_sidebar not in text:
 text = text.replace(old_sidebar, new_sidebar, 1)
 
 TARGET.write_text(text, encoding="utf-8")
+
+# release trigger
