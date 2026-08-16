@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT - US Sign Glass Theme
 // @namespace    us-sign-full-modules
-// @version      2.0.6
-// @description  US Sign-inspired ChatGPT theme with resilient 30-minute Bing UHD rotation, optimized parallax, translucent sidebar glass, a wallpaper-only frosted reading rail, brighter menus, and a cutout geometric cursor.
+// @version      2.0.7
+// @description  US Sign-inspired ChatGPT theme with resilient 30-minute Bing UHD rotation, optimized parallax, translucent sidebar glass, a click-safe wallpaper-only frosted reading rail, brighter menus, and a cutout geometric cursor.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @run-at       document-start
@@ -17,8 +17,8 @@
 (function () {
   "use strict";
 
-  if (window.__chatgptUsSignGlassThemeV206) return;
-  window.__chatgptUsSignGlassThemeV206 = true;
+  if (window.__chatgptUsSignGlassThemeV207) return;
+  window.__chatgptUsSignGlassThemeV207 = true;
 
   GM_addStyle(String.raw`
     @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;650;700&display=swap");
@@ -170,9 +170,14 @@
       backdrop-filter: blur(22px) saturate(122%) !important;
     }
 
-    body > :not(script):not(style):not(link) {
+    /* v2.0.7: only elevate the actual ChatGPT application root.
+       Do not elevate every body child: ChatGPT mounts invisible portals,
+       live regions, and utility layers at body level that can otherwise
+       intercept link/button hit-testing. */
+    body > #root,
+    body > #__next {
       position: relative !important;
-      z-index: 2 !important;
+      z-index: 1 !important;
     }
 
     nav,
