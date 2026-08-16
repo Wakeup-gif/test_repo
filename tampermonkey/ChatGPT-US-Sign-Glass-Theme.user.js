@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT - US Sign Glass Theme
 // @namespace    us-sign-full-modules
-// @version      2.0.16
-// @description  US Sign-inspired ChatGPT theme with full-height tapered reading glass, resilient Bing UHD rotation, immediate low-overhead parallax, single-layer sidebar/composer frost, improved contrast, native layout, and a cutout geometric cursor.
+// @version      2.0.17
+// @description  US Sign-inspired ChatGPT theme with bottom-continuous tapered reading glass, resilient Bing UHD rotation, direct-rule low-overhead parallax, single-layer sidebar/composer frost, improved contrast, native layout, and a cutout geometric cursor.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @run-at       document-start
@@ -17,10 +17,10 @@
 (function () {
   "use strict";
 
-  if (window.__chatgptUsSignGlassThemeV216) return;
+  if (window.__chatgptUsSignGlassThemeV217) return;
   window.__chatgptUsSignGlassThemeV216 = true;
 
-  GM_addStyle(String.raw`
+  const themeStyle = GM_addStyle(String.raw`
     @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;650;700&display=swap");
 
     :root,
@@ -146,9 +146,9 @@
     /* v2.0.15: make the reading atmosphere meet the top of the viewport instead
        of reading like a floating card. The elliptical mask keeps the center
        opaque enough for text while progressively tapering the side/lower frost. */
-    /* v2.0.16: keep the physical panel full viewport height so there is no
-       visible rectangular bottom edge. The mask itself now reaches zero near
-       the bottom center while continuing to feather the side edges. */
+    /* v2.0.17: the rear glass now remains present all the way through the
+       disclaimer/composer zone. Only the left/right edges feather away, so
+       there is no horizontal transparency seam behind the footer copy. */
     #thread::before {
       content: "" !important;
       display: block !important;
@@ -162,21 +162,21 @@
       margin-bottom: -100dvh !important;
       pointer-events: none !important;
       z-index: -1 !important;
-      background: rgba(10, 23, 36, 0.64) !important;
-      background-image: linear-gradient(180deg, rgba(198, 229, 252, 0.072), rgba(3, 10, 17, 0.042)) !important;
+      background: rgba(10, 23, 36, 0.69) !important;
+      background-image: linear-gradient(180deg, rgba(198, 229, 252, 0.066), rgba(3, 10, 17, 0.050)) !important;
       border: 0 !important;
       border-radius: 0 !important;
-      box-shadow: 0 18px 64px rgba(0,0,0,0.12) !important;
-      -webkit-backdrop-filter: blur(16px) saturate(120%) !important;
-      backdrop-filter: blur(16px) saturate(120%) !important;
-      -webkit-mask-image: radial-gradient(ellipse 58% 101% at 50% -1%, #000 0%, #000 57%, rgba(0,0,0,0.96) 68%, rgba(0,0,0,0.78) 79%, rgba(0,0,0,0.48) 89%, rgba(0,0,0,0.16) 96%, transparent 100%) !important;
-      mask-image: radial-gradient(ellipse 58% 101% at 50% -1%, #000 0%, #000 57%, rgba(0,0,0,0.96) 68%, rgba(0,0,0,0.78) 79%, rgba(0,0,0,0.48) 89%, rgba(0,0,0,0.16) 96%, transparent 100%) !important;
+      box-shadow: 0 18px 64px rgba(0,0,0,0.11) !important;
+      -webkit-backdrop-filter: blur(9px) saturate(116%) !important;
+      backdrop-filter: blur(9px) saturate(116%) !important;
+      -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.22) 4%, rgba(0,0,0,0.62) 10%, #000 18%, #000 82%, rgba(0,0,0,0.62) 90%, rgba(0,0,0,0.22) 96%, transparent 100%) !important;
+      mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.22) 4%, rgba(0,0,0,0.62) 10%, #000 18%, #000 82%, rgba(0,0,0,0.62) 90%, rgba(0,0,0,0.22) 96%, transparent 100%) !important;
     }
 
     /* ChatGPT's native footer fade was an 80% solid-black strip in the
        snapshot. Keep the fade, but make it atmospheric instead of a black bar. */
     #thread-bottom-container::after {
-      background: linear-gradient(180deg, rgba(5, 12, 20, 0), rgba(5, 12, 20, 0.46)) !important;
+      background: linear-gradient(180deg, rgba(10, 23, 36, 0) 0%, rgba(10, 23, 36, 0.12) 48%, rgba(10, 23, 36, 0.30) 100%) !important;
       opacity: 1 !important;
     }
 
@@ -473,11 +473,11 @@
         height: 100dvh !important;
         margin-bottom: -100dvh !important;
         border-radius: 0 !important;
-        background: rgba(10, 23, 36, 0.70) !important;
-        -webkit-backdrop-filter: blur(10px) saturate(112%) !important;
-        backdrop-filter: blur(10px) saturate(112%) !important;
-        -webkit-mask-image: radial-gradient(ellipse 65% 101% at 50% -1%, #000 0%, #000 59%, rgba(0,0,0,0.90) 73%, rgba(0,0,0,0.52) 88%, rgba(0,0,0,0.18) 96%, transparent 100%) !important;
-        mask-image: radial-gradient(ellipse 65% 101% at 50% -1%, #000 0%, #000 59%, rgba(0,0,0,0.90) 73%, rgba(0,0,0,0.52) 88%, rgba(0,0,0,0.18) 96%, transparent 100%) !important;
+        background: rgba(10, 23, 36, 0.72) !important;
+        -webkit-backdrop-filter: blur(7px) saturate(110%) !important;
+        backdrop-filter: blur(7px) saturate(110%) !important;
+        -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.42) 4%, #000 12%, #000 88%, rgba(0,0,0,0.42) 96%, transparent 100%) !important;
+        mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.42) 4%, #000 12%, #000 88%, rgba(0,0,0,0.42) 96%, transparent 100%) !important;
       }
 
       form[class*="group/composer"] [class*="bg-(--composer-surface-primary)"] {
@@ -684,23 +684,44 @@
   /* v2.0.13: no thread discovery observer is needed. The uploaded visual
      snapshot exposes the stable native #thread container directly. */
 
-  /* v2.0.16: pointer motion is sampled once per animation frame and the
-     compositor transform is applied immediately. No CSS trailing transition
-     and no recursive easing loop. */
-  const PARALLAX_X_PX = 10;
-  const PARALLAX_Y_PX = 6;
+  /* v2.0.17: pointer motion is sampled once per animation frame, but the
+     transform is written directly to the one html::before CSS rule instead of
+     mutating an inherited root custom property across the entire ChatGPT tree. */
+  const PARALLAX_X_PX = 9;
+  const PARALLAX_Y_PX = 5;
+  let wallpaperRule = null;
   let parallaxRaf = 0;
   let pendingShiftX = 0;
   let pendingShiftY = 0;
   let lastPointerX = -9999;
   let lastPointerY = -9999;
 
+  function resolveWallpaperRule() {
+    if (wallpaperRule) return wallpaperRule;
+    try {
+      const sheet = themeStyle?.sheet;
+      if (!sheet) return null;
+      for (const rule of sheet.cssRules) {
+        if (rule?.selectorText === "html::before") {
+          wallpaperRule = rule;
+          return wallpaperRule;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
   function commitParallax() {
     parallaxRaf = 0;
-    document.documentElement.style.setProperty(
-      "--us-wallpaper-transform",
-      `translate3d(${pendingShiftX.toFixed(2)}px, ${pendingShiftY.toFixed(2)}px, 0) scale(1.06)`
-    );
+    const transform = `translate3d(${pendingShiftX.toFixed(2)}px, ${pendingShiftY.toFixed(2)}px, 0) scale(1.06)`;
+    const rule = resolveWallpaperRule();
+    if (rule) {
+      rule.style.setProperty("transform", transform, "important");
+      return;
+    }
+    // Rare fallback for userscript engines that do not expose the inserted
+    // stylesheet object. This path is only used if direct-rule mutation fails.
+    document.documentElement.style.setProperty("--us-wallpaper-transform", transform);
   }
 
   function queueParallax() {
