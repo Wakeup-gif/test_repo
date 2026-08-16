@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT - US Sign Glass Theme
 // @namespace    us-sign-full-modules
-// @version      2.0.14
-// @description  US Sign-inspired ChatGPT theme with snapshot-audited viewport glass, resilient Bing UHD rotation, low-overhead parallax, single-layer sidebar/composer frost, improved contrast, native layout, and a cutout geometric cursor.
+// @version      2.0.15
+// @description  US Sign-inspired ChatGPT theme with top-anchored tapered reading glass, resilient Bing UHD rotation, low-overhead parallax, single-layer sidebar/composer frost, improved contrast, native layout, and a cutout geometric cursor.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @run-at       document-start
@@ -17,8 +17,8 @@
 (function () {
   "use strict";
 
-  if (window.__chatgptUsSignGlassThemeV214) return;
-  window.__chatgptUsSignGlassThemeV214 = true;
+  if (window.__chatgptUsSignGlassThemeV215) return;
+  window.__chatgptUsSignGlassThemeV215 = true;
 
   GM_addStyle(String.raw`
     @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;650;700&display=swap");
@@ -143,26 +143,31 @@
       isolation: isolate !important;
     }
 
+    /* v2.0.15: make the reading atmosphere meet the top of the viewport instead
+       of reading like a floating card. The elliptical mask keeps the center
+       opaque enough for text while progressively tapering the side/lower frost. */
     #thread::before {
       content: "" !important;
       display: block !important;
       position: sticky !important;
-      top: 60px !important;
+      top: 0 !important;
       align-self: center !important;
       flex: 0 0 auto !important;
       box-sizing: border-box !important;
-      width: min(920px, calc(100% - 56px)) !important;
-      height: calc(100dvh - 152px) !important;
-      margin-bottom: calc(-100dvh + 152px) !important;
+      width: min(1000px, calc(100% - 32px)) !important;
+      height: calc(100dvh - 92px) !important;
+      margin-bottom: calc(-100dvh + 92px) !important;
       pointer-events: none !important;
       z-index: -1 !important;
       background: rgba(10, 23, 36, 0.64) !important;
-      background-image: linear-gradient(180deg, rgba(198, 229, 252, 0.075), rgba(3, 10, 17, 0.035)) !important;
-      border: 1px solid rgba(202, 230, 251, 0.16) !important;
-      border-radius: 24px !important;
-      box-shadow: 0 20px 60px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.055) !important;
+      background-image: linear-gradient(180deg, rgba(198, 229, 252, 0.072), rgba(3, 10, 17, 0.055)) !important;
+      border: 0 !important;
+      border-radius: 0 0 32px 32px !important;
+      box-shadow: 0 22px 68px rgba(0,0,0,0.14) !important;
       -webkit-backdrop-filter: blur(16px) saturate(120%) !important;
       backdrop-filter: blur(16px) saturate(120%) !important;
+      -webkit-mask-image: radial-gradient(ellipse 55% 125% at 50% 0%, #000 0%, #000 60%, rgba(0,0,0,0.96) 69%, rgba(0,0,0,0.72) 80%, rgba(0,0,0,0.38) 90%, transparent 100%) !important;
+      mask-image: radial-gradient(ellipse 55% 125% at 50% 0%, #000 0%, #000 60%, rgba(0,0,0,0.96) 69%, rgba(0,0,0,0.72) 80%, rgba(0,0,0,0.38) 90%, transparent 100%) !important;
     }
 
     /* ChatGPT's native footer fade was an 80% solid-black strip in the
@@ -460,14 +465,16 @@
 
     @media (max-width: 768px) {
       #thread::before {
-        top: 52px !important;
-        width: calc(100% - 18px) !important;
-        height: calc(100dvh - 132px) !important;
-        margin-bottom: calc(-100dvh + 132px) !important;
-        border-radius: 16px !important;
+        top: 0 !important;
+        width: calc(100% - 6px) !important;
+        height: calc(100dvh - 78px) !important;
+        margin-bottom: calc(-100dvh + 78px) !important;
+        border-radius: 0 0 22px 22px !important;
         background: rgba(10, 23, 36, 0.70) !important;
         -webkit-backdrop-filter: blur(10px) saturate(112%) !important;
         backdrop-filter: blur(10px) saturate(112%) !important;
+        -webkit-mask-image: radial-gradient(ellipse 62% 128% at 50% 0%, #000 0%, #000 64%, rgba(0,0,0,0.90) 75%, rgba(0,0,0,0.50) 90%, transparent 100%) !important;
+        mask-image: radial-gradient(ellipse 62% 128% at 50% 0%, #000 0%, #000 64%, rgba(0,0,0,0.90) 75%, rgba(0,0,0,0.50) 90%, transparent 100%) !important;
       }
 
       form[class*="group/composer"] [class*="bg-(--composer-surface-primary)"] {
