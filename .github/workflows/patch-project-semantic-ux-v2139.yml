@@ -1,0 +1,40 @@
+name: Patch project semantic UX v2.1.39
+on:
+  push:
+    paths:
+      - "scripts/patch_project_semantic_ux_v2139.py"
+      - ".github/workflows/patch-project-semantic-ux-v2139.yml"
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply semantic UX patch
+        run: python scripts/patch_project_semantic_ux_v2139.py
+      - name: Verify semantic UX
+        run: |
+          grep -Fq "@version      2.1.39" tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -Fq "v2.1.39 SEMANTIC PROJECT UX" tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -Fq "usSignApplyProjectSemanticUX" tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -Fq "data-us-action=\"danger\"" tampermonkey/US-Sign-Full-UI-Theme.user.js || true
+          grep -Fq "#badge-design-count" tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -Fq "US-Sign-Full-UI-Theme-v2.1.39.user.js" scripts/patch_project_semantic_ux_v2139.py
+          test -f tampermonkey/US-Sign-Full-UI-Theme-v2.1.39.user.js
+      - name: Syntax check
+        run: |
+          node --check tampermonkey/US-Sign-Full-UI-Theme.user.js
+          node --check tampermonkey/US-Sign-Full-UI-Theme-v2.1.39.user.js
+      - name: Diff check
+        run: git diff --check
+      - name: Commit canonical update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tampermonkey/US-Sign-Full-UI-Theme.user.js tampermonkey/US-Sign-Full-UI-Theme-v2.1.39.user.js
+          git commit -m "Add semantic project UX states"
+          git pull --rebase origin main
+          git push origin HEAD:main
