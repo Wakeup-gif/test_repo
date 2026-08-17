@@ -1,0 +1,53 @@
+name: Patch Status glass v2.1.34
+on:
+  push:
+    paths:
+      - "scripts/patch_status_glass_v2134.py"
+      - ".github/workflows/patch-status-glass-v2134.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply Status glass patch
+        run: python scripts/patch_status_glass_v2134.py
+
+      - name: Verify version and scope
+        run: |
+          grep -Fq "@version      2.1.34" tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -Fq "v2.1.34 PROJECT STATUS TRUE GLASS" tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -Fq "html.us-sign-project-status-page #customer-info" tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -Fq "html.us-sign-project-status-page .tab-block > .tabs-left" tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -Fq "html.us-sign-project-status-page .tab-block > .tab-content" tampermonkey/US-Sign-Full-UI-Theme.user.js
+
+      - name: Verify glass and native-structure preservation
+        run: |
+          grep -Fq "backdrop-filter: blur(14px) saturate(132%) !important" tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -Fq "v2.1.33 PROJECT STATUS / MILESTONES" tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -Fq "padding: 12px 16px !important" tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -Fq "height: 76px !important" tampermonkey/US-Sign-Full-UI-Theme.user.js
+
+      - name: Syntax check
+        run: node --check tampermonkey/US-Sign-Full-UI-Theme.user.js
+
+      - name: Diff check
+        run: git diff --check
+
+      - name: Commit canonical update
+        run: |
+          if git diff --quiet -- tampermonkey/US-Sign-Full-UI-Theme.user.js; then
+            echo "No canonical theme changes generated" >&2
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tampermonkey/US-Sign-Full-UI-Theme.user.js
+          git commit -m "Add frosted glass to Project Status"
+          git push origin HEAD:main
