@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      2.1.36
-// @description  Stable SquareCoil frosted-glass UI with native-structure Status and fully frosted Clock Out dialogs, aligned top chrome, source-targeted Dashboard/Design glass, rotating Bing UHD wallpapers, and a cutout geometric cursor.
+// @version      2.1.37
+// @description  Stable SquareCoil frosted-glass UI with native-structure Status and true transparent Clock Out glass, aligned top chrome, source-targeted Dashboard/Design glass, rotating Bing UHD wallpapers, and a cutout geometric cursor.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
 // @grant        GM_addStyle
@@ -3189,12 +3189,12 @@
       box-sizing: border-box !important;
       padding: clamp(48px, 12vh, 132px) 24px 28px !important;
       overflow: auto !important;
-      background: rgba(3, 8, 14, 0.32) !important;
+      background: rgba(3, 8, 14, 0.18) !important;
       background-image:
-        radial-gradient(circle at 50% 34%, rgba(76, 151, 214, 0.055), transparent 42%),
-        linear-gradient(180deg, rgba(7, 18, 29, 0.055), rgba(2, 6, 10, 0.12)) !important;
-      -webkit-backdrop-filter: blur(8px) saturate(92%) brightness(0.78) !important;
-      backdrop-filter: blur(8px) saturate(92%) brightness(0.78) !important;
+        radial-gradient(circle at 50% 34%, rgba(94, 174, 238, 0.040), transparent 46%),
+        linear-gradient(180deg, rgba(7, 18, 29, 0.025), rgba(2, 6, 10, 0.060)) !important;
+      -webkit-backdrop-filter: blur(14px) saturate(108%) brightness(0.80) !important;
+      backdrop-filter: blur(14px) saturate(108%) brightness(0.80) !important;
     }
 
     #modal-overlay.duplicate-modal-2 > .duplicate-modal-content-2 {
@@ -3211,19 +3211,25 @@
       overflow: visible !important;
       color: var(--us-text) !important;
       background:
-        linear-gradient(145deg, rgba(166, 218, 255, 0.085), transparent 34%),
-        linear-gradient(180deg, rgba(12, 25, 39, 0.49), rgba(5, 12, 20, 0.38)) !important;
-      background-color: rgba(7, 15, 24, 0.46) !important;
-      border: 1px solid rgba(198, 228, 251, 0.20) !important;
+        linear-gradient(145deg, rgba(205, 236, 255, 0.095), transparent 34%),
+        linear-gradient(180deg, rgba(24, 48, 68, 0.18), rgba(6, 14, 23, 0.12)) !important;
+      background-color: rgba(8, 18, 29, 0.16) !important;
+      border: 1px solid rgba(210, 236, 255, 0.24) !important;
       border-radius: 16px !important;
-      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.070) !important;
+      box-shadow:
+        0 20px 52px rgba(0, 0, 0, 0.20),
+        inset 0 1px 0 rgba(255, 255, 255, 0.12),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.025) !important;
       transition: none !important;
     }
 
     @supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
       #modal-overlay.duplicate-modal-2 > .duplicate-modal-content-2 {
-        -webkit-backdrop-filter: blur(22px) saturate(142%) brightness(0.97) !important;
-        backdrop-filter: blur(22px) saturate(142%) brightness(0.97) !important;
+        /* The full-screen overlay already owns the Gaussian blur. Keeping the
+           dialog itself filter-free avoids Chrome's nested-backdrop root, which
+           was making the panel read as a dark slab instead of transparent glass. */
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
       }
 
       #modal-overlay.duplicate-modal-2 > .duplicate-modal-content-2 :is(
@@ -3241,9 +3247,9 @@
     }
 
 
-    /* v2.1.36: the overlay itself blurs/dims the page, while the dialog uses a
-       stronger local frost so the wallpaper remains visible as soft color rather
-       than reading as a flat dark modal. */
+    /* v2.1.37: one Gaussian backdrop layer only. The overlay blurs the live page;
+       the dialog is deliberately low-opacity glass so that blurred page color and
+       structure remain visibly present through the surface. */
     #modal-overlay.duplicate-modal-2 > .duplicate-modal-content-2 {
       isolation: isolate !important;
     }
