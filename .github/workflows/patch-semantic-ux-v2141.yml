@@ -1,0 +1,30 @@
+name: Patch semantic UX v2.1.41
+on:
+  push:
+    paths:
+      - "scripts/patch_semantic_ux_v2141.py"
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply semantic UX v2.1.41
+        run: python scripts/patch_semantic_ux_v2141.py
+      - name: Verify
+        run: |
+          grep -q '@version      2.1.41' tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -q 'v2.1.41 SEMANTIC PILL POLISH' tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -q 'data-us-state="urgent"' tampermonkey/US-Sign-Full-UI-Theme.user.js
+          node --check tampermonkey/US-Sign-Full-UI-Theme.user.js
+          git diff --check
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tampermonkey/US-Sign-Full-UI-Theme.user.js tampermonkey/US-Sign-Full-UI-Theme-v2.1.41.user.js
+          git commit -m "Polish semantic status pills v2.1.41"
+          git push origin main
