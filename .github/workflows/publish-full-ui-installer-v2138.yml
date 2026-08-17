@@ -1,0 +1,33 @@
+name: Publish Full UI installer v2.1.38
+on:
+  push:
+    paths:
+      - "scripts/publish_full_ui_installer_v2138.py"
+      - ".github/workflows/publish-full-ui-installer-v2138.yml"
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Publish canonical and fresh installer alias
+        run: python scripts/publish_full_ui_installer_v2138.py
+      - name: Verify metadata and syntax
+        run: |
+          grep -Fq "@version      2.1.38" tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -Fq "@version      2.1.38" tampermonkey/US-Sign-Full-UI-Theme-v2.1.38.user.js
+          head -n 1 tampermonkey/US-Sign-Full-UI-Theme-v2.1.38.user.js | grep -Fqx "// ==UserScript=="
+          node --check tampermonkey/US-Sign-Full-UI-Theme.user.js
+          node --check tampermonkey/US-Sign-Full-UI-Theme-v2.1.38.user.js
+          git diff --check
+      - name: Commit release
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tampermonkey/US-Sign-Full-UI-Theme.user.js tampermonkey/US-Sign-Full-UI-Theme-v2.1.38.user.js
+          git commit -m "Publish Full UI v2.1.38 fresh installer"
+          git pull --rebase origin main
+          git push origin HEAD:main
