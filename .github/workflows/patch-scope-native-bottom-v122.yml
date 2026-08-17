@@ -33,3 +33,4 @@ jobs:
           git add tampermonkey/US-Sign-Project-Scope-Workspace.user.js
           git commit -m "Repair native Scope editor panel"
           git push origin HEAD:main
+# retrigger after non-fast-forward recovery
