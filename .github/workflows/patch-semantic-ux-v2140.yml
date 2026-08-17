@@ -1,0 +1,31 @@
+name: Patch semantic UX v2.1.40
+on:
+  push:
+    paths:
+      - "scripts/patch_semantic_ux_v2140.py"
+      - ".github/workflows/patch-semantic-ux-v2140.yml"
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply semantic UX refinement
+        run: python scripts/patch_semantic_ux_v2140.py
+      - name: Verify
+        run: |
+          grep -q '@version      2.1.40' tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -q 'data-us-field="hours"' tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -q 'US-Sign-Full-UI-Theme-v2.1.40.user.js' <(find tampermonkey -maxdepth 1 -type f -printf '%f\n')
+          node --check tampermonkey/US-Sign-Full-UI-Theme.user.js
+          git diff --check
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tampermonkey/US-Sign-Full-UI-Theme.user.js tampermonkey/US-Sign-Full-UI-Theme-v2.1.40.user.js
+          git commit -m "Refine semantic UX contrast v2.1.40"
+          git push origin main
