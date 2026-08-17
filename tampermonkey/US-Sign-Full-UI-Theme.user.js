@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      2.1.33
-// @description  Stable SquareCoil frosted-glass UI with native-structure Project Status styling, aligned top chrome, source-targeted Dashboard/Design glass, rotating Bing UHD wallpapers, and a cutout geometric cursor.
+// @version      2.1.34
+// @description  Stable SquareCoil frosted-glass UI with native-structure Project Status glass, aligned top chrome, source-targeted Dashboard/Design glass, rotating Bing UHD wallpapers, and a cutout geometric cursor.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
 // @grant        GM_addStyle
@@ -3128,6 +3128,53 @@
       min-height: 0 !important;
       height: 76px !important;
       resize: vertical !important;
+    }
+
+
+    /* =========================================================
+       v2.1.34 PROJECT STATUS TRUE GLASS
+       Match the primary-card frost used elsewhere while preserving the
+       snapshot-grounded native Status/Milestones geometry from v2.1.33.
+       One blur layer per visible surface; nested controls remain blur-free.
+    ========================================================= */
+    @supports ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+      html.us-sign-project-status-page #customer-info,
+      html.us-sign-project-status-page #content .tray-center > .pl15.pr15 > .well,
+      html.us-sign-project-status-page .tab-block > .tabs-left,
+      html.us-sign-project-status-page .tab-block > .tab-content {
+        -webkit-backdrop-filter: blur(14px) saturate(132%) !important;
+        backdrop-filter: blur(14px) saturate(132%) !important;
+      }
+
+      html.us-sign-project-status-page #customer-info :is(
+        .panel,
+        .panel-heading,
+        .panel-body,
+        .panel-footer,
+        .panel-menu,
+        input,
+        textarea,
+        select,
+        button,
+        a.btn
+      ),
+      html.us-sign-project-status-page #content .tray-center > .pl15.pr15 > .well :is(
+        .panel,
+        .panel-heading,
+        .panel-body,
+        .panel-footer,
+        .panel-menu,
+        input,
+        textarea,
+        select,
+        button,
+        a.btn
+      ),
+      html.us-sign-project-status-page .tab-block > .tabs-left *,
+      html.us-sign-project-status-page .tab-block > .tab-content * {
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+      }
     }
 
   `);
