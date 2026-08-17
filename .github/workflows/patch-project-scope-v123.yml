@@ -15,6 +15,17 @@ jobs:
           fetch-depth: 0
       - name: Apply Project Scope v1.2.3
         run: python scripts/patch_project_scope_v123.py
+      - name: Normalize release files
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          for name in (
+              'tampermonkey/US-Sign-Project-Scope-Workspace.user.js',
+              'tampermonkey/US-Sign-Project-Scope-Workspace-v1.2.3.user.js',
+          ):
+              p = Path(name)
+              p.write_text(p.read_text().rstrip() + '\n')
+          PY
       - name: Verify
         run: |
           grep -q '@version      1.2.3' tampermonkey/US-Sign-Project-Scope-Workspace.user.js
