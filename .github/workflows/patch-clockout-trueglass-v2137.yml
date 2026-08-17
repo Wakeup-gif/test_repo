@@ -1,0 +1,35 @@
+name: Patch Clock Out true glass v2.1.37
+on:
+  push:
+    paths:
+      - "scripts/patch_clockout_trueglass_v2137.py"
+      - ".github/workflows/patch-clockout-trueglass-v2137.yml"
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply Clock Out true-glass patch
+        run: python scripts/patch_clockout_trueglass_v2137.py
+      - name: Verify true glass architecture
+        run: |
+          grep -Fq "@version      2.1.37" tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -Fq "backdrop-filter: blur(14px) saturate(96%) brightness(0.72)" tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -Fq "background-color: rgba(8, 18, 29, 0.12)" tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -Fq "avoid nested backdrop filters" tampermonkey/US-Sign-Full-UI-Theme.user.js
+      - name: Syntax check
+        run: node --check tampermonkey/US-Sign-Full-UI-Theme.user.js
+      - name: Diff check
+        run: git diff --check
+      - name: Commit canonical update
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tampermonkey/US-Sign-Full-UI-Theme.user.js
+          git commit -m "Make Clock Out modal true glass"
+          git pull --rebase origin main
+          git push origin HEAD:main
