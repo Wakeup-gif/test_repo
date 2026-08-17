@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Project and Scope Workspace
 // @namespace    us-sign-full-modules
-// @version      1.2.0
-// @description  Preserves the working Scope layout while adding performance-conscious blue glass surfaces, lighter editor chrome, and matched project cards.
+// @version      1.2.1
+// @description  Preserves the working Scope layout while explicitly leaving Project Status/Milestones on its native three-column structure.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
 // @grant        GM_addStyle
@@ -13,6 +13,10 @@
 
 (function () {
   "use strict";
+
+  // The Status/Milestones page has its own native split-pane layout. This
+  // workspace is intentionally excluded so Scope grid rules cannot reshape it.
+  if (/\/project_milestones\.php$/i.test(location.pathname)) return;
 
   GM_addStyle(String.raw`
     :root {
