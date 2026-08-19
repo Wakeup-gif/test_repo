@@ -1,0 +1,25 @@
+=== builder ===
+Built theme-aware companions and Glass/Dark suite packages.
+builder_rc=0
+=== git status ===
+ M tampermonkey/US-Sign-Dark-Glass-Theme.user.js
+ M tampermonkey/US-Sign-Description-File-Path-Tools.user.js
+ M tampermonkey/US-Sign-Design-Job-Tools.user.js
+ M tampermonkey/US-Sign-Project-Scope-Workspace.user.js
+ M tampermonkey/US-Sign-Scope-of-Work-File-Tools.user.js
+ M tampermonkey/US-Sign-UI-Runtime-Fixes.user.js
+?? packages/US-Sign-Dark-Glass-Suite-v1.0.1.zip
+?? packages/US-Sign-Glass-Suite-v1.0.0.zip
+?? tampermonkey/US-Sign-Dark-Glass-Theme-v1.0.1.user.js
+?? tampermonkey/US-Sign-Description-File-Path-Tools-v2.3.1.user.js
+?? tampermonkey/US-Sign-Design-Job-Tools-v4.1.5.user.js
+?? tampermonkey/US-Sign-Project-Scope-Workspace-v1.2.5.user.js
+?? tampermonkey/US-Sign-Scope-of-Work-File-Tools-v2.6.1.user.js
+?? tampermonkey/US-Sign-UI-Runtime-Fixes-v3.1.4.user.js
+=== syntax ===
+-- tampermonkey/US-Sign-Dark-Glass-Theme.user.js
+-- tampermonkey/US-Sign-Design-Job-Tools.user.js
+-- tampermonkey/US-Sign-Project-Scope-Workspace.user.js
+-- tampermonkey/US-Sign-Description-File-Path-Tools.user.js
+-- tampermonkey/US-Sign-Scope-of-Work-File-Tools.user.js
+-- tampermonkey/US-Sign-UI-Runtime-Fixes.user.js
