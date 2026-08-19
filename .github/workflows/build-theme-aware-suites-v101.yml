@@ -57,4 +57,4 @@ jobs:
           git commit -m "Add theme-aware companion scripts and suite packages"
           git pull --rebase origin main
           git push origin main
-# retrigger 2026-08-19
+# validated retrigger
