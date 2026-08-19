@@ -1,0 +1,52 @@
+name: Patch Dark Glass blur audit v2.2.1b
+on:
+  push:
+    paths:
+      - "scripts/patch_dark_glass_blur_audit_v221b.py"
+      - ".github/workflows/patch-dark-glass-blur-audit-v221b.yml"
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply fixes
+        run: python scripts/patch_dark_glass_blur_audit_v221b.py
+      - name: Validate
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q '@version      2.2.1' tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -q 'FULL DARK-GLASS BLUR ROOT AUDIT' tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -q '@version      4.1.6' tampermonkey/US-Sign-Design-Job-Tools.user.js
+          grep -q '@version      1.2.6' tampermonkey/US-Sign-Project-Scope-Workspace.user.js
+          grep -q '@version      2.3.2' tampermonkey/US-Sign-Description-File-Path-Tools.user.js
+          grep -q '@version      2.6.2' tampermonkey/US-Sign-Scope-of-Work-File-Tools.user.js
+          grep -q '@version      3.1.5' tampermonkey/US-Sign-UI-Runtime-Fixes.user.js
+          for f in \
+            tampermonkey/US-Sign-Full-UI-Theme.user.js \
+            tampermonkey/US-Sign-Design-Job-Tools.user.js \
+            tampermonkey/US-Sign-Project-Scope-Workspace.user.js \
+            tampermonkey/US-Sign-Description-File-Path-Tools.user.js \
+            tampermonkey/US-Sign-Scope-of-Work-File-Tools.user.js \
+            tampermonkey/US-Sign-UI-Runtime-Fixes.user.js; do node --check "$f"; done
+          git diff --check
+      - name: Commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            tampermonkey/US-Sign-Full-UI-Theme.user.js tampermonkey/US-Sign-Full-UI-Theme-v2.2.1.user.js \
+            tampermonkey/US-Sign-Design-Job-Tools.user.js tampermonkey/US-Sign-Design-Job-Tools-v4.1.6.user.js \
+            tampermonkey/US-Sign-Project-Scope-Workspace.user.js tampermonkey/US-Sign-Project-Scope-Workspace-v1.2.6.user.js \
+            tampermonkey/US-Sign-Description-File-Path-Tools.user.js tampermonkey/US-Sign-Description-File-Path-Tools-v2.3.2.user.js \
+            tampermonkey/US-Sign-Scope-of-Work-File-Tools.user.js tampermonkey/US-Sign-Scope-of-Work-File-Tools-v2.6.2.user.js \
+            tampermonkey/US-Sign-UI-Runtime-Fixes.user.js tampermonkey/US-Sign-UI-Runtime-Fixes-v3.1.5.user.js
+          git commit -m "Audit and unify Dark Glass panel blur"
+          git pull --rebase origin main
+          git push origin main
