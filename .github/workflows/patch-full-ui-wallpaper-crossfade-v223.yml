@@ -43,3 +43,4 @@ jobs:
             git commit -m "Add smooth wallpaper crossfade"
             git push origin main
           fi
+# trigger after workflow creation
