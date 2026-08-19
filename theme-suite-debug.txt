@@ -1,6 +1,53 @@
 === builder ===
 Built theme-aware companions and Glass/Dark suite packages.
 builder_rc=0
+=== expected markers ===
+rc=0 :: grep -q '@version      1.0.1' tampermonkey/US-Sign-Dark-Glass-Theme.user.js
+rc=0 :: grep -q 'us-sign-theme-dark-glass' tampermonkey/US-Sign-Dark-Glass-Theme.user.js
+rc=0 :: grep -q '@version      4.1.5' tampermonkey/US-Sign-Design-Job-Tools.user.js
+rc=0 :: grep -q '@version      1.2.5' tampermonkey/US-Sign-Project-Scope-Workspace.user.js
+rc=0 :: grep -q '@version      2.3.1' tampermonkey/US-Sign-Description-File-Path-Tools.user.js
+rc=0 :: grep -q '@version      2.6.1' tampermonkey/US-Sign-Scope-of-Work-File-Tools.user.js
+rc=0 :: grep -q '@version      3.1.4' tampermonkey/US-Sign-UI-Runtime-Fixes.user.js
+rc=0 :: test -s packages/US-Sign-Glass-Suite-v1.0.0.zip
+rc=0 :: test -s packages/US-Sign-Dark-Glass-Suite-v1.0.1.zip
+=== node syntax ===
+rc=0 :: node --check tampermonkey/US-Sign-Dark-Glass-Theme.user.js
+rc=0 :: node --check tampermonkey/US-Sign-Design-Job-Tools.user.js
+rc=0 :: node --check tampermonkey/US-Sign-Project-Scope-Workspace.user.js
+rc=0 :: node --check tampermonkey/US-Sign-Menu-Cleanup.user.js
+rc=0 :: node --check tampermonkey/US-Sign-Description-File-Path-Tools.user.js
+rc=0 :: node --check tampermonkey/US-Sign-Scope-of-Work-File-Tools.user.js
+rc=0 :: node --check tampermonkey/US-Sign-UI-Runtime-Fixes.user.js
+=== zip tests ===
+Archive:  packages/US-Sign-Glass-Suite-v1.0.0.zip
+    testing: US-Sign-Glass-Theme.user.js   OK
+    testing: US-Sign-Design-Job-Tools.user.js   OK
+    testing: US-Sign-Project-Scope-Workspace.user.js   OK
+    testing: US-Sign-Menu-Cleanup.user.js   OK
+    testing: US-Sign-Description-File-Path-Tools.user.js   OK
+    testing: US-Sign-Scope-of-Work-File-Tools.user.js   OK
+    testing: US-Sign-UI-Runtime-Fixes.user.js   OK
+    testing: manifest.json            OK
+    testing: README.txt               OK
+No errors detected in compressed data of packages/US-Sign-Glass-Suite-v1.0.0.zip.
+glass_zip_rc=0
+Archive:  packages/US-Sign-Dark-Glass-Suite-v1.0.1.zip
+    testing: US-Sign-Dark-Glass-Theme.user.js   OK
+    testing: US-Sign-Design-Job-Tools.user.js   OK
+    testing: US-Sign-Project-Scope-Workspace.user.js   OK
+    testing: US-Sign-Menu-Cleanup.user.js   OK
+    testing: US-Sign-Description-File-Path-Tools.user.js   OK
+    testing: US-Sign-Scope-of-Work-File-Tools.user.js   OK
+    testing: US-Sign-UI-Runtime-Fixes.user.js   OK
+    testing: manifest.json            OK
+    testing: README.txt               OK
+No errors detected in compressed data of packages/US-Sign-Dark-Glass-Suite-v1.0.1.zip.
+dark_zip_rc=0
+=== diff check ===
+tampermonkey/US-Sign-Project-Scope-Workspace.user.js:1449: trailing whitespace.
++  
+diff_rc=2
 === git status ===
  M tampermonkey/US-Sign-Dark-Glass-Theme.user.js
  M tampermonkey/US-Sign-Description-File-Path-Tools.user.js
@@ -16,10 +63,3 @@ builder_rc=0
 ?? tampermonkey/US-Sign-Project-Scope-Workspace-v1.2.5.user.js
 ?? tampermonkey/US-Sign-Scope-of-Work-File-Tools-v2.6.1.user.js
 ?? tampermonkey/US-Sign-UI-Runtime-Fixes-v3.1.4.user.js
-=== syntax ===
--- tampermonkey/US-Sign-Dark-Glass-Theme.user.js
--- tampermonkey/US-Sign-Design-Job-Tools.user.js
--- tampermonkey/US-Sign-Project-Scope-Workspace.user.js
--- tampermonkey/US-Sign-Description-File-Path-Tools.user.js
--- tampermonkey/US-Sign-Scope-of-Work-File-Tools.user.js
--- tampermonkey/US-Sign-UI-Runtime-Fixes.user.js
