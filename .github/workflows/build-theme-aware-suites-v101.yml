@@ -15,6 +15,23 @@ jobs:
           fetch-depth: 0
       - name: Build companion bridges and packages
         run: python scripts/build_theme_aware_suites_v101.py
+      - name: Normalize generated workspace and Dark package
+        run: |
+          sed -i 's/[[:space:]]\+$//' tampermonkey/US-Sign-Project-Scope-Workspace.user.js
+          sed -i 's/[[:space:]]\+$//' tampermonkey/US-Sign-Project-Scope-Workspace-v1.2.5.user.js
+          python - <<'PY'
+          from pathlib import Path
+          import zipfile
+          p = Path('packages/US-Sign-Dark-Glass-Suite-v1.0.1.zip')
+          with zipfile.ZipFile(p, 'r') as z:
+              entries = {i.filename: z.read(i.filename) for i in z.infolist()}
+          entries['US-Sign-Project-Scope-Workspace.user.js'] = Path('tampermonkey/US-Sign-Project-Scope-Workspace.user.js').read_bytes()
+          tmp = p.with_suffix('.tmp.zip')
+          with zipfile.ZipFile(tmp, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+              for name, data in entries.items():
+                  z.writestr(name, data)
+          tmp.replace(p)
+          PY
       - name: Validate userscripts and packages
         run: |
           grep -q '@version      1.0.1' tampermonkey/US-Sign-Dark-Glass-Theme.user.js
@@ -57,4 +74,3 @@ jobs:
           git commit -m "Add theme-aware companion scripts and suite packages"
           git pull --rebase origin main
           git push origin main
-# validated retrigger
