@@ -34,12 +34,15 @@ jobs:
               echo "-- $f"
               node --check "$f" || true
             done
-          } > theme-suite-debug.txt 2>&1
-      - name: Commit diagnostic
+          } > /tmp/theme-suite-debug.txt 2>&1
+      - name: Commit diagnostic only
         run: |
+          git reset --hard HEAD
+          git clean -fd
+          cp /tmp/theme-suite-debug.txt theme-suite-debug.txt
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add theme-suite-debug.txt
-          git commit -m "Capture theme suite build diagnostic" || true
+          git commit -m "Capture theme suite build diagnostic"
           git pull --rebase origin main
           git push origin main
