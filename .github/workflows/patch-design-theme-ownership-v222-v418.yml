@@ -19,32 +19,56 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Apply matched Design cleanup
-        run: python scripts/patch_design_theme_ownership_v222_v418.py
-      - name: Validate userscripts
+      - name: Apply, validate, and publish
+        shell: bash
         run: |
-          node --check tampermonkey/US-Sign-Full-UI-Theme.user.js
-          node --check tampermonkey/US-Sign-Design-Job-Tools.user.js
-          node --check tampermonkey/US-Sign-Full-UI-Theme-v2.2.2.user.js
-          node --check tampermonkey/US-Sign-Design-Job-Tools-v4.1.8.user.js
-          grep -q '@version      2.2.2' tampermonkey/US-Sign-Full-UI-Theme.user.js
-          grep -q '@version      4.1.8' tampermonkey/US-Sign-Design-Job-Tools.user.js
-          grep -q 'usSignDesignPaintOwner = "full-ui"' tampermonkey/US-Sign-Design-Job-Tools.user.js
-          grep -q 'v2.2.2 DESIGN PAGE PAINT OWNERSHIP' tampermonkey/US-Sign-Full-UI-Theme.user.js
-          git diff --check
-      - name: Commit canonical and fresh installers
-        run: |
+          set +e
+          rm -f design-theme-ownership-debug.txt
+          {
+            echo "=== patcher ==="
+            python scripts/patch_design_theme_ownership_v222_v418.py
+            PATCH_RC=$?
+            echo "patcher_rc=$PATCH_RC"
+            echo "=== validation ==="
+            if [ "$PATCH_RC" -eq 0 ]; then
+              node --check tampermonkey/US-Sign-Full-UI-Theme.user.js
+              V1=$?
+              node --check tampermonkey/US-Sign-Design-Job-Tools.user.js
+              V2=$?
+              node --check tampermonkey/US-Sign-Full-UI-Theme-v2.2.2.user.js
+              V3=$?
+              node --check tampermonkey/US-Sign-Design-Job-Tools-v4.1.8.user.js
+              V4=$?
+              grep -q '@version      2.2.2' tampermonkey/US-Sign-Full-UI-Theme.user.js; G1=$?
+              grep -q '@version      4.1.8' tampermonkey/US-Sign-Design-Job-Tools.user.js; G2=$?
+              grep -q 'usSignDesignPaintOwner = "full-ui"' tampermonkey/US-Sign-Design-Job-Tools.user.js; G3=$?
+              grep -q 'v2.2.2 DESIGN PAGE PAINT OWNERSHIP' tampermonkey/US-Sign-Full-UI-Theme.user.js; G4=$?
+              git diff --check
+              GD=$?
+              echo "node=$V1,$V2,$V3,$V4 grep=$G1,$G2,$G3,$G4 diff=$GD"
+              if [ "$V1$V2$V3$V4$G1$G2$G3$G4$GD" = "000000000" ]; then
+                VALID_RC=0
+              else
+                VALID_RC=1
+              fi
+            else
+              VALID_RC=1
+            fi
+            echo "valid_rc=$VALID_RC"
+          } > design-theme-ownership-debug.txt 2>&1
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            tampermonkey/US-Sign-Full-UI-Theme.user.js \
-            tampermonkey/US-Sign-Design-Job-Tools.user.js \
-            tampermonkey/US-Sign-Full-UI-Theme-v2.2.2.user.js \
-            tampermonkey/US-Sign-Design-Job-Tools-v4.1.8.user.js
-          if git diff --cached --quiet; then
-            echo "No generated changes to commit"
-          else
+
+          if grep -q 'valid_rc=0' design-theme-ownership-debug.txt; then
+            git add \
+              tampermonkey/US-Sign-Full-UI-Theme.user.js \
+              tampermonkey/US-Sign-Design-Job-Tools.user.js \
+              tampermonkey/US-Sign-Full-UI-Theme-v2.2.2.user.js \
+              tampermonkey/US-Sign-Design-Job-Tools-v4.1.8.user.js
             git commit -m "Centralize Design paint in Full UI"
-            git push origin main
+          else
+            git add design-theme-ownership-debug.txt
+            git commit -m "Capture Design theme ownership diagnostic"
           fi
-# trigger after workflow creation
+          git push origin main
