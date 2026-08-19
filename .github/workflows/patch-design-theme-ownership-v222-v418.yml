@@ -1,0 +1,49 @@
+name: Patch Design theme ownership v2.2.2 + v4.1.8
+on:
+  push:
+    paths:
+      - "scripts/patch_design_theme_ownership_v222_v418.py"
+      - ".github/workflows/patch-design-theme-ownership-v222-v418.yml"
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Apply matched Design cleanup
+        run: python scripts/patch_design_theme_ownership_v222_v418.py
+      - name: Validate userscripts
+        run: |
+          node --check tampermonkey/US-Sign-Full-UI-Theme.user.js
+          node --check tampermonkey/US-Sign-Design-Job-Tools.user.js
+          node --check tampermonkey/US-Sign-Full-UI-Theme-v2.2.2.user.js
+          node --check tampermonkey/US-Sign-Design-Job-Tools-v4.1.8.user.js
+          grep -q '@version      2.2.2' tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -q '@version      4.1.8' tampermonkey/US-Sign-Design-Job-Tools.user.js
+          grep -q 'usSignDesignPaintOwner = "full-ui"' tampermonkey/US-Sign-Design-Job-Tools.user.js
+          grep -q 'v2.2.2 DESIGN PAGE PAINT OWNERSHIP' tampermonkey/US-Sign-Full-UI-Theme.user.js
+          git diff --check
+      - name: Commit canonical and fresh installers
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            tampermonkey/US-Sign-Full-UI-Theme.user.js \
+            tampermonkey/US-Sign-Design-Job-Tools.user.js \
+            tampermonkey/US-Sign-Full-UI-Theme-v2.2.2.user.js \
+            tampermonkey/US-Sign-Design-Job-Tools-v4.1.8.user.js
+          if git diff --cached --quiet; then
+            echo "No generated changes to commit"
+          else
+            git commit -m "Centralize Design paint in Full UI"
+            git push origin main
+          fi
