@@ -10,6 +10,7 @@ def read(name):
 
 
 def write(name, text):
+    text = re.sub(r'[ \t]+$', '', text, flags=re.M)
     (TM / name).write_text(text, encoding='utf-8', newline='\n')
 
 
@@ -20,18 +21,20 @@ def replace_once(text, old, new, label):
     return text.replace(old, new, 1)
 
 
+BRIDGE_PATTERN = (
+    r'  function installDarkGlassThemeBridge\(\) \{.*?'
+    r'themeStyle\.textContent = `(?P<css>.*?)`;\n\s*'
+    r'\(document\.head \|\| document\.documentElement\)\.appendChild\(themeStyle\);\n'
+    r'  \}\n\n  installDarkGlassThemeBridge\(\);'
+)
+
 # ---------------------------------------------------------------------------
-# Read current Design bridge before removing it. The goal of this release is
-# to preserve the current look while moving visual ownership into Full UI.
+# Read current Design bridge before removing it. Preserve its working paint by
+# migrating that CSS into Full UI, then add the screenshot-driven refinements.
 # ---------------------------------------------------------------------------
 design_name = 'US-Sign-Design-Job-Tools.user.js'
 design = read(design_name)
-
-bridge_match = re.search(
-    r'  function installDarkGlassThemeBridge\(\) \{.*?themeStyle\.textContent = `(?P<css>.*?)`;\n\s*\(document\.head \|\| document\.documentElement\)\.appendChild\(themeStyle\);\n  \}\n\n  installDarkGlassThemeBridge\(\);',
-    design,
-    flags=re.S,
-)
+bridge_match = re.search(BRIDGE_PATTERN, design, flags=re.S)
 if not bridge_match:
     raise RuntimeError('Could not locate Design Dark Glass bridge')
 
@@ -83,9 +86,6 @@ refine_css = r'''
       --us-design-gap: 14px;
     }
 
-    /* Layout wrappers must never become extra dark plates behind the real
-       glass cards. Keeping these transparent is what lets the wallpaper feed
-       the 14px backdrop blur instead of blurring an opaque parent. */
     html.us-sign-theme-dark-glass.us-sign-design-page body :is(
       #us-sign-design-bottom-grid,
       #us-sign-design-right-stack,
@@ -102,7 +102,6 @@ refine_css = r'''
       backdrop-filter: none !important;
     }
 
-    /* One visual recipe for every major Design card. */
     html.us-sign-theme-dark-glass.us-sign-design-page body :is(
       #us-sign-design-actionbar,
       #us-sign-job-overview,
@@ -128,8 +127,6 @@ refine_css = r'''
       gap: var(--us-design-gap) !important;
     }
 
-    /* Action bar: slightly larger targets and clearer grouping without making
-       the toolbar feel oversized. */
     html.us-sign-theme-dark-glass.us-sign-design-page body #us-sign-design-actionbar {
       min-height: 52px !important;
       padding: 9px 10px !important;
@@ -157,7 +154,6 @@ refine_css = r'''
       outline: none !important;
     }
 
-    /* Keep destructive action semantically obvious and creation actions blue. */
     html.us-sign-theme-dark-glass.us-sign-design-page body #delete-design[data-us-action="danger"] {
       color: #ffdada !important;
       background: rgba(132,42,46,.44) !important;
@@ -172,7 +168,6 @@ refine_css = r'''
       border-color: rgba(112,184,236,.34) !important;
     }
 
-    /* Job Overview: more breathing room and clearer label/value hierarchy. */
     html.us-sign-theme-dark-glass.us-sign-design-page body #us-sign-job-overview .us-sign-overview-stack {
       gap: 6px !important;
       padding: 6px 7px 6px 0 !important;
@@ -210,8 +205,6 @@ refine_css = r'''
       font-weight: 600 !important;
     }
 
-    /* Summary cells read as a single card with five quiet sections, not five
-       competing mini-panels. */
     html.us-sign-theme-dark-glass.us-sign-design-page body #us-sign-design-summary {
       gap: 4px !important;
       padding: 5px !important;
@@ -224,7 +217,6 @@ refine_css = r'''
       border-radius: 7px !important;
     }
 
-    /* Panel headers use one consistent 40px rhythm and no Bootstrap bevels. */
     html.us-sign-theme-dark-glass.us-sign-design-page body :is(
       #us-sign-design-bottom-grid > .us-sign-description-panel,
       #us-sign-design-right-stack > .us-sign-designs-panel,
@@ -242,7 +234,6 @@ refine_css = r'''
       box-shadow: none !important;
     }
 
-    /* Body copy was a little cramped in the screenshot. */
     html.us-sign-theme-dark-glass.us-sign-design-page body #us-sign-design-bottom-grid > .us-sign-description-panel > .panel-body {
       width: 100% !important;
       max-width: none !important;
@@ -256,8 +247,6 @@ refine_css = r'''
       padding: 9px 11px 11px !important;
     }
 
-    /* Native tables/rows: kill residual Bootstrap paint and keep row hit areas
-       large enough to scan/click. */
     html.us-sign-theme-dark-glass.us-sign-design-page body #us-sign-design-right-stack table,
     html.us-sign-theme-dark-glass.us-sign-design-page body #us-sign-design-right-stack :is(tbody,tr,td,th)[bgcolor] {
       background: transparent !important;
@@ -281,7 +270,6 @@ refine_css = r'''
       color: #fff !important;
     }
 
-    /* Focus is visible without a bright default browser outline artifact. */
     html.us-sign-theme-dark-glass.us-sign-design-page body :is(button,a.btn,[role="button"]):focus-visible {
       outline: 2px solid rgba(154,205,244,.52) !important;
       outline-offset: 2px !important;
@@ -298,7 +286,7 @@ write(theme_name, theme)
 
 # ---------------------------------------------------------------------------
 # Design Job Tools 4.1.8 — remove late visual CSS injection. Keep a small marker
-# for diagnostics so it is obvious Full UI owns paint in future audits.
+# for diagnostics so future audits make ownership obvious.
 # ---------------------------------------------------------------------------
 design = replace_once(design, '// @version      4.1.7', '// @version      4.1.8', 'Design version')
 design = replace_once(
@@ -310,10 +298,11 @@ design = replace_once(
 design = replace_once(design, 'const VERSION = "4.1.7";', 'const VERSION = "4.1.8";', 'Design VERSION const')
 
 replacement_bridge = '''  function installDarkGlassThemeBridge() {\n    if (!document.documentElement?.classList.contains("us-sign-theme-dark-glass")) return;\n    document.documentElement.dataset.usSignDesignPaintOwner = "full-ui";\n  }\n\n  installDarkGlassThemeBridge();'''
-design = design[:bridge_match.start()] + replacement_bridge + design[bridge_match.end():]
+design, bridge_count = re.subn(BRIDGE_PATTERN, lambda _: replacement_bridge, design, count=1, flags=re.S)
+if bridge_count != 1:
+    raise RuntimeError(f'Design bridge removal: expected 1 match, found {bridge_count}')
 write(design_name, design)
 
-# Fresh installers for Tampermonkey fallback.
 write('US-Sign-Full-UI-Theme-v2.2.2.user.js', theme)
 write('US-Sign-Design-Job-Tools-v4.1.8.user.js', design)
 
