@@ -1,0 +1,35 @@
+name: Patch Design page polish v4.1.7
+on:
+  push:
+    paths:
+      - "scripts/patch_design_page_polish_v417.py"
+      - ".github/workflows/patch-design-page-polish-v417.yml"
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply Design page polish
+        run: python scripts/patch_design_page_polish_v417.py
+      - name: Validate userscript
+        run: |
+          node --check tampermonkey/US-Sign-Design-Job-Tools.user.js
+          node --check tampermonkey/US-Sign-Design-Job-Tools-v4.1.7.user.js
+          git diff --check
+          grep -F "// @version      4.1.7" tampermonkey/US-Sign-Design-Job-Tools.user.js
+          grep -F "v4.1.7 DESIGN DARK GLASS POLISH" tampermonkey/US-Sign-Design-Job-Tools.user.js
+          grep -F "No files attached" tampermonkey/US-Sign-Design-Job-Tools.user.js
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tampermonkey/US-Sign-Design-Job-Tools.user.js tampermonkey/US-Sign-Design-Job-Tools-v4.1.7.user.js
+          git commit -m "Polish Design page Dark Glass UI"
+          git push origin HEAD:main
