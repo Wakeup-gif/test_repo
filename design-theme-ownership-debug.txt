@@ -1,26 +1,5 @@
 === patcher ===
-patched theme 2.2.2 and design tools 4.1.8
-patcher_rc=0
+python: can't open file '/home/runner/work/test_repo/test_repo/scripts/patch_design_theme_ownership_v222_v418.py': [Errno 2] No such file or directory
+patcher_rc=2
 === validation ===
-/home/runner/work/test_repo/test_repo/tampermonkey/US-Sign-Design-Job-Tools.user.js:32
-  function installDarkGlassThemeBridg  function installDarkGlassThemeBridge() {
-                                       ^^^^^^^^
-
-SyntaxError: Unexpected token 'function'
-    at wrapSafe (node:internal/modules/cjs/loader:1713:18)
-    at checkSyntax (node:internal/main/check_syntax:78:3)
-
-Node.js v22.23.2
-/home/runner/work/test_repo/test_repo/tampermonkey/US-Sign-Design-Job-Tools-v4.1.8.user.js:32
-  function installDarkGlassThemeBridg  function installDarkGlassThemeBridge() {
-                                       ^^^^^^^^
-
-SyntaxError: Unexpected token 'function'
-    at wrapSafe (node:internal/modules/cjs/loader:1713:18)
-    at checkSyntax (node:internal/main/check_syntax:78:3)
-
-Node.js v22.23.2
-tampermonkey/US-Sign-Full-UI-Theme.user.js:5186: trailing whitespace.
-+    
-node=0,1,0,1 grep=0,0,0,0 diff=2
 valid_rc=1
