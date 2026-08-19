@@ -47,3 +47,4 @@ jobs:
             git commit -m "Centralize Design paint in Full UI"
             git push origin main
           fi
+# trigger after workflow creation
