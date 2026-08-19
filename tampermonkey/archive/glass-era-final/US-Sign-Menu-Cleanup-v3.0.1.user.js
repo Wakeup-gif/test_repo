@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         US Sign Menu Cleanup and Reorder
 // @namespace    us-sign-full-modules
-// @version      3.0.2
+// @version      3.0.1
 // @description  Lightweight sidebar cleanup, project ordering, compact rail controls, project-page marker, and native sticky rail in one bounded runtime.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-idle
@@ -14,8 +14,8 @@
 (function () {
   "use strict";
 
-  if (window.__usSignMenuCleanupV302) return;
-  window.__usSignMenuCleanupV302 = true;
+  if (window.__usSignMenuCleanupV301) return;
+  window.__usSignMenuCleanupV301 = true;
 
   const SIDEBAR_HIDDEN_LINKS = new Set([
     "LEADS", "QUEUES", "PURCHASING", "SCHEDULE", "INSTALL CALENDAR",
@@ -82,8 +82,8 @@
       height: 29px !important;
       margin: 5px 0 10px !important;
       padding: 2px !important;
-      background: var(--us-glass-strong, #0b0b0e) !important;
-      border: 1px solid var(--us-border, rgba(255,255,255,.08)) !important;
+      background: var(--us-glass-strong, #171b20) !important;
+      border: 1px solid var(--us-border, #2d343c) !important;
       border-radius: 7px !important;
       box-shadow: none !important;
       white-space: nowrap !important;
@@ -131,7 +131,7 @@
     #us-sign-rail-nav-group > input[type="button"]:hover,
     #us-sign-rail-nav-group > input[type="submit"]:hover {
       color: var(--us-text, #f5f7f9) !important;
-      background: var(--us-hover, #232328) !important;
+      background: var(--us-hover, #262c33) !important;
     }
 
     #us-sign-rail-counter {
@@ -145,9 +145,9 @@
       min-height: 23px !important;
       padding: 0 6px !important;
       color: var(--us-text-soft, #d4dbe3) !important;
-      background: var(--us-bg-soft, #141418) !important;
+      background: var(--us-bg-soft, #252d35) !important;
       background-image: none !important;
-      border: 1px solid var(--us-border-strong, rgba(255,255,255,.12)) !important;
+      border: 1px solid var(--us-border-strong, #3a4652) !important;
       border-radius: 4px !important;
       box-shadow: none !important;
       font-size: 11px !important;
@@ -191,9 +191,9 @@
       margin: 0 !important;
       padding: 0 7px !important;
       color: var(--us-text-soft, #d1d7de) !important;
-      background: var(--us-glass, #101013) !important;
+      background: var(--us-glass, #1d2228) !important;
       background-image: none !important;
-      border: 1px solid var(--us-border, rgba(255,255,255,.08)) !important;
+      border: 1px solid var(--us-border, #353e48) !important;
       border-radius: 6px !important;
       box-shadow: none !important;
       font-size: 10.5px !important;
@@ -208,8 +208,8 @@
 
     #us-sign-rail-action-group > *:hover {
       color: var(--us-text, #f5f7f9) !important;
-      background: var(--us-hover, #232328) !important;
-      border-color: var(--us-border-strong, rgba(255,255,255,.13)) !important;
+      background: var(--us-hover, #282e35) !important;
+      border-color: var(--us-border-strong, #4b5662) !important;
     }
 
     #us-sign-rail-action-group > *::before,

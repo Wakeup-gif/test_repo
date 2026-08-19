@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         US Sign Scope of Work File Tools
 // @namespace    us-sign-full-modules
-// @version      2.6.1
+// @version      2.6.0
 // @description  Adds project-folder and reference-link controls from Important Notes with reliable OneCommander launching.
 // @match        https://ussignandmill.squarecoil.net/project.php*
 // @run-at       document-idle
@@ -16,8 +16,8 @@
 (function () {
   "use strict";
 
-  if (window.__usSignScopeFileToolsV261) return;
-  window.__usSignScopeFileToolsV261 = true;
+  if (window.__usSignScopeFileToolsV260) return;
+  window.__usSignScopeFileToolsV260 = true;
 
   const HOST_ID = "us-sign-scope-file-tools";
   const PROTOCOL = "ussign-onecommander";
@@ -81,32 +81,6 @@
       font-size:10.5px !important;
     }
     #${HOST_ID} button:disabled { opacity:.38; cursor:not-allowed; }
-
-    html.us-sign-theme-dark-glass body #${HOST_ID} {
-      color:#d0d0d4;
-      background:rgba(11,11,14,.46);
-      border-color:rgba(255,255,255,.070);
-    }
-    html.us-sign-theme-dark-glass body #${HOST_ID} .us-file-title {
-      color:#eeeeef;
-      border-bottom-color:rgba(255,255,255,.065);
-    }
-    html.us-sign-theme-dark-glass body #${HOST_ID} .us-file-label { color:#96969d; }
-    html.us-sign-theme-dark-glass body #${HOST_ID} .us-path-value {
-      color:#ccccd1;
-      background:rgba(255,255,255,.025);
-      border-color:rgba(255,255,255,.070);
-    }
-    html.us-sign-theme-dark-glass body #${HOST_ID} button {
-      color:#d2d2d6 !important;
-      background:rgba(255,255,255,.038) !important;
-      border-color:rgba(255,255,255,.085) !important;
-    }
-    html.us-sign-theme-dark-glass body #${HOST_ID} button:hover:not(:disabled) {
-      color:#fff !important;
-      background:rgba(255,255,255,.070) !important;
-      border-color:rgba(255,255,255,.12) !important;
-    }
     @media(max-width:700px){
       #${HOST_ID} .us-path-row{grid-template-columns:1fr;}
       #${HOST_ID} .us-link-grid{grid-template-columns:repeat(2,minmax(0,1fr));}

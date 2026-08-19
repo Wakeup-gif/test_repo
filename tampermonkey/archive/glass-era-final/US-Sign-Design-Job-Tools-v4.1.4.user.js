@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         US Sign - Design Job Tools
 // @namespace    us-sign-local-tools
-// @version      4.1.5
+// @version      4.1.4
 // @description  Stable Design workspace with bounded startup discovery, one scoped data observer, and no permanent content watcher.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-idle
@@ -27,65 +27,7 @@
     lookup: "us-sign-job-lookup-button"
   };
 
-  const VERSION = "4.1.5";
-
-  function installDarkGlassThemeBridge() {
-    if (!document.documentElement?.classList.contains("us-sign-theme-dark-glass")) return;
-    if (document.getElementById("us-sign-design-dark-glass-bridge")) return;
-    const themeStyle = document.createElement("style");
-    themeStyle.id = "us-sign-design-dark-glass-bridge";
-    themeStyle.textContent = `
-      html.us-sign-theme-dark-glass body #${IDS.actionbar},
-      html.us-sign-theme-dark-glass body #${IDS.overview},
-      html.us-sign-theme-dark-glass body #${IDS.summary},
-      html.us-sign-theme-dark-glass body #${IDS.bottomGrid},
-      html.us-sign-theme-dark-glass body #${IDS.rightStack},
-      html.us-sign-theme-dark-glass body .us-sign-designs-panel,
-      html.us-sign-theme-dark-glass body .us-sign-files-panel,
-      html.us-sign-theme-dark-glass body .us-sign-description-panel {
-        background-color: rgba(11, 11, 14, 0.62) !important;
-        background-image: linear-gradient(180deg, rgba(255,255,255,0.022), rgba(255,255,255,0.004)) !important;
-        border-color: rgba(255, 255, 255, 0.075) !important;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.18) !important;
-      }
-
-      html.us-sign-theme-dark-glass body #${IDS.summary} .us-sign-djt-summary-cell,
-      html.us-sign-theme-dark-glass body #${IDS.overview} td,
-      html.us-sign-theme-dark-glass body #${IDS.overview} th {
-        background-color: rgba(255, 255, 255, 0.012) !important;
-        border-color: rgba(255, 255, 255, 0.055) !important;
-      }
-
-      html.us-sign-theme-dark-glass body #${IDS.lookup},
-      html.us-sign-theme-dark-glass body #${IDS.actionbar} :is(a,button,.btn):not([data-us-state]),
-      html.us-sign-theme-dark-glass body #${IDS.copyTools} :is(a,button,.btn):not([data-us-state]),
-      html.us-sign-theme-dark-glass body #${IDS.nativeActions} :is(a,button,.btn):not([data-us-state]) {
-        color: #d5d5d8 !important;
-        background: rgba(255, 255, 255, 0.038) !important;
-        border-color: rgba(255, 255, 255, 0.080) !important;
-        box-shadow: none !important;
-      }
-
-      html.us-sign-theme-dark-glass body #${IDS.lookup}:hover,
-      html.us-sign-theme-dark-glass body #${IDS.actionbar} :is(a,button,.btn):not([data-us-state]):hover,
-      html.us-sign-theme-dark-glass body #${IDS.copyTools} :is(a,button,.btn):not([data-us-state]):hover,
-      html.us-sign-theme-dark-glass body #${IDS.nativeActions} :is(a,button,.btn):not([data-us-state]):hover {
-        color: #fff !important;
-        background: rgba(255, 255, 255, 0.070) !important;
-        border-color: rgba(255, 255, 255, 0.120) !important;
-      }
-
-      html.us-sign-theme-dark-glass body #${IDS.bottomGrid} :is(.panel,.well),
-      html.us-sign-theme-dark-glass body #${IDS.rightStack} :is(.panel,.well) {
-        -webkit-backdrop-filter: none !important;
-        backdrop-filter: none !important;
-      }
-    `;
-    (document.head || document.documentElement).appendChild(themeStyle);
-  }
-
-  installDarkGlassThemeBridge();
-
+  const VERSION = "4.1.4";
 
   const NATIVE_ACTION_ORDER = [
     "EDIT",

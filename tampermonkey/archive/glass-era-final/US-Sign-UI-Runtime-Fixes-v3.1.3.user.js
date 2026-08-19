@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         US Sign - UI Runtime Fixes
 // @namespace    us-sign-local-tools
-// @version      3.1.4
+// @version      3.1.3
 // @description  Lightweight cached logo and CKEditor iframe styling. No page-wide observers, color crawlers, or Scope DOM ownership.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-idle
@@ -17,10 +17,10 @@
 (function () {
   "use strict";
 
-  if (window.__usSignUiRuntimeV314) return;
-  window.__usSignUiRuntimeV314 = true;
+  if (window.__usSignUiRuntimeV313) return;
+  window.__usSignUiRuntimeV313 = true;
 
-  const VERSION = "3.1.4";
+  const VERSION = "3.1.3";
   const CUSTOM_LOGO_URL = "https://i.imgur.com/7I1u2iF.png";
   const LOGO_CACHE_KEY = "us-sign-custom-logo-data-v1";
   const processedIframes = new WeakSet();
@@ -133,17 +133,6 @@
       font[color="red"], [style*="color: red" i], [style*="#ff0000" i] { color: #d9aaaa !important; }
       font[color="green"], [style*="color: green" i], [style*="#008000" i] { color: #acd0b5 !important; }
     `;
-
-    if (document.documentElement?.classList.contains("us-sign-theme-dark-glass")) {
-      style.textContent += `
-        html, body { background:#0d0d0f !important; color:#d4d4d7 !important; }
-        a { color:#c6c8cc !important; }
-        strong, b, h1, h2, h3, h4, h5, h6 { color:#f4f4f5 !important; }
-        font[color="blue"], [style*="color: blue" i], [style*="#0000ff" i] { color:#c3c5c9 !important; }
-        font[color="red"], [style*="color: red" i], [style*="#ff0000" i] { color:#dbaaaa !important; }
-        font[color="green"], [style*="color: green" i], [style*="#008000" i] { color:#b6d1bb !important; }
-      `;
-    }
     (editorDocument.head || editorDocument.documentElement).appendChild(style);
   }
 

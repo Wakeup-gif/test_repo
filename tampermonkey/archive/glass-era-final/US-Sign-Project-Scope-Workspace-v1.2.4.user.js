@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         US Sign Project and Scope Workspace
 // @namespace    us-sign-full-modules
-// @version      1.2.5
+// @version      1.2.4
 // @description  Preserves native Status and repairs the live Scope editor around its actual SquareCoil DOM with aligned controls, true glass, and a cleaner CKEditor formatting toolbar.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
@@ -1446,57 +1446,7 @@
       min-width: 74px !important;
     }
 
-
-
-    /* v1.2.5: Dark Glass bridge. Scoped so the preserved Glass theme is untouched. */
-    html.us-sign-theme-dark-glass {
-      --us-ws-bg: rgba(11, 11, 14, 0.58);
-      --us-ws-soft-bg: rgba(255, 255, 255, 0.020);
-      --us-ws-line: rgba(255, 255, 255, 0.070);
-      --us-ws-line-strong: rgba(255, 255, 255, 0.105);
-      --us-ws-accent: rgba(255, 255, 255, 0.060);
-    }
-
-    html.us-sign-theme-dark-glass body:has(#pmlt) #customer-info,
-    html.us-sign-theme-dark-glass body:has(#pmlt) #content .tray-center > .pl15.pr15 > .well:has(.important-notes),
-    html.us-sign-theme-dark-glass body:has(#pmlt) #content .tray-center > .pl15.pr15 > .well.us-sign-scope-enhanced {
-      background-color: rgba(11, 11, 14, 0.66) !important;
-      background-image: linear-gradient(180deg, rgba(255,255,255,0.026), rgba(255,255,255,0.004)) !important;
-      border-color: rgba(255,255,255,0.072) !important;
-      -webkit-backdrop-filter: blur(var(--us-dark-glass-blur, 14px)) saturate(var(--us-dark-glass-saturation, 108%)) brightness(var(--us-dark-glass-brightness, .90)) !important;
-      backdrop-filter: blur(var(--us-dark-glass-blur, 14px)) saturate(var(--us-dark-glass-saturation, 108%)) brightness(var(--us-dark-glass-brightness, .90)) !important;
-    }
-
-    html.us-sign-theme-dark-glass body:has(#pmlt) #us-sign-scope-header button.multiselect,
-    html.us-sign-theme-dark-glass body:has(#pmlt) #us-sign-scope-header .multiselect-native-select > .btn-group > .btn,
-    html.us-sign-theme-dark-glass body:has(#pmlt) #us-sign-scope-header #insert-btn,
-    html.us-sign-theme-dark-glass body:has(#pmlt) #customer-info #showbtns .btn {
-      color: #d5d5d8 !important;
-      background: rgba(255,255,255,0.040) !important;
-      border-color: rgba(255,255,255,0.090) !important;
-    }
-
-    html.us-sign-theme-dark-glass body:has(#pmlt) #us-sign-scope-header .multiselect-container.dropdown-menu {
-      background: rgba(12, 12, 15, 0.96) !important;
-      border-color: rgba(255,255,255,0.10) !important;
-    }
-
-    html.us-sign-theme-dark-glass body:has(#pmlt) .well.us-sign-scope-enhanced :is(.cke, .cke_chrome, .cke_inner) {
-      background: rgba(10, 10, 13, 0.46) !important;
-      border-color: rgba(255,255,255,0.065) !important;
-      -webkit-backdrop-filter: none !important;
-      backdrop-filter: none !important;
-    }
-
-    html.us-sign-theme-dark-glass body:has(#pmlt) .well.us-sign-scope-enhanced .cke_top {
-      background: rgba(255,255,255,0.018) !important;
-      border-bottom-color: rgba(255,255,255,0.060) !important;
-    }
-
-    html.us-sign-theme-dark-glass body:has(#pmlt) .well.us-sign-scope-enhanced .cke_contents {
-      background: rgba(8, 8, 10, 0.30) !important;
-    }
-`);
+  `);
 
   // CKEditor is a same-origin iframe. The outer Scope well owns the expensive
   // Gaussian blur; this bounded pass makes the iframe canvas transparent so the

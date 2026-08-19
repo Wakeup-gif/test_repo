@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         US Sign - Description File Path Tools
 // @namespace    us-sign-local-tools
-// @version      2.3.1
+// @version      2.3.0
 // @description  Lightweight Description path detection with one scoped observer, no page-wide watcher, and no DOM cloning.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-idle
@@ -14,8 +14,8 @@
 (function () {
   "use strict";
 
-  if (window.__usSignDescriptionPathToolsV231) return;
-  window.__usSignDescriptionPathToolsV231 = true;
+  if (window.__usSignDescriptionPathToolsV230) return;
+  window.__usSignDescriptionPathToolsV230 = true;
 
   const HOST_ID = "us-sign-description-path-tools-standalone";
   const LEGACY_HOST_ID = "us-sign-description-path-tools";
@@ -216,12 +216,6 @@
         button:hover { color:#fff; background:rgba(255,255,255,.065); }
         .path { min-width:0; overflow:hidden; text-align:left; text-overflow:ellipsis; white-space:nowrap; font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace; font-size:9.5px; }
         .open { white-space:nowrap; font-weight:600; }
-
-        :host-context(html.us-sign-theme-dark-glass) { color:#eeeeef; }
-        :host-context(html.us-sign-theme-dark-glass) .toolbar { background:rgba(12,12,15,.90); border-color:rgba(255,255,255,.075); }
-        :host-context(html.us-sign-theme-dark-glass) .heading { color:#9c9ca3; }
-        :host-context(html.us-sign-theme-dark-glass) button { color:#d1d1d5; background:rgba(255,255,255,.038); border-color:rgba(255,255,255,.085); }
-        :host-context(html.us-sign-theme-dark-glass) button:hover { color:#fff; background:rgba(255,255,255,.070); border-color:rgba(255,255,255,.12); }
       </style>
       <section class="toolbar" aria-label="Description file paths">
         <h3 class="heading">File paths</h3>
