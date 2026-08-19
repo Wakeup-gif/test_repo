@@ -1,0 +1,45 @@
+name: Patch Full UI wallpaper crossfade v2.2.3
+on:
+  push:
+    paths:
+      - "scripts/patch_full_ui_wallpaper_crossfade_v223.py"
+      - ".github/workflows/patch-full-ui-wallpaper-crossfade-v223.yml"
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Apply wallpaper crossfade patch
+        run: python scripts/patch_full_ui_wallpaper_crossfade_v223.py
+      - name: Validate userscripts
+        run: |
+          node --check tampermonkey/US-Sign-Full-UI-Theme.user.js
+          node --check tampermonkey/US-Sign-Full-UI-Theme-v2.2.3.user.js
+          grep -q '@version      2.2.3' tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -q 'PRELOADED WALLPAPER CROSSFADE' tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -q 'usSignQueueWallpaperTransition' tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -q -- '-webkit-cross-fade' tampermonkey/US-Sign-Full-UI-Theme.user.js
+          git diff --check
+      - name: Commit canonical and fresh installer
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            tampermonkey/US-Sign-Full-UI-Theme.user.js \
+            tampermonkey/US-Sign-Full-UI-Theme-v2.2.3.user.js
+          if git diff --cached --quiet; then
+            echo "No generated changes to commit"
+          else
+            git commit -m "Add smooth wallpaper crossfade"
+            git push origin main
+          fi
