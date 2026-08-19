@@ -1,5 +1,0 @@
-=== patcher ===
-python: can't open file '/home/runner/work/test_repo/test_repo/scripts/patch_design_theme_ownership_v222_v418.py': [Errno 2] No such file or directory
-patcher_rc=2
-=== validation ===
-valid_rc=1
