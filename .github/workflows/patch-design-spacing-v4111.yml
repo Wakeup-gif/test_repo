@@ -1,0 +1,43 @@
+name: Patch Design spacing v4.1.11
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - scripts/patch_design_spacing_v4111.py
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch Design Job Tools
+        run: python scripts/patch_design_spacing_v4111.py
+
+      - name: Validate JavaScript
+        run: |
+          node --check tampermonkey/US-Sign-Design-Job-Tools.user.js
+          node --check tampermonkey/US-Sign-Design-Job-Tools-v4.1.11.user.js
+          grep -F '// @version      4.1.11' tampermonkey/US-Sign-Design-Job-Tools.user.js
+          grep -F 'margin:"0 0 12px"' tampermonkey/US-Sign-Design-Job-Tools.user.js
+          cmp tampermonkey/US-Sign-Design-Job-Tools.user.js tampermonkey/US-Sign-Design-Job-Tools-v4.1.11.user.js
+          git diff --check
+
+      - name: Commit release
+        run: |
+          if git diff --quiet -- tampermonkey/US-Sign-Design-Job-Tools.user.js tampermonkey/US-Sign-Design-Job-Tools-v4.1.11.user.js; then
+            echo 'No changes to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- tampermonkey/US-Sign-Design-Job-Tools.user.js tampermonkey/US-Sign-Design-Job-Tools-v4.1.11.user.js
+          git commit -m 'Add vertical spacing between job state and overview'
+          git push origin HEAD:main
