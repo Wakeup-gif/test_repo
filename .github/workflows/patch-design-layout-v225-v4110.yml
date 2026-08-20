@@ -1,0 +1,43 @@
+name: Patch Design layout v2.2.5 + v4.1.10
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - scripts/patch_design_layout_v225_v4110.py
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch canonical scripts
+        run: python scripts/patch_design_layout_v225_v4110.py
+
+      - name: Validate JavaScript and diff
+        run: |
+          node --check tampermonkey/US-Sign-Full-UI-Theme.user.js
+          node --check tampermonkey/US-Sign-Design-Job-Tools.user.js
+          node --check tampermonkey/US-Sign-Full-UI-Theme-v2.2.5.user.js
+          node --check tampermonkey/US-Sign-Design-Job-Tools-v4.1.10.user.js
+          grep -q '@version      2.2.5' tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -q '@version      4.1.10' tampermonkey/US-Sign-Design-Job-Tools.user.js
+          grep -q 'v2.2.5 DESIGN INFORMATION HIERARCHY' tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -q 'us-sign-design-project-controls' tampermonkey/US-Sign-Design-Job-Tools.user.js
+          git diff --check
+
+      - name: Commit canonical release
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- tampermonkey/US-Sign-Full-UI-Theme.user.js tampermonkey/US-Sign-Full-UI-Theme-v2.2.5.user.js tampermonkey/US-Sign-Design-Job-Tools.user.js tampermonkey/US-Sign-Design-Job-Tools-v4.1.10.user.js
+          git commit -m 'Refine Design page information hierarchy'
+          git push origin main
