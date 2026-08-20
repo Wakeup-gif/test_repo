@@ -48,3 +48,4 @@ jobs:
             git commit -m "Darken Scope editor glass canvas"
             git push origin main
           fi
+# trigger release
