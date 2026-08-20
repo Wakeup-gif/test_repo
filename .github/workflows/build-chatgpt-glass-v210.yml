@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - scripts/build_chatgpt_glass_themes_v210.py
+      - .github/workflows/build-chatgpt-glass-v210.yml
 
 permissions:
   contents: write
