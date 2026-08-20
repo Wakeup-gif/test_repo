@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Project and Scope Workspace
 // @namespace    us-sign-full-modules
-// @version      1.2.7
-// @description  Preserves native Status and gives the live Scope workspace cohesive Dark Glass panels with a true dark translucent CKEditor canvas, aligned controls, and clean formatting chrome.
+// @version      1.2.8
+// @description  Scope-only workspace with explicit Design/Status exclusions, cohesive Dark Glass panels, a true dark translucent CKEditor canvas, aligned controls, and clean formatting chrome.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
 // @grant        GM_addStyle
@@ -17,6 +17,10 @@
   // The Status/Milestones page has its own native split-pane layout. This
   // workspace is intentionally excluded so Scope grid rules cannot reshape it.
   if (/\/project_milestones\.php$/i.test(location.pathname)) return;
+
+  // Design owns its own DOM/layout through Design Job Tools. Keep Scope rules
+  // completely off that page instead of relying on CSS specificity.
+  if (/\/project_designs\.php$/i.test(location.pathname)) return;
 
   GM_addStyle(String.raw`
     :root {
