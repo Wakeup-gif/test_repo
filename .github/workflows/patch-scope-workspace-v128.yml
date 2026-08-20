@@ -1,0 +1,43 @@
+name: Patch Scope Workspace v1.2.8
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - scripts/patch_scope_workspace_v128.py
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch Scope Workspace
+        run: python scripts/patch_scope_workspace_v128.py
+
+      - name: Validate JavaScript
+        run: |
+          node --check tampermonkey/US-Sign-Project-Scope-Workspace.user.js
+          node --check tampermonkey/US-Sign-Project-Scope-Workspace-v1.2.8.user.js
+          grep -F '// @version      1.2.8' tampermonkey/US-Sign-Project-Scope-Workspace.user.js
+          grep -F 'project_designs\\.php' tampermonkey/US-Sign-Project-Scope-Workspace.user.js
+          cmp tampermonkey/US-Sign-Project-Scope-Workspace.user.js tampermonkey/US-Sign-Project-Scope-Workspace-v1.2.8.user.js
+          git diff --check
+
+      - name: Commit release
+        run: |
+          if git diff --quiet -- tampermonkey/US-Sign-Project-Scope-Workspace.user.js tampermonkey/US-Sign-Project-Scope-Workspace-v1.2.8.user.js; then
+            echo 'No changes to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- tampermonkey/US-Sign-Project-Scope-Workspace.user.js tampermonkey/US-Sign-Project-Scope-Workspace-v1.2.8.user.js
+          git commit -m 'Exclude Design page from Scope workspace'
+          git push origin HEAD:main
