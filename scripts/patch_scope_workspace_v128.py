@@ -36,3 +36,4 @@ else:
     SNAPSHOT.write_text(text, encoding="utf-8")
 
 print("Patched Scope Workspace to v1.2.8 with explicit Design-page exclusion")
+# Triggered after workflow creation so the release job runs on main.
