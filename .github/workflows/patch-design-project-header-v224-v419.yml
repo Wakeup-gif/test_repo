@@ -1,0 +1,50 @@
+name: Patch Design project header v2.2.4 + v4.1.9
+on:
+  push:
+    paths:
+      - "scripts/patch_design_project_header_v224_v419.py"
+      - ".github/workflows/patch-design-project-header-v224-v419.yml"
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Apply Design project header patch
+        run: python scripts/patch_design_project_header_v224_v419.py
+      - name: Validate userscripts
+        run: |
+          node --check tampermonkey/US-Sign-Full-UI-Theme.user.js
+          node --check tampermonkey/US-Sign-Design-Job-Tools.user.js
+          node --check tampermonkey/US-Sign-Full-UI-Theme-v2.2.4.user.js
+          node --check tampermonkey/US-Sign-Design-Job-Tools-v4.1.9.user.js
+          grep -q '@version      2.2.4' tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -q '@version      4.1.9' tampermonkey/US-Sign-Design-Job-Tools.user.js
+          grep -q 'DESIGN-ONLY UNIFIED PROJECT IDENTITY ROW' tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -q 'ensureProjectIdentityRow' tampermonkey/US-Sign-Design-Job-Tools.user.js
+          grep -q 'us-sign-design-project-header' tampermonkey/US-Sign-Design-Job-Tools.user.js
+          git diff --check
+      - name: Commit canonical and fresh installers
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            tampermonkey/US-Sign-Full-UI-Theme.user.js \
+            tampermonkey/US-Sign-Design-Job-Tools.user.js \
+            tampermonkey/US-Sign-Full-UI-Theme-v2.2.4.user.js \
+            tampermonkey/US-Sign-Design-Job-Tools-v4.1.9.user.js
+          if git diff --cached --quiet; then
+            echo "No generated changes to commit"
+          else
+            git commit -m "Unify Design project identity header"
+            git push origin main
+          fi
