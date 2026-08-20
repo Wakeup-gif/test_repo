@@ -30,3 +30,4 @@ if text.count('margin:0 0 12px!important') < 1:
 CANONICAL.write_text(text, encoding="utf-8")
 SNAPSHOT.write_text(text, encoding="utf-8")
 print("Patched Design Job Tools to v4.1.11 with 12px summary-to-overview spacing")
+# Trigger release after workflow creation.
