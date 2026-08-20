@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         ChatGPT - US Sign Dark Glass Theme
+// @name         ChatGPT - US Sign Clear Glass Theme
 // @namespace    us-sign-full-modules
-// @version      2.1.0
-// @description  US Sign Dark Glass for ChatGPT with graphite translucent surfaces, restrained semantic blue, cached 14px reading frost, Bing UHD rotation, native layout, and the cutout geometric cursor.
+// @version      2.0.20
+// @description  Preserved Clear Glass ChatGPT theme with cool translucent surfaces, cached Gaussian reading glass, resilient Bing UHD rotation, native layout, and the cutout geometric cursor.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @run-at       document-start
@@ -10,17 +10,17 @@
 // @grant        GM_xmlhttpRequest
 // @connect      www.bing.com
 // @noframes
-// @updateURL    https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
-// @downloadURL  https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+// @updateURL    https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/ChatGPT-US-Sign-Clear-Glass-Theme.user.js
+// @downloadURL  https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/ChatGPT-US-Sign-Clear-Glass-Theme.user.js
 // ==/UserScript==
 
 (function () {
   "use strict";
 
-  if (window.__chatgptUsSignDarkGlassThemeV210) return;
-  window.__chatgptUsSignDarkGlassThemeV210 = true;
-  document.documentElement?.classList.add("us-sign-theme-dark-glass");
-  if (document.documentElement) document.documentElement.dataset.usSignTheme = "dark-glass";
+  if (window.__chatgptUsSignClearGlassThemeV220) return;
+  window.__chatgptUsSignClearGlassThemeV220 = true;
+  document.documentElement?.classList.add("us-sign-theme-clear-glass");
+  if (document.documentElement) document.documentElement.dataset.usSignTheme = "clear-glass";
 
   GM_addStyle(String.raw`
     @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;650;700&display=swap");
@@ -28,54 +28,54 @@
     :root,
     html.dark,
     html[data-theme="dark"] {
-      --us-bg: rgba(8, 8, 10, 0.34);
-      --us-bg-elevated: rgba(15, 15, 18, 0.76);
-      --us-bg-soft: rgba(20, 20, 23, 0.60);
-      --us-glass: rgba(12, 12, 15, 0.58);
-      --us-glass-strong: rgba(8, 8, 10, 0.76);
-      --us-glass-soft: rgba(255, 255, 255, 0.035);
-      --us-hover: rgba(255, 255, 255, 0.055);
-      --us-text: #f2f4f6;
-      --us-text-soft: #d5d5d8;
-      --us-text-muted: #92959b;
-      --us-accent: #8ecbff;
-      --us-accent-soft: rgba(10, 132, 255, 0.16);
-      --us-border: rgba(255, 255, 255, 0.070);
-      --us-border-strong: rgba(255, 255, 255, 0.105);
-      --us-border-focus: rgba(142, 203, 255, 0.48);
-      --us-shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.20);
-      --us-shadow-md: 0 12px 32px rgba(0, 0, 0, 0.26);
-      --us-radius-sm: 7px;
-      --us-radius-md: 10px;
-      --us-radius-lg: 14px;
+      --us-bg: rgba(9, 15, 23, 0.18);
+      --us-bg-elevated: rgba(20, 31, 43, 0.62);
+      --us-bg-soft: rgba(24, 37, 50, 0.46);
+      --us-glass: rgba(18, 30, 43, 0.54);
+      --us-glass-strong: rgba(14, 25, 37, 0.76);
+      --us-glass-soft: rgba(255, 255, 255, 0.05);
+      --us-hover: rgba(123, 194, 255, 0.12);
+      --us-text: #f6f9fc;
+      --us-text-soft: #eaf0f5;
+      --us-text-muted: #b6c2ce;
+      --us-accent: #9bd3ff;
+      --us-accent-soft: rgba(72, 166, 244, 0.18);
+      --us-border: rgba(184, 220, 249, 0.14);
+      --us-border-strong: rgba(195, 227, 252, 0.22);
+      --us-border-focus: rgba(111, 190, 255, 0.62);
+      --us-shadow-sm: 0 5px 16px rgba(0, 0, 0, 0.18);
+      --us-shadow-md: 0 16px 42px rgba(0, 0, 0, 0.24);
+      --us-radius-sm: 8px;
+      --us-radius-md: 12px;
+      --us-radius-lg: 20px;
       --us-font: "Manrope", "Avenir Next", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
       --us-wallpaper: url("https://www.bing.com/th?id=OBTQ.BTA9ACD46ADE4DF290D5640B661E6A5C8CF666B651507F76309661E06C8AA70FB2&rs=2&c=1");
 
       /* Keep incidental ChatGPT surfaces readable while the actual page/thread
          stay transparent over the wallpaper. */
-      --main-surface-primary: rgba(10, 10, 12, 0.30) !important;
-      --main-surface-secondary: rgba(15, 15, 18, 0.42) !important;
-      --main-surface-tertiary: rgba(20, 20, 23, 0.50) !important;
-      --sidebar-surface-primary: rgba(12, 12, 15, 0.20) !important;
-      --sidebar-surface-secondary: rgba(18, 18, 21, 0.22) !important;
-      --sidebar-surface-tertiary: rgba(24, 24, 27, 0.18) !important;
-      --composer-surface: rgba(10, 10, 13, 0.76) !important;
-      --composer-surface-primary: rgba(10, 10, 13, 0.76) !important;
-      --composer-blue-bg: rgba(10, 132, 255, 0.12) !important;
-      --message-surface: rgba(15, 15, 18, 0.30) !important;
+      --main-surface-primary: rgba(17, 29, 42, 0.30) !important;
+      --main-surface-secondary: rgba(23, 37, 51, 0.40) !important;
+      --main-surface-tertiary: rgba(29, 45, 60, 0.48) !important;
+      --sidebar-surface-primary: rgba(27, 43, 58, 0.12) !important;
+      --sidebar-surface-secondary: rgba(38, 58, 76, 0.13) !important;
+      --sidebar-surface-tertiary: rgba(48, 68, 86, 0.11) !important;
+      --composer-surface: rgba(15, 28, 40, 0.70) !important;
+      --composer-surface-primary: rgba(15, 28, 40, 0.70) !important;
+      --composer-blue-bg: rgba(80, 165, 238, 0.14) !important;
+      --message-surface: rgba(20, 34, 48, 0.30) !important;
       --text-primary: var(--us-text) !important;
       --text-secondary: var(--us-text-soft) !important;
       --text-tertiary: var(--us-text-muted) !important;
       --border-light: var(--us-border) !important;
       --border-medium: var(--us-border-strong) !important;
-      --interactive-bg-secondary-default: rgba(255, 255, 255, 0.035) !important;
-      --interactive-bg-secondary-hover: rgba(255, 255, 255, 0.060) !important;
+      --interactive-bg-secondary-default: rgba(255, 255, 255, 0.045) !important;
+      --interactive-bg-secondary-hover: rgba(123, 194, 255, 0.10) !important;
     }
 
     html {
       min-height: 100% !important;
       color-scheme: dark !important;
-      background: #09090b !important;
+      background: #081019 !important;
     }
 
     /* One static compositor-friendly wallpaper plane. Bing rotation swaps
@@ -88,9 +88,9 @@
       z-index: 0 !important;
       pointer-events: none !important;
       background-image:
-        radial-gradient(circle at 78% 0%, rgba(255, 255, 255, 0.030), transparent 38%),
-        radial-gradient(circle at 14% 100%, rgba(255, 255, 255, 0.014), transparent 34%),
-        linear-gradient(rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0.46)),
+        radial-gradient(circle at 78% 0%, rgba(42, 135, 255, 0.12), transparent 38%),
+        radial-gradient(circle at 14% 100%, rgba(100, 210, 255, 0.055), transparent 34%),
+        linear-gradient(rgba(4, 8, 13, 0.20), rgba(6, 11, 17, 0.38)),
         var(--us-wallpaper) !important;
       background-position: center !important;
       background-size: auto, auto, auto, cover !important;
@@ -166,7 +166,7 @@
       pointer-events: none !important;
       z-index: -1 !important;
       background-image:
-        linear-gradient(180deg, rgba(8, 8, 10, 0.56), rgba(5, 5, 7, 0.68)),
+        linear-gradient(180deg, rgba(8, 18, 29, 0.55), rgba(5, 14, 24, 0.66)),
         var(--us-wallpaper) !important;
       background-position: center, center !important;
       background-size: auto, cover !important;
@@ -176,8 +176,8 @@
       box-shadow: none !important;
       -webkit-backdrop-filter: none !important;
       backdrop-filter: none !important;
-      -webkit-filter: blur(14px) saturate(108%) brightness(0.90) !important;
-      filter: blur(14px) saturate(108%) brightness(0.90) !important;
+      -webkit-filter: blur(14px) saturate(114%) brightness(0.92) !important;
+      filter: blur(14px) saturate(114%) brightness(0.92) !important;
       transform: translateZ(0) scale(1.028) !important;
       backface-visibility: hidden !important;
       contain: paint !important;
@@ -188,7 +188,7 @@
     /* ChatGPT's native footer fade was an 80% solid-black strip in the
        snapshot. Keep the fade, but make it atmospheric instead of a black bar. */
     #thread-bottom-container::after {
-      background: linear-gradient(180deg, rgba(8, 8, 10, 0) 0%, rgba(8, 8, 10, 0.14) 48%, rgba(8, 8, 10, 0.36) 100%) !important;
+      background: linear-gradient(180deg, rgba(10, 23, 36, 0) 0%, rgba(10, 23, 36, 0.12) 48%, rgba(10, 23, 36, 0.30) 100%) !important;
       opacity: 1 !important;
     }
 
@@ -196,9 +196,9 @@
        blurred both the visible 260px nav and the invisible 52px tiny rail. */
     #stage-slideover-sidebar {
       color: var(--us-text-soft) !important;
-      background: rgba(12, 12, 15, 0.64) !important;
-      background-image: linear-gradient(180deg, rgba(255,255,255,0.026), rgba(255,255,255,0.004)) !important;
-      border-inline-end: 1px solid rgba(255,255,255,0.070) !important;
+      background: rgba(22, 38, 53, 0.64) !important;
+      background-image: linear-gradient(180deg, rgba(190, 222, 247, 0.040), rgba(255,255,255,0.008)) !important;
+      border-inline-end: 1px solid rgba(190, 224, 250, 0.13) !important;
       box-shadow: 10px 0 32px rgba(0,0,0,0.12), inset -1px 0 0 rgba(255,255,255,0.025) !important;
       -webkit-backdrop-filter: none !important;
       backdrop-filter: none !important;
@@ -240,15 +240,15 @@
     }
 
     #conversation-header-actions {
-      background: rgba(12, 12, 15, 0.78) !important;
-      border: 1px solid rgba(255,255,255,0.090) !important;
-      box-shadow: 0 8px 24px rgba(0,0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.035) !important;
+      background: rgba(20, 34, 48, 0.74) !important;
+      border: 1px solid rgba(192, 224, 249, 0.16) !important;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.035) !important;
       -webkit-backdrop-filter: none !important;
       backdrop-filter: none !important;
     }
 
     #conversation-header-actions button:hover {
-      background: rgba(255,255,255,0.060) !important;
+      background: rgba(123, 194, 255, 0.11) !important;
     }
 
     [data-message-author-role="assistant"],
@@ -303,8 +303,8 @@
 
     blockquote {
       color: var(--us-text-soft) !important;
-      border-color: rgba(142, 203, 255, 0.22) !important;
-      background: rgba(12, 12, 15, 0.52) !important;
+      border-color: rgba(155, 211, 255, 0.32) !important;
+      background: rgba(13, 27, 41, 0.42) !important;
       border-radius: 0 var(--us-radius-sm) var(--us-radius-sm) 0 !important;
     }
 
@@ -312,8 +312,8 @@
     .prose pre,
     [data-testid="code-block"] {
       color: #e8eff5 !important;
-      background: rgba(5, 5, 7, 0.86) !important;
-      border: 1px solid rgba(255,255,255,0.080) !important;
+      background: rgba(5, 11, 18, 0.84) !important;
+      border: 1px solid rgba(184, 220, 249, 0.15) !important;
       border-radius: var(--us-radius-md) !important;
       box-shadow: var(--us-shadow-sm) !important;
       -webkit-backdrop-filter: none !important;
@@ -333,7 +333,7 @@
     .prose table {
       border: 1px solid var(--us-border) !important;
       border-radius: var(--us-radius-md) !important;
-      background: rgba(10, 10, 12, 0.58) !important;
+      background: rgba(10, 22, 34, 0.52) !important;
     }
 
     .markdown th,
@@ -353,10 +353,10 @@
        not the inner ProseMirror scroller, and avoid broad :has() selectors. */
     form[class*="group/composer"] [class*="bg-(--composer-surface-primary)"] {
       color: var(--us-text) !important;
-      background: rgba(10, 10, 13, 0.80) !important;
-      background-image: linear-gradient(180deg, rgba(255,255,255,0.026), rgba(255,255,255,0.004)) !important;
-      border: 1px solid rgba(255,255,255,0.105) !important;
-      box-shadow: 0 14px 38px rgba(0,0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.040) !important;
+      background: rgba(15, 28, 40, 0.80) !important;
+      background-image: linear-gradient(180deg, rgba(201, 229, 250, 0.045), rgba(255,255,255,0.010)) !important;
+      border: 1px solid rgba(195, 227, 252, 0.19) !important;
+      box-shadow: 0 14px 38px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.040) !important;
       -webkit-backdrop-filter: none !important;
       backdrop-filter: none !important;
     }
@@ -396,22 +396,22 @@
     [data-radix-popper-content-wrapper] [data-radix-select-content],
     [role="listbox"] {
       color: var(--us-text-soft) !important;
-      background: rgba(13, 13, 16, 0.92) !important;
-      background-image: linear-gradient(180deg, rgba(255,255,255,0.030), rgba(255,255,255,0.004)) !important;
-      border: 1px solid rgba(255,255,255,0.105) !important;
-      box-shadow: 0 18px 44px rgba(0,0,0,0.26), inset 0 1px 0 rgba(255,255,255,0.045) !important;
-      -webkit-backdrop-filter: blur(14px) saturate(108%) brightness(90%) !important;
-      backdrop-filter: blur(14px) saturate(108%) brightness(90%) !important;
+      background: rgba(28, 44, 59, 0.76) !important;
+      background-image: linear-gradient(180deg, rgba(176, 218, 249, 0.055), rgba(255,255,255,0.012)) !important;
+      border: 1px solid rgba(196, 226, 250, 0.20) !important;
+      box-shadow: 0 18px 44px rgba(0,0,0,0,0.26), inset 0 1px 0 rgba(255,255,255,0.045) !important;
+      -webkit-backdrop-filter: blur(12px) saturate(120%) !important;
+      backdrop-filter: blur(12px) saturate(120%) !important;
     }
 
     [role="dialog"],
     [data-testid*="modal" i] {
       color: var(--us-text-soft) !important;
-      background: rgba(12, 12, 15, 0.94) !important;
-      border: 1px solid rgba(255,255,255,0.105) !important;
+      background: rgba(24, 38, 52, 0.90) !important;
+      border: 1px solid rgba(196, 226, 250, 0.20) !important;
       box-shadow: 0 24px 64px rgba(0,0,0,0.32) !important;
-      -webkit-backdrop-filter: blur(14px) saturate(108%) brightness(90%) !important;
-      backdrop-filter: blur(14px) saturate(108%) brightness(90%) !important;
+      -webkit-backdrop-filter: blur(8px) saturate(112%) !important;
+      backdrop-filter: blur(8px) saturate(112%) !important;
     }
 
     [role="menuitem"] {
@@ -426,7 +426,7 @@
 
     html,
     body {
-      cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2222%22%20height%3D%2222%22%20viewBox%3D%220%200%2022%2022%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%224%22%20y1%3D%223%22%20x2%3D%2217%22%20y2%3D%2218%22%20gradientUnits%3D%22userSpaceOnUse%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23FFFFFF%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23DCEFFF%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M3p2.6L20%2010.7L7.7%2020Z%22%20fill%3D%22%236FA8D0%22%20opacity%3D%22.14%22%20transform%3D%22translate%28.55%20.7%29%22%2F%3E%3Cpath%20fill-rule%3D%22evenodd%22%20d%3D%22M3p2.6L20%2010.7L7.7%2020ZM8.05%207.65L14.5%2010.72L9.75%2014.65Z%22%20fill%3D%22url%28%23g%29%22%2F%3E%3C%2Fsvg%3E") 3 3, default !important;
+      cursor: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2222%22%20height%3D%2222%22%20viewBox%3D%220%200%2022%2022%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%224%22%20y1%3D%223%22%20x2%3D%2217%22%20y2%3D%2218%22%20gradientUnits%3D%22userSpaceOnUse%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23FFFFFF%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23DCEFFF%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M3%202.6L20%2010.7L7.7%2020Z%22%20fill%3D%22%236FA8D0%22%20opacity%3D%22.14%22%20transform%3D%22translate%28.55%20.7%29%22%2F%3E%3Cpath%20fill-rule%3D%22evenodd%22%20d%3D%22M3%202.6L20%2010.7L7.7%2020ZM8.05%207.65L14.5%2010.72L9.75%2014.65Z%22%20fill%3D%22url%28%23g%29%22%2F%3E%3C%2Fsvg%3E") 3 3, default !important;
     }
 
     a,
@@ -462,20 +462,20 @@
     }
 
     ::-webkit-scrollbar-thumb {
-      background: rgba(255,255,255,0.16) !important;
+      background: rgba(205, 229, 247, 0.18) !important;
       border: 2px solid transparent !important;
       background-clip: padding-box !important;
       border-radius: 999px !important;
     }
 
     ::-webkit-scrollbar-thumb:hover {
-      background: rgba(255,255,255,0.26) !important;
+      background: rgba(205, 229, 247, 0.30) !important;
       background-clip: padding-box !important;
     }
 
     ::selection {
       color: var(--us-text) !important;
-      background: rgba(255,255,255,0.20) !important;
+      background: rgba(142, 203, 255, 0.30) !important;
     }
 
     @media (max-width: 768px) {
@@ -487,11 +487,11 @@
         border-radius: 0 !important;
         -webkit-backdrop-filter: none !important;
         backdrop-filter: none !important;
-        -webkit-filter: blur(10px) saturate(106%) brightness(0.90) !important;
-        filter: blur(10px) saturate(106%) brightness(0.90) !important;
+        -webkit-filter: blur(10px) saturate(110%) brightness(0.92) !important;
+        filter: blur(10px) saturate(110%) brightness(0.92) !important;
         transform: translateZ(0) scale(1.022) !important;
         -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.42) 3%, #000 11%, #000 89%, rgba(0,0,0,0.42) 97%, transparent 100%) !important;
-        mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0,0.42) 3%, #000 11%, #000 89%, rgba(0,0,0,0.42) 97%, transparent 100%) !important;
+        mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.42) 3%, #000 11%, #000 89%, rgba(0,0,0,0.42) 97%, transparent 100%) !important;
       }
 
       form[class*="group/composer"] [class*="bg-(--composer-surface-primary)"] {
@@ -508,7 +508,7 @@
 
   const ROTATE_MS = 30 * 60 * 1000;
   const CACHE_MS = 6 * 60 * 60 * 1000;
-  const CACHE_KEY = "chatgpt-us-sign-dark-glass-bing-wallpaper-pool-v1";
+  const CACHE_KEY = "chatgpt-us-sign-clear-glass-bing-wallpaper-pool-v1";
   const MIN_ROTATION_POOL = 2;
   const MARKETS = ["en-US", "en-GB", "en-AU", "ja-JP"];
   let wallpaperPool = [];
