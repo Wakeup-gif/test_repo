@@ -1,0 +1,43 @@
+name: Patch Full UI Fraunces v2.2.6
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - scripts/patch_full_ui_fraunces_v226.py
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch Full UI
+        run: python scripts/patch_full_ui_fraunces_v226.py
+
+      - name: Validate userscripts
+        run: |
+          node --check tampermonkey/US-Sign-Full-UI-Theme.user.js
+          node --check tampermonkey/US-Sign-Full-UI-Theme-v2.2.6.user.js
+          cmp tampermonkey/US-Sign-Full-UI-Theme.user.js tampermonkey/US-Sign-Full-UI-Theme-v2.2.6.user.js
+          grep -F '// @version      2.2.6' tampermonkey/US-Sign-Full-UI-Theme.user.js
+          grep -F 'family=Fraunces:opsz,wght@9..144,700;9..144,800' tampermonkey/US-Sign-Full-UI-Theme.user.js
+          git diff --check
+
+      - name: Commit Full UI
+        run: |
+          if git diff --quiet -- tampermonkey/US-Sign-Full-UI-Theme.user.js tampermonkey/US-Sign-Full-UI-Theme-v2.2.6.user.js; then
+            echo 'No changes to commit.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- tampermonkey/US-Sign-Full-UI-Theme.user.js tampermonkey/US-Sign-Full-UI-Theme-v2.2.6.user.js
+          git commit -m 'Use bold Fraunces for project identity'
+          git push origin HEAD:main
