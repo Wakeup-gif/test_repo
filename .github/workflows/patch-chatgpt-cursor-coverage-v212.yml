@@ -1,0 +1,44 @@
+name: Patch ChatGPT cursor coverage v2.1.2
+on:
+  push:
+    paths:
+      - "scripts/patch_chatgpt_cursor_coverage_v212.py"
+      - ".github/workflows/patch-chatgpt-cursor-coverage-v212.yml"
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Apply ChatGPT cursor coverage patch
+        run: python scripts/patch_chatgpt_cursor_coverage_v212.py
+      - name: Validate userscripts
+        run: |
+          node --check tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          node --check tampermonkey/ChatGPT-US-Sign-Glass-Theme-v2.1.2.user.js
+          grep -q '@version      2.1.2' tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          grep -q 'FULL-VIEWPORT CURSOR COVERAGE' tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          grep -q 'body \*' tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          git diff --check
+      - name: Commit canonical and fresh installer
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js \
+            tampermonkey/ChatGPT-US-Sign-Glass-Theme-v2.1.2.user.js
+          if git diff --cached --quiet; then
+            echo "No generated changes to commit"
+          else
+            git commit -m "Fix ChatGPT cursor coverage"
+            git push origin main
+          fi
