@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT - US Sign Dark Glass Theme
 // @namespace    us-sign-full-modules
-// @version      2.1.3
-// @description  Modern graphite glass for ChatGPT with bounded live blur on compact UI panels, cached reading frost, restrained semantic color, Bing UHD rotation, native layout, and optimized cursor coverage.
+// @version      2.1.4
+// @description  Modern graphite glass for ChatGPT with bounded live blur, cinematic Bing UHD crossfades, randomized slow pan and zoom routes, direction-aware image changes, cached reading frost, and no pointer parallax.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @run-at       document-start
@@ -10,6 +10,7 @@
 // @grant        GM_xmlhttpRequest
 // @connect      www.bing.com
 // @noframes
+// @require      https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/ChatGPT-US-Sign-Glass-Theme-v2.1.3.user.js
 // @updateURL    https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
 // @downloadURL  https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
 // ==/UserScript==
@@ -17,605 +18,409 @@
 (function () {
   "use strict";
 
-  if (window.__chatgptUsSignDarkGlassThemeV213) return;
-  window.__chatgptUsSignDarkGlassThemeV213 = true;
+  if (window.__chatgptUsSignDarkGlassThemeV214) return;
+  window.__chatgptUsSignDarkGlassThemeV214 = true;
 
   const root = document.documentElement;
-  root?.classList.add("us-sign-theme-dark-glass");
-  if (root) root.dataset.usSignTheme = "dark-glass";
+  if (!root) return;
+  root.dataset.usSignTheme = "dark-glass-cinematic";
+  root.dataset.usSignThemeVersion = "2.1.4";
 
-  const DEFAULT_CURSOR = 'url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2226%22%20height%3D%2226%22%20viewBox%3D%220%200%2022%2022%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%224%22%20y1%3D%223%22%20x2%3D%2217%22%20y2%3D%2218%22%20gradientUnits%3D%22userSpaceOnUse%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23FFFFFF%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23DCEFFF%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M3%202.6L20%2010.7L7.7%2020Z%22%20fill%3D%22%236FA8D0%22%20opacity%3D%22.14%22%20transform%3D%22translate%28.55%20.7%29%22%2F%3E%3Cpath%20fill-rule%3D%22evenodd%22%20d%3D%22M3%202.6L20%2010.7L7.7%2020ZM8.05%207.65L14.5%2010.72L9.75%2014.65Z%22%20fill%3D%22url%28%23g%29%22%2F%3E%3C%2Fsvg%3E") 4 4, default';
-  const POINTER_CURSOR = 'url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2232%22%20height%3D%2232%22%20viewBox%3D%220%200%2027%2027%22%3E%3Cdefs%3E%3ClinearGradient%20id%3D%22g%22%20x1%3D%225%22%20y1%3D%224%22%20x2%3D%2221%22%20y2%3D%2222%22%20gradientUnits%3D%22userSpaceOnUse%22%3E%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23FFFFFF%22%2F%3E%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23D6ECFF%22%2F%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Cpath%20d%3D%22M3.6%203L24.2%2012.9L9.3%2024Z%22%20fill%3D%22%236FA8D0%22%20opacity%3D%22.17%22%20transform%3D%22translate%28.7%20.85%29%22%2F%3E%3Cpath%20fill-rule%3D%22evenodd%22%20d%3D%22M3.6%203L24.2%2012.9L9.3%2024ZM9.7%209.1L17.4%2012.85L11.65%2017.6Z%22%20fill%3D%22url%28%23g%29%22%2F%3E%3C%2Fsvg%3E") 5 4, pointer';
+  const SHARED_CACHE_KEY = "chatgpt-us-sign-dark-glass-bing-wallpaper-pool-v1";
+  const ROTATE_MS = 30 * 60 * 1000;
+  const FADE_MS = 5200;
+  const PAN_X_LIMIT = 3.6;
+  const PAN_Y_LIMIT = 2.9;
+  const MIN_ZOOM = 1.115;
+  const MAX_ZOOM = 1.165;
+  const MIN_PAN_MS = 110000;
+  const MAX_PAN_MS = 190000;
+  const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true;
 
   GM_addStyle(String.raw`
-    @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;650;700&display=swap");
-
     :root,
     html.dark,
     html[data-theme="dark"] {
-      --us-bg: rgba(8, 8, 10, 0.30);
-      --us-bg-elevated: rgba(15, 15, 18, 0.68);
-      --us-bg-soft: rgba(20, 20, 23, 0.52);
-      --us-glass: rgba(10, 10, 13, 0.48);
-      --us-glass-strong: rgba(8, 8, 10, 0.72);
-      --us-glass-soft: rgba(255, 255, 255, 0.030);
-      --us-hover: rgba(255, 255, 255, 0.060);
-      --us-active: rgba(255, 255, 255, 0.085);
-      --us-text: #f2f4f6;
-      --us-text-soft: #d5d5d8;
-      --us-text-muted: #92959b;
-      --us-accent: #8ecbff;
-      --us-accent-soft: rgba(10, 132, 255, 0.15);
-      --us-border: rgba(255, 255, 255, 0.070);
-      --us-border-strong: rgba(255, 255, 255, 0.100);
-      --us-border-focus: rgba(142, 203, 255, 0.48);
-      --us-shadow-sm: 0 4px 14px rgba(0, 0, 0, 0.20);
-      --us-shadow-md: 0 16px 42px rgba(0, 0, 0, 0.24);
-      --us-radius-sm: 7px;
-      --us-radius-md: 10px;
-      --us-radius-lg: 14px;
-      --us-frost: blur(18px) saturate(112%) brightness(92%);
-      --us-frost-soft: blur(14px) saturate(108%) brightness(94%);
-      --us-font: "Manrope", "Avenir Next", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-      --us-wallpaper: url("https://www.bing.com/th?id=OBTQ.BTA9ACD46ADE4DF290D5640B661E6A5C8CF666B651507F76309661E06C8AA70FB2&rs=2&c=1");
-
-      /* Let native controls inherit the palette without turning the whole app
-         into one opaque sheet. */
-      --main-surface-primary: rgba(10, 10, 12, 0.24) !important;
-      --main-surface-secondary: rgba(15, 15, 18, 0.34) !important;
-      --main-surface-tertiary: rgba(20, 20, 23, 0.44) !important;
-      --sidebar-surface-primary: rgba(12, 12, 15, 0.14) !important;
-      --sidebar-surface-secondary: rgba(18, 18, 21, 0.18) !important;
-      --sidebar-surface-tertiary: rgba(24, 24, 27, 0.15) !important;
-      --composer-surface: rgba(10, 10, 13, 0.64) !important;
-      --composer-surface-primary: rgba(10, 10, 13, 0.64) !important;
-      --composer-blue-bg: rgba(10, 132, 255, 0.12) !important;
-      --message-surface: rgba(15, 15, 18, 0.24) !important;
-      --text-primary: var(--us-text) !important;
-      --text-secondary: var(--us-text-soft) !important;
-      --text-tertiary: var(--us-text-muted) !important;
-      --border-light: var(--us-border) !important;
-      --border-medium: var(--us-border-strong) !important;
-      --interactive-bg-secondary-default: rgba(255, 255, 255, 0.025) !important;
-      --interactive-bg-secondary-hover: rgba(255, 255, 255, 0.060) !important;
+      --us-cine-a-image: var(--us-wallpaper);
+      --us-cine-b-image: var(--us-wallpaper);
+      --us-cine-reading-image: var(--us-wallpaper);
+      --us-cine-a-opacity: 1;
+      --us-cine-b-opacity: 0;
+      --us-cine-a-x: 0%;
+      --us-cine-a-y: 0%;
+      --us-cine-b-x: 0%;
+      --us-cine-b-y: 0%;
+      --us-cine-a-scale: 1.13;
+      --us-cine-b-scale: 1.13;
+      --us-cine-a-motion: 0ms;
+      --us-cine-b-motion: 0ms;
+      --us-cine-fade: ${FADE_MS}ms;
     }
 
-    html {
-      min-height: 100% !important;
-      color-scheme: dark !important;
-      background: #09090b !important;
-    }
-
-    /* One wallpaper plane. No pointer-driven animation and no second copy
-       painted onto the sidebar. */
+    /* v2.1.4 removes the old wallpaper plane completely. The pinned v2.1.3
+       base may continue maintaining its Bing cache, but its visible plane is
+       gone and there is no mousemove/pointermove parallax layer. */
     html::before {
-      content: "" !important;
-      position: fixed !important;
-      inset: -4vh -4vw !important;
-      z-index: 0 !important;
-      pointer-events: none !important;
-      background-image:
-        radial-gradient(circle at 78% 0%, rgba(255, 255, 255, 0.030), transparent 38%),
-        radial-gradient(circle at 14% 100%, rgba(255, 255, 255, 0.014), transparent 34%),
-        linear-gradient(rgba(0, 0, 0, 0.20), rgba(0, 0, 0, 0.42)),
-        var(--us-wallpaper) !important;
-      background-position: center !important;
-      background-size: auto, auto, auto, cover !important;
-      background-repeat: no-repeat !important;
-      transform: scale(1.06) !important;
-      transform-origin: center center !important;
-      transition: none !important;
-      backface-visibility: hidden !important;
-    }
-
-    body,
-    #__next,
-    #root {
-      min-height: 100% !important;
-      color: var(--us-text) !important;
-      background: transparent !important;
-      background-color: transparent !important;
+      content: none !important;
+      display: none !important;
       background-image: none !important;
-      font-family: var(--us-font) !important;
+      transform: none !important;
     }
 
     body {
-      scrollbar-color: rgba(210, 231, 248, 0.20) transparent !important;
-    }
-
-    body,
-    input,
-    textarea,
-    select,
-    button {
-      font-family: var(--us-font) !important;
-    }
-
-    /* Only the true canvas is transparent. Native small surfaces remain useful
-       for hierarchy and accessibility. */
-    #main,
-    #thread,
-    [class~="group/scroll-root"] {
-      background: transparent !important;
-      background-color: transparent !important;
-      background-image: none !important;
-    }
-
-    #thread {
       position: relative !important;
       isolation: isolate !important;
     }
 
-    /* PERFORMANCE: this is a viewport-bounded duplicate of the wallpaper,
-       blurred as an image. It is not a live backdrop-filter over the very tall
-       conversation DOM. */
-    #thread::before {
+    /* Two compositor-only wallpaper planes. They sit behind normal body
+       content inside the isolated body stacking context, so the incoming
+       layer can crossfade without ever covering ChatGPT controls. */
+    body::before,
+    body::after {
       content: "" !important;
-      display: block !important;
-      position: sticky !important;
-      top: -28px !important;
-      align-self: center !important;
-      flex: 0 0 auto !important;
-      box-sizing: border-box !important;
-      width: min(1040px, calc(100% - 24px)) !important;
-      height: calc(100dvh + 56px) !important;
-      margin-bottom: calc(-100dvh - 56px) !important;
-      pointer-events: none !important;
+      position: fixed !important;
+      inset: -10vh -10vw !important;
       z-index: -1 !important;
-      background-image:
-        linear-gradient(180deg, rgba(8, 8, 10, 0.44), rgba(5, 5, 7, 0.58)),
-        var(--us-wallpaper) !important;
-      background-position: center, center !important;
-      background-size: auto, cover !important;
+      pointer-events: none !important;
+      background-position: center !important;
+      background-size: auto, auto, auto, cover !important;
       background-repeat: no-repeat !important;
-      border: 0 !important;
-      border-radius: 0 !important;
-      box-shadow: none !important;
-      -webkit-backdrop-filter: none !important;
-      backdrop-filter: none !important;
-      -webkit-filter: blur(14px) saturate(108%) brightness(90%) !important;
-      filter: blur(14px) saturate(108%) brightness(90%) !important;
-      transform: translateZ(0) scale(1.028) !important;
+      transform-origin: center center !important;
+      will-change: transform, opacity !important;
       backface-visibility: hidden !important;
       contain: paint !important;
-      -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.18) 3%, rgba(0,0,0,0.62) 9%, #000 17%, #000 83%, rgba(0,0,0,0.62) 91%, rgba(0,0,0,0.18) 97%, transparent 100%) !important;
-      mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.18) 3%, rgba(0,0,0,0.62) 9%, #000 17%, #000 83%, rgba(0,0,0,0.62) 91%, rgba(0,0,0,0.18) 97%, transparent 100%) !important;
     }
 
-    #thread-bottom-container::after {
-      background: linear-gradient(180deg, rgba(8, 8, 10, 0) 0%, rgba(8, 8, 10, 0.12) 48%, rgba(8, 8, 10, 0.32) 100%) !important;
-      opacity: 1 !important;
+    body::before {
+      opacity: var(--us-cine-a-opacity) !important;
+      background-image:
+        radial-gradient(circle at 78% 0%, rgba(255,255,255,0.030), transparent 38%),
+        radial-gradient(circle at 14% 100%, rgba(255,255,255,0.014), transparent 34%),
+        linear-gradient(rgba(0,0,0,0.18), rgba(0,0,0,0.40)),
+        var(--us-cine-a-image) !important;
+      transform: translate3d(var(--us-cine-a-x), var(--us-cine-a-y), 0) scale(var(--us-cine-a-scale)) !important;
+      transition-property: opacity, transform !important;
+      transition-duration: var(--us-cine-fade), var(--us-cine-a-motion) !important;
+      transition-timing-function: cubic-bezier(.22,.61,.36,1), cubic-bezier(.42,0,.22,1) !important;
     }
 
-    /* One live blur for the whole navigation rail. Children stay transparent,
-       so we do not stack Gaussian filters. */
-    #stage-slideover-sidebar {
-      color: var(--us-text-soft) !important;
-      background: rgba(10, 10, 13, 0.46) !important;
-      background-image: linear-gradient(180deg, rgba(255,255,255,0.040), rgba(255,255,255,0.006)) !important;
-      border-inline-end: 1px solid rgba(255,255,255,0.075) !important;
-      box-shadow: 12px 0 36px rgba(0,0,0,0.16), inset -1px 0 0 rgba(255,255,255,0.030) !important;
-      -webkit-backdrop-filter: var(--us-frost) !important;
-      backdrop-filter: var(--us-frost) !important;
+    body::after {
+      opacity: var(--us-cine-b-opacity) !important;
+      background-image:
+        radial-gradient(circle at 78% 0%, rgba(255,255,255,0.030), transparent 38%),
+        radial-gradient(circle at 14% 100%, rgba(255,255,255,0.014), transparent 34%),
+        linear-gradient(rgba(0,0,0,0.18), rgba(0,0,0,0.40)),
+        var(--us-cine-b-image) !important;
+      transform: translate3d(var(--us-cine-b-x), var(--us-cine-b-y), 0) scale(var(--us-cine-b-scale)) !important;
+      transition-property: opacity, transform !important;
+      transition-duration: var(--us-cine-fade), var(--us-cine-b-motion) !important;
+      transition-timing-function: cubic-bezier(.22,.61,.36,1), cubic-bezier(.42,0,.22,1) !important;
     }
 
-    #stage-slideover-sidebar nav,
-    #stage-sidebar-tiny-bar,
-    #stage-slideover-sidebar [class*="bg-token-sidebar-surface-primary"] {
-      background-color: transparent !important;
-      background-image: none !important;
-      box-shadow: none !important;
-      -webkit-backdrop-filter: none !important;
-      backdrop-filter: none !important;
+    /* Keep the fast cached reading frost from v2.1.3, but give it its own
+       image variable. The image flips only at the midpoint of a crossfade,
+       when both full-screen photos are already blended together. */
+    #thread::before {
+      background-image:
+        linear-gradient(180deg, rgba(8,8,10,0.44), rgba(5,5,7,0.58)),
+        var(--us-cine-reading-image) !important;
     }
 
-    #stage-slideover-sidebar a,
-    #stage-slideover-sidebar .__menu-item {
-      border-radius: var(--us-radius-sm) !important;
-    }
-
-    #stage-slideover-sidebar a:hover,
-    #stage-slideover-sidebar button:hover,
-    #stage-slideover-sidebar .__menu-item:hover {
-      background: var(--us-hover) !important;
-    }
-
-    #stage-slideover-sidebar [aria-current="page"] {
-      background: var(--us-active) !important;
-      box-shadow: inset 0 1px 0 rgba(255,255,255,0.035) !important;
-    }
-
-    /* Keep the native header geometry. Only the compact action group is glass. */
-    #page-header {
-      color: var(--us-text) !important;
-      background: transparent !important;
-      background-image: none !important;
-      box-shadow: none !important;
-      -webkit-backdrop-filter: none !important;
-      backdrop-filter: none !important;
-    }
-
-    #conversation-header-actions {
-      background: rgba(10, 10, 13, 0.56) !important;
-      background-image: linear-gradient(180deg, rgba(255,255,255,0.036), rgba(255,255,255,0.004)) !important;
-      border: 1px solid rgba(255,255,255,0.085) !important;
-      box-shadow: 0 10px 28px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.040) !important;
-      -webkit-backdrop-filter: var(--us-frost-soft) !important;
-      backdrop-filter: var(--us-frost-soft) !important;
-    }
-
-    #conversation-header-actions button:hover {
-      background: var(--us-hover) !important;
-    }
-
-    [data-message-author-role="assistant"],
-    .markdown,
-    .prose {
-      color: var(--us-text-soft) !important;
-    }
-
-    [data-message-author-role="user"] {
-      color: var(--us-text) !important;
-    }
-
-    .markdown h1,
-    .markdown h2,
-    .markdown h3,
-    .markdown h4,
-    .markdown h5,
-    .markdown h6,
-    .prose h1,
-    .prose h2,
-    .prose h3,
-    .prose h4,
-    .prose h5,
-    .prose h6,
-    .markdown strong,
-    .markdown b,
-    .prose strong,
-    .prose b {
-      color: var(--us-text) !important;
-    }
-
-    .markdown h1,
-    .markdown h2,
-    .markdown h3,
-    .prose h1,
-    .prose h2,
-    .prose h3 {
-      letter-spacing: -0.018em !important;
-    }
-
-    .markdown a,
-    .prose a {
-      color: var(--us-accent) !important;
-      text-decoration-color: rgba(155, 211, 255, 0.50) !important;
-      text-underline-offset: 2px !important;
-    }
-
-    .markdown hr,
-    .prose hr {
-      border-color: var(--us-border) !important;
-    }
-
-    blockquote {
-      color: var(--us-text-soft) !important;
-      border-color: rgba(142, 203, 255, 0.22) !important;
-      background: rgba(12, 12, 15, 0.40) !important;
-      border-radius: 0 var(--us-radius-sm) var(--us-radius-sm) 0 !important;
-    }
-
-    .markdown pre,
-    .prose pre,
-    [data-testid="code-block"] {
-      color: #e8eff5 !important;
-      background: rgba(5, 5, 7, 0.72) !important;
-      border: 1px solid rgba(255,255,255,0.080) !important;
-      border-radius: var(--us-radius-md) !important;
-      box-shadow: var(--us-shadow-sm) !important;
-      -webkit-backdrop-filter: none !important;
-      backdrop-filter: none !important;
-    }
-
-    .markdown :not(pre) > code,
-    .prose :not(pre) > code {
-      color: #edf4fa !important;
-      background: rgba(255, 255, 255, 0.09) !important;
-      border: 1px solid rgba(190, 225, 255, 0.10) !important;
-      border-radius: 5px !important;
-      padding: 0.08em 0.32em !important;
-    }
-
-    .markdown table,
-    .prose table {
-      border: 1px solid var(--us-border) !important;
-      border-radius: var(--us-radius-md) !important;
-      background: rgba(10, 10, 12, 0.46) !important;
-    }
-
-    .markdown th,
-    .prose th {
-      color: var(--us-text) !important;
-      background: rgba(255, 255, 255, 0.055) !important;
-      border-color: var(--us-border) !important;
-    }
-
-    .markdown td,
-    .prose td {
-      color: var(--us-text-soft) !important;
-      border-color: var(--us-border) !important;
-    }
-
-    /* The composer is small and viewport-bound, so this is an appropriate place
-       to spend a real blur. Do not blur its nested editor. */
-    form[class*="group/composer"] [class*="bg-(--composer-surface-primary)"] {
-      color: var(--us-text) !important;
-      background: rgba(9, 9, 12, 0.58) !important;
-      background-image: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.006)) !important;
-      border: 1px solid rgba(255,255,255,0.100) !important;
-      box-shadow: 0 16px 42px rgba(0,0,0,0.24), inset 0 1px 0 rgba(255,255,255,0.050) !important;
-      -webkit-backdrop-filter: var(--us-frost) !important;
-      backdrop-filter: var(--us-frost) !important;
-    }
-
-    #prompt-textarea,
-    textarea,
-    [contenteditable="true"] {
-      color: var(--us-text) !important;
-      caret-color: var(--us-accent) !important;
-      background: transparent !important;
-    }
-
-    #prompt-textarea::placeholder,
-    textarea::placeholder {
-      color: var(--us-text-muted) !important;
-    }
-
-    button[aria-label*="Send" i],
-    button[data-testid*="send" i] {
-      color: #07111b !important;
-      background: linear-gradient(180deg, #e1f3ff, #a7d5f6) !important;
-      border-color: rgba(218, 240, 255, 0.86) !important;
-    }
-
-    button[aria-label*="Send" i]:hover,
-    button[data-testid*="send" i]:hover {
-      background: linear-gradient(180deg, #f0f9ff, #bce0f8) !important;
-    }
-
-    /* Transient panels can afford richer frost because they are bounded and
-       short-lived. */
-    [role="menu"],
-    [data-radix-popper-content-wrapper] > div,
-    [data-headlessui-state] [role="menu"],
-    [data-radix-popper-content-wrapper] [role="listbox"],
-    [data-radix-popper-content-wrapper] [data-radix-menu-content],
-    [data-radix-popper-content-wrapper] [data-radix-select-content],
-    [role="listbox"] {
-      color: var(--us-text-soft) !important;
-      background: rgba(11, 11, 14, 0.70) !important;
-      background-image: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.006)) !important;
-      border: 1px solid rgba(255,255,255,0.100) !important;
-      box-shadow: 0 20px 48px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.050) !important;
-      -webkit-backdrop-filter: var(--us-frost) !important;
-      backdrop-filter: var(--us-frost) !important;
-    }
-
-    [role="dialog"],
-    [data-testid*="modal" i] {
-      color: var(--us-text-soft) !important;
-      background: rgba(10, 10, 13, 0.76) !important;
-      background-image: linear-gradient(180deg, rgba(255,255,255,0.040), rgba(255,255,255,0.004)) !important;
-      border: 1px solid rgba(255,255,255,0.100) !important;
-      box-shadow: 0 26px 70px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.045) !important;
-      -webkit-backdrop-filter: blur(22px) saturate(112%) brightness(90%) !important;
-      backdrop-filter: blur(22px) saturate(112%) brightness(90%) !important;
-    }
-
-    [role="menuitem"] {
-      border-radius: var(--us-radius-sm) !important;
-    }
-
-    [role="menuitem"]:hover,
-    [role="option"]:hover,
-    [data-highlighted] {
-      background: var(--us-hover) !important;
-    }
-
-    /* One cursor system only. The old pre-v2.1.2 duplicate block is gone. */
-    @media (pointer: fine) {
-      html,
-      body,
-      body * {
-        cursor: ${DEFAULT_CURSOR} !important;
-      }
-
-      input,
-      textarea,
-      [contenteditable="true"],
-      [contenteditable="true"] *,
-      [role="textbox"],
-      [role="textbox"] *,
-      .markdown,
-      .markdown *,
-      .prose,
-      .prose * {
-        cursor: text !important;
-      }
-
-      a,
-      a *,
-      button,
-      button *,
-      [role="button"],
-      [role="button"] *,
-      [role="menuitem"],
-      [role="menuitem"] *,
-      [role="option"],
-      [role="option"] *,
-      summary,
-      summary *,
-      label[for],
-      label[for] * {
-        cursor: ${POINTER_CURSOR} !important;
-      }
-
-      button:disabled,
-      button:disabled *,
-      [aria-disabled="true"],
-      [aria-disabled="true"] * {
-        cursor: not-allowed !important;
-      }
-
-      [draggable="true"] {
-        cursor: grab !important;
-      }
-
-      [aria-grabbed="true"] {
-        cursor: grabbing !important;
-      }
-
-      [data-resize-handle],
-      [class*="resize-handle" i],
-      [style*="cursor: col-resize" i],
-      [style*="cursor: row-resize" i] {
-        cursor: revert !important;
-      }
-    }
-
-    ::-webkit-scrollbar {
-      width: 9px;
-      height: 9px;
-    }
-
-    ::-webkit-scrollbar-track {
-      background: transparent !important;
-    }
-
-    ::-webkit-scrollbar-thumb {
-      background: rgba(255,255,255,0.16) !important;
-      border: 2px solid transparent !important;
-      background-clip: padding-box !important;
-      border-radius: 999px !important;
-    }
-
-    ::-webkit-scrollbar-thumb:hover {
-      background: rgba(255,255,255,0.26) !important;
-      background-clip: padding-box !important;
-    }
-
-    ::selection {
-      color: var(--us-text) !important;
-      background: rgba(255,255,255,0.20) !important;
-    }
-
-    @media (max-width: 768px) {
-      #thread::before {
-        top: -18px !important;
-        width: calc(100% - 2px) !important;
-        height: calc(100dvh + 36px) !important;
-        margin-bottom: calc(-100dvh - 36px) !important;
-        border-radius: 0 !important;
-        -webkit-backdrop-filter: none !important;
-        backdrop-filter: none !important;
-        -webkit-filter: blur(10px) saturate(106%) brightness(90%) !important;
-        filter: blur(10px) saturate(106%) brightness(90%) !important;
-        transform: translateZ(0) scale(1.022) !important;
-        -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.42) 3%, #000 11%, #000 89%, rgba(0,0,0,0.42) 97%, transparent 100%) !important;
-        mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.42) 3%, #000 11%, #000 89%, rgba(0,0,0,0.42) 97%, transparent 100%) !important;
-      }
-
-      form[class*="group/composer"] [class*="bg-(--composer-surface-primary)"] {
-        border-radius: 18px !important;
-      }
-    }
-
-    @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-      #stage-slideover-sidebar,
-      #conversation-header-actions,
-      form[class*="group/composer"] [class*="bg-(--composer-surface-primary)"],
-      [role="menu"],
-      [role="listbox"],
-      [role="dialog"],
-      [data-testid*="modal" i] {
-        background-color: rgba(10, 10, 13, 0.88) !important;
-      }
-    }
-
-    @media (pointer: coarse), (prefers-reduced-motion: reduce) {
-      html::before {
-        transition: none !important;
+    @media (prefers-reduced-motion: reduce) {
+      body::before,
+      body::after {
+        transform: scale(1.08) !important;
+        transition-property: opacity !important;
+        transition-duration: 900ms !important;
       }
     }
   `);
 
-  const ROTATE_MS = 30 * 60 * 1000;
-  const CACHE_MS = 6 * 60 * 60 * 1000;
-  const CACHE_KEY = "chatgpt-us-sign-dark-glass-bing-wallpaper-pool-v1";
-  const MIN_ROTATION_POOL = 2;
-  const MARKETS = ["en-US", "en-GB", "en-AU", "ja-JP"];
-
   let wallpaperPool = [];
   let rotateTimer = 0;
-  let refreshInFlight = false;
-  let lastAppliedSlot = -1;
+  let cachePollTimer = 0;
+  let activeLayer = "a";
   let lastWallpaperKey = "";
+  let lastAppliedSlot = -1;
+  let pendingWallpaperKey = "";
+  let swapToken = 0;
 
-  function hashString(value) {
-    const text = String(value || "");
-    let hash = 2166136261;
-    for (let i = 0; i < text.length; i += 1) {
-      hash ^= text.charCodeAt(i);
-      hash = Math.imul(hash, 16777619);
-    }
-    return hash >>> 0;
+  const layerMotion = {
+    a: { timer: 0, point: null, direction: null },
+    b: { timer: 0, point: null, direction: null }
+  };
+
+  function randomBetween(min, max) {
+    return min + Math.random() * (max - min);
   }
 
-  function readCache() {
+  function clamp(value, min, max) {
+    return Math.min(max, Math.max(min, value));
+  }
+
+  function cssUrl(url) {
+    return `url("${String(url || "").replace(/"/g, "%22")}")`;
+  }
+
+  function unitVector(vector) {
+    const x = Number(vector?.x || 0);
+    const y = Number(vector?.y || 0);
+    const length = Math.hypot(x, y) || 1;
+    return { x: x / length, y: y / length };
+  }
+
+  function randomDirection() {
+    const angle = randomBetween(0, Math.PI * 2);
+    return { x: Math.cos(angle), y: Math.sin(angle) };
+  }
+
+  function randomPoint() {
+    return {
+      x: randomBetween(-PAN_X_LIMIT, PAN_X_LIMIT),
+      y: randomBetween(-PAN_Y_LIMIT, PAN_Y_LIMIT),
+      scale: randomBetween(MIN_ZOOM, MAX_ZOOM)
+    };
+  }
+
+  function layerVar(layer, suffix) {
+    return `--us-cine-${layer}-${suffix}`;
+  }
+
+  function setLayerPoint(layer, point, durationMs) {
+    if (!point) return;
+    root.style.setProperty(layerVar(layer, "motion"), `${Math.max(0, Math.round(durationMs))}ms`);
+    root.style.setProperty(layerVar(layer, "x"), `${point.x.toFixed(3)}%`);
+    root.style.setProperty(layerVar(layer, "y"), `${point.y.toFixed(3)}%`);
+    root.style.setProperty(layerVar(layer, "scale"), point.scale.toFixed(4));
+  }
+
+  function stopLayerMotion(layer) {
+    const state = layerMotion[layer];
+    if (!state) return;
+    if (state.timer) window.clearTimeout(state.timer);
+    state.timer = 0;
+  }
+
+  function chooseTarget(from, preferredDirection = null) {
+    let direction = unitVector(preferredDirection || randomDirection());
+
+    /* Near a safe crop edge, reflect only the outward component. This makes
+       the camera naturally return across the photo instead of exposing an edge
+       or snapping to an unrelated location. */
+    if (Math.abs(from.x) > PAN_X_LIMIT * 0.78 && Math.sign(direction.x) === Math.sign(from.x)) {
+      direction.x *= -1;
+    }
+    if (Math.abs(from.y) > PAN_Y_LIMIT * 0.78 && Math.sign(direction.y) === Math.sign(from.y)) {
+      direction.y *= -1;
+    }
+
+    const baseAngle = Math.atan2(direction.y, direction.x);
+    const angle = baseAngle + randomBetween(-0.30, 0.30);
+    direction = { x: Math.cos(angle), y: Math.sin(angle) };
+
+    const distance = randomBetween(2.6, 5.3);
+    let target = {
+      x: clamp(from.x + direction.x * distance, -PAN_X_LIMIT, PAN_X_LIMIT),
+      y: clamp(from.y + direction.y * distance, -PAN_Y_LIMIT, PAN_Y_LIMIT),
+      scale: from.scale
+    };
+
+    if (Math.hypot(target.x - from.x, target.y - from.y) < 1.6) {
+      target.x = clamp(from.x - direction.x * distance, -PAN_X_LIMIT, PAN_X_LIMIT);
+      target.y = clamp(from.y - direction.y * distance, -PAN_Y_LIMIT, PAN_Y_LIMIT);
+    }
+
+    let zoomDirection = Math.random() < 0.5 ? -1 : 1;
+    if (from.scale >= MAX_ZOOM - 0.006) zoomDirection = -1;
+    if (from.scale <= MIN_ZOOM + 0.006) zoomDirection = 1;
+    target.scale = clamp(
+      from.scale + zoomDirection * randomBetween(0.006, 0.017),
+      MIN_ZOOM,
+      MAX_ZOOM
+    );
+
+    return {
+      point: target,
+      direction: unitVector({ x: target.x - from.x, y: target.y - from.y })
+    };
+  }
+
+  function updateMotionDebug(layer, state) {
+    if (!state?.point || !state?.direction) return;
+    root.dataset.usWallpaperLayer = layer;
+    root.dataset.usWallpaperMotion = reducedMotion ? "reduced" : "cinematic-pan";
+    root.dataset.usWallpaperPan = `${state.point.x.toFixed(2)},${state.point.y.toFixed(2)},${state.point.scale.toFixed(3)}`;
+    root.dataset.usWallpaperDirection = `${state.direction.x.toFixed(2)},${state.direction.y.toFixed(2)}`;
+  }
+
+  function scheduleLayerLeg(layer, from, directionHint = null) {
+    stopLayerMotion(layer);
+    const state = layerMotion[layer];
+    if (!state) return;
+
+    if (reducedMotion) {
+      state.point = { x: 0, y: 0, scale: 1.08 };
+      state.direction = { x: 0, y: 0 };
+      setLayerPoint(layer, state.point, 0);
+      updateMotionDebug(layer, state);
+      return;
+    }
+
+    const next = chooseTarget(from, directionHint);
+    const duration = Math.round(randomBetween(MIN_PAN_MS, MAX_PAN_MS));
+    state.point = next.point;
+    state.direction = next.direction;
+    setLayerPoint(layer, next.point, duration);
+    updateMotionDebug(layer, state);
+
+    state.timer = window.setTimeout(() => {
+      if (document.hidden || layer !== activeLayer) return;
+      scheduleLayerLeg(layer, state.point, state.direction);
+    }, duration + 100);
+  }
+
+  function beginLayerMotion(layer, directionHint = null, startPoint = null) {
+    stopLayerMotion(layer);
+    const state = layerMotion[layer];
+    if (!state) return;
+
+    const start = reducedMotion
+      ? { x: 0, y: 0, scale: 1.08 }
+      : (startPoint || randomPoint());
+
+    state.point = start;
+    state.direction = unitVector(directionHint || randomDirection());
+    setLayerPoint(layer, start, 0);
+    updateMotionDebug(layer, state);
+
+    if (reducedMotion) return;
+
+    /* CSS performs the long animation. JS only supplies randomized endpoints
+       every two to three minutes, so there is no requestAnimationFrame loop. */
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        if (layer !== activeLayer) return;
+        scheduleLayerLeg(layer, start, state.direction);
+      });
+    });
+  }
+
+  function chooseEntryFromDirection(directionHint) {
+    const direction = unitVector(directionHint || randomDirection());
+    const point = randomPoint();
+
+    /* Start the incoming image slightly behind its travel vector. During the
+       crossfade it therefore continues the outgoing camera direction instead
+       of visibly reversing or sliding sideways. */
+    point.x = clamp(point.x - direction.x * 1.45, -PAN_X_LIMIT, PAN_X_LIMIT);
+    point.y = clamp(point.y - direction.y * 1.10, -PAN_Y_LIMIT, PAN_Y_LIMIT);
+    return point;
+  }
+
+  function preloadWallpaper(url) {
+    return new Promise((resolve) => {
+      const image = new Image();
+      let settled = false;
+      const finish = (ok) => {
+        if (settled) return;
+        settled = true;
+        resolve(ok);
+      };
+      image.decoding = "async";
+      image.onload = () => finish(true);
+      image.onerror = () => finish(false);
+      image.src = url;
+      window.setTimeout(() => finish(false), 10000);
+    });
+  }
+
+  function readSharedPool() {
     try {
-      const raw = localStorage.getItem(CACHE_KEY);
+      const raw = localStorage.getItem(SHARED_CACHE_KEY);
       const parsed = raw ? JSON.parse(raw) : null;
-      if (!parsed || !Array.isArray(parsed.images)) return null;
+      if (!parsed || !Array.isArray(parsed.images)) return [];
 
       const unique = new Map();
       parsed.images.forEach((image) => {
         if (image?.url && image?.key && !unique.has(image.key)) unique.set(image.key, image);
       });
-
-      const images = Array.from(unique.values());
-      if (images.length < MIN_ROTATION_POOL) return null;
-      return { ...parsed, images };
+      return Array.from(unique.values());
     } catch (_) {
-      return null;
+      return [];
     }
   }
 
-  function writeCache(images) {
-    try {
-      localStorage.setItem(CACHE_KEY, JSON.stringify({ fetchedAt: Date.now(), images }));
-    } catch (_) {}
+  function freezeBaseWallpaper() {
+    const baseWallpaper = getComputedStyle(root).getPropertyValue("--us-wallpaper").trim();
+    if (!baseWallpaper) return;
+    root.style.setProperty("--us-cine-a-image", baseWallpaper);
+    root.style.setProperty("--us-cine-reading-image", baseWallpaper);
   }
 
-  function normalizeImage(image, market) {
-    if (!image || typeof image.url !== "string") return null;
-    try {
-      const url = new URL(image.url, "https://www.bing.com/");
-      if (url.protocol !== "https:") return null;
+  function updateWallpaperMetadata(image, slot, layer) {
+    root.dataset.usBingWallpaper = image?.title || "Bing wallpaper";
+    root.dataset.usBingMarket = image?.market || "";
+    root.dataset.usBingPoolSize = String(wallpaperPool.length);
+    root.dataset.usBingSlot = String(slot);
+    root.dataset.usWallpaperLayer = layer;
+  }
 
-      return {
-        url: url.href,
-        key: String(image.urlbase || url.pathname),
-        title: String(image.title || image.copyright || "Bing wallpaper"),
-        startdate: String(image.startdate || ""),
-        market: String(market || "")
-      };
-    } catch (_) {
-      return null;
+  async function transitionWallpaper(image, slot) {
+    if (!image?.url) return;
+    const key = image.key || image.url;
+    if (key === lastWallpaperKey || key === pendingWallpaperKey) {
+      updateWallpaperMetadata(image, slot, activeLayer);
+      return;
     }
+
+    pendingWallpaperKey = key;
+    const token = ++swapToken;
+    const loaded = await preloadWallpaper(image.url);
+    if (!loaded || token !== swapToken) {
+      if (pendingWallpaperKey === key) pendingWallpaperKey = "";
+      return;
+    }
+
+    const outgoing = activeLayer;
+    const incoming = outgoing === "a" ? "b" : "a";
+    const outgoingDirection = layerMotion[outgoing]?.direction || randomDirection();
+    const entryPoint = chooseEntryFromDirection(outgoingDirection);
+
+    root.style.setProperty(`--us-cine-${incoming}-image`, cssUrl(image.url));
+    root.style.setProperty("--us-cine-fade", `${reducedMotion ? 900 : FADE_MS}ms`);
+
+    activeLayer = incoming;
+    beginLayerMotion(incoming, outgoingDirection, entryPoint);
+
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        if (token !== swapToken) return;
+        root.style.setProperty(`--us-cine-${incoming}-opacity`, "1");
+        root.style.setProperty(`--us-cine-${outgoing}-opacity`, "0");
+      });
+    });
+
+    /* The reading-frost duplicate changes at the visual midpoint. Because the
+       two full-screen photos are each near 50% opacity then, the blurred center
+       never appears to hard-cut to the next image. */
+    window.setTimeout(() => {
+      if (token !== swapToken) return;
+      root.style.setProperty("--us-cine-reading-image", cssUrl(image.url));
+    }, reducedMotion ? 450 : Math.round(FADE_MS / 2));
+
+    window.setTimeout(() => {
+      if (token !== swapToken) return;
+      stopLayerMotion(outgoing);
+    }, reducedMotion ? 950 : FADE_MS + 160);
+
+    lastWallpaperKey = key;
+    lastAppliedSlot = slot;
+    pendingWallpaperKey = "";
+    updateWallpaperMetadata(image, slot, incoming);
   }
 
   function applyWallpaper(images = wallpaperPool) {
-    if (!Array.isArray(images) || images.length < MIN_ROTATION_POOL || !document.documentElement) return;
+    if (!Array.isArray(images) || images.length < 2) return;
 
     const slot = Math.floor(Date.now() / ROTATE_MS);
     let index = slot % images.length;
@@ -627,130 +432,67 @@
       image = images[index];
     }
 
-    document.documentElement.style.setProperty(
-      "--us-wallpaper",
-      `url("${image.url.replace(/"/g, "%22")}")`
-    );
-    document.documentElement.dataset.usBingWallpaper = image.title || "Bing wallpaper";
-    document.documentElement.dataset.usBingMarket = image.market || "";
-    document.documentElement.dataset.usBingPoolSize = String(images.length);
-    document.documentElement.dataset.usBingSlot = String(slot);
-
-    lastAppliedSlot = slot;
-    lastWallpaperKey = image.key || image.url;
+    transitionWallpaper(image, slot);
   }
 
-  function requestMarket(market) {
-    return new Promise((resolve) => {
-      if (typeof GM_xmlhttpRequest !== "function") {
-        resolve([]);
-        return;
-      }
-
-      const endpoint = `https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=${encodeURIComponent(market)}&uhd=1&uhdwidth=3840&uhdheight=2160`;
-
-      GM_xmlhttpRequest({
-        method: "GET",
-        url: endpoint,
-        timeout: 9000,
-        headers: { Accept: "application/json,text/plain,*/*" },
-        onload(response) {
-          if (response.status < 200 || response.status >= 300) {
-            resolve([]);
-            return;
-          }
-
-          try {
-            const payload = JSON.parse(response.responseText || "{}");
-            const images = Array.isArray(payload.images) ? payload.images : [];
-            resolve(images.map((image) => normalizeImage(image, market)).filter(Boolean));
-          } catch (_) {
-            resolve([]);
-          }
-        },
-        onerror() {
-          resolve([]);
-        },
-        ontimeout() {
-          resolve([]);
-        }
-      });
-    });
+  function refreshFromSharedCache() {
+    const images = readSharedPool();
+    if (images.length >= 2) {
+      wallpaperPool = images;
+      applyWallpaper(images);
+      return true;
+    }
+    return false;
   }
 
-  async function refreshPool(force = false) {
-    if (refreshInFlight) return;
+  function pollSharedCache(attempt = 0) {
+    if (cachePollTimer) window.clearTimeout(cachePollTimer);
+    if (refreshFromSharedCache()) return;
 
-    const cached = readCache();
-    if (cached?.images?.length) {
-      wallpaperPool = cached.images;
-      applyWallpaper();
-      const age = Date.now() - Number(cached.fetchedAt || 0);
-      if (!force && age >= 0 && age < CACHE_MS) return;
-    }
-
-    refreshInFlight = true;
-    try {
-      const batches = await Promise.all(MARKETS.map(requestMarket));
-      const unique = new Map();
-
-      batches.flat().forEach((image) => {
-        if (image?.url && !unique.has(image.key)) unique.set(image.key, image);
-      });
-
-      const images = Array.from(unique.values()).sort(
-        (a, b) => hashString(a.key) - hashString(b.key)
-      );
-
-      if (images.length >= MIN_ROTATION_POOL) {
-        wallpaperPool = images;
-        writeCache(images);
-        applyWallpaper();
-      }
-    } finally {
-      refreshInFlight = false;
-    }
+    const nextDelay = attempt < 8 ? 1500 : 30000;
+    cachePollTimer = window.setTimeout(() => pollSharedCache(attempt + 1), nextDelay);
   }
 
   function scheduleRotation() {
     if (rotateTimer) window.clearTimeout(rotateTimer);
-
     const now = Date.now();
-    const untilNext = ROTATE_MS - (now % ROTATE_MS) + 500;
-
+    const untilNext = ROTATE_MS - (now % ROTATE_MS) + 600;
     rotateTimer = window.setTimeout(() => {
-      applyWallpaper();
-      refreshPool(false);
+      refreshFromSharedCache();
       scheduleRotation();
     }, untilNext);
   }
 
-  function syncWallpaperRotation() {
-    applyWallpaper();
-    refreshPool(false);
-    scheduleRotation();
-  }
-
-  function initWallpapers() {
-    const cached = readCache();
-    if (cached?.images?.length >= MIN_ROTATION_POOL) {
-      wallpaperPool = cached.images;
-      applyWallpaper();
+  function resumeMotion() {
+    const state = layerMotion[activeLayer];
+    if (!reducedMotion && state?.point) {
+      scheduleLayerLeg(activeLayer, state.point, state.direction || randomDirection());
     }
-
-    refreshPool(false);
-    scheduleRotation();
-
-    window.addEventListener("pageshow", syncWallpaperRotation, { passive: true });
-    window.addEventListener("focus", syncWallpaperRotation, { passive: true });
-    document.addEventListener(
-      "visibilitychange",
-      () => {
-        if (!document.hidden) syncWallpaperRotation();
-      },
-      { passive: true }
-    );
   }
 
-  initWallpapers();
+  function syncWallpaper() {
+    refreshFromSharedCache();
+    resumeMotion();
+    scheduleRotation();
+  }
+
+  function initCinematicWallpaper() {
+    freezeBaseWallpaper();
+    beginLayerMotion("a", randomDirection(), randomPoint());
+    pollSharedCache(0);
+    scheduleRotation();
+
+    window.addEventListener("pageshow", syncWallpaper, { passive: true });
+    window.addEventListener("focus", syncWallpaper, { passive: true });
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        stopLayerMotion("a");
+        stopLayerMotion("b");
+      } else {
+        syncWallpaper();
+      }
+    }, { passive: true });
+  }
+
+  initCinematicWallpaper();
 })();
