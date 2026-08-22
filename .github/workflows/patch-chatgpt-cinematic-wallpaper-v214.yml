@@ -1,0 +1,49 @@
+name: Patch ChatGPT Cinematic Wallpaper v2.1.4
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/patch_chatgpt_cinematic_wallpaper_v214.py"
+      - ".github/workflows/patch-chatgpt-cinematic-wallpaper-v214.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Apply cinematic wallpaper patch
+        run: python scripts/patch_chatgpt_cinematic_wallpaper_v214.py
+      - name: Validate userscripts
+        run: |
+          node --check tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          node --check tampermonkey/ChatGPT-US-Sign-Glass-Theme-v2.1.4.user.js
+          grep -q '@version      2.1.4' tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          grep -q 'CINEMATIC WALLPAPER' tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          grep -q 'html::after' tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          ! grep -q 'mousemove' tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          ! grep -q 'pointermove' tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          git diff --check
+      - name: Commit canonical and installer
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js tampermonkey/ChatGPT-US-Sign-Glass-Theme-v2.1.4.user.js
+          if git diff --cached --quiet; then
+            echo "No generated changes to commit"
+          else
+            git commit -m "Add cinematic ChatGPT wallpaper motion v2.1.4"
+            git push origin main
+          fi
