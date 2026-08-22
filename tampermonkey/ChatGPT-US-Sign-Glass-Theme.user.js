@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         ChatGPT - US Sign Dark Glass Theme
 // @namespace    us-sign-full-modules
-// @version      2.1.7
-// @description  Modern graphite glass for ChatGPT with cinematic Bing UHD motion and a true sibling-layer live reading glass that samples the moving wallpaper directly.
+// @version      2.1.8
+// @description  Modern graphite glass for ChatGPT with wider live reading glass, cinematic Bing UHD motion, and a fresh today-only multi-market Bing wallpaper pool.
 // @match        https://chatgpt.com/*
 // @match        https://chat.openai.com/*
 // @run-at       document-start
@@ -12,6 +12,7 @@
 // @noframes
 // @require      https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/ChatGPT-US-Sign-Glass-Theme-v2.1.3.user.js
 // @require      https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/ChatGPT-US-Sign-Glass-Theme-v2.1.5.user.js
+// @require      https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/ChatGPT-US-Sign-Glass-Theme-v2.1.7.user.js
 // @updateURL    https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
 // @downloadURL  https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
 // ==/UserScript==
@@ -19,299 +20,291 @@
 (function () {
   "use strict";
 
-  if (window.__chatgptUsSignDarkGlassThemeV217) return;
-  window.__chatgptUsSignDarkGlassThemeV217 = true;
+  if (window.__chatgptUsSignDarkGlassThemeV218) return;
+  window.__chatgptUsSignDarkGlassThemeV218 = true;
 
   const root = document.documentElement;
   if (!root) return;
 
-  root.dataset.usSignTheme = "dark-glass-cinematic-sibling-reading-glass";
-  root.dataset.usSignThemeVersion = "2.1.7";
-  root.dataset.usReadingGlass = "sibling-live-backdrop";
+  root.dataset.usSignTheme = "dark-glass-cinematic-wide-fresh-bing";
+  root.dataset.usSignThemeVersion = "2.1.8";
+  root.dataset.usReadingGlass = "sibling-live-backdrop-wide";
+
+  const CACHE_KEY = "chatgpt-us-sign-dark-glass-bing-wallpaper-pool-v1";
+  const FRESH_POLICY = "today-only-localized-markets-v1";
+  const REFRESH_MS = 55 * 60 * 1000;
+  const MAX_MARKET_DATE_LAG_DAYS = 1;
+  const MARKETS = [
+    "en-US",
+    "en-GB",
+    "en-CA",
+    "en-IN",
+    "de-DE",
+    "fr-FR",
+    "fr-CA",
+    "es-ES",
+    "it-IT",
+    "ja-JP",
+    "pt-BR",
+    "zh-CN"
+  ];
 
   GM_addStyle(String.raw`
-    /* Three explicit sibling depth planes inside the isolated body:
-       wallpaper (-2), live reading glass (-1), ChatGPT UI (auto/0+).
-       This lets backdrop-filter sample the actual animated Bing pixels. */
-    body {
-      position: relative !important;
-      isolation: isolate !important;
-    }
-
-    #us-cinematic-wallpaper {
-      z-index: -2 !important;
-    }
-
+    /* v2.1.8 gives the conversation more contrast breathing room without
+       turning the whole viewport into frosted glass. v2.1.7 still tracks the
+       correct horizontal center; this !important width overrides its older
+       1040px inline cap. */
     #us-reading-glass {
-      position: fixed !important;
-      top: -28px !important;
-      height: calc(100dvh + 56px) !important;
-      left: 50%;
-      width: min(1040px, calc(100vw - 24px));
-      z-index: -1 !important;
-      pointer-events: none !important;
-      background:
-        linear-gradient(
-          180deg,
-          rgba(10, 10, 13, 0.16) 0%,
-          rgba(7, 7, 10, 0.22) 52%,
-          rgba(5, 5, 8, 0.30) 100%
-        ) !important;
-      border: 0 !important;
-      border-radius: 0 !important;
-      box-shadow: none !important;
-      -webkit-filter: none !important;
-      filter: none !important;
-      -webkit-backdrop-filter: blur(20px) saturate(118%) brightness(89%) !important;
-      backdrop-filter: blur(20px) saturate(118%) brightness(89%) !important;
-      transform: translateX(-50%) !important;
-      transform-origin: center center !important;
-      isolation: auto !important;
-      contain: none !important;
-      will-change: auto !important;
-      backface-visibility: hidden !important;
+      width: min(1360px, calc(100vw - 56px)) !important;
       -webkit-mask-image: linear-gradient(
         90deg,
         transparent 0%,
-        rgba(0,0,0,0.20) 3%,
-        rgba(0,0,0,0.66) 9%,
-        #000 17%,
-        #000 83%,
-        rgba(0,0,0,0.66) 91%,
-        rgba(0,0,0,0.20) 97%,
+        rgba(0,0,0,0.22) 2.5%,
+        rgba(0,0,0,0.72) 7.5%,
+        #000 13%,
+        #000 87%,
+        rgba(0,0,0,0.72) 92.5%,
+        rgba(0,0,0,0.22) 97.5%,
         transparent 100%
       ) !important;
       mask-image: linear-gradient(
         90deg,
         transparent 0%,
-        rgba(0,0,0,0.20) 3%,
-        rgba(0,0,0,0.66) 9%,
-        #000 17%,
-        #000 83%,
-        rgba(0,0,0,0.66) 91%,
-        rgba(0,0,0,0.20) 97%,
+        rgba(0,0,0,0.22) 2.5%,
+        rgba(0,0,0,0.72) 7.5%,
+        #000 13%,
+        #000 87%,
+        rgba(0,0,0,0.72) 92.5%,
+        rgba(0,0,0,0.22) 97.5%,
         transparent 100%
       ) !important;
     }
 
-    /* Completely remove the old pseudo-element reading panel. No duplicated
-       wallpaper, no cached-image blur, and no second backdrop-filter here. */
-    #thread::before {
-      content: none !important;
-      display: none !important;
-      background: none !important;
-      background-image: none !important;
-      -webkit-filter: none !important;
-      filter: none !important;
-      -webkit-backdrop-filter: none !important;
-      backdrop-filter: none !important;
-      transform: none !important;
-    }
-
     @media (max-width: 768px) {
       #us-reading-glass {
-        top: -18px !important;
-        height: calc(100dvh + 36px) !important;
-        width: calc(100vw - 2px);
-        -webkit-backdrop-filter: blur(14px) saturate(114%) brightness(90%) !important;
-        backdrop-filter: blur(14px) saturate(114%) brightness(90%) !important;
-        -webkit-mask-image: linear-gradient(
-          90deg,
-          transparent 0%,
-          rgba(0,0,0,0.46) 3%,
-          #000 11%,
-          #000 89%,
-          rgba(0,0,0,0.46) 97%,
-          transparent 100%
-        ) !important;
-        mask-image: linear-gradient(
-          90deg,
-          transparent 0%,
-          rgba(0,0,0,0.46) 3%,
-          #000 11%,
-          #000 89%,
-          rgba(0,0,0,0.46) 97%,
-          transparent 100%
-        ) !important;
-      }
-    }
-
-    @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-      #us-reading-glass {
-        background: rgba(8, 8, 11, 0.78) !important;
+        width: calc(100vw - 2px) !important;
       }
     }
   `);
 
-  let glass = null;
-  let thread = null;
-  let resizeObserver = null;
-  let geometryFrame = 0;
-  let findTimer = 0;
-  let findAttempts = 0;
+  let refreshTimer = 0;
+  let refreshInFlight = false;
+  let lastFreshRefresh = 0;
 
-  function ensureGlass() {
-    if (!document.body) return false;
-
-    glass = document.getElementById("us-reading-glass");
-    if (!glass) {
-      glass = document.createElement("div");
-      glass.id = "us-reading-glass";
-      glass.setAttribute("aria-hidden", "true");
-      document.body.appendChild(glass);
+  function parseCache() {
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (!parsed || !Array.isArray(parsed.images)) return null;
+      return parsed;
+    } catch (_) {
+      return null;
     }
-
-    return true;
   }
 
-  function scheduleGeometry() {
-    if (geometryFrame) cancelAnimationFrame(geometryFrame);
-    geometryFrame = requestAnimationFrame(() => {
-      geometryFrame = 0;
-      updateGeometry();
+  function normalizeImage(image, market) {
+    if (!image || typeof image.url !== "string") return null;
+
+    try {
+      const url = new URL(image.url, "https://www.bing.com/");
+      if (url.protocol !== "https:") return null;
+
+      return {
+        url: url.href,
+        key: String(image.urlbase || url.pathname),
+        title: String(image.title || image.copyright || "Bing wallpaper"),
+        startdate: String(image.startdate || ""),
+        market: String(market || "")
+      };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function dateNumber(value) {
+    const text = String(value || "");
+    if (!/^\d{8}$/.test(text)) return NaN;
+    const y = Number(text.slice(0, 4));
+    const m = Number(text.slice(4, 6));
+    const d = Number(text.slice(6, 8));
+    return Date.UTC(y, m - 1, d);
+  }
+
+  function requestMarket(market) {
+    return new Promise((resolve) => {
+      if (typeof GM_xmlhttpRequest !== "function") {
+        resolve([]);
+        return;
+      }
+
+      /* idx=0 + n=1 is intentional: only each market's current homepage image.
+         Variety comes from localized markets instead of recycling the previous
+         seven days from every market. */
+      const endpoint = `https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=${encodeURIComponent(market)}&uhd=1&uhdwidth=3840&uhdheight=2160&_=${Date.now()}`;
+
+      GM_xmlhttpRequest({
+        method: "GET",
+        url: endpoint,
+        timeout: 10000,
+        headers: {
+          Accept: "application/json,text/plain,*/*",
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache"
+        },
+        onload(response) {
+          if (response.status < 200 || response.status >= 300) {
+            resolve([]);
+            return;
+          }
+
+          try {
+            const payload = JSON.parse(response.responseText || "{}");
+            const images = Array.isArray(payload.images) ? payload.images : [];
+            resolve(images.map((image) => normalizeImage(image, market)).filter(Boolean));
+          } catch (_) {
+            resolve([]);
+          }
+        },
+        onerror() { resolve([]); },
+        ontimeout() { resolve([]); }
+      });
     });
   }
 
-  function updateGeometry() {
-    if (!ensureGlass()) return false;
+  function dedupeAndKeepFresh(images) {
+    const unique = new Map();
+    images.forEach((image) => {
+      if (image?.url && image?.key && !unique.has(image.key)) unique.set(image.key, image);
+    });
 
-    thread = document.querySelector("#thread");
-    if (!thread) {
-      glass.style.display = "none";
-      return false;
-    }
+    const deduped = Array.from(unique.values());
+    const dated = deduped
+      .map((image) => ({ image, time: dateNumber(image.startdate) }))
+      .filter((entry) => Number.isFinite(entry.time));
 
-    const rect = thread.getBoundingClientRect();
-    const width = Math.min(1040, Math.max(0, rect.width - 24));
-    const centerX = rect.left + rect.width / 2;
+    const freshestTime = dated.length ? Math.max(...dated.map((entry) => entry.time)) : NaN;
+    const freshestDate = dated.length
+      ? dated.find((entry) => entry.time === freshestTime)?.image?.startdate || ""
+      : "";
 
-    if (width < 120 || !Number.isFinite(centerX)) {
-      glass.style.display = "none";
-      return false;
-    }
+    const maxLagMs = MAX_MARKET_DATE_LAG_DAYS * 24 * 60 * 60 * 1000;
+    const fresh = Number.isFinite(freshestTime)
+      ? deduped.filter((image) => {
+          const time = dateNumber(image.startdate);
+          return !Number.isFinite(time) || freshestTime - time <= maxLagMs;
+        })
+      : deduped;
 
-    glass.style.display = "block";
-    glass.style.width = `${Math.round(width * 100) / 100}px`;
-    glass.style.left = `${Math.round(centerX * 100) / 100}px`;
-
-    root.dataset.usReadingGlassWidth = String(Math.round(width));
-    root.dataset.usReadingGlassCenterX = String(Math.round(centerX));
-
-    return true;
+    return { images: fresh, freshestDate };
   }
 
-  function attachGeometryObserver() {
-    thread = document.querySelector("#thread");
-    if (!thread) return false;
+  function publishFreshPool(images, freshestDate) {
+    if (!Array.isArray(images) || images.length < 2) return false;
 
-    resizeObserver?.disconnect();
-    if (typeof ResizeObserver === "function") {
-      resizeObserver = new ResizeObserver(scheduleGeometry);
-      resizeObserver.observe(thread);
-
-      let node = thread.parentElement;
-      let observed = 0;
-      while (node && node !== document.body && observed < 3) {
-        const style = getComputedStyle(node);
-        if (style.display !== "contents") {
-          resizeObserver.observe(node);
-          observed += 1;
-        }
-        node = node.parentElement;
-      }
-    }
-
-    scheduleGeometry();
-    return true;
-  }
-
-  function findThreadAndAttach() {
-    if (attachGeometryObserver()) {
-      if (findTimer) clearTimeout(findTimer);
-      findTimer = 0;
-      return;
-    }
-
-    findAttempts += 1;
-    if (findAttempts > 40) return;
-    findTimer = setTimeout(findThreadAndAttach, findAttempts < 12 ? 250 : 1000);
-  }
-
-  function styleSnapshot(style) {
-    if (!style) return null;
-    return {
-      display: style.display,
-      position: style.position,
-      zIndex: style.zIndex,
-      isolation: style.isolation,
-      opacity: style.opacity,
-      backgroundImage: style.backgroundImage,
-      backgroundColor: style.backgroundColor,
-      filter: style.filter,
-      backdropFilter: style.backdropFilter,
-      webkitBackdropFilter: style.webkitBackdropFilter,
-      transform: style.transform,
-      contain: style.contain
+    const payload = {
+      fetchedAt: Date.now(),
+      images,
+      freshPolicy: FRESH_POLICY,
+      freshestStartdate: freshestDate,
+      markets: MARKETS
     };
+
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+    } catch (_) {
+      return false;
+    }
+
+    lastFreshRefresh = payload.fetchedAt;
+    root.dataset.usBingFreshPolicy = FRESH_POLICY;
+    root.dataset.usBingFreshestDate = freshestDate || "";
+    root.dataset.usBingFreshPoolSize = String(images.length);
+    root.dataset.usBingFreshMarkets = String(MARKETS.length);
+
+    /* v2.1.5 listens for pageshow and immediately rereads the shared pool.
+       Reusing that path means the new current-day pool enters through the same
+       cinematic crossfade rather than hard-cutting the wallpaper. */
+    window.dispatchEvent(new Event("pageshow"));
+    return true;
   }
 
-  function readingGlassDebug() {
-    const liveGlass = document.getElementById("us-reading-glass");
-    const liveThread = document.querySelector("#thread");
-    const host = document.getElementById("us-cinematic-wallpaper");
+  async function refreshFreshPool(force = false) {
+    if (refreshInFlight) return false;
 
+    const cached = parseCache();
+    const cachedAge = cached ? Date.now() - Number(cached.fetchedAt || 0) : Infinity;
+    const cacheIsOurs = cached?.freshPolicy === FRESH_POLICY;
+
+    if (!force && cacheIsOurs && cachedAge >= 0 && cachedAge < REFRESH_MS && cached.images?.length >= 2) {
+      lastFreshRefresh = Number(cached.fetchedAt || Date.now());
+      root.dataset.usBingFreshPolicy = FRESH_POLICY;
+      root.dataset.usBingFreshestDate = String(cached.freshestStartdate || "");
+      root.dataset.usBingFreshPoolSize = String(cached.images.length);
+      root.dataset.usBingFreshMarkets = String(MARKETS.length);
+      return true;
+    }
+
+    refreshInFlight = true;
+    try {
+      const batches = await Promise.all(MARKETS.map(requestMarket));
+      const result = dedupeAndKeepFresh(batches.flat());
+      return publishFreshPool(result.images, result.freshestDate);
+    } finally {
+      refreshInFlight = false;
+    }
+  }
+
+  function scheduleFreshRefresh() {
+    if (refreshTimer) clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(async () => {
+      await refreshFreshPool(true);
+      scheduleFreshRefresh();
+    }, REFRESH_MS);
+  }
+
+  function freshDebug() {
+    const cached = parseCache();
     return {
-      capturedAt: new Date().toISOString(),
       version: root.dataset.usSignThemeVersion,
-      readingGlass: root.dataset.usReadingGlass,
-      support: {
-        backdropFilter: CSS.supports("backdrop-filter", "blur(10px)"),
-        webkitBackdropFilter: CSS.supports("-webkit-backdrop-filter", "blur(10px)")
-      },
-      glass: liveGlass ? {
-        rect: liveGlass.getBoundingClientRect().toJSON(),
-        style: styleSnapshot(getComputedStyle(liveGlass))
-      } : null,
-      cinematicHost: host ? {
-        rect: host.getBoundingClientRect().toJSON(),
-        style: styleSnapshot(getComputedStyle(host))
-      } : null,
-      thread: liveThread ? {
-        rect: liveThread.getBoundingClientRect().toJSON(),
-        style: styleSnapshot(getComputedStyle(liveThread)),
-        before: styleSnapshot(getComputedStyle(liveThread, "::before"))
-      } : null,
-      body: styleSnapshot(getComputedStyle(document.body))
+      policy: cached?.freshPolicy || null,
+      fetchedAt: cached?.fetchedAt ? new Date(cached.fetchedAt).toISOString() : null,
+      ageMinutes: cached?.fetchedAt ? Math.round((Date.now() - cached.fetchedAt) / 6000) / 10 : null,
+      freshestStartdate: cached?.freshestStartdate || null,
+      poolSize: Array.isArray(cached?.images) ? cached.images.length : 0,
+      marketsRequested: MARKETS,
+      images: Array.isArray(cached?.images)
+        ? cached.images.map((image) => ({
+            market: image.market,
+            startdate: image.startdate,
+            title: image.title,
+            key: image.key
+          }))
+        : []
     };
   }
 
-  function downloadReadingGlassDebug() {
-    const result = readingGlassDebug();
-    const blob = new Blob([JSON.stringify(result, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `chatgpt-reading-glass-${Date.now()}.json`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    return result;
+  window.__usBingFreshDebug = freshDebug;
+  window.__usBingFreshRefresh = () => refreshFreshPool(true);
+
+  async function initFreshBing() {
+    await refreshFreshPool(false);
+    scheduleFreshRefresh();
+
+    const refreshIfNeeded = () => {
+      const age = Date.now() - Number(lastFreshRefresh || 0);
+      if (age >= REFRESH_MS) refreshFreshPool(false);
+    };
+
+    window.addEventListener("focus", refreshIfNeeded, { passive: true });
+    window.addEventListener("pageshow", refreshIfNeeded, { passive: true });
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) refreshIfNeeded();
+    }, { passive: true });
   }
 
-  window.__usReadingGlassDebug = readingGlassDebug;
-  window.__usReadingGlassDownloadDebug = downloadReadingGlassDebug;
-
-  function initReadingGlass() {
-    if (!ensureGlass()) return;
-    findThreadAndAttach();
-
-    window.addEventListener("resize", scheduleGeometry, { passive: true });
-    window.addEventListener("pageshow", scheduleGeometry, { passive: true });
-    window.addEventListener("focus", scheduleGeometry, { passive: true });
-    document.addEventListener("transitionend", scheduleGeometry, { passive: true, capture: true });
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initFreshBing, { once: true });
+  } else {
+    initFreshBing();
   }
-
-  if (document.body) initReadingGlass();
-  else document.addEventListener("DOMContentLoaded", initReadingGlass, { once: true });
 })();
