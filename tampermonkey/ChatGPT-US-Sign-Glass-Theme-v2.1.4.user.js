@@ -57,6 +57,9 @@
       --us-cine-fade: ${FADE_MS}ms;
     }
 
+    /* v2.1.4 removes the old wallpaper plane completely. The pinned v2.1.3
+       base may continue maintaining its Bing cache, but its visible plane is
+       gone and there is no mousemove/pointermove parallax layer. */
     html::before {
       content: none !important;
       display: none !important;
@@ -69,6 +72,9 @@
       isolation: isolate !important;
     }
 
+    /* Two compositor-only wallpaper planes. They sit behind normal body
+       content inside the isolated body stacking context, so the incoming
+       layer can crossfade without ever covering ChatGPT controls. */
     body::before,
     body::after {
       content: "" !important;
@@ -111,6 +117,9 @@
       transition-timing-function: cubic-bezier(.22,.61,.36,1), cubic-bezier(.42,0,.22,1) !important;
     }
 
+    /* Keep the fast cached reading frost from v2.1.3, but give it its own
+       image variable. The image flips only at the midpoint of a crossfade,
+       when both full-screen photos are already blended together. */
     #thread::before {
       background-image:
         linear-gradient(180deg, rgba(8,8,10,0.44), rgba(5,5,7,0.58)),
@@ -195,6 +204,9 @@
   function chooseTarget(from, preferredDirection = null) {
     let direction = unitVector(preferredDirection || randomDirection());
 
+    /* Near a safe crop edge, reflect only the outward component. This makes
+       the camera naturally return across the photo instead of exposing an edge
+       or snapping to an unrelated location. */
     if (Math.abs(from.x) > PAN_X_LIMIT * 0.78 && Math.sign(direction.x) === Math.sign(from.x)) {
       direction.x *= -1;
     }
@@ -221,7 +233,11 @@
     let zoomDirection = Math.random() < 0.5 ? -1 : 1;
     if (from.scale >= MAX_ZOOM - 0.006) zoomDirection = -1;
     if (from.scale <= MIN_ZOOM + 0.006) zoomDirection = 1;
-    target.scale = clamp(from.scale + zoomDirection * randomBetween(0.006, 0.017), MIN_ZOOM, MAX_ZOOM);
+    target.scale = clamp(
+      from.scale + zoomDirection * randomBetween(0.006, 0.017),
+      MIN_ZOOM,
+      MAX_ZOOM
+    );
 
     return {
       point: target,
@@ -268,7 +284,10 @@
     const state = layerMotion[layer];
     if (!state) return;
 
-    const start = reducedMotion ? { x: 0, y: 0, scale: 1.08 } : (startPoint || randomPoint());
+    const start = reducedMotion
+      ? { x: 0, y: 0, scale: 1.08 }
+      : (startPoint || randomPoint());
+
     state.point = start;
     state.direction = unitVector(directionHint || randomDirection());
     setLayerPoint(layer, start, 0);
@@ -276,6 +295,8 @@
 
     if (reducedMotion) return;
 
+    /* CSS performs the long animation. JS only supplies randomized endpoints
+       every two to three minutes, so there is no requestAnimationFrame loop. */
     window.requestAnimationFrame(() => {
       window.requestAnimationFrame(() => {
         if (layer !== activeLayer) return;
@@ -287,6 +308,10 @@
   function chooseEntryFromDirection(directionHint) {
     const direction = unitVector(directionHint || randomDirection());
     const point = randomPoint();
+
+    /* Start the incoming image slightly behind its travel vector. During the
+       crossfade it therefore continues the outgoing camera direction instead
+       of visibly reversing or sliding sideways. */
     point.x = clamp(point.x - direction.x * 1.45, -PAN_X_LIMIT, PAN_X_LIMIT);
     point.y = clamp(point.y - direction.y * 1.10, -PAN_Y_LIMIT, PAN_Y_LIMIT);
     return point;
@@ -314,6 +339,7 @@
       const raw = localStorage.getItem(SHARED_CACHE_KEY);
       const parsed = raw ? JSON.parse(raw) : null;
       if (!parsed || !Array.isArray(parsed.images)) return [];
+
       const unique = new Map();
       parsed.images.forEach((image) => {
         if (image?.url && image?.key && !unique.has(image.key)) unique.set(image.key, image);
@@ -374,6 +400,9 @@
       });
     });
 
+    /* The reading-frost duplicate changes at the visual midpoint. Because the
+       two full-screen photos are each near 50% opacity then, the blurred center
+       never appears to hard-cut to the next image. */
     window.setTimeout(() => {
       if (token !== swapToken) return;
       root.style.setProperty("--us-cine-reading-image", cssUrl(image.url));
@@ -392,6 +421,7 @@
 
   function applyWallpaper(images = wallpaperPool) {
     if (!Array.isArray(images) || images.length < 2) return;
+
     const slot = Math.floor(Date.now() / ROTATE_MS);
     let index = slot % images.length;
     let image = images[index];
@@ -401,6 +431,7 @@
       index = (index + 1) % images.length;
       image = images[index];
     }
+
     transitionWallpaper(image, slot);
   }
 
@@ -417,6 +448,7 @@
   function pollSharedCache(attempt = 0) {
     if (cachePollTimer) window.clearTimeout(cachePollTimer);
     if (refreshFromSharedCache()) return;
+
     const nextDelay = attempt < 8 ? 1500 : 30000;
     cachePollTimer = window.setTimeout(() => pollSharedCache(attempt + 1), nextDelay);
   }
