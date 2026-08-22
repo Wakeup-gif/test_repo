@@ -1,0 +1,40 @@
+name: Patch ChatGPT Modern Glass v2.1.3
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/patch_chatgpt_modern_glass_v213.py'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch canonical userscript
+        run: python scripts/patch_chatgpt_modern_glass_v213.py
+
+      - name: Validate userscripts
+        run: |
+          node --check tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js
+          node --check tampermonkey/ChatGPT-US-Sign-Glass-Theme-v2.1.3.user.js
+          git diff --check
+
+      - name: Commit release
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tampermonkey/ChatGPT-US-Sign-Glass-Theme.user.js tampermonkey/ChatGPT-US-Sign-Glass-Theme-v2.1.3.user.js
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "Optimize ChatGPT modern glass theme v2.1.3"
+          git push origin main
