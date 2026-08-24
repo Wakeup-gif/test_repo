@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         US Sign Full UI Theme
 // @namespace    us-sign-full-modules
-// @version      2.2.7
-// @description  SquareCoil dark glass with cinematic fresh Bing UHD pan/zoom, true live backdrop glass surfaces, and clean Space Grotesk project identity with Manrope operational typography.
+// @version      2.2.9
+// @description  SquareCoil v2.2.7 visual system plus a dashboard.php?show=2-only refresh, with both required dependency layers loaded directly.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-start
 // @grant        GM_addStyle
@@ -10,6 +10,7 @@
 // @connect      www.bing.com
 // @noframes
 // @require      https://raw.githubusercontent.com/Wakeup-gif/test_repo/a340786458402732f0f78d48face95c940adabf3/tampermonkey/US-Sign-Full-UI-Theme-v2.2.6.user.js
+// @require      https://raw.githubusercontent.com/Wakeup-gif/test_repo/b0a89382eabdbcb873b3f8d20bcacb05ada7b63c/tampermonkey/US-Sign-Full-UI-Theme-v2.2.7.user.js
 // @updateURL    https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/US-Sign-Full-UI-Theme.user.js
 // @downloadURL  https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/US-Sign-Full-UI-Theme.user.js
 // ==/UserScript==
@@ -17,961 +18,353 @@
 (function () {
   "use strict";
 
-  if (window.__usSignFullUIThemeV227) return;
-  window.__usSignFullUIThemeV227 = true;
+  if (window.__usSignFullUIThemeV229) return;
+  window.__usSignFullUIThemeV229 = true;
 
   const root = document.documentElement;
   if (!root) return;
 
-  root.dataset.usSignThemeVersion = "2.2.7";
-  root.dataset.usSignWallpaperMode = "cinematic-fresh-bing";
-  root.dataset.usSignGlassMode = "live-backdrop";
-  root.dataset.usSignDisplayFont = "Space Grotesk";
+  root.dataset.usSignThemeVersion = "2.2.9";
 
-  const FALLBACK_WALLPAPER = "https://www.bing.com/th?id=OBTQ.BTA9ACD46ADE4DF290D5640B661E6A5C8CF666B651507F76309661E06C8AA70FB2&rs=2&c=1";
-  const CACHE_KEY = "us-sign-squarecoil-bing-fresh-v1";
-  const ROTATE_MS = 30 * 60 * 1000;
-  const REFRESH_MS = 55 * 60 * 1000;
-  const FADE_MS = 7200;
-  const MAX_MARKET_DATE_LAG_DAYS = 1;
+  const params = new URLSearchParams(location.search);
+  const isDesignDashboard = /\/dashboard\.php$/i.test(location.pathname) && params.get("show") === "2";
+  if (!isDesignDashboard) return;
 
-  const PAN_X_LIMIT = 11.0;
-  const PAN_Y_LIMIT = 8.5;
-  const START_X_LIMIT = 8.4;
-  const START_Y_LIMIT = 6.4;
-  const MIN_ZOOM = 1.24;
-  const MAX_ZOOM = 1.38;
-  const MIN_PAN_MS = 50000;
-  const MAX_PAN_MS = 82000;
-  const MIN_TRAVEL = 8.0;
-  const MAX_TRAVEL = 14.5;
-  const HANDOFF_MIN = 0.82;
-  const HANDOFF_MAX = 0.89;
-
-  const MARKETS = [
-    "en-US",
-    "en-GB",
-    "en-CA",
-    "en-IN",
-    "de-DE",
-    "fr-FR",
-    "fr-CA",
-    "es-ES",
-    "it-IT",
-    "ja-JP",
-    "pt-BR",
-    "zh-CN"
-  ];
-
-  const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true;
+  root.classList.add("us-sign-dashboard-designs-v229");
+  root.dataset.usSignDashboardRefresh = "designs-2026-live-dom-safe";
 
   GM_addStyle(String.raw`
-    @import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;650;700&family=Space+Grotesk:wght@500;600;700&display=swap");
-
-    :root {
-      --us-wallpaper: none !important;
-      --us-display-font: "Space Grotesk", "Manrope", "Avenir Next", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif !important;
-      --us-squarecoil-glass: rgba(10, 10, 13, 0.55);
-      --us-squarecoil-glass-soft: rgba(10, 10, 13, 0.46);
-      --us-squarecoil-glass-strong: rgba(8, 8, 11, 0.64);
-      --us-squarecoil-glass-line: rgba(255, 255, 255, 0.080);
-      --us-squarecoil-live-frost: blur(20px) saturate(118%) brightness(88%);
-      --us-squarecoil-live-frost-soft: blur(16px) saturate(116%) brightness(90%);
-      --us-squarecoil-fade: ${FADE_MS}ms;
+    html.us-sign-dashboard-designs-v229 #content {
+      padding-top: 22px !important;
+      padding-right: 22px !important;
+      padding-bottom: 54px !important;
+      padding-left: 22px !important;
     }
 
-    html {
-      background: #09090b !important;
-      background-image: none !important;
+    html.us-sign-dashboard-designs-v229 #content .mw1000.center-block.demo-block.mt30 {
+      width: calc(100% - 24px) !important;
+      max-width: 1180px !important;
+      margin: 20px auto 0 !important;
     }
 
-    body {
-      position: relative !important;
-      isolation: isolate !important;
-      background: transparent !important;
-      background-color: transparent !important;
-      background-image: none !important;
+    html.us-sign-dashboard-designs-v229 #page-content,
+    html.us-sign-dashboard-designs-v229 #db-designs {
+      width: 100% !important;
+      max-width: none !important;
     }
 
-    html body #main,
-    html body #content_wrapper,
-    html body #content,
-    html body #content > .tray,
-    html body #content > .tray-left,
-    html body #content > .tray-right,
-    html body #content > .tray-center,
-    html body .tray,
-    html body .tray-left,
-    html body .tray-right,
-    html body .tray-center,
-    html body .tray-inner,
-    html body [class^="tray-"],
-    html body [class*=" tray-"],
-    html body .content,
-    html body .content-wrapper,
-    html body .page-content,
-    html body .content-body,
-    html body .main-content,
-    html body .main-panel,
-    html body .admin-panels,
-    html body .dashboard,
-    html body .dashboard-page,
-    html body .container,
-    html body .container-fluid {
-      background-color: transparent !important;
-      background-image: none !important;
-    }
-
-    html body #main::before {
-      content: none !important;
-      display: none !important;
-      background: transparent !important;
-      background-image: none !important;
-      box-shadow: none !important;
-    }
-
-    #us-squarecoil-cinematic-wallpaper {
-      position: fixed !important;
-      inset: 0 !important;
-      z-index: -3 !important;
+    html.us-sign-dashboard-designs-v229 :is(#widget-tasks,#widget-designs,#widget-estimates) {
+      min-height: 94px !important;
+      height: auto !important;
+      margin-bottom: 12px !important;
+      color: var(--us-text) !important;
+      background-color: rgba(10,10,13,0.55) !important;
+      background-image: linear-gradient(180deg,rgba(255,255,255,0.030),rgba(255,255,255,0.004)) !important;
+      border: 1px solid rgba(255,255,255,0.080) !important;
+      border-radius: 15px !important;
+      box-shadow: 0 12px 34px rgba(0,0,0,0.16), inset 0 1px 0 rgba(255,255,255,0.035) !important;
+      -webkit-backdrop-filter: blur(20px) saturate(118%) brightness(88%) !important;
+      backdrop-filter: blur(20px) saturate(118%) brightness(88%) !important;
       overflow: hidden !important;
-      pointer-events: none !important;
-      contain: strict !important;
+      transition: transform 160ms ease,border-color 160ms ease,background-color 160ms ease !important;
     }
 
-    #us-squarecoil-cinematic-wallpaper .us-squarecoil-cine-layer {
-      --us-squarecoil-cine-image: none;
-      position: absolute !important;
-      inset: -12vh -12vw !important;
-      opacity: 0;
-      pointer-events: none !important;
-      background-image:
-        radial-gradient(circle at 78% 0%, rgba(255,255,255,0.026), transparent 38%),
-        radial-gradient(circle at 14% 100%, rgba(255,255,255,0.012), transparent 34%),
-        linear-gradient(rgba(0,0,0,0.22), rgba(0,0,0,0.46)),
-        var(--us-squarecoil-cine-image) !important;
-      background-position: center !important;
-      background-size: auto, auto, auto, cover !important;
-      background-repeat: no-repeat !important;
-      transform-origin: center center !important;
-      will-change: transform, opacity !important;
-      backface-visibility: hidden !important;
-      transition: opacity var(--us-squarecoil-fade) cubic-bezier(.22,.61,.36,1) !important;
+    html.us-sign-dashboard-designs-v229 #widget-tasks {
+      box-shadow: inset 3px 0 0 rgba(142,203,255,0.55),0 12px 34px rgba(0,0,0,0.16),inset 0 1px 0 rgba(255,255,255,0.035) !important;
     }
 
-    #us-squarecoil-cinematic-wallpaper .us-squarecoil-cine-layer[data-active="true"] {
-      opacity: 1;
+    html.us-sign-dashboard-designs-v229 #widget-designs {
+      box-shadow: inset 3px 0 0 rgba(199,169,107,0.52),0 12px 34px rgba(0,0,0,0.16),inset 0 1px 0 rgba(255,255,255,0.035) !important;
     }
 
-    header,
-    header.navbar,
-    .navbar,
-    .navbar-fixed-top,
-    #topbar,
-    .topbar,
-    #sidebar_left,
-    #pmlt {
-      background-color: var(--us-squarecoil-glass) !important;
-      background-image: linear-gradient(180deg, rgba(255,255,255,0.026), rgba(255,255,255,0.004)) !important;
-      border-color: var(--us-squarecoil-glass-line) !important;
-      -webkit-backdrop-filter: var(--us-squarecoil-live-frost) !important;
-      backdrop-filter: var(--us-squarecoil-live-frost) !important;
+    html.us-sign-dashboard-designs-v229 #widget-estimates {
+      box-shadow: inset 3px 0 0 rgba(196,122,122,0.50),0 12px 34px rgba(0,0,0,0.16),inset 0 1px 0 rgba(255,255,255,0.035) !important;
     }
 
-    #customer-name,
-    #customer-info,
-    #projectbox,
-    #descriptionbox,
-    #designbox,
-    #filesbox,
-    #showbtns,
-    #mapcontainer {
-      background-color: var(--us-squarecoil-glass-soft) !important;
-      background-image: linear-gradient(180deg, rgba(255,255,255,0.024), rgba(255,255,255,0.003)) !important;
-      border-color: var(--us-squarecoil-glass-line) !important;
-      -webkit-backdrop-filter: var(--us-squarecoil-live-frost) !important;
-      backdrop-filter: var(--us-squarecoil-live-frost) !important;
-    }
-
-    .modal-content,
-    .popover,
-    .dropdown-menu,
-    .well,
-    .panel,
-    .panel-default {
-      background-color: var(--us-squarecoil-glass-soft) !important;
-      background-image: linear-gradient(180deg, rgba(255,255,255,0.022), rgba(255,255,255,0.003)) !important;
-      border-color: var(--us-squarecoil-glass-line) !important;
-      -webkit-backdrop-filter: var(--us-squarecoil-live-frost-soft) !important;
-      backdrop-filter: var(--us-squarecoil-live-frost-soft) !important;
-    }
-
-    #customer-info .panel,
-    #projectbox .panel,
-    #descriptionbox .panel,
-    #designbox .panel,
-    #filesbox .panel,
-    #descriptionbox .well,
-    #designbox .well,
-    #filesbox .well,
-    #projectbox .well,
-    #customer-info .well,
-    #sidebar_left .sidebar-left-content,
-    #sidebar_left .sidebar-menu,
-    #sidebar_left .nav.sidebar-menu {
-      background-color: transparent !important;
+    html.us-sign-dashboard-designs-v229 :is(#widget-tasks,#widget-designs,#widget-estimates) > div {
+      min-height: 92px !important;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: center !important;
+      padding: 14px 20px !important;
+      background: transparent !important;
       background-image: none !important;
       -webkit-backdrop-filter: none !important;
       backdrop-filter: none !important;
     }
 
-    .panel-heading,
-    .panel-footer,
-    .modal-header,
-    .modal-footer,
-    .cke_top,
-    .cke_bottom,
-    .note-toolbar {
-      background: rgba(255,255,255,0.025) !important;
-      background-image: none !important;
-      -webkit-backdrop-filter: none !important;
-      backdrop-filter: none !important;
-    }
-
-    html.us-sign-design-page body #pmlt h1,
-    html.us-sign-design-page body #pmlt h1 *,
-    html.us-sign-design-page body #pmlt .project-number,
-    html.us-sign-design-page body #pmlt [class*="project-number" i],
-    html.us-sign-design-page body #pmlt .project-name,
-    html.us-sign-design-page body #pmlt [class*="project-name" i],
-    html.us-sign-design-page body #customer-name h1,
-    html.us-sign-design-page body #customer-name h2,
-    html.us-sign-design-page body #customer-name .project-number,
-    html.us-sign-design-page body #customer-name .project-name {
-      font-family: var(--us-display-font) !important;
-      font-style: normal !important;
+    html.us-sign-dashboard-designs-v229 :is(#widget-tasks,#widget-designs,#widget-estimates) h2 {
+      margin: 0 0 7px !important;
+      color: #f5f7fa !important;
+      font-size: 30px !important;
       font-weight: 700 !important;
-      font-variation-settings: normal !important;
+      line-height: 1 !important;
       letter-spacing: -0.035em !important;
-      text-rendering: geometricPrecision !important;
     }
 
-    body,
-    input,
-    textarea,
-    select,
-    button,
-    table,
-    td,
-    th,
-    label,
-    .panel-title,
-    .panel-body,
-    .panel-heading,
-    .nav,
-    .navbar,
-    #sidebar_left,
-    #pmlt :not(h1):not(.project-number):not(.project-name) {
-      font-family: var(--us-font) !important;
+    html.us-sign-dashboard-designs-v229 :is(#widget-tasks,#widget-designs,#widget-estimates) h5 {
+      margin: 0 !important;
+      color: rgba(213,218,225,0.82) !important;
+      font-size: 12.5px !important;
+      font-weight: 600 !important;
+      line-height: 1.25 !important;
+      letter-spacing: 0.01em !important;
     }
 
-    @media (prefers-reduced-motion: reduce) {
-      #us-squarecoil-cinematic-wallpaper .us-squarecoil-cine-layer {
-        inset: -5vh -5vw !important;
-        transform: scale(1.08) !important;
-        transition-duration: 900ms !important;
+    html.us-sign-dashboard-designs-v229 :is(#widget-tasks,#widget-designs,#widget-estimates) .icon-bg {
+      opacity: 0.11 !important;
+      transform: scale(0.92) !important;
+      transform-origin: center !important;
+    }
+
+    @media (hover:hover) and (pointer:fine) {
+      html.us-sign-dashboard-designs-v229 :is(#widget-tasks,#widget-designs,#widget-estimates):hover {
+        transform: translateY(-2px) !important;
+        border-color: rgba(255,255,255,0.115) !important;
+        background-color: rgba(12,12,15,0.60) !important;
       }
     }
 
-    @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
-      header,
-      header.navbar,
-      .navbar,
-      #sidebar_left,
-      #pmlt,
-      #customer-name,
-      #customer-info,
-      #projectbox,
-      #descriptionbox,
-      #designbox,
-      #filesbox,
-      .panel,
-      .well,
-      .modal-content,
-      .popover,
-      .dropdown-menu {
-        background-color: rgba(10,10,13,0.88) !important;
+    html.us-sign-dashboard-designs-v229 #page-content .panel.heading-border.panel-primary {
+      position: relative !important;
+      width: 100% !important;
+      margin: 0 !important;
+      color: var(--us-text-soft) !important;
+      background-color: rgba(10,10,13,0.55) !important;
+      background-image: linear-gradient(180deg,rgba(255,255,255,0.024),rgba(255,255,255,0.003)) !important;
+      border: 1px solid rgba(255,255,255,0.080) !important;
+      border-radius: 16px !important;
+      box-shadow: 0 18px 44px rgba(0,0,0,0.18),inset 0 1px 0 rgba(255,255,255,0.032) !important;
+      -webkit-backdrop-filter: blur(20px) saturate(118%) brightness(88%) !important;
+      backdrop-filter: blur(20px) saturate(118%) brightness(88%) !important;
+      overflow: hidden !important;
+    }
+
+    html.us-sign-dashboard-designs-v229 #page-content .panel-body.bg-light {
+      width: 100% !important;
+      padding: 22px 24px 24px !important;
+      color: var(--us-text-soft) !important;
+      background: transparent !important;
+      background-color: transparent !important;
+      background-image: none !important;
+      border: 0 !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
+      overflow-x: auto !important;
+      overflow-y: visible !important;
+    }
+
+    html.us-sign-dashboard-designs-v229 #multiple_location_id {
+      width: min(340px,100%) !important;
+      min-height: 38px !important;
+      margin: 0 0 10px !important;
+      padding: 8px 34px 8px 12px !important;
+      color: #f2f4f7 !important;
+      background-color: rgba(8,8,10,0.72) !important;
+      background-image: linear-gradient(180deg,rgba(255,255,255,0.026),rgba(255,255,255,0.004)) !important;
+      border: 1px solid rgba(255,255,255,0.090) !important;
+      border-radius: 9px !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.025) !important;
+      font-size: 13px !important;
+      font-weight: 550 !important;
+    }
+
+    html.us-sign-dashboard-designs-v229 #multiple_location_id:focus {
+      border-color: rgba(142,203,255,0.42) !important;
+      box-shadow: 0 0 0 3px rgba(142,203,255,0.08) !important;
+      outline: none !important;
+    }
+
+    html.us-sign-dashboard-designs-v229 #multiple_location_id option {
+      color: #f2f4f7 !important;
+      background: #111216 !important;
+    }
+
+    html.us-sign-dashboard-designs-v229 #db-designs h3 {
+      margin: 24px 0 10px !important;
+      padding: 0 0 9px !important;
+      color: #f3f5f8 !important;
+      border-bottom: 1px solid rgba(255,255,255,0.075) !important;
+      font-family: var(--us-font) !important;
+      font-size: 15px !important;
+      font-weight: 700 !important;
+      line-height: 1.3 !important;
+      letter-spacing: -0.012em !important;
+    }
+
+    html.us-sign-dashboard-designs-v229 :is(#inProgress,#nextJob,#onHold).design-list-container {
+      width: 100% !important;
+      margin: 0 0 18px !important;
+      color: var(--us-text-soft) !important;
+      background: rgba(255,255,255,0.018) !important;
+      background-image: linear-gradient(180deg,rgba(255,255,255,0.012),rgba(255,255,255,0)) !important;
+      border: 1px solid rgba(255,255,255,0.065) !important;
+      border-radius: 12px !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.018) !important;
+      overflow: hidden !important;
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
+    }
+
+    html.us-sign-dashboard-designs-v229 .design-list-container .clickableRowx,
+    html.us-sign-dashboard-designs-v229 .design-list-container > .row {
+      color: var(--us-text-soft) !important;
+      background-color: transparent !important;
+      background-image: none !important;
+      border-bottom: 1px solid rgba(255,255,255,0.050) !important;
+      box-shadow: none !important;
+      transition: background-color 140ms ease !important;
+    }
+
+    html.us-sign-dashboard-designs-v229 .design-list-container > .row:last-child,
+    html.us-sign-dashboard-designs-v229 .design-list-container .clickableRowx:last-child {
+      border-bottom-color: transparent !important;
+    }
+
+    @media (hover:hover) and (pointer:fine) {
+      html.us-sign-dashboard-designs-v229 .design-list-container .clickableRowx:hover,
+      html.us-sign-dashboard-designs-v229 .design-list-container > .row:hover {
+        background-color: rgba(255,255,255,0.040) !important;
+      }
+    }
+
+    html.us-sign-dashboard-designs-v229 .design-list-container :is(.col0,.col1,.col2,.col3) {
+      color: rgba(222,227,234,0.92) !important;
+      line-height: 1.42 !important;
+    }
+
+    html.us-sign-dashboard-designs-v229 .design-list-container :is(.bold,strong,b) {
+      color: #f3f5f8 !important;
+      font-weight: 650 !important;
+    }
+
+    html.us-sign-dashboard-designs-v229 :is(.sort-btn,.existing-sort) {
+      color: rgba(190,218,241,0.88) !important;
+    }
+
+    html.us-sign-dashboard-designs-v229 :is(.design-pop-icon,.fa-info-circle) {
+      color: rgba(142,203,255,0.82) !important;
+      opacity: 0.88 !important;
+    }
+
+    html.us-sign-dashboard-designs-v229 .expander,
+    html.us-sign-dashboard-designs-v229 .expander1 {
+      color: rgba(199,208,218,0.88) !important;
+    }
+
+    html.us-sign-dashboard-designs-v229 #db-designs .btn.btn-xs.btn-primary {
+      margin: 0 0 14px !important;
+      padding: 7px 11px !important;
+      color: rgba(235,239,244,0.92) !important;
+      background: rgba(255,255,255,0.055) !important;
+      background-image: none !important;
+      border: 1px solid rgba(255,255,255,0.075) !important;
+      border-radius: 8px !important;
+      box-shadow: none !important;
+      font-size: 12px !important;
+      font-weight: 600 !important;
+    }
+
+    html.us-sign-dashboard-designs-v229 #db-designs .btn.btn-xs.btn-primary:hover {
+      background: rgba(255,255,255,0.090) !important;
+      border-color: rgba(255,255,255,0.11) !important;
+    }
+
+    html.us-sign-dashboard-designs-v229 :is(#complete-tasks-form,#description-modal .modal-content,.show-materials-used-warning-modal-content,.popup-modal) {
+      color: var(--us-text-soft) !important;
+      background-color: rgba(10,10,13,0.86) !important;
+      background-image: linear-gradient(180deg,rgba(255,255,255,0.030),rgba(255,255,255,0.004)) !important;
+      border: 1px solid rgba(255,255,255,0.085) !important;
+      border-radius: 14px !important;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.34) !important;
+      -webkit-backdrop-filter: blur(20px) saturate(116%) brightness(88%) !important;
+      backdrop-filter: blur(20px) saturate(116%) brightness(88%) !important;
+    }
+
+    html.us-sign-dashboard-designs-v229 #description-modal :is(.modal-header,.modal-body,.modal-footer),
+    html.us-sign-dashboard-designs-v229 #complete-tasks-form > * {
+      color: inherit !important;
+      background: transparent !important;
+      background-image: none !important;
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
+    }
+
+    html.us-sign-dashboard-designs-v229 #page-content .panel-body.bg-light::-webkit-scrollbar {
+      height: 8px !important;
+    }
+
+    html.us-sign-dashboard-designs-v229 #page-content .panel-body.bg-light::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.16) !important;
+      border-radius: 999px !important;
+    }
+
+    @media (max-width:1100px) {
+      html.us-sign-dashboard-designs-v229 #content .mw1000.center-block.demo-block.mt30 {
+        width: 100% !important;
+        max-width: none !important;
+      }
+    }
+
+    @media (max-width:768px) {
+      html.us-sign-dashboard-designs-v229 #content {
+        padding: 14px 12px 40px !important;
+      }
+
+      html.us-sign-dashboard-designs-v229 :is(#widget-tasks,#widget-designs,#widget-estimates),
+      html.us-sign-dashboard-designs-v229 #page-content .panel.heading-border.panel-primary {
+        -webkit-backdrop-filter: blur(14px) saturate(114%) brightness(90%) !important;
+        backdrop-filter: blur(14px) saturate(114%) brightness(90%) !important;
+      }
+
+      html.us-sign-dashboard-designs-v229 #page-content .panel-body.bg-light {
+        padding: 16px !important;
       }
     }
   `);
 
-  let wallpaperPool = [];
-  let activeLayer = "a";
-  let lastWallpaperKey = "";
-  let pendingWallpaperKey = "";
-  let lastAppliedSlot = -1;
-  let swapToken = 0;
-  let rotateTimer = 0;
-  let refreshTimer = 0;
-  let refreshInFlight = false;
-  let host = null;
-
-  const layers = { a: null, b: null };
-  const motion = { a: makeMotionState(), b: makeMotionState() };
-
-  function makeMotionState() {
-    return {
-      animation: null,
-      timer: 0,
-      from: null,
-      to: null,
-      direction: null,
-      zoomDirection: 1,
-      duration: 0,
-      handoff: 0.86,
-      running: false
-    };
-  }
-
-  function randomBetween(min, max) {
-    return min + Math.random() * (max - min);
-  }
-
-  function clamp(value, min, max) {
-    return Math.min(max, Math.max(min, value));
-  }
-
-  function lerp(a, b, t) {
-    return a + (b - a) * t;
-  }
-
-  function interpolatePoint(from, to, t) {
-    return {
-      x: lerp(from.x, to.x, t),
-      y: lerp(from.y, to.y, t),
-      scale: lerp(from.scale, to.scale, t)
-    };
-  }
-
-  function unitVector(vector) {
-    const x = Number(vector?.x || 0);
-    const y = Number(vector?.y || 0);
-    const length = Math.hypot(x, y) || 1;
-    return { x: x / length, y: y / length };
-  }
-
-  function randomDirection() {
-    const angle = randomBetween(0, Math.PI * 2);
-    return { x: Math.cos(angle), y: Math.sin(angle) };
-  }
-
-  function cssUrl(url) {
-    return `url("${String(url || "").replace(/"/g, "%22")}")`;
-  }
-
-  function transformFor(point) {
-    return `translate3d(${point.x.toFixed(3)}%, ${point.y.toFixed(3)}%, 0) scale(${point.scale.toFixed(4)})`;
-  }
-
-  function randomStartPoint(zoomDirection = null) {
-    const zoomDir = zoomDirection || (Math.random() < 0.5 ? -1 : 1);
-    const scale = zoomDir > 0
-      ? randomBetween(MIN_ZOOM, MIN_ZOOM + 0.075)
-      : randomBetween(MAX_ZOOM - 0.075, MAX_ZOOM);
-
-    return {
-      x: randomBetween(-START_X_LIMIT, START_X_LIMIT),
-      y: randomBetween(-START_Y_LIMIT, START_Y_LIMIT),
-      scale
-    };
-  }
-
-  function ensureHost() {
-    if (host?.isConnected && layers.a?.isConnected && layers.b?.isConnected) return true;
-    if (!document.body) return false;
-
-    host = document.getElementById("us-squarecoil-cinematic-wallpaper");
-    if (!host) {
-      host = document.createElement("div");
-      host.id = "us-squarecoil-cinematic-wallpaper";
-      host.setAttribute("aria-hidden", "true");
-      document.body.prepend(host);
-    }
-
-    ["a", "b"].forEach((name) => {
-      let layer = host.querySelector(`[data-us-squarecoil-cine-layer="${name}"]`);
-      if (!layer) {
-        layer = document.createElement("div");
-        layer.className = "us-squarecoil-cine-layer";
-        layer.dataset.usSquarecoilCineLayer = name;
-        layer.dataset.active = name === "a" ? "true" : "false";
-        host.appendChild(layer);
-      }
-      layers[name] = layer;
-    });
-
-    return true;
-  }
-
-  function setLayerImage(layerName, url) {
-    const layer = layers[layerName];
-    if (!layer || !url) return;
-    layer.style.setProperty("--us-squarecoil-cine-image", cssUrl(url));
-  }
-
-  function setLayerVisible(layerName, visible) {
-    const layer = layers[layerName];
-    if (!layer) return;
-    layer.dataset.active = visible ? "true" : "false";
-  }
-
-  function sampleMotionPoint(layerName) {
-    const state = motion[layerName];
-    if (!state?.from) return null;
-    if (!state.to || !state.animation || !state.duration) return { ...state.from };
-
-    const currentTime = Number(state.animation.currentTime);
-    const progress = Number.isFinite(currentTime)
-      ? clamp(currentTime / state.duration, 0, 1)
-      : 0;
-
-    return interpolatePoint(state.from, state.to, progress);
-  }
-
-  function stopMotion(layerName, freeze = true) {
-    const state = motion[layerName];
-    const layer = layers[layerName];
-    if (!state) return;
-
-    if (state.timer) clearTimeout(state.timer);
-    state.timer = 0;
-
-    if (state.animation) {
-      if (freeze && layer) {
-        const point = sampleMotionPoint(layerName);
-        if (point) {
-          layer.style.transform = transformFor(point);
-          state.from = point;
-          state.to = point;
-        }
-      }
-      state.animation.cancel();
-      state.animation = null;
-    }
-
-    state.running = false;
-  }
-
-  function chooseTarget(from, preferredDirection = null, preferredZoomDirection = 1) {
-    let direction = unitVector(preferredDirection || randomDirection());
-
-    if (Math.abs(from.x) > PAN_X_LIMIT * 0.70 && Math.sign(direction.x) === Math.sign(from.x)) {
-      direction.x *= -0.62;
-    }
-    if (Math.abs(from.y) > PAN_Y_LIMIT * 0.70 && Math.sign(direction.y) === Math.sign(from.y)) {
-      direction.y *= -0.62;
-    }
-    direction = unitVector(direction);
-
-    const baseAngle = Math.atan2(direction.y, direction.x);
-    const angle = baseAngle + randomBetween(-0.20, 0.20);
-    direction = { x: Math.cos(angle), y: Math.sin(angle) };
-
-    const distance = randomBetween(MIN_TRAVEL, MAX_TRAVEL);
-    let target = {
-      x: clamp(from.x + direction.x * distance, -PAN_X_LIMIT, PAN_X_LIMIT),
-      y: clamp(from.y + direction.y * distance, -PAN_Y_LIMIT, PAN_Y_LIMIT),
-      scale: from.scale
-    };
-
-    if (Math.hypot(target.x - from.x, target.y - from.y) < 5.2) {
-      direction = unitVector({ x: -direction.x, y: -direction.y });
-      target.x = clamp(from.x + direction.x * distance, -PAN_X_LIMIT, PAN_X_LIMIT);
-      target.y = clamp(from.y + direction.y * distance, -PAN_Y_LIMIT, PAN_Y_LIMIT);
-    }
-
-    let zoomDirection = preferredZoomDirection || 1;
-    if (from.scale >= MAX_ZOOM - 0.012) zoomDirection = -1;
-    else if (from.scale <= MIN_ZOOM + 0.012) zoomDirection = 1;
-    else if (Math.random() < 0.13) zoomDirection *= -1;
-
-    target.scale = clamp(
-      from.scale + zoomDirection * randomBetween(0.028, 0.052),
-      MIN_ZOOM,
-      MAX_ZOOM
-    );
-
-    return {
-      point: target,
-      direction: unitVector({ x: target.x - from.x, y: target.y - from.y }),
-      zoomDirection
-    };
-  }
-
-  function updateMotionDebug(layerName) {
-    const state = motion[layerName];
-    const point = sampleMotionPoint(layerName) || state?.from;
-    if (!state || !point) return;
-
-    root.dataset.usSignWallpaperLayer = layerName;
-    root.dataset.usSignWallpaperPan = `${point.x.toFixed(2)},${point.y.toFixed(2)},${point.scale.toFixed(3)}`;
-    root.dataset.usSignWallpaperDirection = state.direction
-      ? `${state.direction.x.toFixed(2)},${state.direction.y.toFixed(2)}`
-      : "0.00,0.00";
-  }
-
-  function startLeg(layerName, from, directionHint = null, zoomDirectionHint = 1) {
-    const layer = layers[layerName];
-    const state = motion[layerName];
-    if (!layer || !state || reducedMotion) return;
-
-    if (state.timer) clearTimeout(state.timer);
-    if (state.animation) state.animation.cancel();
-
-    const next = chooseTarget(from, directionHint, zoomDirectionHint);
-    const duration = Math.round(randomBetween(MIN_PAN_MS, MAX_PAN_MS));
-    const handoff = randomBetween(HANDOFF_MIN, HANDOFF_MAX);
-
-    state.from = { ...from };
-    state.to = next.point;
-    state.direction = next.direction;
-    state.zoomDirection = next.zoomDirection;
-    state.duration = duration;
-    state.handoff = handoff;
-    state.running = true;
-
-    layer.style.transform = transformFor(from);
-    state.animation = layer.animate(
-      [
-        { transform: transformFor(from) },
-        { transform: transformFor(next.point) }
-      ],
-      {
-        duration,
-        easing: "linear",
-        fill: "both"
-      }
-    );
-
-    state.timer = setTimeout(() => {
-      if (document.hidden || !state.running || layerName !== activeLayer) return;
-      const current = sampleMotionPoint(layerName) || interpolatePoint(from, next.point, handoff);
-      layer.style.transform = transformFor(current);
-      state.animation?.cancel();
-      state.animation = null;
-      startLeg(layerName, current, state.direction, state.zoomDirection);
-    }, Math.round(duration * handoff));
-
-    updateMotionDebug(layerName);
-  }
-
-  function beginMotion(layerName, directionHint = null, startPoint = null, zoomDirectionHint = null) {
-    const layer = layers[layerName];
-    const state = motion[layerName];
-    if (!layer || !state) return;
-
-    stopMotion(layerName, false);
-
-    if (reducedMotion) {
-      const point = { x: 0, y: 0, scale: 1.08 };
-      layer.style.transform = transformFor(point);
-      state.from = point;
-      state.to = point;
-      state.direction = { x: 0, y: 0 };
-      state.zoomDirection = 0;
-      updateMotionDebug(layerName);
-      return;
-    }
-
-    const zoomDirection = zoomDirectionHint || (Math.random() < 0.5 ? -1 : 1);
-    const start = startPoint || randomStartPoint(zoomDirection);
-    const direction = unitVector(directionHint || randomDirection());
-
-    state.from = start;
-    state.to = start;
-    state.direction = direction;
-    state.zoomDirection = zoomDirection;
-    state.running = true;
-    layer.style.transform = transformFor(start);
-    updateMotionDebug(layerName);
-
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (!state.running || layerName !== activeLayer) return;
-        startLeg(layerName, start, direction, zoomDirection);
-      });
-    });
-  }
-
-  function chooseEntryFromDirection(directionHint, zoomDirectionHint = 1) {
-    const direction = unitVector(directionHint || randomDirection());
-    const point = randomStartPoint(zoomDirectionHint);
-    point.x = clamp(point.x - direction.x * 4.2, -PAN_X_LIMIT, PAN_X_LIMIT);
-    point.y = clamp(point.y - direction.y * 3.2, -PAN_Y_LIMIT, PAN_Y_LIMIT);
-    return point;
-  }
-
-  function preloadWallpaper(url) {
-    return new Promise((resolve) => {
-      const image = new Image();
-      let settled = false;
-      const finish = (ok) => {
-        if (settled) return;
-        settled = true;
-        resolve(ok);
-      };
-
-      image.decoding = "async";
-      image.onload = () => finish(true);
-      image.onerror = () => finish(false);
-      image.src = url;
-      setTimeout(() => finish(false), 12000);
-    });
-  }
-
-  function dateNumber(value) {
-    const text = String(value || "");
-    if (!/^\d{8}$/.test(text)) return NaN;
-    const y = Number(text.slice(0, 4));
-    const m = Number(text.slice(4, 6));
-    const d = Number(text.slice(6, 8));
-    return Date.UTC(y, m - 1, d);
-  }
-
-  function normalizeImage(image, market) {
-    if (!image || typeof image.url !== "string") return null;
-    try {
-      const url = new URL(image.url, "https://www.bing.com/");
-      if (url.protocol !== "https:") return null;
+  function dashboardDebug() {
+    const snapshot = (selector) => {
+      const el = document.querySelector(selector);
+      if (!el) return null;
+      const style = getComputedStyle(el);
+      const rect = el.getBoundingClientRect();
       return {
-        url: url.href,
-        key: String(image.urlbase || url.pathname),
-        title: String(image.title || image.copyright || "Bing wallpaper"),
-        startdate: String(image.startdate || ""),
-        market: String(market || "")
-      };
-    } catch (_) {
-      return null;
-    }
-  }
-
-  function readCache() {
-    try {
-      const raw = localStorage.getItem(CACHE_KEY);
-      const parsed = raw ? JSON.parse(raw) : null;
-      if (!parsed || !Array.isArray(parsed.images)) return null;
-      return parsed;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  function writeCache(images, freshestDate) {
-    try {
-      localStorage.setItem(CACHE_KEY, JSON.stringify({
-        fetchedAt: Date.now(),
-        freshestStartdate: freshestDate || "",
-        markets: MARKETS,
-        images
-      }));
-    } catch (_) {}
-  }
-
-  function requestMarket(market) {
-    return new Promise((resolve) => {
-      if (typeof GM_xmlhttpRequest !== "function") {
-        resolve([]);
-        return;
-      }
-
-      const endpoint = `https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=${encodeURIComponent(market)}&uhd=1&uhdwidth=3840&uhdheight=2160&_=${Date.now()}`;
-
-      GM_xmlhttpRequest({
-        method: "GET",
-        url: endpoint,
-        timeout: 10000,
-        headers: {
-          Accept: "application/json,text/plain,*/*",
-          "Cache-Control": "no-cache",
-          Pragma: "no-cache"
+        selector,
+        rect: {
+          x: Math.round(rect.x * 10) / 10,
+          y: Math.round(rect.y * 10) / 10,
+          width: Math.round(rect.width * 10) / 10,
+          height: Math.round(rect.height * 10) / 10
         },
-        onload(response) {
-          if (response.status < 200 || response.status >= 300) {
-            resolve([]);
-            return;
-          }
-          try {
-            const payload = JSON.parse(response.responseText || "{}");
-            const images = Array.isArray(payload.images) ? payload.images : [];
-            resolve(images.map((image) => normalizeImage(image, market)).filter(Boolean));
-          } catch (_) {
-            resolve([]);
-          }
-        },
-        onerror() { resolve([]); },
-        ontimeout() { resolve([]); }
-      });
-    });
-  }
-
-  function dedupeAndKeepFresh(images) {
-    const unique = new Map();
-    images.forEach((image) => {
-      if (image?.url && image?.key && !unique.has(image.key)) unique.set(image.key, image);
-    });
-
-    const deduped = Array.from(unique.values());
-    const dated = deduped
-      .map((image) => ({ image, time: dateNumber(image.startdate) }))
-      .filter((entry) => Number.isFinite(entry.time));
-
-    const freshestTime = dated.length ? Math.max(...dated.map((entry) => entry.time)) : NaN;
-    const freshestDate = dated.length
-      ? dated.find((entry) => entry.time === freshestTime)?.image?.startdate || ""
-      : "";
-    const maxLagMs = MAX_MARKET_DATE_LAG_DAYS * 24 * 60 * 60 * 1000;
-
-    const fresh = Number.isFinite(freshestTime)
-      ? deduped.filter((image) => {
-          const time = dateNumber(image.startdate);
-          return !Number.isFinite(time) || freshestTime - time <= maxLagMs;
-        })
-      : deduped;
-
-    return { images: fresh, freshestDate };
-  }
-
-  async function refreshPool(force = false) {
-    if (refreshInFlight) return false;
-
-    const cached = readCache();
-    const cachedAge = cached ? Date.now() - Number(cached.fetchedAt || 0) : Infinity;
-    if (!force && cached?.images?.length >= 2 && cachedAge >= 0 && cachedAge < REFRESH_MS) {
-      wallpaperPool = cached.images;
-      root.dataset.usSignBingFreshestDate = String(cached.freshestStartdate || "");
-      root.dataset.usSignBingPoolSize = String(wallpaperPool.length);
-      applyWallpaper();
-      return true;
-    }
-
-    refreshInFlight = true;
-    try {
-      const batches = await Promise.all(MARKETS.map(requestMarket));
-      const result = dedupeAndKeepFresh(batches.flat());
-      if (result.images.length >= 2) {
-        wallpaperPool = result.images;
-        writeCache(result.images, result.freshestDate);
-        root.dataset.usSignBingFreshestDate = result.freshestDate || "";
-        root.dataset.usSignBingPoolSize = String(result.images.length);
-        applyWallpaper();
-        return true;
-      }
-      return false;
-    } finally {
-      refreshInFlight = false;
-    }
-  }
-
-  async function transitionWallpaper(image, slot) {
-    if (!image?.url || !ensureHost()) return false;
-    const key = image.key || image.url;
-
-    if (key === lastWallpaperKey || key === pendingWallpaperKey) {
-      root.dataset.usSignBingWallpaper = image.title || "Bing wallpaper";
-      root.dataset.usSignBingMarket = image.market || "";
-      return false;
-    }
-
-    pendingWallpaperKey = key;
-    const token = ++swapToken;
-    const loaded = await preloadWallpaper(image.url);
-    if (!loaded || token !== swapToken) {
-      if (pendingWallpaperKey === key) pendingWallpaperKey = "";
-      return false;
-    }
-
-    const outgoing = activeLayer;
-    const incoming = outgoing === "a" ? "b" : "a";
-    const outgoingState = motion[outgoing];
-    const outgoingDirection = outgoingState?.direction || randomDirection();
-    const outgoingZoomDirection = outgoingState?.zoomDirection || 1;
-    const entryPoint = chooseEntryFromDirection(outgoingDirection, outgoingZoomDirection);
-
-    setLayerImage(incoming, image.url);
-    setLayerVisible(incoming, false);
-    beginMotion(incoming, outgoingDirection, entryPoint, outgoingZoomDirection);
-
-    activeLayer = incoming;
-    root.style.setProperty("--us-squarecoil-fade", `${reducedMotion ? 900 : FADE_MS}ms`);
-
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (token !== swapToken) return;
-        setLayerVisible(incoming, true);
-        setLayerVisible(outgoing, false);
-      });
-    });
-
-    setTimeout(() => {
-      if (token !== swapToken) return;
-      stopMotion(outgoing, false);
-    }, reducedMotion ? 950 : FADE_MS + 180);
-
-    lastWallpaperKey = key;
-    lastAppliedSlot = slot;
-    pendingWallpaperKey = "";
-    root.dataset.usSignBingWallpaper = image.title || "Bing wallpaper";
-    root.dataset.usSignBingMarket = image.market || "";
-    root.dataset.usSignWallpaperLayer = incoming;
-    return true;
-  }
-
-  function applyWallpaper() {
-    if (!wallpaperPool.length) return;
-    const slot = Math.floor(Date.now() / ROTATE_MS);
-    let index = slot % wallpaperPool.length;
-    let image = wallpaperPool[index];
-    if (!image?.url) return;
-
-    if (slot !== lastAppliedSlot && wallpaperPool.length > 1 && (image.key || image.url) === lastWallpaperKey) {
-      index = (index + 1) % wallpaperPool.length;
-      image = wallpaperPool[index];
-    }
-
-    void transitionWallpaper(image, slot);
-  }
-
-  function scheduleRotation() {
-    if (rotateTimer) clearTimeout(rotateTimer);
-    const now = Date.now();
-    const untilNext = ROTATE_MS - (now % ROTATE_MS) + 600;
-    rotateTimer = setTimeout(() => {
-      applyWallpaper();
-      scheduleRotation();
-    }, untilNext);
-  }
-
-  function scheduleRefresh() {
-    if (refreshTimer) clearTimeout(refreshTimer);
-    refreshTimer = setTimeout(async () => {
-      await refreshPool(true);
-      scheduleRefresh();
-    }, REFRESH_MS);
-  }
-
-  function pauseMotionForVisibility() {
-    ["a", "b"].forEach((layerName) => {
-      const state = motion[layerName];
-      if (!state?.running) return;
-      const current = sampleMotionPoint(layerName) || state.from;
-      stopMotion(layerName, false);
-      if (current && layers[layerName]) {
-        layers[layerName].style.transform = transformFor(current);
-        state.from = current;
-        state.to = current;
-      }
-    });
-  }
-
-  function resumeActiveMotion() {
-    if (reducedMotion) return;
-    const state = motion[activeLayer];
-    const point = state?.from || randomStartPoint(state?.zoomDirection || 1);
-    beginMotion(activeLayer, state?.direction || randomDirection(), point, state?.zoomDirection || 1);
-  }
-
-  function debugSnapshot() {
-    const snapshotLayer = (layerName) => {
-      const state = motion[layerName];
-      const point = sampleMotionPoint(layerName) || state?.from;
-      return {
-        visible: layers[layerName]?.dataset.active === "true",
-        running: Boolean(state?.running),
-        point: point ? {
-          x: Number(point.x.toFixed(2)),
-          y: Number(point.y.toFixed(2)),
-          scale: Number(point.scale.toFixed(3))
-        } : null,
-        direction: state?.direction ? {
-          x: Number(state.direction.x.toFixed(2)),
-          y: Number(state.direction.y.toFixed(2))
-        } : null,
-        durationMs: state?.duration || 0,
-        handoff: state?.handoff || 0
+        backgroundColor: style.backgroundColor,
+        backdropFilter: style.backdropFilter,
+        borderRadius: style.borderRadius,
+        overflow: style.overflow
       };
     };
 
     return {
       version: root.dataset.usSignThemeVersion,
-      displayFont: root.dataset.usSignDisplayFont,
-      wallpaperMode: root.dataset.usSignWallpaperMode,
-      glassMode: root.dataset.usSignGlassMode,
-      activeLayer,
-      bingPhoto: root.dataset.usSignBingWallpaper || "",
-      bingMarket: root.dataset.usSignBingMarket || "",
-      freshestDate: root.dataset.usSignBingFreshestDate || "",
-      poolSize: wallpaperPool.length,
-      reducedMotion,
-      layerA: snapshotLayer("a"),
-      layerB: snapshotLayer("b")
+      dashboardRefresh: root.dataset.usSignDashboardRefresh,
+      path: location.pathname,
+      show: params.get("show"),
+      classActive: root.classList.contains("us-sign-dashboard-designs-v229"),
+      baseLoaded: Boolean(window.__usSignFullUIThemeV227),
+      workspace: snapshot("#content .mw1000.center-block.demo-block.mt30"),
+      tasks: snapshot("#widget-tasks"),
+      designs: snapshot("#widget-designs"),
+      estimates: snapshot("#widget-estimates"),
+      queuePanel: snapshot("#page-content .panel.heading-border.panel-primary"),
+      queueBody: snapshot("#page-content .panel-body.bg-light"),
+      inProgress: snapshot("#inProgress"),
+      nextJob: snapshot("#nextJob"),
+      onHold: snapshot("#onHold"),
+      visibleRows: document.querySelectorAll(".design-list-container .clickableRowx").length
     };
   }
 
-  function forceNextWallpaper() {
-    if (wallpaperPool.length < 2) return false;
-    const currentIndex = wallpaperPool.findIndex((image) => (image.key || image.url) === lastWallpaperKey);
-    let nextIndex = currentIndex >= 0 ? (currentIndex + 1) % wallpaperPool.length : 0;
-    if ((wallpaperPool[nextIndex]?.key || wallpaperPool[nextIndex]?.url) === lastWallpaperKey) {
-      nextIndex = (nextIndex + 1) % wallpaperPool.length;
-    }
-    const image = wallpaperPool[nextIndex];
-    if (!image?.url) return false;
-    void transitionWallpaper(image, `manual-${Date.now()}`);
-    return true;
-  }
-
-  window.__usSquareCoilThemeDebug = debugSnapshot;
-  window.__usSquareCoilWallpaperNext = forceNextWallpaper;
-  window.__usSquareCoilBingRefresh = () => refreshPool(true);
-
-  async function init() {
-    if (!ensureHost()) return;
-
-    setLayerImage("a", FALLBACK_WALLPAPER);
-    setLayerVisible("a", true);
-    setLayerVisible("b", false);
-    beginMotion("a", randomDirection(), randomStartPoint(), Math.random() < 0.5 ? -1 : 1);
-
-    const cached = readCache();
-    if (cached?.images?.length >= 2) {
-      wallpaperPool = cached.images;
-      root.dataset.usSignBingFreshestDate = String(cached.freshestStartdate || "");
-      root.dataset.usSignBingPoolSize = String(wallpaperPool.length);
-      applyWallpaper();
-    }
-
-    await refreshPool(false);
-    scheduleRotation();
-    scheduleRefresh();
-
-    window.addEventListener("pageshow", () => {
-      applyWallpaper();
-      if (!motion[activeLayer]?.running) resumeActiveMotion();
-    }, { passive: true });
-
-    window.addEventListener("focus", () => {
-      if (!motion[activeLayer]?.running) resumeActiveMotion();
-    }, { passive: true });
-
-    document.addEventListener("visibilitychange", () => {
-      if (document.hidden) pauseMotionForVisibility();
-      else {
-        applyWallpaper();
-        resumeActiveMotion();
-      }
-    }, { passive: true });
-  }
-
-  if (document.body) void init();
-  else document.addEventListener("DOMContentLoaded", () => void init(), { once: true });
+  window.__usSquareCoilDashboardDebug = dashboardDebug;
 })();
