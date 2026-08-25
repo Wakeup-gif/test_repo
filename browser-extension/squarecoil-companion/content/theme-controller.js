@@ -1,10 +1,14 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.3.0';
+  const VERSION = '0.4.0';
   const DEFAULTS = { themePreference: 'auto', timerEnabled: true };
   const media = window.matchMedia('(prefers-color-scheme: dark)');
   let preference = 'auto';
+
+  function normalizeTheme(value) {
+    return ['light', 'dark', 'auto'].includes(value) ? value : 'auto';
+  }
 
   function effectiveTheme(value) {
     if (value === 'light' || value === 'dark') return value;
@@ -12,12 +16,18 @@
   }
 
   function applyTheme(value) {
-    preference = ['light', 'dark', 'auto'].includes(value) ? value : 'auto';
+    preference = normalizeTheme(value);
     const root = document.documentElement;
     if (!root) return;
     root.dataset.usxExtension = VERSION;
     root.dataset.usxTimerThemePreference = preference;
     root.dataset.usxTheme = effectiveTheme(preference);
+  }
+
+  async function setThemePreference(value) {
+    const next = normalizeTheme(value);
+    await chrome.storage.local.set({ themePreference: next });
+    applyTheme(next);
   }
 
   function bootTimer() {
@@ -44,6 +54,10 @@
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
     if (changes.themePreference) applyTheme(changes.themePreference.newValue);
+  });
+
+  window.addEventListener('USX_SET_TIMER_THEME', event => {
+    setThemePreference(event?.detail?.theme).catch(() => {});
   });
 
   media.addEventListener('change', () => {
