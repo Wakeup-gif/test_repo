@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.1.0';
+  const VERSION = '0.3.0';
   const DEFAULTS = { themePreference: 'auto', timerEnabled: true };
   const media = window.matchMedia('(prefers-color-scheme: dark)');
   let preference = 'auto';
@@ -16,7 +16,7 @@
     const root = document.documentElement;
     if (!root) return;
     root.dataset.usxExtension = VERSION;
-    root.dataset.usxThemePreference = preference;
+    root.dataset.usxTimerThemePreference = preference;
     root.dataset.usxTheme = effectiveTheme(preference);
   }
 
@@ -28,9 +28,7 @@
       }
 
       const existing = document.getElementById('ussign-job-timer');
-      if (existing) {
-        document.documentElement.dataset.usxTimerSource = 'existing';
-      }
+      if (existing) document.documentElement.dataset.usxTimerSource = 'existing';
 
       chrome.runtime.sendMessage({ type: 'USX_BOOT_TIMER' }).then(result => {
         document.documentElement.dataset.usxTimerSource = result?.source || (result?.ok ? 'extension' : 'error');
@@ -41,9 +39,7 @@
     });
   }
 
-  chrome.storage.local.get(DEFAULTS).then(settings => {
-    applyTheme(settings.themePreference);
-  });
+  chrome.storage.local.get(DEFAULTS).then(settings => applyTheme(settings.themePreference));
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
