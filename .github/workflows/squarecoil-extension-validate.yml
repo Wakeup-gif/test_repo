@@ -64,10 +64,10 @@ jobs:
           set -euo pipefail
           ROOT="browser-extension/squarecoil-companion"
           VERSION=$(node -p "require('./${ROOT}/manifest.json').version")
-          OUT="SquareCoil-Companion-v${VERSION}-EDGE.zip"
+          OUT="$GITHUB_WORKSPACE/SquareCoil-Companion-v${VERSION}-EDGE.zip"
           cd "$ROOT"
-          zip -r "../../../$OUT" . -x '*.DS_Store' >/dev/null
-          cd ../../..
+          zip -r "$OUT" . -x '*.DS_Store' >/dev/null
+          cd "$GITHUB_WORKSPACE"
           echo "Built $OUT"
           unzip -l "$OUT" | grep -q 'manifest.json'
           unzip -l "$OUT" | grep -q 'background.js'
