@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         SquareCoil Job Timer Manager
 // @namespace    us-sign-squarecoil-tools
-// @version      1.0.5
-// @description  Job Timer v1.0.4 with a softer rounded collapsed shell and darker frosted inactive tabs.
+// @version      1.0.6
+// @description  Job Timer v1.0.5 with drag-safe double-click tab selection.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-end
 // @grant        none
@@ -12,6 +12,7 @@
 // @require      https://raw.githubusercontent.com/Wakeup-gif/test_repo/b3626c03fd05ab514233a668d02df18896bc338c/tampermonkey/SquareCoil-Job-Timer-v1.0.2.user.js
 // @require      https://raw.githubusercontent.com/Wakeup-gif/test_repo/80b36561fe492edb205cecb585315077ea0dfc3a/tampermonkey/SquareCoil-Job-Timer-v1.0.3.user.js
 // @require      https://raw.githubusercontent.com/Wakeup-gif/test_repo/8a310be6524e4478d9d00f81cb3e2a19001d3abd/tampermonkey/SquareCoil-Job-Timer-v1.0.4.user.js
+// @require      https://raw.githubusercontent.com/Wakeup-gif/test_repo/1d740e7dac0f4449fdbade1c18782fe7168e444f/tampermonkey/SquareCoil-Job-Timer-v1.0.5.user.js
 // @updateURL    https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/SquareCoil-Job-Timer.user.js
 // @downloadURL  https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/tampermonkey/SquareCoil-Job-Timer.user.js
 // ==/UserScript==
@@ -19,112 +20,98 @@
 (() => {
   'use strict';
 
-  const VERSION = '1.0.5';
+  const VERSION = '1.0.6';
   const ROOT_ID = 'ussign-job-timer';
+  let allowBaseSelect = false;
+  let observer = null;
+
   window.__squareCoilJobTimerUiVersion = VERSION;
+  window.__squareCoilJobTimerInteractionVersion = VERSION;
 
-  if (document.getElementById('ussign-job-timer-ui-v105')) return;
+  function tabFromEvent(event, root) {
+    const target = event.target instanceof Element ? event.target : null;
+    const tab = target?.closest?.('.jt-tab[data-key]');
+    return tab && root.contains(tab) ? tab : null;
+  }
 
-  const style = document.createElement('style');
-  style.id = 'ussign-job-timer-ui-v105';
-  style.textContent = `
-/* Softer compact shell when collapsed */
-#${ROOT_ID}.jt-collapsed .jt-shell{
-  border-radius:18px!important;
-  overflow:visible!important;
-  border:1px solid rgba(255,255,255,.085)!important;
-  background:
-    linear-gradient(180deg,rgba(255,255,255,.028),rgba(255,255,255,.004)),
-    rgba(15,16,20,.66)!important;
-  box-shadow:
-    0 14px 34px rgba(0,0,0,.20),
-    inset 0 1px 0 rgba(255,255,255,.03)!important;
-  -webkit-backdrop-filter:blur(20px) saturate(116%) brightness(92%)!important;
-  backdrop-filter:blur(20px) saturate(116%) brightness(92%)!important;
-}
-#${ROOT_ID}.jt-collapsed .jt-shell>header{
-  min-height:50px!important;
-  padding:7px 9px 7px 14px!important;
-  border:0!important;
-  border-radius:18px!important;
-  background:transparent!important;
-}
-#${ROOT_ID}.jt-collapsed .jt-shell>header>button{
-  width:34px!important;
-  height:34px!important;
-  flex-basis:34px!important;
-  border-radius:11px!important;
-  background:rgba(255,255,255,.045)!important;
-  border-color:rgba(255,255,255,.085)!important;
-}
-#${ROOT_ID}.jt-collapsed .jt-shell>header>button:hover{
-  background:rgba(255,255,255,.085)!important;
-}
+  function refreshHints(root) {
+    root.querySelectorAll('.jt-tab[data-key]').forEach(tab => {
+      const label = tab.getAttribute('title') || tab.dataset.key || 'Timer';
+      const clean = label.replace(/\s*•\s*Double-click to view.*$/i, '').trim();
+      tab.setAttribute('title', `${clean} • Double-click to view • Drag to reorder`);
+      tab.dataset.selectMode = 'double-click';
+    });
+  }
 
-/* Inactive tabs should read as real frosted dark glass, not transparent cards */
-#${ROOT_ID} .jt-tab:not(.jt-selected){
-  background:
-    linear-gradient(180deg,rgba(var(--tc),.055),rgba(var(--tc),.012)),
-    rgba(16,17,22,.74)!important;
-  border:1px solid rgba(255,255,255,.07)!important;
-  border-color:rgba(var(--tc),.16)!important;
-  border-bottom-color:rgba(255,255,255,.055)!important;
-  box-shadow:
-    0 6px 16px rgba(0,0,0,.14),
-    inset 0 1px 0 rgba(255,255,255,.02)!important;
-  -webkit-backdrop-filter:blur(16px) saturate(114%) brightness(90%)!important;
-  backdrop-filter:blur(16px) saturate(114%) brightness(90%)!important;
-}
-#${ROOT_ID} .jt-tab:not(.jt-selected):hover{
-  background:
-    linear-gradient(180deg,rgba(var(--tc),.09),rgba(var(--tc),.018)),
-    rgba(18,19,24,.82)!important;
-  border-color:rgba(var(--tc),.24)!important;
-}
+  function install(root) {
+    if (root.dataset.doubleClickSelectReady === '1') return true;
+    root.dataset.doubleClickSelectReady = '1';
 
-/* Selected tab stays darker and more substantial while still glassy */
-#${ROOT_ID} .jt-tab.jt-selected{
-  background:
-    linear-gradient(180deg,rgba(var(--tc),.085),rgba(var(--tc),.018)),
-    rgba(19,20,26,.84)!important;
-  border-color:rgba(var(--tc),.27)!important;
-  border-bottom-color:rgba(15,16,20,.84)!important;
-  box-shadow:
-    0 -4px 14px rgba(0,0,0,.12),
-    inset 0 1px 0 rgba(255,255,255,.03)!important;
-  -webkit-backdrop-filter:blur(17px) saturate(115%) brightness(92%)!important;
-  backdrop-filter:blur(17px) saturate(115%) brightness(92%)!important;
-}
+    root.addEventListener('click', event => {
+      const tab = tabFromEvent(event, root);
+      if (!tab) return;
+      if (event.target.closest?.('.jt-x')) return;
+      if (allowBaseSelect) return;
 
-/* Softer close control */
-#${ROOT_ID} .jt-x{
-  width:19px!important;
-  height:19px!important;
-  flex-basis:19px!important;
-  border-radius:7px!important;
-  background:rgba(255,255,255,.025)!important;
-  color:rgba(229,233,239,.48)!important;
-}
-#${ROOT_ID} .jt-x:hover{
-  background:rgba(255,255,255,.085)!important;
-  color:#fff!important;
-}
+      // A normal click should never change the viewed timer. This also prevents
+      // a drag/drop release from accidentally selecting the dragged tab.
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }, true);
 
-/* Keep the top tab row cohesive while collapsed */
-#${ROOT_ID}.jt-collapsed .jt-tabs{
-  filter:none!important;
-}
-#${ROOT_ID}.jt-collapsed .jt-tab:not(.jt-selected){
-  background:
-    linear-gradient(180deg,rgba(var(--tc),.05),rgba(var(--tc),.01)),
-    rgba(14,15,20,.78)!important;
-}
+    root.addEventListener('dblclick', event => {
+      const tab = tabFromEvent(event, root);
+      if (!tab) return;
+      if (event.target.closest?.('.jt-x')) return;
 
-@media(max-width:640px){
-  #${ROOT_ID}.jt-collapsed .jt-shell{border-radius:16px!important}
-  #${ROOT_ID}.jt-collapsed .jt-shell>header{border-radius:16px!important}
+      event.preventDefault();
+      event.stopImmediatePropagation();
+
+      // Reuse the base timer's existing select-tab action so selection,
+      // persistence, render, and cross-tab sync all stay inside the proven engine.
+      allowBaseSelect = true;
+      try {
+        tab.click();
+      } finally {
+        allowBaseSelect = false;
+      }
+
+      tab.classList.remove('jt-double-selected');
+      void tab.offsetWidth;
+      tab.classList.add('jt-double-selected');
+      setTimeout(() => tab.classList.remove('jt-double-selected'), 260);
+    }, true);
+
+    observer = new MutationObserver(() => refreshHints(root));
+    observer.observe(root, { childList: true, subtree: true });
+    refreshHints(root);
+    return true;
+  }
+
+  if (!document.getElementById('ussign-job-timer-ui-v106')) {
+    const style = document.createElement('style');
+    style.id = 'ussign-job-timer-ui-v106';
+    style.textContent = `
+#${ROOT_ID} .jt-tab[data-key]{
+  cursor:grab!important;
+}
+#${ROOT_ID} .jt-tab[data-key]:active{
+  cursor:grabbing!important;
+}
+#${ROOT_ID} .jt-tab.jt-double-selected{
+  animation:jtDoubleSelectFlash 240ms ease-out;
+}
+@keyframes jtDoubleSelectFlash{
+  0%{box-shadow:0 0 0 0 rgba(var(--tc),.28),inset 0 1px 0 rgba(255,255,255,.03)}
+  100%{box-shadow:0 0 0 5px rgba(var(--tc),0),inset 0 1px 0 rgba(255,255,255,.03)}
 }
 `;
+    document.documentElement.appendChild(style);
+  }
 
-  document.documentElement.appendChild(style);
+  let tries = 0;
+  const wait = setInterval(() => {
+    const root = document.getElementById(ROOT_ID);
+    if ((root && install(root)) || ++tries >= 80) clearInterval(wait);
+  }, 125);
 })();
