@@ -52,6 +52,12 @@ async function bootTimer(tabId) {
     files: ['page/timer-controls.js']
   });
 
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    world: 'MAIN',
+    files: ['page/timer-workspace.js']
+  });
+
   bootedTabs.add(tabId);
   return {
     ok: true,

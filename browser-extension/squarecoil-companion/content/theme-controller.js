@@ -1,18 +1,18 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.5.3';
+  const VERSION = '0.6.0';
   const DEFAULTS = {
-    themePreference: 'auto',
+    themePreference: 'light',
     squareCoilTheme: 'original',
     timerEnabled: true
   };
   const media = window.matchMedia('(prefers-color-scheme: dark)');
-  let timerPreference = 'auto';
+  let timerPreference = 'light';
   let squareCoilPreference = 'original';
 
   function normalizeTimerTheme(value) {
-    return ['light', 'dark', 'auto'].includes(value) ? value : 'auto';
+    return ['light', 'dark', 'auto'].includes(value) ? value : 'light';
   }
 
   function normalizeSquareCoilTheme(value) {

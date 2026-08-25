@@ -1,9 +1,9 @@
 {
   "channel": "stable",
-  "latestVersion": "0.5.3",
+  "latestVersion": "0.6.0",
   "releasedAt": "2026-08-25",
-  "minimumVersion": "0.4.0",
-  "releaseNotes": "Stability rebuild: removes the whole-page settings MutationObserver loop, uses a root-only render observer, adds navigable Recent Jobs, History, Activity Log, Timer Appearance, and scoped Original/Refined Light/Sleek Dark SquareCoil themes.",
+  "minimumVersion": "0.5.3",
+  "releaseNotes": "Job Workspace release: Light is now the first-install default, timer contrast is improved, SquareCoil Refined Light and Sleek Dark are rebuilt around audited project surfaces, and the timer adds Pause/Resume, direct job links, individual delete/archive controls, Archive All/Clear Recent, CSV export/import restore, and a full history wipe option.",
   "distribution": {
     "recommended": "microsoft-edge-addons",
     "storeUrl": null,
