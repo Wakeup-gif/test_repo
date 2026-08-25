@@ -53,6 +53,8 @@
       if (event.target.closest?.('.jt-x')) return;
       if (allowBaseSelect) return;
 
+      // A normal click should never change the viewed timer. This also prevents
+      // a drag/drop release from accidentally selecting the dragged tab.
       event.preventDefault();
       event.stopImmediatePropagation();
     }, true);
@@ -65,6 +67,8 @@
       event.preventDefault();
       event.stopImmediatePropagation();
 
+      // Reuse the base timer's existing select-tab action so selection,
+      // persistence, render, and cross-tab sync all stay inside the proven engine.
       allowBaseSelect = true;
       try {
         tab.click();
