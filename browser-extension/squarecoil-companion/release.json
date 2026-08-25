@@ -1,9 +1,9 @@
 {
   "channel": "stable",
-  "latestVersion": "0.4.0",
+  "latestVersion": "0.5.3",
   "releasedAt": "2026-08-25",
-  "minimumVersion": "0.1.0",
-  "releaseNotes": "Adds Light, Dark, and Auto appearance controls directly inside the Job Timer settings panel while keeping SquareCoil itself untouched.",
+  "minimumVersion": "0.4.0",
+  "releaseNotes": "Stability rebuild: removes the whole-page settings MutationObserver loop, uses a root-only render observer, adds navigable Recent Jobs, History, Activity Log, Timer Appearance, and scoped Original/Refined Light/Sleek Dark SquareCoil themes.",
   "distribution": {
     "recommended": "microsoft-edge-addons",
     "storeUrl": null,
