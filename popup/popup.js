@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const DEFAULTS = { themePreference: 'auto' };
+  const DEFAULTS = { themePreference: 'light' };
   const buttons = [...document.querySelectorAll('[data-theme]')];
   const status = document.getElementById('status');
   const installedVersion = document.getElementById('installedVersion');
