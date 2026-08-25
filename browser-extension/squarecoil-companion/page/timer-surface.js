@@ -1,9 +1,9 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.7.0';
+  const VERSION = '0.7.1';
   const ROOT_ID = 'ussign-job-timer';
-  const STYLE_ID = 'usx-timer-surface-v070';
+  const STYLE_ID = 'usx-timer-surface-v071';
   const SURFACES = ['solid', 'glass'];
 
   const previous = window.__usxTimerSurface;
@@ -149,6 +149,7 @@ html[data-usx-timer-surface="glass"][data-usx-theme="light"] #${ROOT_ID} header>
   function onRootClick(event) {
     const target = event.target instanceof Element ? event.target.closest('[data-usx-timer-surface]') : null;
     if (!target) {
+      // Runtime/controls own the click. Patch after their synchronous render settles.
       setTimeout(queuePatch, 0);
       return;
     }
@@ -164,7 +165,9 @@ html[data-usx-timer-surface="glass"][data-usx-theme="light"] #${ROOT_ID} header>
     root = nextRoot;
     root.addEventListener('click', onRootClick, true);
     observer = new MutationObserver(queuePatch);
-    observer.observe(root, { childList: true, subtree: true });
+    // Stability rule: observe only direct runtime root replacement. Never watch the
+    // entire timer subtree, because settings rendering mutates that subtree itself.
+    observer.observe(root, { childList: true });
     patchSettings();
   }
 

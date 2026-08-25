@@ -1,20 +1,20 @@
 {
   "channel": "stable",
-  "latestVersion": "0.7.0",
+  "latestVersion": "0.7.1",
   "releasedAt": "2026-08-25",
   "minimumVersion": "0.5.3",
-  "releaseNotes": "Dual Browser + Glass release: Edge and Chrome now ship from the same MV3 source. The Job Timer adds a Solid or Glass/Blur finish in both the in-widget settings and extension popup. Sleek Dark receives a targeted white-outline audit and uses the cached custom US Sign logo; Original and Refined Light deliberately keep the native SquareCoil logo until a light-theme replacement is supplied. Existing Job Workspace pause/resume, links, archives, CSV backup/restore, and history controls remain intact.",
+  "releaseNotes": "Chrome Interaction Recovery: fixes a case where the Job Timer could be visible but non-interactive because a stale timer root caused the extension to skip the MAIN-world timer runtime. v0.7.1 now treats the runtime global as authoritative, removes stale dead timer DOM before reinjection, verifies the runtime after boot, and restores the root-only observer rule for the Glass presentation layer. Edge and Chrome continue to ship from the same MV3 source with Solid/Glass finishes, website themes, dark-theme logo, Job Workspace controls, archives, and CSV backup/restore.",
   "distribution": {
     "recommended": "developer-mode",
     "browsers": ["microsoft-edge", "google-chrome"],
     "edge": {
       "branch": "release/squarecoil-companion-edge",
-      "artifact": "SquareCoil-Companion-v0.7.0-EDGE.zip",
+      "artifact": "SquareCoil-Companion-v0.7.1-EDGE.zip",
       "storeUrl": null
     },
     "chrome": {
       "branch": "release/squarecoil-companion-chrome",
-      "artifact": "SquareCoil-Companion-v0.7.0-CHROME.zip",
+      "artifact": "SquareCoil-Companion-v0.7.1-CHROME.zip",
       "storeUrl": null
     },
     "stableBranch": "release/squarecoil-companion",
