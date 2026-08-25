@@ -1,11 +1,12 @@
 (() => {
   'use strict';
 
-  if (window.__usxTimerControlsV030) return;
-  window.__usxTimerControlsV030 = true;
+  if (window.__usxTimerControlsV040) return;
+  window.__usxTimerControlsV040 = true;
 
   const ROOT_ID = 'ussign-job-timer';
-  const STYLE_ID = 'usx-timer-controls-v030';
+  const STYLE_ID = 'usx-timer-controls-v040';
+  const THEMES = ['light', 'dark', 'auto'];
 
   function injectStyle() {
     if (document.getElementById(STYLE_ID)) return;
@@ -92,6 +93,58 @@
 #${ROOT_ID}:not(.jt-collapsed) .usx-expand-path { display: none !important; }
 #${ROOT_ID}.jt-collapsed .usx-minimize-path { display: none !important; }
 
+#${ROOT_ID} .usx-theme-setting {
+  padding: 10px 11px 11px !important;
+  border-bottom: 1px solid rgba(255,255,255,.05) !important;
+}
+#${ROOT_ID} .usx-theme-setting-head {
+  display: flex !important;
+  align-items: baseline !important;
+  justify-content: space-between !important;
+  gap: 10px !important;
+  margin-bottom: 7px !important;
+}
+#${ROOT_ID} .usx-theme-setting-head b {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: .055em !important;
+  text-transform: uppercase !important;
+}
+#${ROOT_ID} .usx-theme-setting-head small {
+  font-size: 9px !important;
+}
+#${ROOT_ID} .usx-theme-options {
+  display: grid !important;
+  grid-template-columns: repeat(3,1fr) !important;
+  gap: 5px !important;
+  padding: 3px !important;
+  border: 1px solid rgba(255,255,255,.07) !important;
+  border-radius: 9px !important;
+  background: rgba(0,0,0,.12) !important;
+}
+#${ROOT_ID} .usx-theme-option {
+  min-height: 29px !important;
+  padding: 5px 7px !important;
+  margin: 0 !important;
+  border: 1px solid transparent !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  color: rgba(220,226,233,.66) !important;
+  font-size: 10px !important;
+  font-weight: 650 !important;
+  cursor: pointer !important;
+  box-shadow: none !important;
+}
+#${ROOT_ID} .usx-theme-option:hover {
+  color: rgba(244,247,250,.94) !important;
+  background: rgba(255,255,255,.05) !important;
+}
+#${ROOT_ID} .usx-theme-option[data-selected="true"] {
+  color: rgba(246,249,252,.96) !important;
+  background: rgba(123,170,242,.13) !important;
+  border-color: rgba(123,170,242,.22) !important;
+}
+
 html[data-usx-theme="light"] #${ROOT_ID} {
   --jt-line: rgba(0,0,0,.10) !important;
   color: #40464d !important;
@@ -134,12 +187,14 @@ html[data-usx-theme="light"] #${ROOT_ID} .jt-resume {
 html[data-usx-theme="light"] #${ROOT_ID} .jt-main-head b,
 html[data-usx-theme="light"] #${ROOT_ID} .jt-main > strong,
 html[data-usx-theme="light"] #${ROOT_ID} .jt-settings > h4,
-html[data-usx-theme="light"] #${ROOT_ID} .jt-row b {
+html[data-usx-theme="light"] #${ROOT_ID} .jt-row b,
+html[data-usx-theme="light"] #${ROOT_ID} .usx-theme-setting-head b {
   color: #343a40 !important;
 }
 html[data-usx-theme="light"] #${ROOT_ID} .jt-main-head span,
 html[data-usx-theme="light"] #${ROOT_ID} .jt-row small,
-html[data-usx-theme="light"] #${ROOT_ID} .jt-archive-empty {
+html[data-usx-theme="light"] #${ROOT_ID} .jt-archive-empty,
+html[data-usx-theme="light"] #${ROOT_ID} .usx-theme-setting-head small {
   color: #7e858c !important;
 }
 html[data-usx-theme="light"] #${ROOT_ID} .jt-tab {
@@ -157,6 +212,26 @@ html[data-usx-theme="light"] #${ROOT_ID} .jt-tab.jt-selected {
 html[data-usx-theme="light"] #${ROOT_ID} .jt-x {
   background: rgba(0,0,0,.045) !important;
   color: #6e767f !important;
+}
+html[data-usx-theme="light"] #${ROOT_ID} .usx-theme-setting {
+  border-bottom-color: rgba(0,0,0,.07) !important;
+}
+html[data-usx-theme="light"] #${ROOT_ID} .usx-theme-options {
+  background: #eef1f3 !important;
+  border-color: #dfe3e6 !important;
+}
+html[data-usx-theme="light"] #${ROOT_ID} .usx-theme-option {
+  color: #717981 !important;
+}
+html[data-usx-theme="light"] #${ROOT_ID} .usx-theme-option:hover {
+  color: #343a40 !important;
+  background: rgba(255,255,255,.70) !important;
+}
+html[data-usx-theme="light"] #${ROOT_ID} .usx-theme-option[data-selected="true"] {
+  color: #2f5278 !important;
+  background: #ffffff !important;
+  border-color: rgba(75,150,230,.30) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08) !important;
 }
 
 html[data-usx-theme="dark"] #${ROOT_ID} {
@@ -225,6 +300,37 @@ html[data-usx-theme="dark"] #${ROOT_ID} header > button:hover {
     return svg;
   }
 
+  function currentPreference() {
+    const value = document.documentElement.dataset.usxTimerThemePreference;
+    return THEMES.includes(value) ? value : 'auto';
+  }
+
+  function syncThemeButtons(root = document.getElementById(ROOT_ID)) {
+    if (!root) return;
+    const selected = currentPreference();
+    root.querySelectorAll('.usx-theme-option').forEach(button => {
+      const active = button.dataset.usxThemeChoice === selected;
+      button.dataset.selected = String(active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+  }
+
+  function makeThemeSettings() {
+    const wrap = document.createElement('div');
+    wrap.className = 'usx-theme-setting';
+    wrap.innerHTML = `
+      <div class="usx-theme-setting-head">
+        <b>Appearance</b>
+        <small>Job Timer only</small>
+      </div>
+      <div class="usx-theme-options" role="group" aria-label="Job Timer appearance">
+        <button type="button" class="usx-theme-option" data-usx-theme-choice="light">Light</button>
+        <button type="button" class="usx-theme-option" data-usx-theme-choice="dark">Dark</button>
+        <button type="button" class="usx-theme-option" data-usx-theme-choice="auto">Auto</button>
+      </div>`;
+    return wrap;
+  }
+
   function patchControls() {
     const root = document.getElementById(ROOT_ID);
     if (!root) return false;
@@ -235,12 +341,47 @@ html[data-usx-theme="dark"] #${ROOT_ID} header > button:hover {
     }
 
     root.querySelectorAll('.jt-x').forEach(button => button.setAttribute('type', 'button'));
+
+    if (root.classList.contains('jt-settings-open')) {
+      const settings = root.querySelector('.jt-settings');
+      if (settings && !settings.querySelector('.usx-theme-setting')) {
+        const themeSetting = makeThemeSettings();
+        const heading = settings.querySelector(':scope > h4');
+        if (heading) heading.insertAdjacentElement('afterend', themeSetting);
+        else settings.prepend(themeSetting);
+      }
+      syncThemeButtons(root);
+    }
+
     return true;
   }
+
+  document.addEventListener('click', event => {
+    const button = event.target.closest?.(`#${ROOT_ID} .usx-theme-option[data-usx-theme-choice]`);
+    if (!button) return;
+    const theme = button.dataset.usxThemeChoice;
+    if (!THEMES.includes(theme)) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    document.documentElement.dataset.usxTimerThemePreference = theme;
+    document.documentElement.dataset.usxTheme = theme === 'auto'
+      ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
+      : theme;
+    syncThemeButtons();
+    window.dispatchEvent(new CustomEvent('USX_SET_TIMER_THEME', { detail: { theme } }));
+  }, true);
 
   injectStyle();
   patchControls();
 
   const observer = new MutationObserver(() => patchControls());
   observer.observe(document.documentElement, { subtree: true, childList: true });
+
+  const themeObserver = new MutationObserver(() => syncThemeButtons());
+  themeObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-usx-timer-theme-preference', 'data-usx-theme']
+  });
 })();
