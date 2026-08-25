@@ -1,17 +1,29 @@
 (() => {
   'use strict';
 
-  if (window.__usxTimerControlsV010) return;
-  window.__usxTimerControlsV010 = true;
+  if (window.__usxTimerControlsV030) return;
+  window.__usxTimerControlsV030 = true;
 
   const ROOT_ID = 'ussign-job-timer';
-  const STYLE_ID = 'usx-timer-controls-v010';
+  const STYLE_ID = 'usx-timer-controls-v030';
 
   function injectStyle() {
     if (document.getElementById(STYLE_ID)) return;
     const style = document.createElement('style');
     style.id = STYLE_ID;
     style.textContent = `
+#${ROOT_ID} .jt-shell {
+  border-radius: 16px !important;
+  background-clip: padding-box !important;
+}
+#${ROOT_ID}:not(.jt-collapsed) header {
+  border-radius: 15px 15px 0 0 !important;
+}
+#${ROOT_ID}.jt-collapsed .jt-shell,
+#${ROOT_ID}.jt-collapsed header {
+  border-radius: 18px !important;
+}
+
 #${ROOT_ID} .jt-x {
   position: relative !important;
   display: block !important;
@@ -222,9 +234,7 @@ html[data-usx-theme="dark"] #${ROOT_ID} header > button:hover {
       collapse.replaceChildren(makeCollapseIcon());
     }
 
-    root.querySelectorAll('.jt-x').forEach(button => {
-      button.setAttribute('type', 'button');
-    });
+    root.querySelectorAll('.jt-x').forEach(button => button.setAttribute('type', 'button'));
     return true;
   }
 
