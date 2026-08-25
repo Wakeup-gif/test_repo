@@ -1,9 +1,9 @@
 {
   "channel": "stable",
-  "latestVersion": "0.2.0",
+  "latestVersion": "0.3.0",
   "releasedAt": "2026-08-25",
   "minimumVersion": "0.1.0",
-  "releaseNotes": "Adds versioned update-shell behavior, visible installed/latest version status, and store/self-host update readiness.",
+  "releaseNotes": "Scopes all extension styling to the Job Timer widget only and rounds the expanded timer header/shell edges.",
   "distribution": {
     "recommended": "microsoft-edge-addons",
     "storeUrl": null,
