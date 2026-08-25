@@ -1,12 +1,23 @@
 {
   "channel": "stable",
-  "latestVersion": "0.6.0",
+  "latestVersion": "0.7.0",
   "releasedAt": "2026-08-25",
   "minimumVersion": "0.5.3",
-  "releaseNotes": "Job Workspace release: Light is now the first-install default, timer contrast is improved, SquareCoil Refined Light and Sleek Dark are rebuilt around audited project surfaces, and the timer adds Pause/Resume, direct job links, individual delete/archive controls, Archive All/Clear Recent, CSV export/import restore, and a full history wipe option.",
+  "releaseNotes": "Dual Browser + Glass release: Edge and Chrome now ship from the same MV3 source. The Job Timer adds a Solid or Glass/Blur finish in both the in-widget settings and extension popup. Sleek Dark receives a targeted white-outline audit and uses the cached custom US Sign logo; Original and Refined Light deliberately keep the native SquareCoil logo until a light-theme replacement is supplied. Existing Job Workspace pause/resume, links, archives, CSV backup/restore, and history controls remain intact.",
   "distribution": {
-    "recommended": "microsoft-edge-addons",
-    "storeUrl": null,
+    "recommended": "developer-mode",
+    "browsers": ["microsoft-edge", "google-chrome"],
+    "edge": {
+      "branch": "release/squarecoil-companion-edge",
+      "artifact": "SquareCoil-Companion-v0.7.0-EDGE.zip",
+      "storeUrl": null
+    },
+    "chrome": {
+      "branch": "release/squarecoil-companion-chrome",
+      "artifact": "SquareCoil-Companion-v0.7.0-CHROME.zip",
+      "storeUrl": null
+    },
+    "stableBranch": "release/squarecoil-companion",
     "selfHostedUpdateManifest": null
   }
 }

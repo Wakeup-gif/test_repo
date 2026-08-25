@@ -1,6 +1,9 @@
 const bootedTabs = new Set();
 const RELEASE_URL = 'https://raw.githubusercontent.com/Wakeup-gif/test_repo/main/browser-extension/squarecoil-companion/release.json';
 const RELEASE_CACHE_MS = 15 * 60 * 1000;
+const DARK_LOGO_URL = 'https://i.imgur.com/7I1u2iF.png';
+const DARK_LOGO_CACHE_KEY = 'usxDarkLogoDataV1';
+let darkLogoTask = null;
 
 function versionParts(value) {
   return String(value || '0')
@@ -58,12 +61,46 @@ async function bootTimer(tabId) {
     files: ['page/timer-workspace.js']
   });
 
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    world: 'MAIN',
+    files: ['page/timer-surface.js']
+  });
+
   bootedTabs.add(tabId);
   return {
     ok: true,
     source: probe.hasTimerGlobal || probe.hasTimerRoot ? 'existing-timer' : 'extension',
     existingVersion: probe.timerVersion || null
   };
+}
+
+function bytesToBase64(bytes) {
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+  return btoa(binary);
+}
+
+async function fetchDarkLogoData() {
+  const stored = await chrome.storage.local.get(DARK_LOGO_CACHE_KEY);
+  if (typeof stored[DARK_LOGO_CACHE_KEY] === 'string' && stored[DARK_LOGO_CACHE_KEY].startsWith('data:image/')) {
+    return stored[DARK_LOGO_CACHE_KEY];
+  }
+
+  if (darkLogoTask) return darkLogoTask;
+  darkLogoTask = (async () => {
+    const response = await fetch(DARK_LOGO_URL, { cache: 'force-cache' });
+    if (!response.ok) throw new Error(`dark logo HTTP ${response.status}`);
+    const mime = response.headers.get('content-type') || 'image/png';
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    const dataUrl = `data:${mime};base64,${bytesToBase64(bytes)}`;
+    await chrome.storage.local.set({ [DARK_LOGO_CACHE_KEY]: dataUrl });
+    return dataUrl;
+  })().finally(() => { darkLogoTask = null; });
+  return darkLogoTask;
 }
 
 async function fetchReleaseMetadata() {
@@ -211,6 +248,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const tabId = sender.tab?.id;
     bootTimer(tabId)
       .then(sendResponse)
+      .catch(error => sendResponse({ ok: false, reason: String(error?.message || error) }));
+    return true;
+  }
+
+  if (message?.type === 'USX_GET_DARK_LOGO') {
+    fetchDarkLogoData()
+      .then(dataUrl => sendResponse({ ok: true, dataUrl, sourceUrl: DARK_LOGO_URL }))
       .catch(error => sendResponse({ ok: false, reason: String(error?.message || error) }));
     return true;
   }

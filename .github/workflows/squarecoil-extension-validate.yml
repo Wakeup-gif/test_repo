@@ -52,31 +52,52 @@ jobs:
             const full = path.join(root, file);
             if (!fs.existsSync(full)) throw new Error(`Manifest references missing file: ${file}`);
           }
-          const workspace = path.join(root, 'page/timer-workspace.js');
-          if (!fs.existsSync(workspace)) throw new Error('timer-workspace.js is missing');
+          for (const file of [
+            'page/timer-runtime.js',
+            'page/timer-controls.js',
+            'page/timer-workspace.js',
+            'page/timer-surface.js',
+            'styles/site-theme-v070.css',
+            'HANDOFF.md'
+          ]) {
+            if (!fs.existsSync(path.join(root, file))) throw new Error(`Required release file missing: ${file}`);
+          }
           console.log(`Validated SquareCoil Companion v${manifest.version}`);
           console.log(`Manifest references ${required.size} packaged files.`);
           NODE
 
-      - name: Build Edge package
+      - name: Build Edge and Chrome packages
         shell: bash
         run: |
           set -euo pipefail
           ROOT="browser-extension/squarecoil-companion"
           VERSION=$(node -p "require('./${ROOT}/manifest.json').version")
-          OUT="$GITHUB_WORKSPACE/SquareCoil-Companion-v${VERSION}-EDGE.zip"
-          cd "$ROOT"
-          zip -r "$OUT" . -x '*.DS_Store' >/dev/null
-          cd "$GITHUB_WORKSPACE"
-          echo "Built $OUT"
-          unzip -l "$OUT" | grep -q 'manifest.json'
-          unzip -l "$OUT" | grep -q 'background.js'
-          unzip -l "$OUT" | grep -q 'page/timer-workspace.js'
+          build_package() {
+            LABEL="$1"
+            OUT="$GITHUB_WORKSPACE/SquareCoil-Companion-v${VERSION}-${LABEL}.zip"
+            (cd "$ROOT" && zip -r "$OUT" . -x '*.DS_Store' >/dev/null)
+            echo "Built $OUT"
+            unzip -l "$OUT" | grep -q 'manifest.json'
+            unzip -l "$OUT" | grep -q 'background.js'
+            unzip -l "$OUT" | grep -q 'page/timer-workspace.js'
+            unzip -l "$OUT" | grep -q 'page/timer-surface.js'
+            unzip -l "$OUT" | grep -q 'styles/site-theme-v070.css'
+          }
+          build_package EDGE
+          build_package CHROME
 
       - name: Upload Edge package
         uses: actions/upload-artifact@v4
         with:
           name: squarecoil-companion-edge
           path: SquareCoil-Companion-v*-EDGE.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Chrome package
+        uses: actions/upload-artifact@v4
+        with:
+          name: squarecoil-companion-chrome
+          path: SquareCoil-Companion-v*-CHROME.zip
           if-no-files-found: error
           retention-days: 30

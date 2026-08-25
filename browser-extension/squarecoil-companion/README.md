@@ -1,44 +1,66 @@
 # US Sign SquareCoil Companion
 
-Manifest V3 extension for Microsoft Edge and Google Chrome.
+Current stable package: **v0.7.0 Dual Browser + Glass**.
 
-## v0.3.0
+The Companion is one Manifest V3 codebase packaged and validated for both Microsoft Edge and Google Chrome. It augments the internal US Sign & Mill SquareCoil site with the Job Timer workspace and optional website themes while keeping SquareCoil authoritative for the real company clock.
 
-- Extension styling is scoped to the **Job Timer widget only**.
-- SquareCoil itself remains visually untouched and uses its native website CSS.
-- Timer widget supports Light, Dark, and Auto appearance modes.
-- Expanded timer shell/header corners are explicitly rounded while preserving the floating timer tabs.
-- Includes the existing SquareCoil Job Timer runtime and preserves its existing localStorage state key, so saved timer/history data can carry over.
-- If a Tampermonkey Job Timer is already present, the extension does not inject a second timer.
-- The popup displays the installed extension version and latest stable release metadata.
-- A manual **Check for update** control can request a browser update check without replacing Edge's normal automatic update schedule.
+## What v0.7.0 contains
+
+- Job Timer Light, Dark, and Auto appearance modes.
+- Job Timer **Solid** or **Glass / Blur** panel finish. Solid remains the default so an update does not silently change the user's existing visual density.
+- Job Workspace Pause/Resume controls. Pause affects the Companion timer only and never clocks the employee out of SquareCoil.
+- Direct job links, recent-job delete/archive controls, Archive All, Clear Recent, CSV export/import restore, and full timer-history wipe.
+- Website themes: Original, Refined Light, and Sleek Dark.
+- Sleek Dark audit overlay that removes inherited bright/white borders and native focus halos from common SquareCoil/AdminDesign components while preserving semantic status colors.
+- Sleek Dark custom US Sign logo, sourced from the same known logo used by the existing Tampermonkey UI Runtime Fixes and cached by the extension service worker.
+- Original and Refined Light keep the native SquareCoil logo. A separate light-theme custom logo has not been supplied yet.
+- Stable release metadata and GitHub Actions validation for both browser packages.
+
+## Install for testing
+
+### Microsoft Edge
+
+1. Extract `SquareCoil-Companion-v0.7.0-EDGE.zip`.
+2. Open `edge://extensions`.
+3. Enable Developer mode.
+4. Choose **Load unpacked**.
+5. Select the extracted folder containing `manifest.json`.
+
+### Google Chrome
+
+1. Extract `SquareCoil-Companion-v0.7.0-CHROME.zip`.
+2. Open `chrome://extensions`.
+3. Enable Developer mode.
+4. Choose **Load unpacked**.
+5. Select the extracted folder containing `manifest.json`.
+
+The Edge and Chrome packages intentionally contain the same extension source. Separate artifacts make installation and release tracking explicit without maintaining divergent code.
+
+## Architecture
+
+- `manifest.json`: MV3 package contract.
+- `background.js`: timer bootstrapping, release metadata/update checks, cached dark-logo fetch.
+- `content/theme-controller.js`: persisted timer appearance, timer finish, website theme, and dark-logo application/restoration.
+- `page/timer-runtime.js`: stable SquareCoil clock observation and timer state engine.
+- `page/timer-controls.js`: settings/navigation control layer.
+- `page/timer-workspace.js`: v0.6 Job Workspace behavior for pause/resume, links, archives, CSV, restore, and destructive history controls.
+- `page/timer-surface.js`: v0.7 additive Solid/Glass UI layer and package-version display patch.
+- `styles/site-theme.css`: v0.6 audited Refined Light / Sleek Dark base website paint.
+- `styles/site-theme-v070.css`: v0.7 dark-outline/focus/logo audit overlay.
+- `popup/`: extension popup controls for appearance, finish, and release status.
+- `release.json`: current stable release metadata.
+- `HANDOFF.md`: implementation context and continuation contract for a new chat or maintainer.
+
+## Critical behavior boundary
+
+SquareCoil remains authoritative for clock-in, project/department switching, and clock-out. The Companion observes the current SquareCoil context. Manual Companion Pause/Resume changes only the local timer state. Resume is allowed only when SquareCoil still reports the same job.
 
 ## Update model
 
-### Recommended: Microsoft Edge Add-ons
+Developer-mode installs must be reloaded after replacing files. Future Edge Add-ons and Chrome Web Store publication can use the same MV3 source, but store URLs are intentionally `null` until actual listings exist. `release.json` is informational metadata and remote JavaScript is never executed.
 
-Publish through Microsoft Edge Add-ons / Partner Center. Each release increments the `manifest.json` version. Users who installed the store version receive browser-managed updates automatically.
+## Tampermonkey coexistence
 
-The extension reads `release.json` from this repository as non-executable release metadata so the popup can show the latest published version and release notes. Remote JavaScript is never executed.
+During migration, ensure there is not a separately enabled historical `SquareCoil Job Timer Manager` userscript creating a second runtime. The extension detects an existing timer root/global and avoids injecting a second timer engine, but individually installed old userscripts can still create their own listeners or UI.
 
-### Developer mode
-
-`Load unpacked` is for development/testing. After pulling or replacing the extension files, reload the extension from `edge://extensions`.
-
-## Install in Microsoft Edge for testing
-
-1. Open `edge://extensions`.
-2. Turn on **Developer mode**.
-3. Click **Load unpacked**.
-4. Select this `squarecoil-companion` folder.
-5. Open SquareCoil and use the extension button to choose the **Job Timer** appearance.
-
-## Migration from Tampermonkey
-
-The extension can coexist during testing. For extension-only use, disable the Tampermonkey `SquareCoil Job Timer Manager` after confirming the extension works.
-
-The separate Tampermonkey `US Sign Full UI Theme` is independent. The extension no longer styles the SquareCoil website itself.
-
-## Behavior boundary
-
-SquareCoil remains authoritative for clock-in/clock-out state. The extension observes that state for the timer and never replaces SquareCoil time-clock actions.
+For full project continuity, read **HANDOFF.md before changing behavior**.

@@ -1,0 +1,131 @@
+/* SquareCoil Companion v0.7.0 dark-theme audit overlay.
+   Loaded after site-theme.css. This file is intentionally additive so the
+   stable v0.6.0 base theme remains easy to compare and roll back. */
+
+html[data-usx-squarecoil-theme="dark"] {
+  --usx-sq-line: #2b353e;
+  --usx-sq-line-soft: #232c34;
+  --usx-sq-focus: rgba(109, 168, 216, .52);
+}
+
+/* Normalize native Bootstrap/AdminDesign surfaces that can retain pale borders. */
+html[data-usx-squarecoil-theme="dark"] :is(
+  .panel,
+  .well,
+  .modal-content,
+  .dropdown-menu,
+  .popover,
+  .tab-block,
+  .tab-content,
+  .list-group,
+  .list-group-item,
+  .input-group-addon,
+  .thumbnail,
+  .widget,
+  .widget-panel,
+  .admin-form .section,
+  .nav-tabs,
+  .nav-tabs > li > a,
+  .tabs-left,
+  .tabs-left > li > a
+) {
+  border-color: var(--usx-sq-line) !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
+html[data-usx-squarecoil-theme="dark"] :is(
+  .list-group-item,
+  .input-group-addon,
+  .thumbnail,
+  .widget,
+  .widget-panel,
+  .admin-form .section
+) {
+  color: var(--usx-sq-text) !important;
+  background-color: var(--usx-sq-surface) !important;
+  background-image: none !important;
+}
+
+/* Keep semantic top accents after the general border normalization. */
+html[data-usx-squarecoil-theme="dark"] .panel-primary.panel-border.top {
+  border-top-color: #5a9ee6 !important;
+}
+html[data-usx-squarecoil-theme="dark"] .panel-success.panel-border.top {
+  border-top-color: #66a873 !important;
+}
+html[data-usx-squarecoil-theme="dark"] .panel-warning.panel-border.top {
+  border-top-color: #d5a547 !important;
+}
+html[data-usx-squarecoil-theme="dark"] .panel-danger.panel-border.top {
+  border-top-color: #c96760 !important;
+}
+
+/* Neutral/default controls were a major source of bright rings in dark mode. */
+html[data-usx-squarecoil-theme="dark"] :is(.btn-default,.btn-secondary,.btn-light) {
+  color: #d9e0e6 !important;
+  background: #20272e !important;
+  background-image: none !important;
+  border-color: #35414b !important;
+  box-shadow: none !important;
+}
+html[data-usx-squarecoil-theme="dark"] :is(.btn-default,.btn-secondary,.btn-light):hover {
+  color: #fff !important;
+  background: #29323b !important;
+  border-color: #43515d !important;
+}
+
+html[data-usx-squarecoil-theme="dark"] :is(
+  .form-control,
+  input[type="text"],
+  input[type="number"],
+  input[type="search"],
+  input[type="email"],
+  input[type="date"],
+  textarea,
+  select,
+  .input-group-addon
+) {
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Accessible focus without the thick native white halo. */
+html[data-usx-squarecoil-theme="dark"] :is(a,button,.btn,input,textarea,select,.form-control):focus {
+  outline: 0 !important;
+}
+html[data-usx-squarecoil-theme="dark"] :is(a,button,.btn,input,textarea,select,.form-control):focus-visible {
+  outline: 2px solid var(--usx-sq-focus) !important;
+  outline-offset: 1px !important;
+  box-shadow: none !important;
+}
+
+/* Project Status and other native tab shells can otherwise show light seams. */
+html[data-usx-squarecoil-theme="dark"] .tab-block > ul.nav.tabs-left,
+html[data-usx-squarecoil-theme="dark"] .tab-block > .tab-content,
+html[data-usx-squarecoil-theme="dark"] .tab-block .tab-pane {
+  border-color: var(--usx-sq-line) !important;
+  box-shadow: none !important;
+}
+
+/* Dark theme custom logo must stay clean against the graphite top bar. */
+html[data-usx-squarecoil-theme="dark"] :is(
+  header.navbar .navbar-brand,
+  .navbar-branding .navbar-brand
+) {
+  background: transparent !important;
+  border-color: transparent !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+html[data-usx-squarecoil-theme="dark"] :is(
+  header.navbar .navbar-brand img,
+  .navbar-branding .navbar-brand img,
+  img[data-usx-dark-logo-applied="true"]
+) {
+  background: transparent !important;
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  filter: none !important;
+}

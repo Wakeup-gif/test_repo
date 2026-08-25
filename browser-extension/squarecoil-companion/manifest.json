@@ -1,13 +1,14 @@
 {
   "manifest_version": 3,
   "name": "US Sign SquareCoil Companion",
-  "version": "0.6.0",
-  "version_name": "0.6.0 Job Workspace",
-  "description": "SquareCoil Job Timer companion with stable navigation, pause/resume controls, job links, archives, CSV backup/restore, accessible light/dark themes, and versioned update support.",
+  "version": "0.7.0",
+  "version_name": "0.7.0 Dual Browser + Glass",
+  "description": "SquareCoil Job Timer companion for Edge and Chrome with job workspace controls, Solid/Glass timer finishes, website themes, dark-theme logo, CSV backup/restore, and versioned update support.",
   "permissions": ["storage", "scripting"],
   "host_permissions": [
     "https://ussignandmill.squarecoil.net/*",
-    "https://raw.githubusercontent.com/Wakeup-gif/test_repo/*"
+    "https://raw.githubusercontent.com/Wakeup-gif/test_repo/*",
+    "https://i.imgur.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -19,7 +20,7 @@
   "content_scripts": [
     {
       "matches": ["https://ussignandmill.squarecoil.net/*"],
-      "css": ["styles/site-theme.css"],
+      "css": ["styles/site-theme.css", "styles/site-theme-v070.css"],
       "js": ["content/theme-controller.js"],
       "run_at": "document_start"
     }
