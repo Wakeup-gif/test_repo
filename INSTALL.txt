@@ -1,17 +1,24 @@
-SquareCoil Companion v0.5.3 Stability
+SquareCoil Companion v0.6.0 Job Workspace
 
 Microsoft Edge install:
 1. Download this branch as ZIP.
 2. Extract it.
 3. Open edge://extensions
-4. Enable Developer mode.
-5. Click Load unpacked.
-6. Select the extracted folder that directly contains manifest.json.
-7. Refresh SquareCoil.
+4. Remove or disable older SquareCoil Companion copies.
+5. Enable Developer mode.
+6. Click Load unpacked.
+7. Select the extracted folder that directly contains manifest.json and background.js.
+8. Refresh SquareCoil in a new tab.
 
-Stability fix:
-- Removed the whole-page settings MutationObserver.
-- Settings now uses one root-only child observer.
-- Timer tick updates no longer trigger settings rebuilds.
-- Recent Jobs, History, and Activity Log render only when opened.
-- Original SquareCoil theme applies no website CSS.
+v0.6.0 highlights:
+- Timer Light is the first-install default with stronger contrast.
+- Refined Light and Sleek Dark website themes use audited SquareCoil surfaces.
+- Expanded timer has plugin Pause/Resume, direct job links, and safe Delete controls.
+- Recent Jobs has individual links, Archive/Delete, Archive All, and Clear Recent.
+- Archives preserve job hours and sessions.
+- Export CSV backs up recent and archived job totals plus session history.
+- Import CSV restores jobs as paused Recent Jobs so tracking can continue.
+- Wipe All History clears recorded hours, sessions, archive hours, and the Activity Log while keeping job entries.
+
+Important:
+Plugin Pause/Resume controls only the Companion timer. It does not clock you out of SquareCoil or change SquareCoil's native time clock.
