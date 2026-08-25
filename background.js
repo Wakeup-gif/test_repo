@@ -30,23 +30,54 @@ async function probeTimer(tabId) {
     world: 'MAIN',
     func: () => ({
       hasTimerGlobal: Boolean(window.__squareCoilJobTimerUiVersion),
+      hasInteractionGlobal: Boolean(window.__squareCoilJobTimerInteractionVersion),
       hasTimerRoot: Boolean(document.getElementById('ussign-job-timer')),
-      timerVersion: window.__squareCoilJobTimerUiVersion || null
+      timerVersion: window.__squareCoilJobTimerUiVersion || null,
+      interactionVersion: window.__squareCoilJobTimerInteractionVersion || null
     })
   });
   return result?.[0]?.result || {};
 }
 
+async function removeStaleTimerRoot(tabId) {
+  await chrome.scripting.executeScript({
+    target: { tabId },
+    world: 'MAIN',
+    func: () => {
+      document.getElementById('ussign-job-timer')?.remove();
+      document.getElementById('ussign-job-timer-v112-style')?.remove();
+      try { window.__usxTimerControls?.teardown?.(); } catch (_) {}
+      try { window.__usxTimerWorkspace?.teardown?.(); } catch (_) {}
+      try { window.__usxTimerSurface?.teardown?.(); } catch (_) {}
+    }
+  });
+}
+
 async function bootTimer(tabId) {
   if (!tabId) return { ok: false, reason: 'missing-tab' };
 
-  const probe = await probeTimer(tabId);
-  if (!probe.hasTimerGlobal && !probe.hasTimerRoot) {
+  const initialProbe = await probeTimer(tabId);
+  let source = initialProbe.hasTimerGlobal ? 'existing-timer' : 'extension';
+
+  // DOM presence alone does not prove that the MAIN-world timer runtime is alive.
+  // Chrome can retain a stale visible root after an extension reload/navigation.
+  // If the runtime global is absent, clear that dead shell and rebuild it.
+  if (!initialProbe.hasTimerGlobal) {
+    if (initialProbe.hasTimerRoot) {
+      source = 'recovered-stale-root';
+      await removeStaleTimerRoot(tabId);
+    }
+
     await chrome.scripting.executeScript({
       target: { tabId },
       world: 'MAIN',
       files: ['page/timer-runtime.js']
     });
+
+    const runtimeProbe = await probeTimer(tabId);
+    if (!runtimeProbe.hasTimerGlobal || !runtimeProbe.hasTimerRoot) {
+      throw new Error('timer runtime did not initialize after injection');
+    }
   }
 
   await chrome.scripting.executeScript({
@@ -67,11 +98,18 @@ async function bootTimer(tabId) {
     files: ['page/timer-surface.js']
   });
 
+  const finalProbe = await probeTimer(tabId);
+  if (!finalProbe.hasTimerGlobal || !finalProbe.hasTimerRoot) {
+    throw new Error('timer interaction stack is incomplete after boot');
+  }
+
   bootedTabs.add(tabId);
   return {
     ok: true,
-    source: probe.hasTimerGlobal || probe.hasTimerRoot ? 'existing-timer' : 'extension',
-    existingVersion: probe.timerVersion || null
+    source,
+    existingVersion: initialProbe.timerVersion || null,
+    timerVersion: finalProbe.timerVersion || null,
+    interactionVersion: finalProbe.interactionVersion || null
   };
 }
 

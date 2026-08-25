@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "US Sign SquareCoil Companion",
-  "version": "0.7.0",
-  "version_name": "0.7.0 Dual Browser + Glass",
-  "description": "SquareCoil Job Timer companion for Edge and Chrome with job workspace controls, Solid/Glass timer finishes, website themes, dark-theme logo, CSV backup/restore, and versioned update support.",
+  "version": "0.7.1",
+  "version_name": "0.7.1 Chrome Interaction Recovery",
+  "description": "SquareCoil Job Timer companion for Edge and Chrome with stale-root recovery, stable interaction controls, Solid/Glass timer finishes, website themes, dark-theme logo, CSV backup/restore, and versioned update support.",
   "permissions": ["storage", "scripting"],
   "host_permissions": [
     "https://ussignandmill.squarecoil.net/*",

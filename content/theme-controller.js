@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.7.0';
+  const VERSION = '0.7.1';
   const DEFAULTS = {
     themePreference: 'light',
     timerSurface: 'solid',
@@ -168,6 +168,9 @@
         document.documentElement.dataset.usxTimerSource = result?.source || (result?.ok ? 'extension' : 'error');
         if (result?.existingVersion) {
           document.documentElement.dataset.usxExistingTimerVersion = result.existingVersion;
+        }
+        if (result?.interactionVersion) {
+          document.documentElement.dataset.usxTimerInteractionVersion = result.interactionVersion;
         }
       }).catch(() => {
         document.documentElement.dataset.usxTimerSource = 'error';
