@@ -1,0 +1,82 @@
+name: SquareCoil Companion Validate
+
+on:
+  push:
+    paths:
+      - 'browser-extension/squarecoil-companion/**'
+      - '.github/workflows/squarecoil-extension-validate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="browser-extension/squarecoil-companion"
+          while IFS= read -r -d '' file; do
+            echo "Checking $file"
+            node --check "$file"
+          done < <(find "$ROOT" -type f -name '*.js' -print0)
+
+      - name: Validate manifest, release metadata, and referenced files
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+          const root = path.resolve('browser-extension/squarecoil-companion');
+          const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
+          const release = JSON.parse(fs.readFileSync(path.join(root, 'release.json'), 'utf8'));
+          if (manifest.manifest_version !== 3) throw new Error('manifest_version must be 3');
+          if (manifest.version !== release.latestVersion) {
+            throw new Error(`manifest version ${manifest.version} does not match release ${release.latestVersion}`);
+          }
+          const required = new Set();
+          if (manifest.background?.service_worker) required.add(manifest.background.service_worker);
+          if (manifest.action?.default_popup) required.add(manifest.action.default_popup);
+          for (const script of manifest.content_scripts || []) {
+            for (const file of script.js || []) required.add(file);
+            for (const file of script.css || []) required.add(file);
+          }
+          for (const file of required) {
+            const full = path.join(root, file);
+            if (!fs.existsSync(full)) throw new Error(`Manifest references missing file: ${file}`);
+          }
+          const workspace = path.join(root, 'page/timer-workspace.js');
+          if (!fs.existsSync(workspace)) throw new Error('timer-workspace.js is missing');
+          console.log(`Validated SquareCoil Companion v${manifest.version}`);
+          console.log(`Manifest references ${required.size} packaged files.`);
+          NODE
+
+      - name: Build Edge package
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="browser-extension/squarecoil-companion"
+          VERSION=$(node -p "require('./${ROOT}/manifest.json').version")
+          OUT="SquareCoil-Companion-v${VERSION}-EDGE.zip"
+          cd "$ROOT"
+          zip -r "../../../$OUT" . -x '*.DS_Store' >/dev/null
+          cd ../../..
+          echo "Built $OUT"
+          unzip -l "$OUT" | grep -q 'manifest.json'
+          unzip -l "$OUT" | grep -q 'background.js'
+          unzip -l "$OUT" | grep -q 'page/timer-workspace.js'
+
+      - name: Upload Edge package
+        uses: actions/upload-artifact@v4
+        with:
+          name: squarecoil-companion-edge
+          path: SquareCoil-Companion-v*-EDGE.zip
+          if-no-files-found: error
+          retention-days: 30
