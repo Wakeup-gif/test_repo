@@ -311,6 +311,19 @@
     addActivity('Cleared recent jobs', `${candidates.length} jobs`);
   }
 
+  function mergeSessions(left, right) {
+    const seen = new Set();
+    const out = [];
+    for (const session of [...(Array.isArray(left) ? left : []), ...(Array.isArray(right) ? right : [])]) {
+      if (!session || typeof session !== 'object') continue;
+      const id = session.id || `${session.startAt || 0}:${session.endAt || 0}:${session.durationMs || 0}:${session.reason || ''}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      out.push({ ...session, id });
+    }
+    return out.sort((a, b) => (Number(a.endAt) || 0) - (Number(b.endAt) || 0)).slice(-180);
+  }
+
   function restoreArchived(key) {
     const archive = readArchive();
     const imported = archive.contexts?.[key];
@@ -347,19 +360,6 @@
     writeArchive(archive);
     addActivity('Deleted archived job', context.label || context.shortLabel || key);
     patchAll();
-  }
-
-  function mergeSessions(left, right) {
-    const seen = new Set();
-    const out = [];
-    for (const session of [...(Array.isArray(left) ? left : []), ...(Array.isArray(right) ? right : [])]) {
-      if (!session || typeof session !== 'object') continue;
-      const id = session.id || `${session.startAt || 0}:${session.endAt || 0}:${session.durationMs || 0}:${session.reason || ''}`;
-      if (seen.has(id)) continue;
-      seen.add(id);
-      out.push({ ...session, id });
-    }
-    return out.sort((a, b) => (Number(a.endAt) || 0) - (Number(b.endAt) || 0)).slice(-180);
   }
 
   function wipeHistory() {
@@ -418,7 +418,7 @@
       rows.push([
         CSV_SCHEMA,'context',archived ? '1' : '0',context.key || '',context.type || 'job',context.projectId || '',
         context.shortLabel || '',context.label || '',String(totalMs),hours(totalMs),context.createdAt || '',
-        context.lastTouchedAt || '',context.archivedAt || '','','','','','','','','','',''
+        context.lastTouchedAt || '',context.archivedAt || '','','','','','','','','',''
       ]);
       for (const session of Array.isArray(context.sessions) ? context.sessions : []) {
         rows.push([
@@ -594,11 +594,11 @@
     if (heading !== 'Timer settings') return;
     const libraryLabel = [...app.querySelectorAll('.usx-section-label')].find(el => el.textContent.trim().toLowerCase() === 'library');
     const stack = libraryLabel?.nextElementSibling;
-    if (!stack?.classList.contains('usx-nav-stack') || stack.querySelector('[data-usx-view="archives"]')) return;
+    if (!stack?.classList.contains('usx-nav-stack') || stack.querySelector('[data-usx-archives-open]')) return;
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'usx-nav-card';
-    button.dataset.usxView = 'archives';
+    button.dataset.usxArchivesOpen = 'true';
     button.innerHTML = '<span><b>Archives & CSV</b><small>Archive jobs, export hours, or restore a backup</small></span><span>›</span>';
     stack.appendChild(button);
   }
@@ -649,6 +649,7 @@
     }
 
     main.querySelector(':scope > .usx-main-actions')?.remove();
+    main.querySelector(':scope > .usx-manual-note')?.remove();
     const actions = document.createElement('div');
     actions.className = 'usx-main-actions';
     const controls = [];
@@ -672,29 +673,28 @@
     patchSettings();
   }
 
+  function restoreFullSettingsHome() {
+    customView = null;
+    window.dispatchEvent(new Event('USX_THEME_STATE'));
+    queueMicrotask(patchAll);
+  }
+
   function onClick(event) {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
 
     if (target.closest('[data-usx-workspace-back]')) {
       event.preventDefault();
-      customView = null;
-      const settings = root?.querySelector('.jt-settings');
-      const app = settings?.querySelector('.usx-settings-app');
-      if (app) {
-        const snap = debugSnapshot();
-        const state = snap?.state || readState() || {};
-        const limits = state.settings || { yellow: 60, orange: 120, red: 240 };
-        app.innerHTML = `<div class="usx-settings-page"><div class="usx-page-head"><span></span><h4>Timer settings</h4><small>v${VERSION}</small></div><div class="usx-home-body"><div class="usx-section-label">Library</div><div class="usx-nav-stack"><button type="button" class="usx-nav-card" data-usx-view="recent"><span><b>Recent Jobs</b><small>Saved job timers and hidden tabs</small></span><span>›</span></button><button type="button" class="usx-nav-card" data-usx-view="history"><span><b>History</b><small>Completed and paused timer sessions</small></span><span>›</span></button><button type="button" class="usx-nav-card" data-usx-view="activity"><span><b>Activity Log</b><small>Timer and theme events</small></span><span>›</span></button><button type="button" class="usx-nav-card" data-usx-view="archives"><span><b>Archives & CSV</b><small>Archive jobs, export hours, or restore a backup</small></span><span>›</span></button></div><div class="usx-section-label" style="margin-top:11px">Timer limits</div><div class="usx-limits"><label>Yellow<input type="number" min="1" data-setting="yellow" value="${esc(limits.yellow)}"></label><label>Orange<input type="number" min="1" data-setting="orange" value="${esc(limits.orange)}"></label><label>Red<input type="number" min="1" data-setting="red" value="${esc(limits.red)}"></label></div></div></div>`;
-      }
+      event.stopPropagation();
+      restoreFullSettingsHome();
       return;
     }
 
-    const nav = target.closest('[data-usx-view="archives"]');
-    if (nav) {
+    if (target.closest('[data-usx-archives-open]')) {
       event.preventDefault();
+      event.stopPropagation();
       customView = 'archives';
-      queueMicrotask(patchSettings);
+      patchSettings();
       return;
     }
 
