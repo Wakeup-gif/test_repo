@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '0.5.4';
+  const VERSION = '0.6.0';
   const DEFAULTS = {
     themePreference: 'light',
     squareCoilTheme: 'original',
