@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "US Sign SquareCoil Companion",
-  "version": "0.5.3",
-  "version_name": "0.5.3 Stability",
-  "description": "SquareCoil Job Timer companion with stable in-widget navigation, activity/history views, scoped website themes, and versioned update support.",
+  "version": "0.6.0",
+  "version_name": "0.6.0 Job Workspace",
+  "description": "SquareCoil Job Timer companion with stable navigation, pause/resume controls, job links, archives, CSV backup/restore, accessible light/dark themes, and versioned update support.",
   "permissions": ["storage", "scripting"],
   "host_permissions": [
     "https://ussignandmill.squarecoil.net/*",
