@@ -1,9 +1,9 @@
 {
   "channel": "stable",
-  "latestVersion": "0.3.0",
+  "latestVersion": "0.4.0",
   "releasedAt": "2026-08-25",
   "minimumVersion": "0.1.0",
-  "releaseNotes": "Scopes all extension styling to the Job Timer widget only and rounds the expanded timer header/shell edges.",
+  "releaseNotes": "Adds Light, Dark, and Auto appearance controls directly inside the Job Timer settings panel while keeping SquareCoil itself untouched.",
   "distribution": {
     "recommended": "microsoft-edge-addons",
     "storeUrl": null,
