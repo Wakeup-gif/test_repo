@@ -1,0 +1,246 @@
+/* SquareCoil Companion v0.5.3 website themes.
+   Original mode intentionally matches no selectors and leaves SquareCoil untouched. */
+
+html[data-usx-squarecoil-theme="light"] {
+  --usx-sq-page: #f4f5f6;
+  --usx-sq-surface: #ffffff;
+  --usx-sq-surface-soft: #f8f9fa;
+  --usx-sq-sidebar: #303842;
+  --usx-sq-sidebar-hover: #39434d;
+  --usx-sq-text: #5a6067;
+  --usx-sq-strong: #3d4349;
+  --usx-sq-muted: #858c93;
+  --usx-sq-line: #e1e4e7;
+  --usx-sq-blue: #4b96e6;
+}
+
+html[data-usx-squarecoil-theme="light"] body,
+html[data-usx-squarecoil-theme="light"] #main,
+html[data-usx-squarecoil-theme="light"] #content_wrapper,
+html[data-usx-squarecoil-theme="light"] #content {
+  color: var(--usx-sq-text) !important;
+  background-color: var(--usx-sq-page) !important;
+  background-image: none !important;
+}
+
+html[data-usx-squarecoil-theme="light"] header.navbar,
+html[data-usx-squarecoil-theme="light"] .navbar-fixed-top,
+html[data-usx-squarecoil-theme="light"] #topbar {
+  background-color: #fff !important;
+  background-image: none !important;
+  border-bottom: 1px solid var(--usx-sq-line) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,.05) !important;
+}
+
+html[data-usx-squarecoil-theme="light"] #sidebar_left,
+html[data-usx-squarecoil-theme="light"] #pmlt {
+  background-color: var(--usx-sq-sidebar) !important;
+  background-image: none !important;
+  border-right: 1px solid rgba(0,0,0,.09) !important;
+}
+
+html[data-usx-squarecoil-theme="light"] #sidebar_left a,
+html[data-usx-squarecoil-theme="light"] #sidebar_left .nav>li>a,
+html[data-usx-squarecoil-theme="light"] #pmlt a {
+  color: #f2f5f8 !important;
+}
+
+html[data-usx-squarecoil-theme="light"] #sidebar_left a:hover,
+html[data-usx-squarecoil-theme="light"] #sidebar_left .nav>li>a:hover {
+  background-color: var(--usx-sq-sidebar-hover) !important;
+}
+
+html[data-usx-squarecoil-theme="light"] .panel,
+html[data-usx-squarecoil-theme="light"] .panel-default,
+html[data-usx-squarecoil-theme="light"] .well,
+html[data-usx-squarecoil-theme="light"] .modal-content,
+html[data-usx-squarecoil-theme="light"] .dropdown-menu,
+html[data-usx-squarecoil-theme="light"] .popover,
+html[data-usx-squarecoil-theme="light"] #customer-info,
+html[data-usx-squarecoil-theme="light"] #filesbox,
+html[data-usx-squarecoil-theme="light"] #descriptionbox,
+html[data-usx-squarecoil-theme="light"] #projectbox,
+html[data-usx-squarecoil-theme="light"] #designbox {
+  color: var(--usx-sq-text) !important;
+  background-color: var(--usx-sq-surface) !important;
+  background-image: none !important;
+  border-color: var(--usx-sq-line) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,.055) !important;
+}
+
+html[data-usx-squarecoil-theme="light"] .panel-heading,
+html[data-usx-squarecoil-theme="light"] .panel-footer,
+html[data-usx-squarecoil-theme="light"] .modal-header,
+html[data-usx-squarecoil-theme="light"] .modal-footer {
+  color: var(--usx-sq-strong) !important;
+  background-color: var(--usx-sq-surface-soft) !important;
+  background-image: none !important;
+  border-color: var(--usx-sq-line) !important;
+}
+
+html[data-usx-squarecoil-theme="light"] .form-control,
+html[data-usx-squarecoil-theme="light"] input[type="text"],
+html[data-usx-squarecoil-theme="light"] input[type="number"],
+html[data-usx-squarecoil-theme="light"] input[type="search"],
+html[data-usx-squarecoil-theme="light"] textarea,
+html[data-usx-squarecoil-theme="light"] select {
+  color: #555c63 !important;
+  background-color: #fff !important;
+  border-color: #dce0e4 !important;
+  border-radius: 5px !important;
+  box-shadow: inset 0 1px 1px rgba(0,0,0,.025) !important;
+}
+
+html[data-usx-squarecoil-theme="light"] table,
+html[data-usx-squarecoil-theme="light"] .table {
+  color: var(--usx-sq-text) !important;
+  background-color: #fff !important;
+}
+
+html[data-usx-squarecoil-theme="light"] .table>thead>tr>th,
+html[data-usx-squarecoil-theme="light"] .table>tbody>tr>td,
+html[data-usx-squarecoil-theme="light"] table td,
+html[data-usx-squarecoil-theme="light"] table th {
+  border-color: #e4e7ea !important;
+}
+
+html[data-usx-squarecoil-theme="light"] a:not(#ussign-job-timer a) {
+  color: var(--usx-sq-blue);
+}
+
+html[data-usx-squarecoil-theme="dark"] {
+  color-scheme: dark;
+  --usx-sq-page: #101419;
+  --usx-sq-surface: #181e25;
+  --usx-sq-surface-soft: #1e252d;
+  --usx-sq-sidebar: #181e25;
+  --usx-sq-sidebar-hover: #232c35;
+  --usx-sq-text: #cbd2da;
+  --usx-sq-strong: #f1f4f6;
+  --usx-sq-muted: #87929d;
+  --usx-sq-line: rgba(255,255,255,.085);
+  --usx-sq-blue: #79b9f3;
+}
+
+html[data-usx-squarecoil-theme="dark"] body,
+html[data-usx-squarecoil-theme="dark"] #main,
+html[data-usx-squarecoil-theme="dark"] #content_wrapper,
+html[data-usx-squarecoil-theme="dark"] #content,
+html[data-usx-squarecoil-theme="dark"] #content>.tray,
+html[data-usx-squarecoil-theme="dark"] #content>.tray-left,
+html[data-usx-squarecoil-theme="dark"] #content>.tray-right,
+html[data-usx-squarecoil-theme="dark"] #content>.tray-center {
+  color: var(--usx-sq-text) !important;
+  background-color: var(--usx-sq-page) !important;
+  background-image: none !important;
+}
+
+html[data-usx-squarecoil-theme="dark"] header.navbar,
+html[data-usx-squarecoil-theme="dark"] .navbar-fixed-top,
+html[data-usx-squarecoil-theme="dark"] #topbar {
+  color: var(--usx-sq-strong) !important;
+  background-color: #151a20 !important;
+  background-image: none !important;
+  border-bottom: 1px solid var(--usx-sq-line) !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,.18) !important;
+}
+
+html[data-usx-squarecoil-theme="dark"] #sidebar_left,
+html[data-usx-squarecoil-theme="dark"] #pmlt {
+  color: var(--usx-sq-text) !important;
+  background-color: var(--usx-sq-sidebar) !important;
+  background-image: none !important;
+  border-right: 1px solid var(--usx-sq-line) !important;
+}
+
+html[data-usx-squarecoil-theme="dark"] #sidebar_left a,
+html[data-usx-squarecoil-theme="dark"] #sidebar_left .nav>li>a,
+html[data-usx-squarecoil-theme="dark"] #pmlt a {
+  color: #dbe1e7 !important;
+}
+
+html[data-usx-squarecoil-theme="dark"] #sidebar_left a:hover,
+html[data-usx-squarecoil-theme="dark"] #sidebar_left .nav>li>a:hover {
+  color: #fff !important;
+  background-color: var(--usx-sq-sidebar-hover) !important;
+}
+
+html[data-usx-squarecoil-theme="dark"] #sidebar_left .active>a,
+html[data-usx-squarecoil-theme="dark"] #sidebar_left .nav>li.active>a {
+  color: #fff !important;
+  background-color: rgba(121,185,243,.14) !important;
+}
+
+html[data-usx-squarecoil-theme="dark"] .panel,
+html[data-usx-squarecoil-theme="dark"] .panel-default,
+html[data-usx-squarecoil-theme="dark"] .well,
+html[data-usx-squarecoil-theme="dark"] .modal-content,
+html[data-usx-squarecoil-theme="dark"] .dropdown-menu,
+html[data-usx-squarecoil-theme="dark"] .popover,
+html[data-usx-squarecoil-theme="dark"] #customer-info,
+html[data-usx-squarecoil-theme="dark"] #filesbox,
+html[data-usx-squarecoil-theme="dark"] #descriptionbox,
+html[data-usx-squarecoil-theme="dark"] #projectbox,
+html[data-usx-squarecoil-theme="dark"] #designbox {
+  color: var(--usx-sq-text) !important;
+  background-color: var(--usx-sq-surface) !important;
+  background-image: none !important;
+  border-color: var(--usx-sq-line) !important;
+  border-radius: 7px !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,.16) !important;
+}
+
+html[data-usx-squarecoil-theme="dark"] .panel-heading,
+html[data-usx-squarecoil-theme="dark"] .panel-footer,
+html[data-usx-squarecoil-theme="dark"] .modal-header,
+html[data-usx-squarecoil-theme="dark"] .modal-footer {
+  color: var(--usx-sq-strong) !important;
+  background-color: var(--usx-sq-surface-soft) !important;
+  background-image: none !important;
+  border-color: var(--usx-sq-line) !important;
+}
+
+html[data-usx-squarecoil-theme="dark"] .panel-body,
+html[data-usx-squarecoil-theme="dark"] .modal-body {
+  color: var(--usx-sq-text) !important;
+}
+
+html[data-usx-squarecoil-theme="dark"] .form-control,
+html[data-usx-squarecoil-theme="dark"] input[type="text"],
+html[data-usx-squarecoil-theme="dark"] input[type="number"],
+html[data-usx-squarecoil-theme="dark"] input[type="search"],
+html[data-usx-squarecoil-theme="dark"] textarea,
+html[data-usx-squarecoil-theme="dark"] select {
+  color: #eef2f5 !important;
+  background-color: #11161c !important;
+  background-image: none !important;
+  border-color: var(--usx-sq-line) !important;
+  border-radius: 5px !important;
+  box-shadow: none !important;
+}
+
+html[data-usx-squarecoil-theme="dark"] table,
+html[data-usx-squarecoil-theme="dark"] .table {
+  color: var(--usx-sq-text) !important;
+  background-color: var(--usx-sq-surface) !important;
+}
+
+html[data-usx-squarecoil-theme="dark"] .table>thead>tr>th,
+html[data-usx-squarecoil-theme="dark"] .table>tbody>tr>td,
+html[data-usx-squarecoil-theme="dark"] table td,
+html[data-usx-squarecoil-theme="dark"] table th {
+  color: var(--usx-sq-text) !important;
+  border-color: rgba(255,255,255,.065) !important;
+  background-color: transparent !important;
+}
+
+html[data-usx-squarecoil-theme="dark"] a:not(#ussign-job-timer a) {
+  color: var(--usx-sq-blue);
+}
+
+html[data-usx-squarecoil-theme="dark"] .text-muted,
+html[data-usx-squarecoil-theme="dark"] .help-block,
+html[data-usx-squarecoil-theme="dark"] small {
+  color: var(--usx-sq-muted) !important;
+}
