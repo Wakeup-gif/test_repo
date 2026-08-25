@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "US Sign SquareCoil Companion",
+  "version": "0.1.0",
+  "description": "SquareCoil Light/Dark/Auto themes plus the US Sign job timer.",
+  "permissions": ["storage", "scripting"],
+  "host_permissions": ["https://ussignandmill.squarecoil.net/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "SquareCoil Companion",
+    "default_popup": "popup/popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://ussignandmill.squarecoil.net/*"],
+      "css": ["styles/theme.css"],
+      "js": ["content/theme-controller.js"],
+      "run_at": "document_start"
+    }
+  ]
+}

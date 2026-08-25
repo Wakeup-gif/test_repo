@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SquareCoil Companion</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main>
+    <header>
+      <div class="mark">US</div>
+      <div>
+        <h1>SquareCoil Companion</h1>
+        <p>Theme + job timer</p>
+      </div>
+    </header>
+
+    <section>
+      <h2>Appearance</h2>
+      <div class="modes" role="radiogroup" aria-label="Appearance">
+        <button type="button" class="mode" data-theme="light" role="radio" aria-checked="false">
+          <span class="swatch light"></span>
+          <span><b>Light</b><small>Original SquareCoil</small></span>
+        </button>
+        <button type="button" class="mode" data-theme="dark" role="radio" aria-checked="false">
+          <span class="swatch dark"></span>
+          <span><b>Dark</b><small>Sleek night mode</small></span>
+        </button>
+        <button type="button" class="mode" data-theme="auto" role="radio" aria-checked="false">
+          <span class="swatch auto"></span>
+          <span><b>Auto</b><small>Follow system</small></span>
+        </button>
+      </div>
+    </section>
+
+    <footer>
+      <span class="dot"></span>
+      <span id="status">Ready</span>
+    </footer>
+  </main>
+  <script src="popup.js"></script>
+</body>
+</html>

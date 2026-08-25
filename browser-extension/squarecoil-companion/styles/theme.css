@@ -1,0 +1,436 @@
+/* US Sign SquareCoil Companion v0.1.0 */
+
+html[data-usx-theme] {
+  --usx-font: "Segoe UI", Arial, sans-serif;
+  --usx-radius-sm: 6px;
+  --usx-radius-md: 10px;
+  --usx-radius-lg: 12px;
+}
+
+html[data-usx-theme="light"] {
+  --usx-page: #f3f3f3;
+  --usx-panel: #ffffff;
+  --usx-panel-soft: #f8f8f8;
+  --usx-topbar: #ffffff;
+  --usx-sidebar: #303842;
+  --usx-sidebar-hover: #3a4550;
+  --usx-text: #5d6166;
+  --usx-text-strong: #3e4348;
+  --usx-muted: #8b8f94;
+  --usx-border: #e2e4e7;
+  --usx-accent: #4b96e6;
+  --usx-shadow: 0 1px 2px rgba(0,0,0,.05);
+}
+
+html[data-usx-theme="dark"] {
+  --usx-page: #101419;
+  --usx-panel: #171c22;
+  --usx-panel-soft: #1c2229;
+  --usx-topbar: #151a20;
+  --usx-sidebar: #171c22;
+  --usx-sidebar-hover: #222a33;
+  --usx-text: #cfd5dc;
+  --usx-text-strong: #f2f5f7;
+  --usx-muted: #8d98a4;
+  --usx-border: rgba(255,255,255,.085);
+  --usx-accent: #78b7f4;
+  --usx-shadow: 0 10px 28px rgba(0,0,0,.20);
+}
+
+html[data-usx-theme] body,
+html[data-usx-theme] input,
+html[data-usx-theme] textarea,
+html[data-usx-theme] select,
+html[data-usx-theme] button {
+  font-family: var(--usx-font) !important;
+}
+
+/* Light mode keeps the familiar SquareCoil composition. */
+html[data-usx-theme="light"] body,
+html[data-usx-theme="light"] #main,
+html[data-usx-theme="light"] #content_wrapper,
+html[data-usx-theme="light"] #content,
+html[data-usx-theme="light"] #content > .tray,
+html[data-usx-theme="light"] #content > .tray-left,
+html[data-usx-theme="light"] #content > .tray-right,
+html[data-usx-theme="light"] #content > .tray-center,
+html[data-usx-theme="light"] .tray,
+html[data-usx-theme="light"] .tray-left,
+html[data-usx-theme="light"] .tray-right,
+html[data-usx-theme="light"] .tray-center,
+html[data-usx-theme="light"] .tray-inner,
+html[data-usx-theme="light"] .content,
+html[data-usx-theme="light"] .content-wrapper,
+html[data-usx-theme="light"] .page-content,
+html[data-usx-theme="light"] .main-content,
+html[data-usx-theme="light"] .container,
+html[data-usx-theme="light"] .container-fluid {
+  color: var(--usx-text) !important;
+  background: var(--usx-page) !important;
+  background-image: none !important;
+}
+
+html[data-usx-theme="light"] header,
+html[data-usx-theme="light"] header.navbar,
+html[data-usx-theme="light"] .navbar,
+html[data-usx-theme="light"] .navbar-fixed-top,
+html[data-usx-theme="light"] #topbar,
+html[data-usx-theme="light"] .topbar {
+  color: #666 !important;
+  background: var(--usx-topbar) !important;
+  background-image: none !important;
+  border-bottom: 1px solid var(--usx-border) !important;
+  box-shadow: none !important;
+}
+
+html[data-usx-theme="light"] #sidebar_left,
+html[data-usx-theme="light"] #pmlt {
+  color: #f4f7fa !important;
+  background: var(--usx-sidebar) !important;
+  background-image: none !important;
+  border-right: 1px solid rgba(0,0,0,.08) !important;
+  box-shadow: none !important;
+}
+
+html[data-usx-theme="light"] #sidebar_left a,
+html[data-usx-theme="light"] #sidebar_left .nav > li > a,
+html[data-usx-theme="light"] #pmlt a {
+  color: #f3f6f9 !important;
+}
+
+html[data-usx-theme="light"] #sidebar_left a:hover,
+html[data-usx-theme="light"] #sidebar_left .nav > li > a:hover {
+  background: var(--usx-sidebar-hover) !important;
+}
+
+html[data-usx-theme="light"] .panel,
+html[data-usx-theme="light"] .panel-default,
+html[data-usx-theme="light"] .well,
+html[data-usx-theme="light"] .modal-content,
+html[data-usx-theme="light"] .popover,
+html[data-usx-theme="light"] .dropdown-menu,
+html[data-usx-theme="light"] #customer-info,
+html[data-usx-theme="light"] #customer-name,
+html[data-usx-theme="light"] #showbtns,
+html[data-usx-theme="light"] #mapcontainer,
+html[data-usx-theme="light"] #filesbox,
+html[data-usx-theme="light"] #descriptionbox,
+html[data-usx-theme="light"] #projectbox,
+html[data-usx-theme="light"] #designbox {
+  color: var(--usx-text) !important;
+  background: var(--usx-panel) !important;
+  background-image: none !important;
+  border: 1px solid var(--usx-border) !important;
+  border-radius: 2px !important;
+  box-shadow: var(--usx-shadow) !important;
+}
+
+html[data-usx-theme="light"] .panel-heading,
+html[data-usx-theme="light"] .panel-footer,
+html[data-usx-theme="light"] .modal-header,
+html[data-usx-theme="light"] .modal-footer {
+  color: var(--usx-text-strong) !important;
+  background: var(--usx-panel-soft) !important;
+  border-color: var(--usx-border) !important;
+}
+
+html[data-usx-theme="light"] h1,
+html[data-usx-theme="light"] h2,
+html[data-usx-theme="light"] h3,
+html[data-usx-theme="light"] h4,
+html[data-usx-theme="light"] h5,
+html[data-usx-theme="light"] h6,
+html[data-usx-theme="light"] strong,
+html[data-usx-theme="light"] b,
+html[data-usx-theme="light"] .panel-title {
+  color: var(--usx-text-strong) !important;
+  text-shadow: none !important;
+}
+
+html[data-usx-theme="light"] p,
+html[data-usx-theme="light"] li,
+html[data-usx-theme="light"] label,
+html[data-usx-theme="light"] td,
+html[data-usx-theme="light"] th,
+html[data-usx-theme="light"] address {
+  color: var(--usx-text) !important;
+}
+
+html[data-usx-theme="light"] a,
+html[data-usx-theme="light"] .design-link,
+html[data-usx-theme="light"] .panel-body a {
+  color: var(--usx-accent) !important;
+}
+
+html[data-usx-theme="light"] input,
+html[data-usx-theme="light"] textarea,
+html[data-usx-theme="light"] select,
+html[data-usx-theme="light"] .form-control {
+  color: #5f6368 !important;
+  background: #fff !important;
+  border-color: #dfe2e5 !important;
+  box-shadow: none !important;
+}
+
+/* Solid night mode. No wallpaper or transparency dependency. */
+html[data-usx-theme="dark"],
+html[data-usx-theme="dark"] body {
+  color-scheme: dark;
+  background: var(--usx-page) !important;
+  background-image: none !important;
+}
+
+html[data-usx-theme="dark"] body,
+html[data-usx-theme="dark"] #main,
+html[data-usx-theme="dark"] #content_wrapper,
+html[data-usx-theme="dark"] #content,
+html[data-usx-theme="dark"] #content > .tray,
+html[data-usx-theme="dark"] #content > .tray-left,
+html[data-usx-theme="dark"] #content > .tray-right,
+html[data-usx-theme="dark"] #content > .tray-center,
+html[data-usx-theme="dark"] .tray,
+html[data-usx-theme="dark"] .tray-left,
+html[data-usx-theme="dark"] .tray-right,
+html[data-usx-theme="dark"] .tray-center,
+html[data-usx-theme="dark"] .tray-inner,
+html[data-usx-theme="dark"] [class^="tray-"],
+html[data-usx-theme="dark"] [class*=" tray-"],
+html[data-usx-theme="dark"] .content,
+html[data-usx-theme="dark"] .content-wrapper,
+html[data-usx-theme="dark"] .page-content,
+html[data-usx-theme="dark"] .content-body,
+html[data-usx-theme="dark"] .main-content,
+html[data-usx-theme="dark"] .main-panel,
+html[data-usx-theme="dark"] .admin-panels,
+html[data-usx-theme="dark"] .dashboard,
+html[data-usx-theme="dark"] .dashboard-page,
+html[data-usx-theme="dark"] .container,
+html[data-usx-theme="dark"] .container-fluid {
+  color: var(--usx-text) !important;
+  background: var(--usx-page) !important;
+  background-image: none !important;
+}
+
+html[data-usx-theme="dark"] #content .row,
+html[data-usx-theme="dark"] .tray .row,
+html[data-usx-theme="dark"] .tray-center .row,
+html[data-usx-theme="dark"] #content [class*="col-"],
+html[data-usx-theme="dark"] .tray [class*="col-"] {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+html[data-usx-theme="dark"] header,
+html[data-usx-theme="dark"] header.navbar,
+html[data-usx-theme="dark"] .navbar,
+html[data-usx-theme="dark"] .navbar-fixed-top,
+html[data-usx-theme="dark"] #topbar,
+html[data-usx-theme="dark"] .topbar {
+  color: var(--usx-text-strong) !important;
+  background: var(--usx-topbar) !important;
+  background-image: none !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--usx-border) !important;
+  box-shadow: 0 5px 18px rgba(0,0,0,.16) !important;
+}
+
+html[data-usx-theme="dark"] #sidebar_left,
+html[data-usx-theme="dark"] #pmlt {
+  color: var(--usx-text) !important;
+  background: var(--usx-sidebar) !important;
+  background-image: none !important;
+  border-right: 1px solid var(--usx-border) !important;
+  box-shadow: none !important;
+}
+
+html[data-usx-theme="dark"] #sidebar_left a,
+html[data-usx-theme="dark"] #sidebar_left .nav > li > a,
+html[data-usx-theme="dark"] #pmlt a {
+  color: var(--usx-text) !important;
+  background: transparent !important;
+  border-radius: var(--usx-radius-sm) !important;
+}
+
+html[data-usx-theme="dark"] #sidebar_left a:hover,
+html[data-usx-theme="dark"] #sidebar_left .nav > li > a:hover {
+  color: #fff !important;
+  background: var(--usx-sidebar-hover) !important;
+}
+
+html[data-usx-theme="dark"] #sidebar_left .nav > li.active > a,
+html[data-usx-theme="dark"] #sidebar_left .active > a,
+html[data-usx-theme="dark"] #sidebar_left a.active {
+  color: #fff !important;
+  background: rgba(120,183,244,.14) !important;
+  border: 1px solid rgba(120,183,244,.18) !important;
+}
+
+html[data-usx-theme="dark"] .panel,
+html[data-usx-theme="dark"] .panel-default,
+html[data-usx-theme="dark"] .well,
+html[data-usx-theme="dark"] .modal-content,
+html[data-usx-theme="dark"] .popover,
+html[data-usx-theme="dark"] .dropdown-menu,
+html[data-usx-theme="dark"] #customer-info,
+html[data-usx-theme="dark"] #customer-name,
+html[data-usx-theme="dark"] #showbtns,
+html[data-usx-theme="dark"] #mapcontainer,
+html[data-usx-theme="dark"] #filesbox,
+html[data-usx-theme="dark"] #descriptionbox,
+html[data-usx-theme="dark"] #projectbox,
+html[data-usx-theme="dark"] #designbox,
+html[data-usx-theme="dark"] .note-editor,
+html[data-usx-theme="dark"] .cke {
+  color: var(--usx-text-strong) !important;
+  background: var(--usx-panel) !important;
+  background-image: none !important;
+  border: 1px solid var(--usx-border) !important;
+  border-radius: var(--usx-radius-lg) !important;
+  box-shadow: var(--usx-shadow) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html[data-usx-theme="dark"] .panel-heading,
+html[data-usx-theme="dark"] .panel-footer,
+html[data-usx-theme="dark"] .modal-header,
+html[data-usx-theme="dark"] .modal-footer,
+html[data-usx-theme="dark"] .cke_top,
+html[data-usx-theme="dark"] .cke_bottom,
+html[data-usx-theme="dark"] .note-toolbar {
+  color: var(--usx-text-strong) !important;
+  background: var(--usx-panel-soft) !important;
+  background-image: none !important;
+  border-color: var(--usx-border) !important;
+  box-shadow: none !important;
+}
+
+html[data-usx-theme="dark"] .panel-body,
+html[data-usx-theme="dark"] .modal-body,
+html[data-usx-theme="dark"] .popover-content {
+  color: var(--usx-text) !important;
+  background: transparent !important;
+}
+
+html[data-usx-theme="dark"] h1,
+html[data-usx-theme="dark"] h2,
+html[data-usx-theme="dark"] h3,
+html[data-usx-theme="dark"] h4,
+html[data-usx-theme="dark"] h5,
+html[data-usx-theme="dark"] h6,
+html[data-usx-theme="dark"] strong,
+html[data-usx-theme="dark"] b,
+html[data-usx-theme="dark"] .panel-title {
+  color: var(--usx-text-strong) !important;
+  text-shadow: none !important;
+}
+
+html[data-usx-theme="dark"] p,
+html[data-usx-theme="dark"] li,
+html[data-usx-theme="dark"] label,
+html[data-usx-theme="dark"] td,
+html[data-usx-theme="dark"] th,
+html[data-usx-theme="dark"] address {
+  color: var(--usx-text) !important;
+}
+
+html[data-usx-theme="dark"] small,
+html[data-usx-theme="dark"] .text-muted,
+html[data-usx-theme="dark"] .help-block {
+  color: var(--usx-muted) !important;
+}
+
+html[data-usx-theme="dark"] a,
+html[data-usx-theme="dark"] .design-link,
+html[data-usx-theme="dark"] .panel-body a {
+  color: var(--usx-accent) !important;
+  text-decoration: none !important;
+}
+
+html[data-usx-theme="dark"] a:hover,
+html[data-usx-theme="dark"] a:focus {
+  color: #fff !important;
+}
+
+html[data-usx-theme="dark"] input,
+html[data-usx-theme="dark"] textarea,
+html[data-usx-theme="dark"] select,
+html[data-usx-theme="dark"] .form-control {
+  color: var(--usx-text-strong) !important;
+  background: #0f1419 !important;
+  background-image: none !important;
+  border: 1px solid var(--usx-border) !important;
+  border-radius: 7px !important;
+  box-shadow: none !important;
+}
+
+html[data-usx-theme="dark"] input:focus,
+html[data-usx-theme="dark"] textarea:focus,
+html[data-usx-theme="dark"] select:focus,
+html[data-usx-theme="dark"] .form-control:focus {
+  border-color: rgba(120,183,244,.42) !important;
+  box-shadow: 0 0 0 3px rgba(120,183,244,.08) !important;
+  outline: none !important;
+}
+
+html[data-usx-theme="dark"] table,
+html[data-usx-theme="dark"] .table,
+html[data-usx-theme="dark"] .table > tbody > tr,
+html[data-usx-theme="dark"] .table > thead > tr {
+  color: var(--usx-text) !important;
+  background: transparent !important;
+}
+
+html[data-usx-theme="dark"] .table > tbody > tr > td,
+html[data-usx-theme="dark"] .table > tbody > tr > th,
+html[data-usx-theme="dark"] .table > thead > tr > td,
+html[data-usx-theme="dark"] .table > thead > tr > th {
+  border-color: var(--usx-border) !important;
+}
+
+html[data-usx-theme="dark"] .table-hover > tbody > tr:hover,
+html[data-usx-theme="dark"] .clickableRowx:hover {
+  background: rgba(255,255,255,.035) !important;
+}
+
+html[data-usx-theme="dark"] .btn-default,
+html[data-usx-theme="dark"] .btn-light,
+html[data-usx-theme="dark"] button:not(.btn-primary):not(.btn-success):not(.btn-danger):not(.btn-warning) {
+  color: var(--usx-text-strong) !important;
+  background: #20272f !important;
+  background-image: none !important;
+  border-color: var(--usx-border) !important;
+  box-shadow: none !important;
+}
+
+html[data-usx-theme="dark"] .btn-primary {
+  color: #eef7ff !important;
+  background: #326ea8 !important;
+  background-image: none !important;
+  border-color: #326ea8 !important;
+}
+
+/* Dashboard keeps semantic color identity while becoming calmer at night. */
+html[data-usx-theme="dark"] :is(#widget-tasks,#widget-designs,#widget-estimates) {
+  border: 1px solid var(--usx-border) !important;
+  border-radius: 10px !important;
+  box-shadow: var(--usx-shadow) !important;
+  overflow: hidden !important;
+}
+
+html[data-usx-theme="dark"] #widget-tasks,
+html[data-usx-theme="dark"] #widget-tasks > div { background-color: #21475a !important; background-image: none !important; }
+html[data-usx-theme="dark"] #widget-designs,
+html[data-usx-theme="dark"] #widget-designs > div { background-color: #664b1e !important; background-image: none !important; }
+html[data-usx-theme="dark"] #widget-estimates,
+html[data-usx-theme="dark"] #widget-estimates > div { background-color: #653126 !important; background-image: none !important; }
+
+html[data-usx-theme="dark"] :is(#widget-tasks,#widget-designs,#widget-estimates) h2,
+html[data-usx-theme="dark"] :is(#widget-tasks,#widget-designs,#widget-estimates) h5 {
+  color: #fff !important;
+}
+
+html[data-usx-theme="dark"] ::selection {
+  color: #fff;
+  background: rgba(120,183,244,.30);
+}
