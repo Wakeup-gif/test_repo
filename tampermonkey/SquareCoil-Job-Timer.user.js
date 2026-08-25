@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         SquareCoil Job Timer Manager
 // @namespace    us-sign-squarecoil-tools
-// @version      1.0.6
-// @description  Job Timer v1.0.5 with drag-safe double-click tab selection.
+// @version      1.0.7
+// @description  Job Timer v1.0.5 with click-to-focus tabs, drag-safe reordering, and centered close controls.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-end
 // @grant        none
@@ -20,9 +20,9 @@
 (() => {
   'use strict';
 
-  const VERSION = '1.0.6';
+  const VERSION = '1.0.7';
   const ROOT_ID = 'ussign-job-timer';
-  let allowBaseSelect = false;
+  let lastDragEndAt = 0;
   let observer = null;
 
   window.__squareCoilJobTimerUiVersion = VERSION;
@@ -36,50 +36,34 @@
 
   function refreshHints(root) {
     root.querySelectorAll('.jt-tab[data-key]').forEach(tab => {
-      const label = tab.getAttribute('title') || tab.dataset.key || 'Timer';
-      const clean = label.replace(/\s*•\s*Double-click to view.*$/i, '').trim();
-      tab.setAttribute('title', `${clean} • Double-click to view • Drag to reorder`);
-      tab.dataset.selectMode = 'double-click';
+      const label = (tab.getAttribute('title') || tab.dataset.key || 'Timer')
+        .replace(/\s*[•·]\s*(Double-click|Click) to view.*$/i, '')
+        .trim();
+      tab.setAttribute('title', `${label} • Click to view • Drag to reorder`);
+      tab.dataset.selectMode = 'click';
     });
   }
 
   function install(root) {
-    if (root.dataset.doubleClickSelectReady === '1') return true;
-    root.dataset.doubleClickSelectReady = '1';
+    if (root.dataset.clickFocusReady === '1') return true;
+    root.dataset.clickFocusReady = '1';
+
+    root.addEventListener('dragend', event => {
+      if (!tabFromEvent(event, root)) return;
+      lastDragEndAt = Date.now();
+    }, true);
 
     root.addEventListener('click', event => {
       const tab = tabFromEvent(event, root);
       if (!tab) return;
       if (event.target.closest?.('.jt-x')) return;
-      if (allowBaseSelect) return;
 
-      // A normal click should never change the viewed timer. This also prevents
-      // a drag/drop release from accidentally selecting the dragged tab.
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    }, true);
-
-    root.addEventListener('dblclick', event => {
-      const tab = tabFromEvent(event, root);
-      if (!tab) return;
-      if (event.target.closest?.('.jt-x')) return;
-
-      event.preventDefault();
-      event.stopImmediatePropagation();
-
-      // Reuse the base timer's existing select-tab action so selection,
-      // persistence, render, and cross-tab sync all stay inside the proven engine.
-      allowBaseSelect = true;
-      try {
-        tab.click();
-      } finally {
-        allowBaseSelect = false;
+      // Let the proven v1.0.0 bubble handler select the tab on a normal click.
+      // Only suppress the synthetic/release click that can occur right after drag.
+      if (Date.now() - lastDragEndAt < 260) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
       }
-
-      tab.classList.remove('jt-double-selected');
-      void tab.offsetWidth;
-      tab.classList.add('jt-double-selected');
-      setTimeout(() => tab.classList.remove('jt-double-selected'), 260);
     }, true);
 
     observer = new MutationObserver(() => refreshHints(root));
@@ -88,9 +72,9 @@
     return true;
   }
 
-  if (!document.getElementById('ussign-job-timer-ui-v106')) {
+  if (!document.getElementById('ussign-job-timer-ui-v107')) {
     const style = document.createElement('style');
-    style.id = 'ussign-job-timer-ui-v106';
+    style.id = 'ussign-job-timer-ui-v107';
     style.textContent = `
 #${ROOT_ID} .jt-tab[data-key]{
   cursor:grab!important;
@@ -98,12 +82,35 @@
 #${ROOT_ID} .jt-tab[data-key]:active{
   cursor:grabbing!important;
 }
-#${ROOT_ID} .jt-tab.jt-double-selected{
-  animation:jtDoubleSelectFlash 240ms ease-out;
+#${ROOT_ID} .jt-tab.jt-selected{
+  outline:1px solid rgba(var(--tc),.10)!important;
+  outline-offset:-2px!important;
 }
-@keyframes jtDoubleSelectFlash{
-  0%{box-shadow:0 0 0 0 rgba(var(--tc),.28),inset 0 1px 0 rgba(255,255,255,.03)}
-  100%{box-shadow:0 0 0 5px rgba(var(--tc),0),inset 0 1px 0 rgba(255,255,255,.03)}
+#${ROOT_ID} .jt-x{
+  width:18px!important;
+  height:18px!important;
+  min-width:18px!important;
+  min-height:18px!important;
+  flex:0 0 18px!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  padding:0!important;
+  margin:0!important;
+  border:0!important;
+  border-radius:7px!important;
+  line-height:1!important;
+  font-family:Arial,sans-serif!important;
+  font-size:13px!important;
+  font-weight:400!important;
+  text-align:center!important;
+  vertical-align:middle!important;
+  transform:none!important;
+  appearance:none!important;
+  -webkit-appearance:none!important;
+}
+#${ROOT_ID} .jt-x:hover{
+  background:rgba(255,255,255,.075)!important;
 }
 `;
     document.documentElement.appendChild(style);
