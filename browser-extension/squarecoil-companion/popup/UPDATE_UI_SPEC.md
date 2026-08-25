@@ -1,1 +1,0 @@
-Temporary spec marker for v0.2.0 updater UI. Installed version and latest known version are shown in the popup. Browser-native update delivery remains authoritative.
