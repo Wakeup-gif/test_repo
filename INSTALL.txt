@@ -1,0 +1,17 @@
+SquareCoil Companion v0.5.3 Stability
+
+Microsoft Edge install:
+1. Download this branch as ZIP.
+2. Extract it.
+3. Open edge://extensions
+4. Enable Developer mode.
+5. Click Load unpacked.
+6. Select the extracted folder that directly contains manifest.json.
+7. Refresh SquareCoil.
+
+Stability fix:
+- Removed the whole-page settings MutationObserver.
+- Settings now uses one root-only child observer.
+- Timer tick updates no longer trigger settings rebuilds.
+- Recent Jobs, History, and Activity Log render only when opened.
+- Original SquareCoil theme applies no website CSS.
