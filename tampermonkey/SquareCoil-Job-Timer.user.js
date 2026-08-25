@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         SquareCoil Job Timer Manager
 // @namespace    us-sign-squarecoil-tools
-// @version      1.1.1
-// @description  Consolidated SquareCoil job timer with lower runtime churn, safer clock-state confirmation, lazy history rendering, and robust tab controls.
+// @version      1.1.2
+// @description  Consolidated SquareCoil job timer with throttled verification, confirmed idle handling, lazy history, stable drag reorder, and robust tab controls.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-end
 // @grant        none
@@ -14,7 +14,7 @@
 (() => {
   'use strict';
 
-  const VERSION = '1.1.1';
+  const VERSION = '1.1.2';
   const KEY = 'ussign-squarecoil-job-timer-v1';
   const ROOT_ID = 'ussign-job-timer';
   const CHANNEL = 'ussign-squarecoil-job-timer';
@@ -33,6 +33,7 @@
   let syncing = false;
   let mutationDebounce = 0;
   let idleConfirmTimer = 0;
+  let idleServerCandidateAt = 0;
   let draggedKey = null;
   let dragChanged = false;
   let lastDragEndAt = 0;
@@ -326,7 +327,7 @@
 
   function shouldAutoOpen(previousKey, incomingKey, source) {
     if (previousKey && previousKey !== incomingKey) return true;
-    return source === 'native-action-3';
+    return !previousKey && source === 'native-action-3';
   }
 
   function observe(observation, source = 'dom', exact = false) {
@@ -334,12 +335,17 @@
     const now = Date.now();
     if (!observation || observation.kind === 'unknown' || observation.kind === 'idle') return;
 
-    if (observation.kind === 'out') {
+    if (observation.kind === 'out' || observation.kind === 'idle-confirmed') {
       if (!state.active && !state.pending && !state.meta.observedClockKey) return;
-      if (state.active) pauseActive(exact ? now : conservativeEnd(now), source === 'native-action-2' ? 'clocked-out-completely' : 'clocked-out', exact ? 'exact' : 'detected');
+      if (state.active) {
+        const reason = observation.kind === 'out'
+          ? (source === 'native-action-2' ? 'clocked-out-completely' : 'clocked-out')
+          : 'left-job-context';
+        pauseActive(exact ? now : conservativeEnd(now), reason, exact ? 'exact' : 'detected');
+      }
       state.pending = null;
       state.meta.observedClockKey = null;
-      save('clocked-out');
+      save(observation.kind === 'out' ? 'clocked-out' : 'confirmed-idle-context');
       return;
     }
 
@@ -352,11 +358,8 @@
 
     if (state.active?.key === incoming.key) {
       state.active.lastVerifiedAt = now;
-      if (changed) {
-        save('active-label-update');
-      } else {
-        persistVerification('verify-active', now);
-      }
+      if (changed) save('active-label-update');
+      else persistVerification('verify-active', now);
       return;
     }
 
@@ -587,9 +590,14 @@
       return;
     }
     if (action === 'settings') {
-      if (state.ui.collapsed) state.ui.collapsed = false;
-      settingsOpen = !settingsOpen;
-      save('toggle-settings');
+      if (state.ui.collapsed) {
+        state.ui.collapsed = false;
+        settingsOpen = true;
+        save('open-settings');
+      } else {
+        settingsOpen = !settingsOpen;
+        render();
+      }
       return;
     }
     if (action === 'hide-tab' && key && state.contexts[key]) {
@@ -705,11 +713,10 @@
     dragChanged = true;
   }
 
-  function saveDomTabOrder(bar) {
+  function storeDomTabOrder(bar) {
     pull();
     const visibleOrder = [...bar.querySelectorAll('.jt-tab[data-key]')].map(tab => tab.dataset.key).filter(Boolean);
     state.ui.tabOrder = [...visibleOrder, ...state.ui.tabOrder.filter(key => !visibleOrder.includes(key))];
-    save('tab-reorder');
   }
 
   function onDrop(event) {
@@ -717,18 +724,31 @@
     const bar = event.target.closest('.jt-tabs');
     if (!bar) return;
     event.preventDefault();
+    const dragged = bar.querySelector(`.jt-tab[data-key="${CSS.escape(draggedKey)}"]`);
+    if (dragged) dragged.classList.remove('jt-dragging');
     clearDropHints(bar);
-    saveDomTabOrder(bar);
+    storeDomTabOrder(bar);
+    draggedKey = null;
     dragChanged = false;
+    lastDragEndAt = Date.now();
+    save('tab-reorder');
   }
 
   function onDragEnd(event) {
     const tab = tabFromEvent(event);
     const bar = tab?.closest('.jt-tabs');
     if (tab) tab.classList.remove('jt-dragging');
+    if (!draggedKey) {
+      if (bar) clearDropHints(bar);
+      lastDragEndAt = Date.now();
+      return;
+    }
     if (bar) {
       clearDropHints(bar);
-      if (dragChanged) saveDomTabOrder(bar);
+      if (dragChanged) {
+        storeDomTabOrder(bar);
+        save('tab-reorder');
+      }
     }
     draggedKey = null;
     dragChanged = false;
@@ -773,6 +793,27 @@
     idleConfirmTimer = setTimeout(() => syncServer('idle-confirm', false), 260);
   }
 
+  function confirmServerIdle(source, exact) {
+    const now = Date.now();
+    if (source === 'native-action-4') {
+      idleServerCandidateAt = 0;
+      observe({ kind: 'idle-confirmed' }, source, true);
+      return;
+    }
+    if (source === 'native-action-3') {
+      setTimeout(() => syncServer('native-action-3-retry', exact), 450);
+      return;
+    }
+    if (source === 'native-action-3-retry') return;
+    if (idleServerCandidateAt && now - idleServerCandidateAt < 2500) {
+      idleServerCandidateAt = 0;
+      observe({ kind: 'idle-confirmed' }, source, false);
+      return;
+    }
+    idleServerCandidateAt = now;
+    setTimeout(() => syncServer('idle-confirm-repeat', false), 350);
+  }
+
   async function syncServer(source = 'server', exact = false) {
     if (syncing) return;
     syncing = true;
@@ -782,12 +823,19 @@
       state.meta.lastServerCheckAt = Date.now();
       const context = fromHeader(html);
       if (context) {
+        idleServerCandidateAt = 0;
         observe({ kind: 'context', context }, source, exact);
       } else if (source === 'native-action-2') {
+        idleServerCandidateAt = 0;
         observe({ kind: 'out' }, source, true);
       } else {
         const dom = fromDom();
-        if (dom.kind === 'context' || dom.kind === 'out') observe(dom, source, exact);
+        if (dom.kind === 'context' || dom.kind === 'out') {
+          idleServerCandidateAt = 0;
+          observe(dom, source, exact);
+        } else if (dom.kind === 'idle') {
+          confirmServerIdle(source, exact);
+        }
       }
     } catch (_) {
       // Read-only verification failures never modify SquareCoil's clock state.
@@ -797,7 +845,10 @@
   function syncDom(source = 'dom') {
     const observation = fromDom();
     if (observation.kind === 'idle') { scheduleIdleConfirmation(); return; }
-    if (observation.kind === 'context' || observation.kind === 'out') observe(observation, source, false);
+    if (observation.kind === 'context' || observation.kind === 'out') {
+      idleServerCandidateAt = 0;
+      observe(observation, source, false);
+    }
   }
 
   function parseAjaxData(data) {
@@ -895,7 +946,7 @@
 
   function injectStyle() {
     const style = document.createElement('style');
-    style.id = 'ussign-job-timer-v111-style';
+    style.id = 'ussign-job-timer-v112-style';
     style.textContent = `
 #${ROOT_ID}{--a:#7baaf2;--as:rgba(123,170,242,.14);--jt-glass:var(--us-glass,rgba(18,18,21,.62));--jt-glass-soft:var(--us-glass-soft,rgba(18,18,21,.55));--jt-line:var(--us-line,rgba(255,255,255,.08));position:fixed;right:18px;bottom:18px;z-index:2147483000;width:min(500px,calc(100vw - 24px));padding-top:39px;color:var(--us-text,#eef1f5);font:13px/1.35 var(--us-font,Manrope,"Segoe UI",Arial,sans-serif);isolation:isolate}
 #${ROOT_ID},#${ROOT_ID} *{box-sizing:border-box}#${ROOT_ID} button,#${ROOT_ID} input{font:inherit}
