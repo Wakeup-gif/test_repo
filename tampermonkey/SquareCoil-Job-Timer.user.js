@@ -106,7 +106,7 @@
   }
 
   function esc(v) {
-    return String(v ?? '').replace(/[&<>'\"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '\"': '&quot;' }[ch]));
+    return String(v ?? '').replace(/[&<>'"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
   }
 
   function visible(sel) {
@@ -119,7 +119,7 @@
   function projectIdFromHref(href) {
     if (!href) return null;
     try { return new URL(href, location.href).searchParams.get('id'); }
-    catch (_) { return String(href).match(/[?&]id=(\\d+)/i)?.[1] || null; }
+    catch (_) { return String(href).match(/[?&]id=(\d+)/i)?.[1] || null; }
   }
 
   function slug(v) {
@@ -128,12 +128,12 @@
 
   function makeContext(projectId, label) {
     const pid = projectId == null ? null : String(projectId);
-    const clean = String(label || '').replace(/\\s+/g, ' ').trim();
+    const clean = String(label || '').replace(/\s+/g, ' ').trim();
     if (pid && pid !== '0') {
       return { key: `job:${pid}`, type: 'job', projectId: pid, shortLabel: pid, label: clean || `Job ${pid}` };
     }
     if (!clean) return null;
-    const isProdGeneral = /production\\s*\\(general\\)/i.test(clean);
+    const isProdGeneral = /production\s*\(general\)/i.test(clean);
     return {
       key: `general:${isProdGeneral ? 'production-general' : slug(clean)}`,
       type: 'general',
@@ -151,7 +151,7 @@
     const span = document.querySelector('#clockin-remaining-time');
     const debug = document.querySelector('#clockin-debug');
     const a = span?.querySelector('a[href*="project.php?id="]');
-    const label = (span?.textContent || debug?.textContent || '').replace(/\\s+/g, ' ').trim();
+    const label = (span?.textContent || debug?.textContent || '').replace(/\s+/g, ' ').trim();
     const pid = projectIdFromHref(a?.getAttribute('href') || a?.href || '');
     if (label) {
       const context = makeContext(pid, label);
@@ -168,7 +168,7 @@
       const doc = new DOMParser().parseFromString(`<div>${raw}</div>`, 'text/html');
       const span = doc.querySelector('#clockin-remaining-time') || doc.body;
       const a = span.querySelector('a[href*="project.php?id="]');
-      const label = (span.textContent || '').replace(/\\s+/g, ' ').trim();
+      const label = (span.textContent || '').replace(/\s+/g, ' ').trim();
       return makeContext(projectIdFromHref(a?.getAttribute('href') || ''), label);
     } catch (_) { return null; }
   }
@@ -559,7 +559,7 @@
     jqHooked = true;
     window.jQuery(document).ajaxComplete((_e, xhr, settings) => {
       try {
-        if (!/(^|\\/)ajax_time_clock\\.php(?:\\?|$)/i.test(String(settings?.url || ''))) return;
+        if (!/(^|\/)ajax_time_clock\.php(?:\?|$)/i.test(String(settings?.url || ''))) return;
         if (Number(xhr?.status || 200) >= 400) return;
         const action = String(parseAjaxData(settings?.data).action || '');
         if (action === '2') {
