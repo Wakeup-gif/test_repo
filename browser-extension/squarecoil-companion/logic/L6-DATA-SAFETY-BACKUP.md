@@ -1,59 +1,49 @@
 # SquareCoil Companion Rebuild
 ## Logic Stage L6: Archive, Housekeeping, Backup, Restore, and CSV
 
-**Status:** Ready for review  
+**Status:** Settled - ready for L7  
 **Logic stage:** L6  
 **Depends on:** L0 invariants, L1 lifecycle, L2 state/time/migration, L3 SquareCoil Bridge, L4 core timer behavior, L5 time views/workspace  
 **Framework authority:** `docs/REBUILD-MASTER-PLAN.md`  
-**Purpose:** Define all data-moving, data-cleaning, import/export, archive, and destructive behavior so ordinary workspace actions cannot silently destroy authoritative Companion-recorded time and external files cannot create unsafe live state.
+**Purpose:** Define all data-moving, cleanup, import/export, archive, restore, and destructive behavior so ordinary workspace actions cannot silently destroy authoritative Companion time and external files cannot create unsafe live or contradictory history.
 
 ---
 
 # 1. Scope and Ownership
 
-L6 owns behavior for:
+L6 owns:
 
-- Archive one Context;
-- Archive eligible Recent Contexts in bulk;
-- restore from Archive;
+- Archive one / Archive eligible in bulk;
+- Archive browser and restore from Archive;
 - Clear Recent;
 - Delete Job Data;
 - Delete Archived Job Data;
 - Delete All Archived Data;
 - Wipe All Time History;
-- Activity Log retention/clear behavior;
+- Activity Log retention and target-data redaction rules;
 - Full Backup JSON;
-- Full Backup validation;
-- Restore Merge;
-- Restore Replace;
-- restore conflict handling;
-- safe post-restore state;
+- backup consistency/integrity metadata;
+- Restore Merge and Restore Replace;
+- restore conflict and overlap analysis;
+- non-live Recovery Evidence restore;
+- safe post-restore behavior;
 - History CSV export/import;
-- legacy v0.7 CSV compatibility;
-- malformed/duplicate CSV behavior;
+- v0.7 CSV compatibility;
+- malformed/duplicate/conflicting CSV behavior;
 - Time Report CSV;
-- external-file safety;
 - data-mutation locking;
-- large-file failure behavior;
+- large-file safety;
 - spreadsheet formula-injection safety.
 
-L6 does **not**:
+L6 does not redefine Timer State/time calculations, restore live SquareCoil state from a file, choose a storage engine, or own final dialog styling.
 
-- redefine Timer State or time calculations;
-- restore a live SquareCoil/Companion clock from file contents;
-- define theme/support settings;
-- define final destructive-dialog visual styling;
-- choose a storage engine.
+> Workspace cleanup, archive organization, disaster recovery, portable history, reporting, and deletion are separate operations.
 
-> Workspace cleanup, disaster recovery, portable history, and reporting are different jobs. L6 keeps them different.
-
-**Settled scope**
+**Settled**
 
 ---
 
 # 2. Data Safety Classes
-
-L6 separates operations into four classes:
 
 ```text
 WORKSPACE_ONLY
@@ -65,13 +55,13 @@ DESTRUCTIVE_DATA_MUTATION
 Examples:
 
 ```text
-Hide / Clear Recent       = WORKSPACE_ONLY
-Archive / Restore Archive = HISTORY_PRESERVING_MOVE
-Restore Merge / CSV Import = EXTERNAL_DATA_MERGE
-Delete / Wipe / Replace   = DESTRUCTIVE_DATA_MUTATION
+Hide / Clear Recent        WORKSPACE_ONLY
+Archive / Restore Archive  HISTORY_PRESERVING_MOVE
+Restore Merge / CSV Import EXTERNAL_DATA_MERGE
+Delete / Wipe / Replace    DESTRUCTIVE_DATA_MUTATION
 ```
 
-The UI and state service must not present these classes as equivalent.
+A conflict-resolution choice that replaces an existing historical record with incoming data is also a destructive correction even when it occurs inside a Merge flow.
 
 **Settled**
 
@@ -79,24 +69,26 @@ The UI and state service must not present these classes as equivalent.
 
 # 3. Data Mutation Lock
 
-Any L6 operation that changes authoritative historical data uses one **Data Mutation Lock** coordinated with the L2 state writer.
+Any operation that changes authoritative historical data runs through one Data Mutation Lock coordinated with the L2 fenced state writer.
 
 While held:
 
-- a second import/restore/delete/wipe operation cannot commit concurrently;
-- read-only views may remain available from the last committed revision;
-- timer operations continue only when the requested mutation is explicitly safe with the current operational state;
-- the mutation validates expected revision before commit;
-- commit is atomic at the logical state-service level.
+- no second restore/import/delete/wipe commit runs concurrently;
+- reads may use the last committed revision;
+- the staged plan records the state/data revision it analyzed;
+- before commit, relevant target protection, overlap, identity, and revision assumptions are revalidated;
+- commit is one logical transaction.
 
-If revision changes in a way that invalidates the staged operation before commit:
+An unrelated heartbeat/revision change does not automatically invalidate a plan. A change invalidates staging only when it changes a fact the plan depends on.
+
+If revalidation fails:
 
 ```text
 operation = STALE
 commit = rejected
 ```
 
-The operation must re-stage against the new state or ask the user to retry.
+No feature writes around the lock through alternate storage.
 
 **Settled**
 
@@ -104,39 +96,43 @@ The operation must re-stage against the new state or ask the user to retry.
 
 # 4. Operational-State Compatibility
 
-Not every data operation requires the timer to be idle.
+## 4.1 May run while another Context is ACTIVE
 
-## 4.1 Allowed while another Context is ACTIVE
+When the active session is untouched and all conflict checks pass:
 
-May be allowed when the target data does not touch a protected Context and the mutation can commit atomically:
-
-- Archive an unrelated eligible inactive Context;
-- Clear eligible Recent Contexts;
-- Delete unrelated inactive Context data after explicit confirmation;
-- Restore Merge / History CSV Import when staged records do not alter Shared Timer State and conflicts with the active session are rejected;
+- Archive/Clear unrelated inactive Contexts;
+- Delete unrelated inactive Context data after confirmation;
+- Restore Merge;
+- History CSV Import;
 - read-only exports.
 
-## 4.2 Requires no live operational Timer State
+External historical merges while ACTIVE have an additional rule:
 
-The initial rebuilt release requires:
+> No incoming attributed interval may overlap the current unfinalized ACTIVE interval, current Safety-Hold interval, or unresolved recovery interval.
+
+If overlap is possible, the import/restore is blocked or staged as a conflict until the active period is finalized/resolved.
+
+## 4.2 Requires global timer quiescence
+
+The first rebuilt release requires:
 
 ```text
-IDLE
+Timer State = IDLE
 no Safety Hold
 no unresolved recovery mutation
 ```
 
 for:
 
-- Full Backup Restore Replace;
+- Restore Replace;
 - Wipe All Time History;
-- Delete All Archived Data when any archived target unexpectedly becomes protected during staging.
+- Delete All Archived Data if any staged target becomes protected.
 
-This avoids global destructive replacement racing a live current session.
+The Data Mutation Lock also prevents a new authoritative timer transition from committing through a destructive replacement window.
 
-## 4.3 Files never restore Timer State
+## 4.3 Files never restore live Timer State
 
-Merge, Replace, and CSV Import never directly set:
+Backup/CSV content cannot directly set:
 
 ```text
 ACTIVE
@@ -144,10 +140,10 @@ PENDING
 LOCAL_PAUSED
 Safety Hold
 accrual owner lease
-live Bridge state
+Bridge/lifecycle state
 ```
 
-Current SquareCoil observation after the operation decides live behavior through L3/L4.
+Fresh SquareCoil observation after the operation drives L3/L4 live behavior.
 
 **Settled**
 
@@ -155,18 +151,18 @@ Current SquareCoil observation after the operation decides live behavior through
 
 # 5. Archive Meaning
 
-Archive is a history-preserving workspace state.
+Archive is history-preserving workspace state.
 
-Archiving a Context:
+Archive preserves:
 
-- preserves Context identity;
-- preserves every Time Ledger Segment;
-- preserves `legacyUnattributedMs`;
-- preserves Job/Context Total;
-- preserves historical daily allocation;
-- removes the Context from normal Recent/visible workspace membership;
-- records archive membership/time metadata;
-- does not change SquareCoil.
+- Context identity;
+- every Time Ledger Segment;
+- `legacyUnattributedMs`;
+- daily attribution;
+- Job/Context Total;
+- restorable history.
+
+Archive removes normal Recent/visible membership and records archive metadata. It never changes SquareCoil.
 
 Archive is not Delete.
 
@@ -174,21 +170,21 @@ Archive is not Delete.
 
 ---
 
-# 6. Archive One Context
+# 6. Archive One
 
-Archive is allowed only when the Context is not protected by L4.
+Allowed only for an unprotected Context.
 
 Transaction:
 
-1. validate target Context and expected workspace revision;
-2. verify target is not ACTIVE/PENDING/LOCAL_PAUSED/current-observed/unresolved-transition protected;
+1. validate target and workspace revision;
+2. recheck L4 protection;
 3. remove Recent/visible membership;
 4. set Archived membership and `archivedAtMs`;
-5. preserve all authoritative time;
-6. update selection/workspace fallback through L5 rules;
+5. preserve all time/history;
+6. resolve selection fallback through L5;
 7. commit once.
 
-If protection changes before commit, Archive is rejected as stale.
+If protection changes before commit, reject as stale.
 
 **Settled**
 
@@ -196,89 +192,54 @@ If protection changes before commit, Archive is rejected as stale.
 
 # 7. Archive Eligible in Bulk
 
-`Archive All` means:
+`Archive All` means all currently eligible inactive Recent Contexts.
 
-> Archive all currently eligible inactive Recent Contexts.
+Protected Contexts are skipped by design.
 
-It does **not** mean force every Context into Archive.
+The eligible target set commits atomically as one workspace transaction. A storage/commit failure does not leave half the eligible set archived.
 
-Protected Contexts are skipped.
-
-The result returns a summary:
+Result summary may include:
 
 ```text
 archivedCount
 skippedProtectedCount
 skippedAlreadyArchivedCount
-failedCount
 ```
 
-A partial eligibility result is expected behavior, not a reason to delete or pause protected jobs.
-
-The commit may be one atomic bulk workspace transaction when practical.
+A skipped protected Context is not a failure.
 
 **Settled**
 
 ---
 
-# 8. Archive Browser
+# 8. Archive Browser and Restore
 
-Archive view may expose:
+Archive rows may expose Context label/job number, Total, last recorded activity, archivedAt, legacy-balance indicator, Restore, Delete Data, and Open Job when valid.
 
-```text
-Context label / job number
-Job Total / Context Total
-last recorded activity
-archivedAt
-legacy-unattributed indicator when relevant
-Restore
-Delete Data
-Open Job when valid
-```
-
-Default ordering:
+Default order:
 
 ```text
-newest archivedAt first
+newest archivedAt
 then stable Context identity
 ```
 
-Archive browsing itself does not return a Context to Recent.
-
-**Settled**
-
----
-
-# 9. Restore from Archive
-
-Restoring an archived Context means:
+Restoring Archive means:
 
 ```text
 Archived -> Recent
 ```
 
-It does not Resume or Start Fresh.
+It preserves all time, does not Resume/Start Fresh, and follows L5 soft visible-tab capacity rules.
 
-Rules:
-
-- preserve all time/history;
-- remove archive membership;
-- add Recent membership;
-- visible-tab capacity is resolved through L5 soft-cap/overflow rules;
-- restoring may return to Recent overflow instead of forcing another user-selected tab out;
-- selection changes only if the user explicitly chooses to View/Focus it.
-
-If SquareCoil independently makes an archived Context current before manual restore, L4/L5 current-context behavior automatically makes it operationally accessible and Archive membership must reconcile out of the way rather than hiding current work.
+If SquareCoil makes an archived Context current, current/protected accessibility wins and archive membership is reconciled away rather than hiding operational work.
 
 **Settled**
 
 ---
 
-# 10. Clear Recent Final Semantics
+# 9. Clear Recent Final Semantics
 
-L6 settles the previously open Clear Recent destination.
-
-`Clear Recent` removes eligible inactive Contexts from **Recent workspace membership** and visible tabs.
+`Clear Recent` removes eligible inactive Contexts from Recent membership and visible tabs.
 
 Destination:
 
@@ -286,196 +247,152 @@ Destination:
 INACTIVE_NON_RECENT
 ```
 
-Clear Recent does **not** automatically Archive them.
+It does not Archive and does not delete history.
 
-Reason:
-
-- Clear Recent is lightweight workspace cleanup;
-- Archive is an intentional organization action;
-- silently turning cleanup into Archive would blur two different user intents.
-
-Authoritative time and Context identity remain available through History/By Job/search.
+Context/time remains available through History, By Context, and search.
 
 Protected Contexts are skipped.
 
-**Settled**
-
----
-
-# 11. Clear Recent Bulk Result
-
-Bulk Clear Recent:
-
-- removes every eligible inactive Recent Context;
-- preserves archived membership for Contexts already archived;
-- skips protected Contexts;
-- preserves Time Ledger and legacy balances;
-- does not change SquareCoil;
-- returns counts for cleared/skipped/failed items.
-
-If the currently Selected Context is cleared and is not protected, L5 chooses a deterministic fallback selection.
+Bulk Clear stages the eligible set and commits it atomically. If Selected Context is cleared, L5 chooses fallback selection.
 
 **Settled**
 
 ---
 
-# 12. Delete Job Data
+# 10. Delete Job Data Exact Scope
 
-`Delete Job Data` is explicit permanent deletion of one inactive Context's Companion data.
+`Delete Job Data` permanently removes one inactive Context's Companion-owned data.
 
-For the target Context, deletion removes when present:
+Delete removes when present:
 
-- Time Ledger Segments;
+- Time Ledger Segments for that Context;
 - legacy-unattributed balance;
-- Context Index identity/labels/aliases;
+- Context Index identity, labels, aliases;
 - Recent/visible/hidden/archive membership;
-- context-specific workspace ordering metadata;
-- context-specific import/restore provenance needed only for the deleted records.
+- context-specific tab/order metadata;
+- context-specific migration/import/restore provenance;
+- target-specific Activity Log fields/entries that would otherwise retain deleted Context identity, time, session detail, or labels.
 
-It does not:
+Activity handling:
 
-- call SquareCoil;
-- delete unrelated Contexts;
-- clear unrelated preferences;
-- clear unrelated Activity Log entries;
-- delete official company time.
+- target-specific Activity records are removed or irreversibly redacted;
+- a new minimal generic audit event may say a destructive Context deletion occurred;
+- that generic event must not retain the deleted job number/name, historical hours, session times, or hidden copy of deleted records.
 
-A minimal non-time Activity Log audit event may record that a destructive operation occurred, but it must not preserve the deleted historical time as a hidden alternate source.
+Delete does not modify SquareCoil official data, unrelated Contexts, unrelated preferences, or unrelated Activity entries.
 
 **Settled**
 
 ---
 
-# 13. Delete Preconditions
+# 11. Delete Preconditions
 
-Delete Job Data is unavailable when target Context is protected.
+Delete Job Data is unavailable for a protected Context.
 
 Before commit:
 
-- target must still be inactive/unprotected;
-- user intent must be explicitly confirmed;
-- confirmation must identify the target Context and make clear that Companion history/time for it will be removed;
-- state revision/protection is rechecked.
+- target is still inactive/unprotected;
+- expected identity/revision is rechecked;
+- user explicitly confirms the named target and permanent removal of Companion history/time.
 
-If SquareCoil makes the target current before commit, deletion is rejected.
+If target becomes current/protected before commit, reject.
 
-After successful deletion, if SquareCoil later observes that job again, it is a newly recreated zero-history Companion Context and normal L4 new-Context behavior applies.
-
-**Settled**
-
----
-
-# 14. Delete Archived Job Data
-
-Deleting an archived Context uses the exact `Delete Job Data` destructive contract.
-
-Archive membership does not make deletion safer or less destructive.
-
-`Remove from Archive` and `Delete Data` must remain separate actions.
+If SquareCoil observes the deleted job later, it is recreated as a zero-history Context and follows L4 normal new-Context behavior.
 
 **Settled**
 
 ---
 
-# 15. Delete All Archived Data
+# 12. Delete Archived Job and Delete All Archived Data
 
-`Delete All Archived Data` permanently deletes Companion data for all currently eligible archived Contexts.
+Deleting one archived Context uses the same Delete Job Data contract.
 
-It:
+`Delete All Archived Data`:
 
-- deletes their Ledger history and legacy balances;
-- removes their Context records/workspace metadata;
-- does not touch non-archived Context data;
-- does not affect SquareCoil official time.
+- stages the complete archived target set;
+- requires every staged target to remain eligible/unprotected;
+- is all-or-nothing for authoritative deletion;
+- permanently deletes archived Ledger/balances/Context metadata and target-specific Activity/provenance;
+- does not touch non-archived Contexts;
+- requires explicit bulk confirmation and the pre-destructive backup opportunity.
 
-Before commit:
-
-- the entire target set is staged;
-- protected targets cause the operation to stop or require the user to retry after protection clears; the first rebuilt release does not silently skip protected targets inside this highly destructive bulk command;
-- explicit bulk confirmation is required.
-
-This operation is distinct from `Clear Archive` or `Restore All` and must never be triggered by ordinary housekeeping.
+If any target becomes protected, the operation stops/re-stages rather than silently skipping it.
 
 **Settled**
 
 ---
 
-# 16. Wipe All Time History
+# 13. Wipe All Time History
 
-`Wipe All Time History` is a system-level destructive operation for Companion-recorded time.
-
-It removes:
+Wipe removes:
 
 - all Time Ledger Segments;
-- all `legacyUnattributedMs` balances;
-- time-specific import provenance and aggregate caches;
-- finalized History derived from those records.
+- all `legacyUnattributedMs`;
+- time-specific import/migration provenance and aggregate caches;
+- finalized History derived from time records.
 
-It preserves:
+Wipe preserves:
 
 - application/theme preferences;
-- compatible workspace/Context metadata;
-- Recent/Archive organization unless the user separately deletes those Contexts;
-- official SquareCoil data, which Companion does not own.
+- Context/workspace metadata and Recent/Archive organization;
+- non-authoritative Activity Log unless the user separately clears it;
+- official SquareCoil records.
 
-Because it changes the remembered/zero-history meaning of every Context, the initial rebuilt release requires Timer State IDLE and no unresolved recovery/Safety Hold before wipe.
+Activity Log is never used to reconstruct wiped time.
 
-After wipe, existing Context records may remain as zero-history workspace entries. Future SquareCoil observation follows normal L4 zero-history behavior.
+Wipe requires Section 4.2 quiescence and explicit confirmation.
 
-**Settled**
+After commit:
 
----
-
-# 17. Activity Log Retention
-
-Activity Log is non-authoritative.
-
-It may use bounded retention by age and/or count as implementation policy.
-
-Rules:
-
-- Activity pruning never changes Today/Week/Job Total/History;
-- activity retention policy is independent from Time Ledger retention;
-- `Clear Activity Log` is non-destructive to time/history;
-- activity failure never becomes a Time Ledger failure.
-
-The first rebuilt release has **no equivalent silent retention cap for authoritative Time Ledger history**.
+1. no pre-wipe safe anchor may be reused to create new Companion time;
+2. Bridge performs fresh SquareCoil verification;
+3. if a current Context exists, L4 evaluates it as zero-history from a fresh post-wipe evidence anchor;
+4. if the user wants Companion to stay stopped, they must disable Companion rather than relying on Wipe as a pause control.
 
 **Settled**
 
 ---
 
-# 18. No Destructive Time Compaction
+# 14. Activity Log Retention
 
-The initial rebuilt release does not compact authoritative Ledger history by deleting detailed Sessions/Segments merely to save space.
+Activity Log is non-authoritative and may be bounded by count/age.
 
-A future storage optimization is acceptable only if it preserves the exact user-visible/history semantics and does not silently discard recoverable detail.
+- Activity pruning never changes Today/Week/Total/History.
+- `Clear Activity Log` never deletes authoritative time.
+- Activity failure does not become Ledger failure.
+- target-specific Activity must still obey Delete Job Data redaction/removal.
 
-If storage becomes too large, the application must surface a storage problem rather than silently prune old authoritative time.
-
-**Settled**
-
----
-
-# 19. Full Backup Purpose
-
-Full Backup JSON is the primary machine-oriented disaster-recovery format.
-
-It is:
-
-- versioned;
-- complete for durable restorable Companion data;
-- validated before restore;
-- independent from Time Report CSV;
-- not a live runtime snapshot.
+There is no equivalent silent age/count retention cap for authoritative Time Ledger history.
 
 **Settled**
 
 ---
 
-# 20. Full Backup Envelope
+# 15. No Silent Authoritative Compaction
 
-A Full Backup must support the logical envelope:
+The first rebuilt release does not delete detailed Ledger history merely to save space.
+
+A future optimization may only replace storage representation if exact user-visible totals/history semantics remain recoverable and the change is explicit/migrated safely.
+
+Storage pressure must surface as a storage problem, not silent pruning.
+
+**Settled**
+
+---
+
+# 16. Full Backup Purpose
+
+Full Backup JSON is the primary versioned disaster-recovery representation of durable Companion data.
+
+It is not a live runtime snapshot and is distinct from History CSV and Time Report CSV.
+
+**Settled**
+
+---
+
+# 17. Full Backup Envelope
+
+Logical envelope:
 
 ```text
 format = squarecoil-companion-backup
@@ -484,6 +401,9 @@ backupId
 exportedAtMs
 appVersion
 sourcePlatform/browser metadata when useful
+dataScopeMetadata when available
+snapshotRevision
+recordCounts
 workdayZone
 workdayZoneDisposition
 contexts
@@ -493,67 +413,63 @@ workspace
 preferences
 migrationMetadata
 optionalActivityLog
-optionalRecoveryEvidence
+recoveryEvidence when applicable
+optionalPayloadDigest
 ```
 
-Exact property names are implementation-level, but these categories are behaviorally required where applicable.
+`recordCounts` must match the parsed payload during validation.
+
+An optional payload digest may detect accidental corruption/truncation. It is an integrity signal only, not proof that an edited file is trusted/authentic.
 
 **Settled**
 
 ---
 
-# 21. Required Backup Data
+# 18. Required Backup Data
 
-Full Backup includes when present:
+Include when present:
 
-- Context/job identity and labels;
-- Job vs General kind;
-- project ID when valid;
-- Time Ledger Segments with stable IDs;
-- session/cycle IDs;
-- timestamps/duration/localDate/workdayZone;
-- startCause/endReason/source/certainty/provenance when available;
-- legacy-unattributed balances and lineage metadata;
-- Archive membership;
-- durable Recent membership;
-- visible/hidden/tab ordering needed to reconstruct workspace;
-- compatible timer thresholds/appearance/preferences;
+- Context identity/kind/project ID/labels;
+- Ledger Segments with stable Segment/session/cycle IDs;
+- timestamps, durations, localDate, historical workday zone;
+- startCause/endReason/source/certainty/provenance;
+- legacy balances with lineage;
+- Archive/Recent/visible/hidden/tab ordering;
+- restorable thresholds/appearance/preferences;
 - current persisted Workday Time Zone preference;
-- migration metadata needed to interpret old imported history.
+- migration metadata needed to interpret history.
 
-Backup may include bounded Activity Log data, but Activity Log is not required to calculate time.
+Activity Log is optional because it is not authoritative time.
 
 **Settled**
 
 ---
 
-# 22. Backup Excludes Live Claims
+# 19. Backup Excludes Live Claims
 
-Full Backup must not restore/export as authoritative live state:
+Backup must not assert as restorable live state:
 
 ```text
 ACTIVE
 PENDING
-LOCAL_PAUSED as a live assertion
+LOCAL_PAUSED
 Safety Hold
-accrual owner/fencing lease
+accrual/fencing lease
+lifecycle/Bridge/root/listener state
 open Settings/modal state
-current lifecycle state
-Bridge observer/listener state
-current root/DOM state
 ```
 
-An exported file must never be able to say, by itself, "the user is currently clocked into Job A."
+A file cannot by itself claim the user is currently clocked into a Context.
 
 **Settled**
 
 ---
 
-# 23. Optional Recovery Evidence in Backup
+# 20. Recovery Evidence in Full Backup
 
-To reduce loss if a backup is created while a session is active, Full Backup may include a **sanitized recovery-evidence record** derived from the current durable Recovery Checkpoint.
+`recoveryEvidence` is present only when applicable, but when a valid durable Recovery Checkpoint contains evidence-backed unfinalized time, Full Backup must include a sanitized non-live Recovery Evidence record rather than silently discard that recoverable interval.
 
-It may contain only evidence such as:
+Allowed evidence includes:
 
 ```text
 contextId
@@ -565,90 +481,89 @@ checkpointedAtMs
 source/provenance
 ```
 
-Rules:
-
-- it is explicitly marked `NON_LIVE_RECOVERY_EVIDENCE`;
-- it cannot become ACTIVE/PENDING/LOCAL_PAUSED on restore;
-- only the evidence-backed interval through `lastVerifiedAtMs` may later be reconciled;
-- normal session/segment dedupe applies;
-- restoring an older backup cannot duplicate a session that later finalized under the same stable session identity.
-
-If no safe recovery evidence exists, backup simply contains finalized durable history.
-
-**Settled**
-
----
-
-# 24. Consistent Backup Snapshot
-
-Backup export is read-only and may occur while Companion is active.
-
-It must use one consistent committed read snapshot:
+It is explicitly marked:
 
 ```text
-snapshotRevision
-exportedAtMs
+NON_LIVE_RECOVERY_EVIDENCE
 ```
 
-Records from different state revisions must not be mixed into one internally inconsistent backup.
+Restore reconciliation rule:
 
-If state changes while export is being assembled, implementation may:
+1. validate `startedAtMs <= lastVerifiedAtMs` and normal timestamp bounds;
+2. dedupe against existing/finalized Segment/session identity;
+3. run global temporal-overlap analysis;
+4. when safe, convert only `[startedAtMs, lastVerifiedAtMs]` into finalized historical recovery Segment(s), day-split through normal L2 rules;
+5. use recovery provenance/end reason such as `recovery-finalize`;
+6. never create ACTIVE/PENDING/LOCAL_PAUSED from the evidence;
+7. never restore any interval after `lastVerifiedAtMs`.
 
-- continue from a stable snapshot; or
-- restart the read.
+If the same Session later finalized in the dataset, dedupe wins and Recovery Evidence adds nothing.
 
-It must not silently mix revisions.
-
-**Settled**
-
----
-
-# 25. Backup Validation
-
-Restore treats every uploaded file as untrusted input.
-
-Validation checks at minimum:
-
-- recognizable format identifier;
-- supported schema version;
-- valid top-level types;
-- valid Context identity shapes;
-- valid timestamps/durations;
-- valid Segment/session IDs where required;
-- internal duplicate/conflict detection;
-- valid workspace membership values;
-- bounded structural depth/string lengths/file size according to implementation safety limits;
-- no executable content is evaluated.
-
-Safety limits may reject a file with a clear error. They may **not silently truncate records and then report restore success**.
+If evidence conflicts/overlaps materially, it is a restore conflict, not automatic added time.
 
 **Settled**
 
 ---
 
-# 26. Schema Compatibility
+# 21. Consistent Backup Snapshot
 
-Restore behavior by schema:
+Backup may be exported while active but uses one committed snapshot revision.
+
+If state changes while serialization occurs, use the stable snapshot or restart. Never mix records from incompatible revisions.
+
+The file's `recordCounts` are generated from that same snapshot.
+
+**Settled**
+
+---
+
+# 22. Backup Validation
+
+Treat every uploaded file as untrusted.
+
+Validate at minimum:
+
+- format identifier and supported schema;
+- record counts against parsed payload;
+- optional digest when present;
+- top-level/record types;
+- Context identity shapes;
+- IDs;
+- timestamp/duration consistency;
+- localDate/workday-zone fields;
+- duplicate IDs/fingerprints;
+- temporal overlaps;
+- workspace membership values;
+- bounded structural depth/string/file size;
+- no executable content evaluation.
+
+Canonical current-schema timestamps must be absolute/offset-aware or otherwise unambiguous under the schema. Zone-less ambiguous timestamps are invalid unless an explicitly audited legacy adapter defines their meaning.
+
+For current canonical rows, materially inconsistent start/end/duration values are validation conflicts. Legacy adapters may apply the settled L2 legacy precedence rules.
+
+Safety limits may reject a file. They may not truncate it and report success.
+
+**Settled**
+
+---
+
+# 23. Schema Compatibility
 
 ```text
-current supported schema -> validate and stage
-older explicitly supported schema -> migrate in staging, then validate
-newer unsupported major schema -> reject safely
+current supported schema       validate/stage
+older explicitly supported     migrate in staging, then validate
+unsupported newer major        reject
 ```
 
-Unknown optional fields may be ignored when the schema contract permits them.
+Unknown optional fields may be ignored only where schema semantics permit. Unknown required meaning is never guessed.
 
-Unknown required semantics must not be guessed.
-
-A failed migration/validation leaves current data unchanged.
+Failure leaves current data unchanged.
 
 **Settled**
 
 ---
 
-# 27. Restore Pipeline
-
-Canonical Restore pipeline:
+# 24. Restore Pipeline
 
 ```text
 File
@@ -656,254 +571,311 @@ File
 -> Schema Validator
 -> Migration Adapter
 -> Internal Invariant Validator
+-> Recovery Evidence Normalizer
+-> Dedupe Analyzer
+-> Temporal-Overlap Analyzer
 -> Conflict Analyzer
 -> Staged Restore Plan
 -> User Mode/Conflict Decision
 -> Data Mutation Lock
--> Revision Recheck
+-> Protection/Revision Recheck
 -> Atomic Commit
--> Post-Restore Requery
--> Fresh SquareCoil verification
+-> Cache/Read-Model Requery
+-> Fresh SquareCoil Verification
 ```
 
-No uploaded JSON object is written directly into persistent state.
+No uploaded object/row is written directly into authoritative storage.
 
 **Settled**
 
 ---
 
-# 28. Restore Modes
-
-Full Backup supports two explicit modes:
+# 25. Restore Modes
 
 ```text
 MERGE
 REPLACE
 ```
 
-Default/recommended mode is `MERGE` because it is non-destructive to current unrelated history.
+MERGE is default because it preserves unrelated current data.
 
-`REPLACE` is explicitly destructive and requires stronger confirmation.
+REPLACE is destructive, requires Section 4.2 quiescence, stronger confirmation, and a pre-destructive Full Backup opportunity.
 
 **Settled**
 
 ---
 
-# 29. Restore Merge Semantics
+# 26. Restore Merge Semantics
 
-MERGE adds compatible durable history/context data without replacing current unrelated records.
+MERGE:
 
-Rules:
-
-- stable Context identity merges by Context ID;
-- stable Segment/session IDs dedupe;
-- new compatible records are added;
-- current operational Shared Timer State is untouched;
-- current workspace membership/order wins for Contexts already present unless the user explicitly opts to restore workspace organization;
+- merges by stable Context identity;
+- dedupes stable Segment/session identity and deterministic interval fingerprints;
+- adds new compatible historical records;
+- never changes Shared Timer State from file data;
+- current workspace membership/order wins for Contexts already present unless explicit workspace import is selected;
 - new Contexts may inherit backup workspace membership;
-- current compatible preferences win by default; user may separately choose to import backup preferences;
-- current Workday Time Zone preference wins, while imported historical Segments retain their stored `localDate`/`workdayZone`.
+- current preferences win by default;
+- imported historical Segments retain their historical `localDate`/workdayZone.
+
+Workspace import protection:
+
+- imported workspace state cannot archive/hide/remove a currently protected Context;
+- L4/L5 current/protected accessibility wins;
+- incompatible workspace wishes are skipped/reconciled and reported, not applied over current work.
 
 **Settled**
 
 ---
 
-# 30. Restore Replace Semantics
+# 27. Workday Time Zone Restore Policy
 
-REPLACE means:
+Historical Segment date/zone attribution is immutable during restore.
 
-> Replace the current durable restorable Companion dataset with the validated backup dataset.
+For the **current future-attribution preference**:
 
-It replaces:
+## MERGE
+
+Current Workday Time Zone wins by default.
+
+If the user explicitly imports the backup preference, the valid incoming zone becomes the future-attribution preference only. Historical `localDate` values are not rewritten.
+
+## REPLACE
+
+A valid backup Workday Time Zone becomes the default future-attribution preference because Replace is disaster recovery, unless the user explicitly chooses Keep Current Zone.
+
+If the selected zone is invalid/unavailable, use L2 fallback/diagnostic rules. Never reinterpret historical Segment dates to match the new current preference.
+
+**Settled**
+
+---
+
+# 28. Restore Replace Semantics
+
+REPLACE atomically replaces the current durable restorable core dataset with the validated backup:
 
 - Ledger/history;
-- Context Index/restorable identity metadata;
+- Context Index/restorable metadata;
 - legacy balances;
-- Recent/Archive/workspace organization;
-- compatible restorable preferences selected by the restore contract.
+- workspace organization;
+- selected compatible preferences under the restore policy.
 
-It preserves local runtime/platform items that a backup must not own, including:
+It preserves installation/browser permissions and volatile runtime/platform identity.
 
-- current extension installation identity;
-- browser permissions/connections;
-- volatile lifecycle/runtime state.
+Activity Log policy:
 
-Requirements:
+- current Activity Log is preserved by default because it is non-authoritative and not required for core disaster recovery;
+- if backup contains Activity Log and the user explicitly chooses Restore Activity, it may replace/merge according to the bounded Activity policy;
+- Activity restore never changes time totals.
 
-- Timer State must satisfy Section 4.2 idle safety;
-- explicit destructive confirmation;
-- pre-commit current-state revision check;
-- one atomic logical replacement;
-- live state remains non-running after commit until SquareCoil is freshly observed.
+After commit there is no file-derived live Timer State. Fresh SquareCoil verification drives L4.
 
 **Settled**
 
 ---
 
-# 31. Segment Dedupe During Merge
+# 29. Historical Segment Dedupe
 
-## 31.1 Same stable Segment ID, same material fields
+## Same stable Segment ID + same material fields
 
-Treat as duplicate. Add nothing.
+Duplicate, add nothing.
 
-## 31.2 Same stable Segment ID, conflicting time fields
+## Same stable ID + conflicting time fields
 
-Do not sum both and do not silently choose one.
+Conflict, never sum or silently choose.
 
-Create a restore conflict.
+## Different IDs + same deterministic interval fingerprint
 
-## 31.3 Different IDs, same deterministic interval fingerprint
+Likely duplicate under L2 identity rules. Do not double-count solely because IDs differ.
 
-Treat as likely duplicate according to L2 fingerprint rules. Do not double-count solely because IDs differ.
+## Overlapping but materially different intervals
 
-## 31.4 Overlapping but materially different intervals
-
-Do not automatically merge/split/trim them merely to maximize or minimize hours.
-
-Flag for conflict analysis when they appear to represent the same source session; otherwise preserve distinct legitimate sessions.
+Run the global overlap rules in Section 30.
 
 **Settled**
 
 ---
 
-# 32. Context Metadata Merge
+# 30. Global Temporal-Overlap Invariant
+
+The Companion data scope permits at most one accruing Context at an instant. Imported/restored dated history must not silently violate that invariant.
+
+For positive-duration attributed intervals in the same dataset:
+
+- exact duplicates are deduped;
+- adjacent intervals are allowed;
+- midnight-split pieces of one Session are expected to be adjacent, not overlapping;
+- overlapping intervals from different Contexts are a conflict;
+- materially overlapping different Sessions of the same Context are a conflict unless they are proven duplicate representations of the same source interval;
+- an incoming interval overlapping the current unfinalized ACTIVE/Safety-Hold/recovery interval is a conflict and cannot commit while that live interval is unresolved.
+
+Legacy-unattributed balance has no date interval and is not overlap-tested.
+
+Conflict code:
+
+```text
+TEMPORAL_OVERLAP_CONFLICT
+```
+
+The application never trims/splits overlapping imported records just to force them to fit or maximize hours.
+
+**Settled**
+
+---
+
+# 31. Context Identity Merge
 
 For the same stable Context ID:
 
-- identity does not fork because names differ;
-- valid project ID remains authoritative identity;
-- richer/newer label metadata may be adopted according to provenance/updated-time rules;
-- a blank incoming label does not erase a useful current label;
-- archive/recent status follows Restore Merge workspace policy, not label freshness.
+- label/name differences do not fork identity;
+- blank/weak metadata does not erase richer useful metadata;
+- workspace status follows restore policy, not label freshness.
 
-A label conflict never creates extra time.
+Hard identity conflict:
 
-**Settled**
+If one stable `contextId` maps to incompatible immutable identity facts, for example:
 
----
+```text
+job:260100 -> projectId 260100
+incoming job:260100 -> projectId 260999
+```
 
-# 33. Legacy Unattributed Balance Merge
+or Job vs General identity is incompatible, normal Merge cannot resolve it by choosing a label.
 
-`legacyUnattributedMs` is aggregate evidence and must never be blindly added during Merge.
+Code:
 
-Backup/export must preserve lineage/source metadata sufficient to identify the balance's migration origin when available.
+```text
+HARD_CONTEXT_IDENTITY_CONFLICT
+```
 
-Merge rules:
-
-- same identifiable lineage/origin -> dedupe and preserve the non-duplicated authoritative balance, normally the maximum equivalent baseline rather than sum;
-- clearly identical backup restored twice -> no added balance on second restore;
-- incompatible/independent lineage where additive meaning cannot be proven -> conflict, not automatic sum;
-- no fabricated dated Sessions are created to resolve the conflict.
+The staged restore must be canceled/fixed or handled by a future explicit remapping tool. Do not silently rewrite stable identity.
 
 **Settled**
 
 ---
 
-# 34. Restore Conflict Resolution
+# 32. Legacy Unattributed Balance Merge
 
-A staged Merge with material conflicts cannot silently commit a guessed winner.
+Never blindly add `legacyUnattributedMs`.
+
+- same identifiable lineage/origin -> dedupe; preserve the non-duplicated trusted baseline, normally max equivalent baseline rather than sum;
+- same backup twice -> second restore adds zero balance;
+- independent/ambiguous lineage with no provable additive meaning -> conflict;
+- never fabricate dated sessions to resolve aggregate balance conflicts.
+
+**Settled**
+
+---
+
+# 33. Conflict Resolution and Destructive Corrections
 
 Conflict classes include:
 
 ```text
 SEGMENT_ID_CONFLICT
 SESSION_ID_CONFLICT
+TEMPORAL_OVERLAP_CONFLICT
 LEGACY_BALANCE_LINEAGE_CONFLICT
-CONTEXT_IDENTITY_CONFLICT
+HARD_CONTEXT_IDENTITY_CONFLICT
 UNSUPPORTED_SCHEMA_CONFLICT
 ```
 
-For resolvable record conflicts, user-facing policy may offer conceptually:
+Normal compatible Merge requires no guessed winner.
+
+For a resolvable existing-vs-incoming record conflict:
 
 ```text
 Keep Current
 Use Incoming
-Cancel Restore
+Cancel
 ```
 
-Bulk policy may be offered only when it is explicit and does not mask materially different conflict types.
+But `Use Incoming` is a **destructive correction**, not an ordinary additive merge. It:
 
-If any required conflict remains unresolved, authoritative commit does not occur.
+- requires explicit confirmation that current historical data will be replaced for that conflict;
+- cannot be applied to a protected/current unfinalized interval;
+- re-runs overlap/invariant validation after replacement;
+- must not be offered for hard identity conflicts where replacing a label cannot make the identity safe.
 
-**Settled**
-
----
-
-# 35. Partial Restore Failure
-
-Restore is staged first and authoritative commit is atomic.
-
-Therefore:
-
-- parse failure -> no mutation;
-- validation failure -> no mutation;
-- migration failure -> no mutation;
-- unresolved conflict -> no mutation;
-- persistence commit failure -> operation reports failure/recovery condition, never normal success.
-
-The application must not restore the first 900 records and silently drop the last 100.
+Bulk conflict policy may only apply to genuinely homogeneous conflict classes. Unresolved required conflicts block commit.
 
 **Settled**
 
 ---
 
-# 36. Safe Post-Restore State
+# 34. Partial Restore Failure
 
-After Merge or Replace:
+Restore is staged and authoritative commit is atomic.
 
-- no file-derived ACTIVE/PENDING/LOCAL_PAUSED state is asserted;
-- read models refresh from the new durable revision;
-- caches are rebuilt/invalidated;
-- SquareCoil Bridge performs fresh current-state verification;
-- L4 decides whether current Context becomes zero-history Active, remembered Pending, or other valid live state.
+```text
+parse failure       no mutation
+validation failure  no mutation
+migration failure   no mutation
+unresolved conflict no mutation
+commit failure      failure/recovery state, not success
+```
 
-Restore itself never clocks into SquareCoil.
+Never restore a prefix and silently drop the tail.
 
 **Settled**
 
 ---
 
-# 37. Restore Activity / Provenance
+# 35. Safe Post-Restore State
 
-A successful restore records a non-authoritative Activity event with:
+After Merge/Replace:
+
+- no file-derived Active/Pending/Local Pause/Safety Hold exists;
+- caches/read models refresh from committed revision;
+- fresh Bridge verification runs;
+- L4 decides current operational state.
+
+Recovery Evidence converted to finalized historical Segments in staging is history only and does not make the Context live.
+
+**Settled**
+
+---
+
+# 36. Restore Activity / Provenance Summary
+
+Successful restore/import may record a non-authoritative Activity event containing only safe operation metadata, for example:
 
 ```text
 mode
-backup schema/version
-counts added/deduped/conflicted/replaced
+schema/version
+addedCount
+duplicateCount
+conflictResolvedCount
+replacedCount
 completedAtMs
 ```
 
-Do not place full customer/job history or uploaded file contents into Activity/diagnostics merely for convenience.
+Do not copy uploaded customer descriptions/full file contents into diagnostics/activity.
 
 **Settled**
 
 ---
 
-# 38. History CSV Purpose
+# 37. History CSV Purpose
 
-History CSV is a portable compatible timer-history round-trip format.
+History CSV is the portable compatible timer-history round-trip format.
 
-It is not:
-
-- a live runtime backup;
-- the preferred full-fidelity application disaster backup;
-- the human summary report format.
+It is not a live runtime backup, not the preferred full application disaster backup, and not the human summary Time Report format.
 
 **Settled**
 
 ---
 
-# 39. History CSV Canonical Records
+# 38. Canonical History CSV Records
 
-The rebuilt canonical CSV schema supports explicit record types:
+Record types:
 
 ```text
 SEGMENT
 LEGACY_BALANCE
 ```
 
-A SEGMENT row can preserve logically:
+SEGMENT supports logically:
 
 ```text
 schema_version
@@ -927,88 +899,78 @@ certainty
 provenance
 ```
 
-A LEGACY_BALANCE row preserves:
+LEGACY_BALANCE supports Context identity, `legacy_unattributed_ms`, and lineage/provenance.
 
-```text
-context identity
-legacy_unattributed_ms
-lineage/provenance
-```
-
-Exact column naming may be implementation-specific only if exported/imported round-trip semantics remain equivalent and documented.
+Canonical timestamps must be unambiguous/offset-aware. Canonical duration must agree with valid timestamps.
 
 **Settled**
 
 ---
 
-# 40. History CSV v0.7 Compatibility
+# 39. v0.7 History CSV Compatibility
 
-The importer must continue to recognize safely interpretable records from the current legacy schema family:
+Importer continues to recognize safely interpretable:
 
 ```text
 squarecoil-job-timer-csv-v1
 ```
 
-The adapter:
+Legacy adapter:
 
-- parses legacy fields according to the audited v0.7 contract;
+- parses audited legacy fields;
 - normalizes Context identity;
 - applies L2 legacy timestamp/duration precedence;
-- creates legacy-unattributed balance where aggregate time exceeds surviving dated rows;
-- does not restore active/pending runtime claims;
-- never invents missing dates to make totals match.
+- derives legacy-unattributed balance where old aggregate exceeds surviving dated history;
+- never restores old live state;
+- never invents dates.
 
-If a legacy row cannot be safely interpreted, it is rejected/reported rather than guessed.
-
-**Settled compatibility requirement**
-
----
-
-# 41. History CSV Export Snapshot
-
-History CSV export uses one consistent read snapshot.
-
-It exports finalized authoritative history and legacy balances.
-
-The current unfinalized ACTIVE contribution is not exported as a finalized SEGMENT.
-
-If a user needs disaster recovery of an in-progress session, Full Backup's optional Recovery Evidence is the correct mechanism.
+Unsafe legacy rows are reported, not guessed.
 
 **Settled**
 
 ---
 
-# 42. History CSV Import Pipeline
+# 40. History CSV Export Snapshot
 
-History CSV Import follows:
+Export uses one consistent committed snapshot.
+
+It exports finalized authoritative Segments and legacy balances.
+
+Current unfinalized Active contribution is not emitted as a finalized SEGMENT. Full Backup Recovery Evidence is the disaster-recovery path for evidence-backed in-progress time.
+
+**Settled**
+
+---
+
+# 41. History CSV Import Pipeline
 
 ```text
 File
 -> CSV parser
 -> schema/header identification
 -> row validation
--> legacy adapter when needed
+-> legacy adapter when applicable
 -> Context normalization
--> dedupe/conflict analysis
--> staged import summary
+-> dedupe
+-> temporal-overlap analysis
+-> conflict analysis
+-> staged summary
 -> Data Mutation Lock
--> revision recheck
+-> recheck
 -> atomic merge commit
 ```
 
-It never writes one row at a time directly into authoritative storage.
+Never write rows one-by-one directly to authoritative storage.
 
 **Settled**
 
 ---
 
-# 43. Malformed CSV Rows
+# 42. Malformed / Reviewed Partial CSV Import
 
-For authoritative History CSV Import, the first rebuilt release uses an **all-valid-or-explicit-review** rule.
+Default behavior is all-valid-or-explicit-review.
 
-A malformed/unsafe row is not silently skipped while the import reports full success.
-
-The staged result reports:
+Staging reports:
 
 ```text
 validRows
@@ -1017,71 +979,56 @@ conflictRows
 duplicateRows
 ```
 
-The user may:
+Invalid rows are never silently skipped while reporting full success.
 
-- cancel and fix the file; or
-- explicitly proceed with an import plan that excludes individually identified invalid rows if the UI later supports reviewed partial import.
-
-No automatic silent partial import.
+If reviewed partial import is implemented, the user must explicitly select/approve the exact excluded invalid/conflict rows. The resulting approved subset is then revalidated for overlap/invariants and committed atomically.
 
 **Settled**
 
 ---
 
-# 44. Duplicate CSV Import
+# 43. Duplicate CSV Import
 
-Importing the same History CSV twice must not double recorded time.
+Importing the same History CSV twice cannot double recorded time.
 
-Dedupe uses:
+Dedupe uses stable IDs, deterministic interval fingerprint, and legacy-balance lineage.
 
-- stable Segment/session IDs when available;
-- L2 deterministic interval fingerprint fallback;
-- legacy-balance lineage rules.
-
-A duplicate import may report:
+A second import may validly report:
 
 ```text
 0 added
 N duplicates
 ```
 
-and is still a valid no-op result.
+**Settled**
+
+---
+
+# 44. Imported Workspace State
+
+History CSV imports history only.
+
+Imported Contexts may become known in Context Index for history access but do not automatically become Recent/visible/Active/Pending/Local Paused.
+
+They may later enter workspace explicitly or when SquareCoil observes them.
 
 **Settled**
 
 ---
 
-# 45. Imported Workspace State
+# 45. Time Report CSV Purpose
 
-History CSV import restores history, not workspace/live state.
+Time Report CSV is human-readable reporting and is never accepted as a restore/import format.
 
-Imported Contexts:
-
-- become known in Context Index as needed for history access;
-- do not automatically become visible timer tabs;
-- do not automatically become Recent solely because they were imported;
-- do not become Active/Pending/Local Paused solely from CSV;
-- can later be shown/restored to workspace explicitly or become Recent when SquareCoil observes them.
+Default mode is daily Context summary.
 
 **Settled**
 
 ---
 
-# 46. Time Report CSV Purpose
+# 46. Time Report Summary
 
-Time Report CSV is a human-readable reporting export.
-
-It is not accepted as a runtime/history restore format.
-
-Default report mode is daily Context summary.
-
-**Settled**
-
----
-
-# 47. Time Report CSV Summary Columns
-
-Default summary supports conceptually:
+Default columns support conceptually:
 
 ```text
 Date
@@ -1096,416 +1043,371 @@ As Of
 
 Rules:
 
-- Job Number is blank for General Contexts;
-- daily rows use L2 local-date attribution;
-- legacy-unattributed time is not inserted into fake daily rows;
-- overall total may include legacy-unattributed balance and valid current contribution;
-- report must make any provisional snapshot value identifiable;
-- export time/as-of timestamp is included in metadata or column data.
+- Job Number blank for General Contexts;
+- daily attribution comes from L2;
+- legacy-unattributed time never creates fake daily rows;
+- Overall Total may include legacy balance and valid current contribution;
+- a current Context with positive current contribution receives a current-date row even if it has no finalized Segment yet;
+- affected current/provisional snapshot values are marked provisional;
+- export/as-of timestamp is included.
 
 **Settled**
 
 ---
 
-# 48. Time Report Detailed Mode
+# 47. Optional Detailed Time Report
 
-An optional detailed report mode may expose logical-session rows with:
+Detailed mode may expose logical-session rows with Context, start/end, duration, startCause, endReason, and useful provenance.
 
-```text
-Context
-start/end
-duration
-startCause
-endReason
-source/provenance when useful
-```
+Cross-midnight logical sessions may be shown as one session with daily-allocation detail.
 
-Cross-midnight logical sessions may be shown as one session while a daily-allocation field/detail explains date splitting.
-
-Detailed Time Report remains human reporting, not an import contract.
+Detailed report remains reporting-only.
 
 **Settled optional mode**
 
 ---
 
-# 49. CSV Precision
+# 48. CSV Precision
 
-CSV outputs derive from integer-millisecond source values.
+CSV derives from integer-millisecond source precision.
 
-If hours are displayed as decimals:
+Human decimal hours are formatting only. History CSV round trip uses canonical timestamps/`duration_ms`, not rounded display hours when canonical fields exist.
 
-- conversion happens at export formatting time;
-- source Ledger precision is not mutated;
-- documented decimal precision is consistent within that file;
-- repeated export/import of History CSV must rely on `duration_ms`/timestamps rather than re-parsing rounded human decimal hours when canonical fields exist.
+Repeated export/import must not progressively change time.
 
 **Settled**
 
 ---
 
-# 50. Spreadsheet Formula-Injection Safety
+# 49. Spreadsheet Formula-Injection Safety
 
-Context labels and imported user-visible text are untrusted strings.
+All user-controlled textual CSV cells are treated as untrusted, including labels, aliases, names, and free-form provenance text.
 
-CSV export must protect spreadsheet users from formula execution when text begins with formula-triggering characters such as:
+CSV export:
 
-```text
-=
-+
--
-@
-```
+- uses RFC-compatible quoting/escaping;
+- applies one documented spreadsheet-safe text escaping convention to formula-triggering leading characters such as `=`, `+`, `-`, and `@`;
+- never intentionally emits user text as executable spreadsheet formula content.
 
-Requirements:
+History CSV import reverses only the exporter's own identifiable escape convention. It never evaluates arbitrary formulas/scripts.
 
-- use RFC-compatible CSV quoting/escaping;
-- apply a reversible or explicitly documented spreadsheet-safe text-escaping rule;
-- never execute imported formulas/scripts;
-- History CSV importer reverses only its own known safe escape convention, not arbitrary spreadsheet formulas.
-
-Security escaping must not silently change Context identity.
+Security escaping must not change Context identity or source stored label values.
 
 **Settled**
 
 ---
 
-# 51. File Size / Resource Safety
+# 50. File Size / Resource Safety
 
-Backup/CSV parsers may enforce implementation safety limits for file size, nesting, row count per operation, and field length.
+Parsers may enforce file size, nesting, row-count-per-operation, and field-length limits.
 
-These are **input-processing limits**, not historical retention limits.
+These are processing limits, never retention caps.
 
-If a valid dataset exceeds one-operation limits:
-
-- reject with a clear reason or support a streamed/chunked import design;
-- never truncate the tail and claim full success.
+If a valid dataset exceeds one-operation capacity, reject clearly or use a supported streamed/chunked staging design. Never truncate and claim complete success.
 
 **Settled**
 
 ---
 
-# 52. Export Failure
+# 51. Export Failure
 
-If export serialization/download preparation fails:
+Serialization/download-preparation failure leaves stored data unchanged.
 
-- authoritative stored data remains unchanged;
-- no partial file is presented as a successful complete backup/report when completeness cannot be guaranteed;
-- failure is surfaced without degrading normal timer state unless the underlying persistence read itself is unhealthy.
+No partial file is presented as a complete successful backup/report when completeness cannot be guaranteed.
+
+Underlying persistence read failure is surfaced through lifecycle/data health; ordinary export failure alone does not stop timer health.
 
 **Settled**
 
 ---
 
-# 53. Destructive Confirmation Semantics
+# 52. Destructive Confirmation Semantics
 
-Exact visual dialogs are deferred, but destructive actions must communicate consequences accurately.
-
-At minimum:
+Confirmations must distinguish Companion data from SquareCoil official data.
 
 ## Delete Job Data
 
-Identify target and say its Companion-recorded history/time will be permanently removed.
+Identify target and state that its Companion-recorded history/time and target-specific Companion metadata will be permanently removed.
 
 ## Delete All Archived Data
 
-State that all archived Companion Context data/time will be permanently deleted.
+State that all archived Companion Context data/time will be permanently removed.
 
 ## Wipe All Time History
 
-State that all Companion-recorded time history will be permanently removed while SquareCoil official records are unaffected.
+State that all Companion-recorded time history will be removed while workspace Contexts may remain and SquareCoil official time is unaffected.
 
 ## Restore Replace
 
-State that current restorable Companion data will be replaced by the selected backup.
+State that current restorable Companion data will be replaced by the selected validated backup.
 
-Confirmation wording must not imply these operations modify official SquareCoil/payroll data.
+## Use Incoming conflict correction
 
-**Settled semantics**
+State that the specific existing Companion historical record will be replaced by incoming data.
+
+**Settled**
 
 ---
 
-# 54. Pre-Destructive Backup Opportunity
+# 53. Pre-Destructive Backup Opportunity
 
-For high-impact global destructive operations, the UI should provide a clear opportunity to create a Full Backup first.
-
-Required for first release conceptually before:
+Before these global high-impact operations, offer a clear Full Backup opportunity:
 
 - Restore Replace;
 - Delete All Archived Data;
 - Wipe All Time History.
 
-This is an opportunity, not an automatic hidden backup promise unless implementation explicitly confirms the backup was successfully created.
+This is not a hidden automatic-backup promise. If backup creation fails, the UI cannot claim the destructive action is protected by a backup.
 
-A failed backup must never be described as successful protection.
+For one-Context Delete Job Data, a Full Backup shortcut may also be offered but is not required to complete the confirmation contract.
 
 **Settled**
 
 ---
 
-# 55. L6 Behavior Invariants
+# 54. L6 Invariants
 
-- **DATA-SAFE-01:** Clear Recent never deletes or archives authoritative time.
-- **DATA-SAFE-02:** Clear Recent destination is inactive/non-recent, not automatic Archive.
-- **DATA-SAFE-03:** Archive preserves all authoritative time.
-- **DATA-SAFE-04:** Restore Archive changes workspace membership only.
-- **DATA-SAFE-05:** Protected Contexts cannot be ordinarily archived/cleared/deleted.
-- **DATA-SAFE-06:** Delete Job Data is explicit permanent Companion-data deletion.
-- **DATA-SAFE-07:** Wipe All Time History never changes official SquareCoil data.
-- **DATA-SAFE-08:** Authoritative Time Ledger has no silent count/age pruning policy.
-- **DATA-SAFE-09:** Full Backup restores durable data, never live Timer State.
-- **DATA-SAFE-10:** Restore validates/stages before commit.
-- **DATA-SAFE-11:** Restore Merge is idempotent for stable duplicate records.
-- **DATA-SAFE-12:** Restore conflicts are not silently summed/overwritten.
-- **DATA-SAFE-13:** Restore Replace requires idle global safety and explicit confirmation.
-- **DATA-SAFE-14:** Legacy unattributed balances are never blindly added.
-- **DATA-SAFE-15:** Partial validation/import failure cannot masquerade as full success.
-- **DATA-SAFE-16:** History CSV import cannot create live Timer State.
-- **DATA-SAFE-17:** Importing the same compatible CSV twice cannot double time.
-- **DATA-SAFE-18:** Time Report CSV is reporting-only and not a restore format.
-- **DATA-SAFE-19:** CSV security escaping protects spreadsheet users without changing Context identity.
-- **DATA-SAFE-20:** Input processing limits may reject, but never silently truncate authoritative history.
+- **DATA-SAFE-01:** Clear Recent is workspace-only and never deletes/archives time.
+- **DATA-SAFE-02:** Clear Recent destination is inactive/non-recent.
+- **DATA-SAFE-03:** Archive/Restore Archive preserve authoritative history.
+- **DATA-SAFE-04:** Protected Contexts cannot be ordinarily archived/cleared/deleted.
+- **DATA-SAFE-05:** Bulk workspace moves commit their eligible set atomically.
+- **DATA-SAFE-06:** Delete Job Data removes target time, identity metadata, provenance, and target-specific Activity remnants.
+- **DATA-SAFE-07:** Wipe History never changes SquareCoil and never reconstructs wiped time from Activity.
+- **DATA-SAFE-08:** No silent authoritative age/count pruning.
+- **DATA-SAFE-09:** Full Backup contains durable restorable data, never live Timer State.
+- **DATA-SAFE-10:** Safe evidence-backed unfinalized time is included as non-live Recovery Evidence when applicable.
+- **DATA-SAFE-11:** Recovery Evidence may restore only through `lastVerifiedAtMs` and only as finalized historical time.
+- **DATA-SAFE-12:** Restore/import validates and stages before commit.
+- **DATA-SAFE-13:** Same backup/CSV imported twice cannot double stable history/balances.
+- **DATA-SAFE-14:** Global attributed history cannot silently contain overlapping concurrent Context time.
+- **DATA-SAFE-15:** Incoming data cannot overlap an unresolved live Active/Hold/recovery interval.
+- **DATA-SAFE-16:** Hard stable-identity conflicts are not repaired by label guessing.
+- **DATA-SAFE-17:** Legacy balances are never blindly added.
+- **DATA-SAFE-18:** `Use Incoming` on an existing conflict is an explicit destructive correction.
+- **DATA-SAFE-19:** Replace requires idle/quiescent safety and never restores live state.
+- **DATA-SAFE-20:** Historical localDate/workday-zone attribution is never rewritten by current timezone preference restore.
+- **DATA-SAFE-21:** Malformed/partial files cannot masquerade as full success.
+- **DATA-SAFE-22:** History CSV never creates live state or workspace clutter by itself.
+- **DATA-SAFE-23:** Time Report CSV is reporting-only.
+- **DATA-SAFE-24:** CSV security escaping protects spreadsheet users without changing stored Context identity.
+- **DATA-SAFE-25:** Processing limits can reject but never silently truncate authoritative data.
 
 **All Settled**
 
 ---
 
-# 56. Acceptance Scenarios
+# 55. Acceptance Scenarios
 
-## D1. Archive inactive job
+## D1 Archive inactive Context
+A with 12h -> Archive; 12h remains, Total unchanged.
 
-Inactive A with 12h history is archived -> leaves Recent, 12h remains, Job Total unchanged.
+## D2 Archive protected Context
+ACTIVE/PENDING/LOCAL_PAUSED/current A -> Archive unavailable/rejected.
 
-## D2. Attempt archive ACTIVE job
+## D3 Archive All
+A/B eligible, C protected -> A/B commit together; C skipped; no partial eligible commit on storage failure.
 
-ACTIVE A -> Archive rejected/unavailable; timing unchanged.
+## D4 Restore archived Context
+Archive A -> Recent; time unchanged; no Resume/start side effect.
 
-## D3. Archive All with one protected Context
+## D5 Clear Recent
+Inactive A/B -> inactive/non-recent, not archived; history remains.
 
-A/B inactive, C Pending -> A/B archived, C skipped/protected, summary reports result.
+## D6 Clear Recent protected
+Protected A skipped; eligible set clears atomically.
 
-## D4. Restore archived job
+## D7 Delete inactive Context
+Confirmed Delete A removes A time/identity/provenance and target-specific Activity remnants; B unchanged.
 
-Archived A -> Recent membership restored, time unchanged, no Resume/start.
+## D8 Delete target becomes current
+Protection recheck rejects deletion.
 
-## D5. Restore into full visible tabs
+## D9 Delete then later observe same job
+Job is recreated zero-history and follows L4 new-context behavior.
 
-Restored A enters Recent overflow if needed; another actively inspected/protected tab is not destroyed.
+## D10 Delete All Archived
+All staged targets eligible -> all deleted atomically; non-archived untouched.
 
-## D6. Clear Recent
+## D11 Delete All gains protected target
+Operation re-stages/rejects; does not silently skip.
 
-Inactive Recent A/B -> become inactive/non-recent; not archived; time remains searchable in History/By Job.
+## D12 Wipe while ACTIVE
+Blocked until quiescent.
 
-## D7. Clear Recent with ACTIVE A
+## D13 Wipe while IDLE
+Ledger/balances removed; workspace/preferences remain; Activity cannot reconstruct time.
 
-A protected and skipped; eligible inactive rows clear.
+## D14 Wipe with SquareCoil still on A
+After commit, fresh verification evaluates A from a new post-wipe anchor; no pre-wipe time is recreated.
 
-## D8. Delete inactive job
+## D15 Activity prune
+Pruning Activity changes no time totals/history.
 
-Confirmed Delete A -> A Ledger/legacy balance/Context workspace metadata removed; unrelated B unchanged.
+## D16 Large Ledger
+No old v0.7-style silent history cap.
 
-## D9. Delete target becomes current during confirmation
+## D17 Backup idle
+Contains durable dataset/counts and no live Timer State.
 
-SquareCoil makes A current before commit -> stale/protection recheck rejects deletion.
+## D18 Backup active
+Contains stable finalized snapshot plus required non-live Recovery Evidence when safe unfinalized checkpoint evidence exists.
 
-## D10. Delete archived job
+## D19 Recovery Evidence restore
+Valid evidence from start to lastVerified converts only that interval to finalized recovery history; no Active state and no post-verification gap restored.
 
-Uses same destructive semantics as Delete Job Data, not simple archive removal.
+## D20 Recovery Evidence duplicate
+Same session already finalized -> evidence adds zero duplicate time.
 
-## D11. Delete all archived
+## D21 Backup record-count mismatch
+Validation rejects likely truncated/corrupt payload; current data unchanged.
 
-All staged archived targets eligible -> archived Context data permanently removed; Recent data untouched.
+## D22 Malformed/unsupported backup
+Rejected safely; no mutation.
 
-## D12. Delete all archived encounters newly protected target
+## D23 Merge new history
+Compatible records added; live Timer State untouched.
 
-Global destructive commit stops/rejects instead of silently skipping an unexpected protected target.
+## D24 Merge same backup twice
+Second merge adds zero duplicate stable history/balance.
 
-## D13. Wipe History while ACTIVE
+## D25 Same Segment ID conflict
+No silent sum/overwrite; conflict required.
 
-Operation blocked until Timer State meets idle safety precondition.
+## D26 Cross-Context historical overlap
+Incoming Job B overlaps existing Job A interval -> `TEMPORAL_OVERLAP_CONFLICT`, no automatic commit.
 
-## D14. Wipe History while IDLE
+## D27 Same-Context different-session overlap
+Material overlap -> conflict unless proven duplicate representation.
 
-All Ledger and legacy balances removed; workspace/preferences remain; official SquareCoil unaffected.
+## D28 Import overlaps current ACTIVE interval
+Blocked/conflicted until live interval resolves; importer cannot create concurrent historical time.
 
-## D15. Activity log prune
+## D29 Hard Context identity mismatch
+Same stable contextId maps to different immutable project ID -> hard conflict, no label-based repair.
 
-Old Activity rows removed -> Today/Job Total/History unchanged.
+## D30 Same legacy balance lineage twice
+No double balance.
 
-## D16. Large Ledger
+## D31 Ambiguous legacy lineages
+Conflict, not automatic addition.
 
-History exceeds old v0.7 caps -> no authoritative sessions are silently pruned.
+## D32 Use Incoming conflict
+Explicit destructive correction confirmation required; replacement revalidates overlap/invariants.
 
-## D17. Backup while idle
+## D33 Merge while unrelated ACTIVE
+May commit compatible non-overlapping history if live state is untouched and revalidation passes.
 
-Backup contains durable Ledger/Context/workspace/preferences and no live Timer State.
+## D34 Replace while ACTIVE
+Blocked.
 
-## D18. Backup while active
+## D35 Replace while IDLE
+Validated core dataset replaces atomically; no live state restored.
 
-Backup uses consistent committed snapshot; optional recovery evidence is marked non-live; no ACTIVE claim is exported.
+## D36 Replace timezone
+Backup valid zone becomes future-attribution default unless user chooses Keep Current; historical dates unchanged.
 
-## D19. Backup snapshot revision changes mid-export
+## D37 Merge timezone
+Current zone wins unless explicit preference import; historical dates unchanged.
 
-Exporter uses stable snapshot or restarts; does not mix incompatible revisions.
+## D38 Workspace restore tries to archive current Context
+Protected current accessibility wins; incompatible imported workspace state is skipped/reported.
 
-## D20. Malformed backup
+## D39 Legacy v0.7 CSV
+Safely interpretable rows adapt using L2 legacy rules; missing detail becomes legacy balance, not fake dates.
 
-Validation fails -> current data unchanged.
+## D40 Canonical CSV ambiguous timestamp
+Zone-less ambiguous canonical timestamp is invalid; no guessed local interpretation.
 
-## D21. Unsupported future backup schema
+## D41 Canonical CSV timestamp/duration mismatch
+Validation conflict; legacy precedence is not silently applied to current canonical schema.
 
-Safely rejected; no guessed import.
-
-## D22. Merge new history
-
-Backup contains new Context/Segments -> compatible records added, current operational state untouched.
-
-## D23. Merge same backup twice
-
-Second restore dedupes stable records; totals do not double.
-
-## D24. Same Segment ID conflict
-
-Current and incoming share ID but different duration -> conflict; no silent sum/overwrite.
-
-## D25. Same Context, newer label
-
-Identity remains one Context; metadata may update without changing time identity.
-
-## D26. Same legacy balance lineage twice
-
-Balance does not double on second restore.
-
-## D27. Ambiguous independent legacy balances
-
-Restore reports conflict instead of adding them automatically.
-
-## D28. Merge during unrelated ACTIVE job
-
-Staged historical merge may commit only if current operational state remains untouched and revision/conflict checks pass.
-
-## D29. Replace while ACTIVE
-
-Blocked by global idle precondition.
-
-## D30. Replace while IDLE
-
-Validated backup replaces restorable durable dataset atomically; no live state restored.
-
-## D31. Replace commit failure
-
-Operation is not reported as successful; recovery/failure condition surfaced.
-
-## D32. Restore then current SquareCoil Context exists
-
-Fresh Bridge verification runs; L4 decides zero-history Active vs remembered Pending. File does not decide.
-
-## D33. Legacy v0.7 CSV complete rows
-
-Safely adapted to rebuilt Ledger/Context model.
-
-## D34. Legacy CSV aggregate exceeds dated sessions
-
-Excess becomes legacy-unattributed balance; no fake dates created.
-
-## D35. History CSV imported twice
-
+## D42 History CSV imported twice
 Second import adds no duplicate time.
 
-## D36. CSV malformed row
+## D43 Malformed CSV row
+Reported in staging; no silent partial success.
 
-Import stages invalid-row report; no silent partial success.
+## D44 Reviewed partial CSV
+User explicitly excludes identified bad rows; remaining subset is revalidated and atomically committed.
 
-## D37. CSV imported Context absent from workspace
+## D45 Imported Context workspace
+History becomes accessible but no automatic Recent/tab/live state.
 
-History becomes accessible but Context does not automatically clutter Recent/tabs.
+## D46 Time Report daily summary
+Includes Job and General Context daily attribution; legacy balance creates no fake dated row.
 
-## D38. History CSV during ACTIVE unrelated job
+## D47 Active current report row
+Current contribution may create today's report row with As Of and provisional status where applicable.
 
-May merge only if it does not alter Shared Timer State/current session and revision checks remain valid.
+## D48 History CSV active session
+Unfinalized Active session is not exported as finalized SEGMENT.
 
-## D39. Time Report daily summary
+## D49 Spreadsheet-dangerous label
+`=SUM(...)` or similar user text exports spreadsheet-safe and is never executed by Companion.
 
-Rows reflect L2 daily attribution, include General Contexts, and do not assign legacy-unattributed time to dates.
+## D50 Oversized file
+Reject or supported streamed staging; never truncate and claim success.
 
-## D40. Time Report active normal session
+## D51 Export failure
+Stored data unchanged; incomplete artifact not called complete.
 
-Valid current contribution may appear in snapshot with As Of metadata.
-
-## D41. Time Report provisional session
-
-Affected snapshot value is explicitly marked provisional.
-
-## D42. History CSV active session
-
-Current unfinalized Active session is not exported as a finalized SEGMENT.
-
-## D43. Spreadsheet-dangerous label
-
-Label beginning `=SUM(...)` exports as spreadsheet-safe text; opening CSV must not execute it as intended Companion content.
-
-## D44. Oversized import
-
-Parser rejects or uses supported streaming path; never truncates tail and claims full success.
-
-## D45. Export failure
-
-Stored history remains unchanged and user is not given a falsely complete backup.
-
-## D46. Pre-destructive backup opportunity
-
-Before Wipe/Replace/Delete-All-Archived, user can choose Full Backup first; destructive action does not claim protection unless backup succeeds.
+## D52 Pre-destructive backup opportunity
+Before Replace/Wipe/Delete-All-Archived, user can create Full Backup; protection is claimed only if backup succeeds.
 
 ---
 
-# 57. Continuity States After L6
+# 56. Continuity States After L6
 
 ## Settled
 
-- Archive preserves history and is distinct from Delete;
-- Restore Archive returns to Recent without timing side effects;
-- Clear Recent destination is inactive/non-recent, not Archive;
-- protected-target recheck before workspace/destructive commit;
-- exact Delete Job Data scope;
-- Delete All Archived Data semantics;
-- Wipe All Time History scope and idle requirement;
-- Activity Log may be retention-bounded independently;
-- no silent authoritative Time Ledger pruning;
-- Full Backup required categories and live-state exclusions;
-- optional non-live Recovery Evidence;
-- consistent backup snapshots;
-- untrusted-file validation and schema handling;
-- Restore Merge vs Replace;
-- merge workspace/preference behavior;
-- segment/context/legacy-balance conflict semantics;
-- atomic staged restore/import behavior;
-- safe non-live post-restore state;
-- canonical rebuilt History CSV record model;
-- legacy v0.7 CSV compatibility requirement;
-- malformed/duplicate CSV behavior;
-- imported history does not automatically enter Recent;
-- Time Report summary/detailed purpose and columns;
-- CSV precision and spreadsheet safety;
-- file-processing limits cannot become silent truncation;
-- destructive confirmation semantics and backup opportunity.
+- Clear Recent -> inactive/non-recent;
+- Archive and restore preserve time;
+- protected-target revalidation;
+- atomic eligible bulk workspace operations;
+- exact single/bulk deletion scope including target Activity redaction;
+- Wipe scope and post-wipe fresh anchor behavior;
+- independent bounded Activity retention;
+- no silent authoritative compaction;
+- Full Backup envelope/count integrity/live exclusions;
+- required-if-applicable non-live Recovery Evidence and exact historical reconciliation;
+- staged untrusted-file pipeline;
+- Merge vs Replace;
+- Workday Time Zone restore policy;
+- workspace import protection;
+- Activity behavior under Replace;
+- stable dedupe;
+- global temporal-overlap validation including live interval overlap;
+- hard Context identity conflict handling;
+- legacy balance lineage rules;
+- destructive `Use Incoming` corrections;
+- atomic failure behavior;
+- non-live post-restore state;
+- canonical History CSV and v0.7 compatibility;
+- reviewed-partial import semantics;
+- Time Report current/provisional reporting;
+- CSV precision/formula safety;
+- file processing limits;
+- destructive confirmation and backup opportunity.
 
 ## Provisional
 
-- exact backup JSON property names;
-- exact maximum file/row/string safety limits;
-- exact Activity Log retention age/count;
-- exact conflict-resolution UI for large conflict sets;
-- exact spreadsheet-safe text escape marker;
-- whether optional Activity Log is enabled by default in Full Backup;
-- exact detailed Time Report column set;
-- exact filename conventions.
+- exact JSON property names;
+- exact safety size/row/string limits;
+- exact Activity retention age/count;
+- exact conflict UI layout for large sets;
+- exact spreadsheet-safe escape marker;
+- optional backup payload-digest algorithm/canonicalization;
+- exact report filename/column formatting;
+- whether optional Activity Log is included in Full Backup by default.
 
 ## Open for later stages
 
 - Settings navigation into Archives & Backup (L7);
-- exact destructive-dialog visual/microcopy (L7);
-- support diagnostics for restore/import failures (L7/L8);
-- implementation storage transaction strategy (build stage);
-- automated backup/CSV fixtures and corruption tests (L8/build).
+- final destructive/dialog microcopy (L7);
+- support diagnostics for import/restore failures (L7/L8);
+- concrete storage transaction strategy (build);
+- automated overlap/backup/CSV/corruption fixtures (L8/build).
 
 ## Blocked
 
@@ -1513,12 +1415,12 @@ None.
 
 ---
 
-# 58. L6 Readiness Judgment
+# 57. L6 Readiness Judgment
 
-**Status: Ready for review**
+**Status: Settled - ready for L7**
 
-L6 is ready for review when Archive/Clear/Delete, backup/restore, History CSV, and Time Report behavior can be implemented without silently deleting authoritative time, double-counting imported history, restoring fake live Timer State, or treating malformed external files as trusted application state.
+L6 now defines workspace cleanup, archive, destructive operations, disaster backup, recovery evidence, restore conflict/overlap safety, History CSV, and Time Report strongly enough that implementation should not need to invent data-loss or import semantics.
 
-If accepted and hardened, the next stage is:
+Next stage:
 
 **L7: Settings, Themes, Support, and Developer Support**
