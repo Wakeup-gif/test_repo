@@ -12,6 +12,21 @@ const STATES = Object.freeze({
 const MODES = Object.freeze({ ENABLED: 'ENABLED', DISABLED: 'DISABLED' });
 const POSITIVE_COORDINATION = new Set(['OWNER', 'OBSERVER_CONNECTED']);
 const DEFAULT_RECOVERY_DELAYS = Object.freeze([250, 1000, 3000]);
+const CORE_ACQUIRE_ORDER = Object.freeze([
+  'ownership',
+  'persistence',
+  'ui',
+  'features',
+  'bridge',
+  'coordination'
+]);
+const CORE_TEARDOWN_ORDER = Object.freeze([
+  'coordination',
+  'bridge',
+  'features',
+  'ui',
+  'persistence'
+]);
 
 function errorMessage(error) {
   return String(error && (error.message || error) || 'unknown-error');
@@ -50,6 +65,10 @@ function createLifecycleController(options = {}) {
   const recoveryDelays = Array.isArray(options.recoveryDelays) && options.recoveryDelays.length
     ? options.recoveryDelays.slice(0, 3)
     : DEFAULT_RECOVERY_DELAYS.slice();
+  const outstandingAdapters = new Set(
+    (Array.isArray(options.initiallyOwnedAdapters) ? options.initiallyOwnedAdapters : [])
+      .filter(name => CORE_ACQUIRE_ORDER.includes(name))
+  );
 
   let mode = MODES.ENABLED;
   let state = STATES.UNINITIALIZED;
@@ -72,6 +91,14 @@ function createLifecycleController(options = {}) {
     if (typeof options.onTransition === 'function') options.onTransition(snapshot());
   }
 
+  function orderedOutstandingResources() {
+    return CORE_ACQUIRE_ORDER.filter(name => outstandingAdapters.has(name));
+  }
+
+  function hasIncompleteTeardown() {
+    return state === STATES.FAILED && reason === 'teardown-incomplete';
+  }
+
   function snapshot() {
     return {
       buildId,
@@ -83,14 +110,10 @@ function createLifecycleController(options = {}) {
       lastError,
       recoveryAttempt,
       teardownInProgress: Boolean(teardownPromise || teardownRequested),
+      cleanupRequired: hasIncompleteTeardown(),
+      outstandingResources: orderedOutstandingResources(),
       readiness: readiness ? { ...readiness } : null
     };
-  }
-
-  async function callAdapter(name, method, fallback) {
-    const adapter = adapters[name];
-    if (!adapter || typeof adapter[method] !== 'function') return fallback;
-    return adapter[method]();
   }
 
   function firstReadinessFailure(assertions) {
@@ -112,18 +135,101 @@ function createLifecycleController(options = {}) {
     return 'readiness-failed';
   }
 
-  async function evaluateReadiness() {
+  function operationStillCurrent(epoch) {
+    return epoch === operationEpoch && !teardownRequested && mode === MODES.ENABLED;
+  }
+
+  function acquisitionContext(epoch) {
+    return Object.freeze({
+      epoch,
+      isCancelled: () => !operationStillCurrent(epoch)
+    });
+  }
+
+  function adapterContract() {
+    const missingEnsure = [];
+    const missingTeardown = [];
+    for (const name of CORE_ACQUIRE_ORDER) {
+      const adapter = adapters[name];
+      if (!adapter || typeof adapter.ensure !== 'function') missingEnsure.push(name);
+      if (!adapter || typeof adapter.teardown !== 'function') missingTeardown.push(name);
+    }
+    const missingObservation = !adapters.bridge || typeof adapters.bridge.observeInitial !== 'function';
+    return { missingEnsure, missingTeardown, missingObservation };
+  }
+
+  async function acquire(name, epoch) {
+    if (!operationStillCurrent(epoch)) return { cancelled: true, value: null };
+    const adapter = adapters[name];
+    outstandingAdapters.add(name);
+    const value = await adapter.ensure(acquisitionContext(epoch));
+    if (!operationStillCurrent(epoch)) return { cancelled: true, value };
+    return { cancelled: false, value };
+  }
+
+  async function observeBridge(epoch) {
+    if (!operationStillCurrent(epoch)) return { cancelled: true, value: null };
+    const value = await adapters.bridge.observeInitial(acquisitionContext(epoch));
+    if (!operationStillCurrent(epoch)) return { cancelled: true, value };
+    return { cancelled: false, value };
+  }
+
+  function cancelledReadiness() {
+    return { ok: false, cancelled: true, reason: 'operation-cancelled', readiness: readiness ? { ...readiness } : null };
+  }
+
+  async function evaluateReadiness(epoch) {
     if (readinessPromise) return readinessPromise;
 
     const task = (async () => {
-      const ownership = await callAdapter('ownership', 'ensure', { oneOwner: false });
-      const persistence = await callAdapter('persistence', 'ensure', { available: false });
-      const ui = await callAdapter('ui', 'ensure', { rootCount: 0, owned: false, interactionReady: false });
-      const features = await callAdapter('features', 'ensure', { initialized: false, teardownRegistered: false });
-      const bridge = await callAdapter('bridge', 'ensure', { initialized: false, teardownRegistered: false });
-      const observation = await callAdapter('bridge', 'observeInitial', { attempted: false, kind: 'STATE_UNKNOWN' });
-      const coordination = await callAdapter('coordination', 'ensure', { disposition: 'UNAVAILABLE' });
+      const contract = adapterContract();
+      if (contract.missingTeardown.length) {
+        readiness = {
+          oneLifecycleOwner: false,
+          validRuntimeIdentity: isConcreteIdentity(runtimeInstanceId, 'runtime-unknown') && isConcreteIdentity(buildId, 'build-unknown'),
+          oneOwnedRoot: false,
+          interactionReady: false,
+          persistenceAvailable: false,
+          bridgeInitialized: false,
+          initialObservationAttempted: false,
+          featureRegistryInitialized: false,
+          teardownRegistered: false,
+          coordinationPositive: false,
+          coordinationDisposition: 'UNAVAILABLE',
+          bridgeObservation: 'STATE_UNKNOWN',
+          missingTeardown: contract.missingTeardown.slice()
+        };
+        return { ok: false, reason: 'teardown-unregistered', readiness: { ...readiness } };
+      }
+      if (contract.missingEnsure.length) {
+        throw new Error(`core-adapter-ensure-unregistered:${contract.missingEnsure.join(',')}`);
+      }
+      if (contract.missingObservation) {
+        throw new Error('bridge-initial-observation-unregistered');
+      }
 
+      const ownershipStep = await acquire('ownership', epoch);
+      if (ownershipStep.cancelled) return cancelledReadiness();
+      const persistenceStep = await acquire('persistence', epoch);
+      if (persistenceStep.cancelled) return cancelledReadiness();
+      const uiStep = await acquire('ui', epoch);
+      if (uiStep.cancelled) return cancelledReadiness();
+      const featuresStep = await acquire('features', epoch);
+      if (featuresStep.cancelled || featuresStep.value?.cancelled) return cancelledReadiness();
+      const bridgeStep = await acquire('bridge', epoch);
+      if (bridgeStep.cancelled) return cancelledReadiness();
+      const observationStep = await observeBridge(epoch);
+      if (observationStep.cancelled) return cancelledReadiness();
+      const coordinationStep = await acquire('coordination', epoch);
+      if (coordinationStep.cancelled) return cancelledReadiness();
+
+      const ownership = ownershipStep.value;
+      const persistence = persistenceStep.value;
+      const ui = uiStep.value;
+      const features = featuresStep.value;
+      const bridge = bridgeStep.value;
+      const observation = observationStep.value;
+      const coordination = coordinationStep.value;
       const assertions = {
         oneLifecycleOwner: ownership && ownership.oneOwner === true,
         validRuntimeIdentity: isConcreteIdentity(runtimeInstanceId, 'runtime-unknown') && isConcreteIdentity(buildId, 'build-unknown'),
@@ -149,7 +255,7 @@ function createLifecycleController(options = {}) {
 
       return {
         ok: Object.values(assertions).every(Boolean),
-        reason: firstReadinessFailure(assertions),
+        reason: assertions.teardownRegistered ? firstReadinessFailure(assertions) : 'teardown-unregistered',
         readiness: { ...readiness }
       };
     })();
@@ -162,18 +268,24 @@ function createLifecycleController(options = {}) {
     }
   }
 
-  function operationStillCurrent(epoch) {
-    return epoch === operationEpoch && !teardownRequested && mode === MODES.ENABLED;
+  function retiredRuntimeSnapshot() {
+    if (!teardownComplete || state !== STATES.UNINITIALIZED) return null;
+    if (reason !== 'fresh-runtime-required') {
+      transition(STATES.UNINITIALIZED, 'fresh-runtime-required');
+    }
+    return snapshot();
   }
 
   async function boot() {
+    if (teardownPromise) await teardownPromise;
+    if (hasIncompleteTeardown()) return snapshot();
     if (mode === MODES.DISABLED) {
-      transition(STATES.UNINITIALIZED, 'user-disabled');
+      if (state !== STATES.FAILED) transition(STATES.UNINITIALIZED, 'user-disabled');
       return snapshot();
     }
-    if (teardownPromise) await teardownPromise;
-    if (mode === MODES.DISABLED) return snapshot();
     if (state === STATES.FAILED) return snapshot();
+    const retired = retiredRuntimeSnapshot();
+    if (retired) return retired;
     if (bootPromise) return bootPromise;
     if (state === STATES.READY) return snapshot();
     if (state === STATES.RECOVERING && recoveryPromise) return recoveryPromise;
@@ -186,8 +298,8 @@ function createLifecycleController(options = {}) {
     const task = (async () => {
       transition(STATES.BOOTING, 'boot-in-progress');
       try {
-        const result = await evaluateReadiness();
-        if (!operationStillCurrent(epoch)) return snapshot();
+        const result = await evaluateReadiness(epoch);
+        if (!operationStillCurrent(epoch) || result.cancelled) return snapshot();
         if (result.ok) transition(STATES.READY, 'ready');
         else transition(STATES.DEGRADED, result.reason);
       } catch (error) {
@@ -208,15 +320,18 @@ function createLifecycleController(options = {}) {
 
   async function revalidate() {
     if (teardownPromise) await teardownPromise;
+    if (hasIncompleteTeardown()) return snapshot();
     if (mode === MODES.DISABLED || teardownRequested) return snapshot();
+    const retired = retiredRuntimeSnapshot();
+    if (retired) return retired;
     if (state === STATES.FAILED) return snapshot();
     if (bootPromise) return bootPromise;
     if (recoveryPromise) return recoveryPromise;
 
     const epoch = operationEpoch;
     try {
-      const result = await evaluateReadiness();
-      if (!operationStillCurrent(epoch)) return snapshot();
+      const result = await evaluateReadiness(epoch);
+      if (!operationStillCurrent(epoch) || result.cancelled) return snapshot();
       if (result.ok) transition(STATES.READY, 'ready');
       else transition(STATES.DEGRADED, result.reason);
     } catch (error) {
@@ -229,10 +344,16 @@ function createLifecycleController(options = {}) {
 
   async function recover() {
     if (teardownPromise) await teardownPromise;
+    if (hasIncompleteTeardown()) return snapshot();
     if (mode === MODES.DISABLED || teardownRequested) return snapshot();
+    let retired = retiredRuntimeSnapshot();
+    if (retired) return retired;
     if (recoveryPromise) return recoveryPromise;
     if (bootPromise) await bootPromise;
+    if (hasIncompleteTeardown()) return snapshot();
     if (mode === MODES.DISABLED || teardownRequested) return snapshot();
+    retired = retiredRuntimeSnapshot();
+    if (retired) return retired;
     if (state === STATES.FAILED && isReloadRequiredReason(reason)) return snapshot();
 
     teardownRequested = false;
@@ -247,10 +368,14 @@ function createLifecycleController(options = {}) {
         if (!operationStillCurrent(epoch)) return snapshot();
 
         try {
-          const result = await evaluateReadiness();
-          if (!operationStillCurrent(epoch)) return snapshot();
+          const result = await evaluateReadiness(epoch);
+          if (!operationStillCurrent(epoch) || result.cancelled) return snapshot();
           if (result.ok) {
             transition(STATES.READY, 'ready');
+            return snapshot();
+          }
+          if (result.reason === 'coordination-not-implemented-b1') {
+            transition(STATES.DEGRADED, result.reason);
             return snapshot();
           }
           reason = result.reason;
@@ -279,8 +404,11 @@ function createLifecycleController(options = {}) {
     }
   }
 
-  async function teardown(nextReason = 'teardown-complete') {
-    if (teardownPromise) return teardownPromise;
+  async function runTeardown(nextReason, cleanupRetry) {
+    if (teardownPromise) {
+      await teardownPromise;
+      return snapshot();
+    }
     if (teardownComplete && state === STATES.UNINITIALIZED) return snapshot();
 
     teardownRequested = true;
@@ -291,39 +419,91 @@ function createLifecycleController(options = {}) {
       if (pending.length) await Promise.allSettled(pending);
 
       const errors = [];
-      const order = ['bridge', 'features', 'coordination', 'ui', 'persistence', 'ownership'];
-      for (const name of order) {
+      const context = Object.freeze({ cleanupRetry: Boolean(cleanupRetry) });
+      for (const name of CORE_TEARDOWN_ORDER) {
+        if (!outstandingAdapters.has(name)) continue;
+        const adapter = adapters[name];
+        if (!adapter || typeof adapter.teardown !== 'function') {
+          errors.push(`${name}:teardown-unregistered`);
+          continue;
+        }
         try {
-          await callAdapter(name, 'teardown', null);
+          await adapter.teardown(context);
+          outstandingAdapters.delete(name);
         } catch (error) {
           errors.push(`${name}:${errorMessage(error)}`);
         }
       }
 
+      const nonOwnershipOutstanding = [...outstandingAdapters].filter(name => name !== 'ownership');
+      if (!nonOwnershipOutstanding.length && outstandingAdapters.has('ownership')) {
+        const ownership = adapters.ownership;
+        if (!ownership || typeof ownership.teardown !== 'function') {
+          errors.push('ownership:teardown-unregistered');
+        } else {
+          try {
+            await ownership.teardown(context);
+            outstandingAdapters.delete('ownership');
+          } catch (error) {
+            errors.push(`ownership:${errorMessage(error)}`);
+          }
+        }
+      }
+
       readiness = null;
       recoveryAttempt = 0;
-      if (errors.length) {
+      if (errors.length || outstandingAdapters.size) {
         teardownComplete = false;
-        transition(STATES.FAILED, 'teardown-incomplete', new Error(errors.join('; ')));
+        const unresolved = orderedOutstandingResources().join(',') || 'unknown';
+        const details = errors.length ? errors.join('; ') : `outstanding:${unresolved}`;
+        transition(STATES.FAILED, 'teardown-incomplete', new Error(details));
       } else {
         teardownComplete = true;
         transition(STATES.UNINITIALIZED, nextReason);
       }
       teardownRequested = false;
-      return snapshot();
     })();
 
-    teardownPromise = task;
-    try {
-      return await task;
-    } finally {
-      if (teardownPromise === task) teardownPromise = null;
+    const active = task.finally(() => {
+      if (teardownPromise === active) teardownPromise = null;
+    });
+    teardownPromise = active;
+    await active;
+    return snapshot();
+  }
+
+  async function teardown(nextReason = 'teardown-complete') {
+    if (teardownPromise) {
+      await teardownPromise;
+      return snapshot();
     }
+    if (hasIncompleteTeardown()) return snapshot();
+    return runTeardown(nextReason, false);
+  }
+
+  async function retryTeardown() {
+    if (!hasIncompleteTeardown()) return snapshot();
+    const nextReason = mode === MODES.DISABLED ? 'user-disabled' : 'teardown-complete';
+    return runTeardown(nextReason, true);
   }
 
   async function setMode(nextMode) {
-    mode = nextMode === MODES.DISABLED ? MODES.DISABLED : MODES.ENABLED;
-    if (mode === MODES.DISABLED) return teardown('user-disabled');
+    const requestedMode = nextMode === MODES.DISABLED ? MODES.DISABLED : MODES.ENABLED;
+    if (requestedMode === MODES.DISABLED) {
+      if (teardownPromise) {
+        await teardownPromise;
+        return snapshot();
+      }
+      if (hasIncompleteTeardown()) return snapshot();
+      mode = MODES.DISABLED;
+      return teardown('user-disabled');
+    }
+
+    if (teardownPromise) await teardownPromise;
+    if (hasIncompleteTeardown()) return snapshot();
+    mode = MODES.ENABLED;
+    const retired = retiredRuntimeSnapshot();
+    if (retired) return retired;
     if (state === STATES.FAILED && isReloadRequiredReason(reason)) return snapshot();
     if (state === STATES.UNINITIALIZED) return boot();
     return snapshot();
@@ -337,6 +517,7 @@ function createLifecycleController(options = {}) {
     revalidate,
     recover,
     teardown,
+    retryTeardown,
     setMode
   };
 }
@@ -345,6 +526,8 @@ module.exports = {
   STATES,
   MODES,
   DEFAULT_RECOVERY_DELAYS,
+  CORE_ACQUIRE_ORDER,
+  CORE_TEARDOWN_ORDER,
   isReloadRequiredReason,
   createLifecycleController
 };

@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createLifecycleController, MODES } = require('../../src/core/lifecycle');
+const { createFeatureRegistry } = require('../../src/core/feature-registry');
 const { BUILD_ID } = require('../../src/core/build-identity');
 
 function createAdapters(overrides = {}) {
@@ -75,6 +76,29 @@ test('B1 live coordination placeholder cannot falsely report READY', async () =>
   assert.equal(result.readiness.coordinationPositive, false);
 });
 
+test('recovery returns to the truthful B1 coordination-only degraded state instead of exhausting', async () => {
+  let uiChecks = 0;
+  const { adapters } = createAdapters({
+    ui: {
+      ensure: async () => {
+        uiChecks += 1;
+        if (uiChecks === 2) throw new Error('transient-ui-check-failed');
+        return { rootCount: 1, owned: true, interactionReady: true, teardownRegistered: true };
+      }
+    },
+    coordination: { ensure: async () => ({ disposition: 'UNAVAILABLE_B1' }) }
+  });
+  const lifecycle = createController(adapters);
+  const booted = await lifecycle.boot();
+  assert.equal(booted.reason, 'coordination-not-implemented-b1');
+
+  const recovered = await lifecycle.recover();
+  assert.equal(recovered.state, 'DEGRADED');
+  assert.equal(recovered.reason, 'coordination-not-implemented-b1');
+  assert.equal(recovered.recoveryAttempt, 2);
+  assert.equal(recovered.readiness.coordinationPositive, false);
+});
+
 test('lifecycle owner must be positively confirmed', async () => {
   const { adapters } = createAdapters({ ownership: { ensure: async () => ({ oneOwner: false }) } });
   const lifecycle = createController(adapters);
@@ -89,6 +113,69 @@ test('sentinel runtime identity cannot satisfy READY', async () => {
   const result = await lifecycle.boot();
   assert.equal(result.state, 'DEGRADED');
   assert.equal(result.reason, 'runtime-identity-invalid');
+});
+
+test('READY requires teardown ownership for every core adapter', async () => {
+  const { adapters } = createAdapters();
+  delete adapters.coordination.teardown;
+  const lifecycle = createController(adapters);
+  const result = await lifecycle.boot();
+  assert.equal(result.state, 'DEGRADED');
+  assert.equal(result.reason, 'teardown-unregistered');
+  assert.equal(result.readiness.teardownRegistered, false);
+});
+
+test('an unregistered core teardown is rejected before its adapter can allocate', async () => {
+  let coordinationAllocations = 0;
+  const { adapters } = createAdapters({
+    coordination: {
+      ensure: async () => {
+        coordinationAllocations += 1;
+        return { disposition: 'OWNER' };
+      }
+    }
+  });
+  delete adapters.coordination.teardown;
+  const lifecycle = createController(adapters);
+  const booted = await lifecycle.boot();
+  assert.equal(booted.reason, 'teardown-unregistered');
+  assert.equal(coordinationAllocations, 0);
+
+  const disabled = await lifecycle.setMode(MODES.DISABLED);
+  assert.equal(disabled.state, 'UNINITIALIZED');
+  assert.equal(disabled.reason, 'user-disabled');
+
+  const enabled = await lifecycle.setMode(MODES.ENABLED);
+  assert.equal(enabled.state, 'UNINITIALIZED');
+  assert.equal(enabled.reason, 'fresh-runtime-required');
+  assert.equal(coordinationAllocations, 0);
+});
+
+test('a feature missing teardown cannot initialize and clean disable remains possible', async () => {
+  let allocations = 0;
+  const registry = createFeatureRegistry();
+  registry.register('leaked-feature', {
+    initialize: async () => { allocations += 1; }
+  });
+  const { adapters } = createAdapters({
+    features: {
+      ensure: registry.ensure,
+      teardown: registry.teardown
+    }
+  });
+  const lifecycle = createController(adapters);
+  const booted = await lifecycle.boot();
+  assert.equal(booted.reason, 'teardown-unregistered');
+  assert.equal(allocations, 0);
+
+  const disabled = await lifecycle.setMode(MODES.DISABLED);
+  assert.equal(disabled.state, 'UNINITIALIZED');
+  assert.equal(disabled.reason, 'user-disabled');
+
+  const enabled = await lifecycle.setMode(MODES.ENABLED);
+  assert.equal(enabled.state, 'UNINITIALIZED');
+  assert.equal(enabled.reason, 'fresh-runtime-required');
+  assert.equal(allocations, 0);
 });
 
 test('persistence failure denies READY', async () => {
@@ -152,6 +239,61 @@ test('disable during BOOTING invalidates the boot so READY cannot publish afterw
   assert.equal(lifecycle.snapshot().state, 'UNINITIALIZED');
 });
 
+test('re-enable during teardown waits for the lock and retires the old Runtime Instance ID', async () => {
+  let releaseTeardown;
+  let markTeardownStarted;
+  const teardownGate = new Promise(resolve => { releaseTeardown = resolve; });
+  const teardownStarted = new Promise(resolve => { markTeardownStarted = resolve; });
+  let uiEnsures = 0;
+  const { adapters } = createAdapters({
+    ui: {
+      ensure: async () => {
+        uiEnsures += 1;
+        return { rootCount: 1, owned: true, interactionReady: true, teardownRegistered: true };
+      }
+    },
+    bridge: {
+      teardown: async () => {
+        markTeardownStarted();
+        await teardownGate;
+      }
+    }
+  });
+  const lifecycle = createController(adapters);
+  await lifecycle.boot();
+
+  const disableTask = lifecycle.setMode(MODES.DISABLED);
+  await teardownStarted;
+
+  let enableSettled = false;
+  const enableTask = lifecycle.setMode(MODES.ENABLED).then(result => {
+    enableSettled = true;
+    return result;
+  });
+  await Promise.resolve();
+  assert.equal(enableSettled, false);
+
+  releaseTeardown();
+  await disableTask;
+  const enabled = await enableTask;
+
+  assert.equal(enabled.mode, 'ENABLED');
+  assert.equal(enabled.state, 'UNINITIALIZED');
+  assert.equal(enabled.reason, 'fresh-runtime-required');
+  assert.equal(uiEnsures, 1);
+
+  const prohibitedReuse = await lifecycle.boot();
+  assert.equal(prohibitedReuse.state, 'UNINITIALIZED');
+  assert.equal(prohibitedReuse.reason, 'fresh-runtime-required');
+  const prohibitedRevalidation = await lifecycle.revalidate();
+  const prohibitedRecovery = await lifecycle.recover();
+  assert.equal(prohibitedRevalidation.state, 'UNINITIALIZED');
+  assert.equal(prohibitedRevalidation.reason, 'fresh-runtime-required');
+  assert.equal(prohibitedRecovery.state, 'UNINITIALIZED');
+  assert.equal(prohibitedRecovery.reason, 'fresh-runtime-required');
+  assert.equal(uiEnsures, 1);
+});
+
 test('incomplete teardown remains FAILED and a later boot call cannot stack a new generation', async () => {
   let uiEnsures = 0;
   const { adapters } = createAdapters({
@@ -172,6 +314,202 @@ test('incomplete teardown remains FAILED and a later boot call cannot stack a ne
   const afterBootRequest = await lifecycle.boot();
   assert.equal(afterBootRequest.state, 'FAILED');
   assert.equal(uiEnsures, 1);
+});
+
+test('UT-B1-LC-23 keeps failed cleanup sticky and retries only outstanding ownership', async () => {
+  const names = ['ownership', 'persistence', 'ui', 'features', 'bridge', 'coordination'];
+  const ensureCounts = Object.fromEntries(names.map(name => [name, 0]));
+  const teardownCounts = Object.fromEntries(names.map(name => [name, 0]));
+  const teardownOrder = [];
+  let bridgeFailuresRemaining = 2;
+  const resultFor = {
+    ownership: { oneOwner: true },
+    persistence: { available: true },
+    ui: { rootCount: 1, owned: true, interactionReady: true, teardownRegistered: true },
+    features: { initialized: true, teardownRegistered: true },
+    bridge: { initialized: true, teardownRegistered: true },
+    coordination: { disposition: 'OWNER' }
+  };
+  const adapters = Object.fromEntries(names.map(name => [name, {
+    ensure: async () => {
+      ensureCounts[name] += 1;
+      return resultFor[name];
+    },
+    teardown: async () => {
+      teardownCounts[name] += 1;
+      teardownOrder.push(name);
+      if (name === 'bridge' && bridgeFailuresRemaining > 0) {
+        bridgeFailuresRemaining -= 1;
+        throw new Error('bridge-release-failed');
+      }
+    }
+  }]));
+  adapters.bridge.observeInitial = async () => ({ attempted: true, kind: 'STATE_UNKNOWN' });
+
+  const oldLifecycle = createController(adapters, {
+    runtimeInstanceId: 'runtime-old-generation',
+    initiallyOwnedAdapters: ['ownership']
+  });
+  const booted = await oldLifecycle.boot();
+  assert.equal(booted.state, 'READY');
+  assert.deepEqual(ensureCounts, Object.fromEntries(names.map(name => [name, 1])));
+
+  const failedDisable = await oldLifecycle.setMode(MODES.DISABLED);
+  assert.equal(failedDisable.state, 'FAILED');
+  assert.equal(failedDisable.mode, 'DISABLED');
+  assert.equal(failedDisable.reason, 'teardown-incomplete');
+  assert.equal(failedDisable.cleanupRequired, true);
+  assert.deepEqual(failedDisable.outstandingResources, ['ownership', 'bridge']);
+  assert.equal(teardownCounts.ownership, 0);
+
+  const ensureSnapshot = { ...ensureCounts };
+  const teardownSnapshot = { ...teardownCounts };
+  const lockedResults = await Promise.all([
+    oldLifecycle.boot(),
+    oldLifecycle.revalidate(),
+    oldLifecycle.recover(),
+    oldLifecycle.setMode(MODES.DISABLED),
+    oldLifecycle.setMode(MODES.ENABLED)
+  ]);
+  for (const locked of lockedResults) {
+    assert.equal(locked.state, 'FAILED');
+    assert.equal(locked.mode, 'DISABLED');
+    assert.equal(locked.reason, 'teardown-incomplete');
+  }
+  assert.deepEqual(ensureCounts, ensureSnapshot);
+  assert.deepEqual(teardownCounts, teardownSnapshot);
+
+  const failedRetry = await oldLifecycle.retryTeardown();
+  assert.equal(failedRetry.state, 'FAILED');
+  assert.equal(failedRetry.reason, 'teardown-incomplete');
+  assert.deepEqual(failedRetry.outstandingResources, ['ownership', 'bridge']);
+  assert.equal(failedRetry.teardownInProgress, false);
+  assert.equal(teardownCounts.bridge, 2);
+  assert.equal(teardownCounts.ownership, 0);
+  for (const name of ['coordination', 'features', 'ui', 'persistence']) {
+    assert.equal(teardownCounts[name], teardownSnapshot[name]);
+  }
+
+  const successfulRetry = await oldLifecycle.retryTeardown();
+  assert.equal(successfulRetry.state, 'UNINITIALIZED');
+  assert.equal(successfulRetry.mode, 'DISABLED');
+  assert.equal(successfulRetry.reason, 'user-disabled');
+  assert.deepEqual(successfulRetry.outstandingResources, []);
+  assert.equal(successfulRetry.teardownInProgress, false);
+  assert.equal(teardownCounts.bridge, 3);
+  assert.equal(teardownCounts.ownership, 1);
+  assert.deepEqual(teardownOrder.slice(-2), ['bridge', 'ownership']);
+
+  await oldLifecycle.boot();
+  const retired = await oldLifecycle.setMode(MODES.ENABLED);
+  assert.equal(retired.state, 'UNINITIALIZED');
+  assert.equal(retired.reason, 'fresh-runtime-required');
+  assert.deepEqual(ensureCounts, ensureSnapshot);
+
+  const freshLifecycle = createController(adapters, {
+    runtimeInstanceId: 'runtime-new-generation',
+    initiallyOwnedAdapters: ['ownership']
+  });
+  const fresh = await freshLifecycle.boot();
+  assert.equal(fresh.state, 'READY');
+  assert.notEqual(fresh.runtimeInstanceId, booted.runtimeInstanceId);
+  assert.deepEqual(ensureCounts, Object.fromEntries(names.map(name => [name, 2])));
+});
+
+test('boot waits for an explicit cleanup retry and cannot race a new generation into it', async () => {
+  let firstFailure = true;
+  let retryStarted;
+  let releaseRetry;
+  const retryGate = new Promise(resolve => { releaseRetry = resolve; });
+  const atRetry = new Promise(resolve => { retryStarted = resolve; });
+  const { adapters } = createAdapters({
+    bridge: {
+      teardown: async () => {
+        if (firstFailure) {
+          firstFailure = false;
+          throw new Error('bridge-release-failed');
+        }
+        retryStarted();
+        await retryGate;
+      }
+    }
+  });
+  const lifecycle = createController(adapters, { initiallyOwnedAdapters: ['ownership'] });
+  await lifecycle.boot();
+  const failed = await lifecycle.setMode(MODES.DISABLED);
+  assert.equal(failed.reason, 'teardown-incomplete');
+
+  const retryTask = lifecycle.retryTeardown();
+  await atRetry;
+  let bootSettled = false;
+  const bootTask = lifecycle.boot().then(value => {
+    bootSettled = true;
+    return value;
+  });
+  await Promise.resolve();
+  assert.equal(bootSettled, false);
+
+  releaseRetry();
+  const retried = await retryTask;
+  const booted = await bootTask;
+  assert.equal(retried.state, 'UNINITIALIZED');
+  assert.equal(booted.state, 'UNINITIALIZED');
+  assert.equal(booted.mode, 'DISABLED');
+  assert.deepEqual(booted.outstandingResources, []);
+});
+
+test('disable during acquisition prevents every later adapter from initializing', async () => {
+  const calls = [];
+  let releasePersistence;
+  let persistenceStarted;
+  const persistenceGate = new Promise(resolve => { releasePersistence = resolve; });
+  const atPersistence = new Promise(resolve => { persistenceStarted = resolve; });
+  const teardownCalls = [];
+  const adapters = {
+    ownership: {
+      ensure: async () => { calls.push('ownership'); return { oneOwner: true }; },
+      teardown: async () => teardownCalls.push('ownership')
+    },
+    persistence: {
+      ensure: async () => {
+        calls.push('persistence');
+        persistenceStarted();
+        await persistenceGate;
+        return { available: true };
+      },
+      teardown: async () => teardownCalls.push('persistence')
+    },
+    ui: {
+      ensure: async () => { calls.push('ui'); return { rootCount: 1, owned: true, interactionReady: true, teardownRegistered: true }; },
+      teardown: async () => teardownCalls.push('ui')
+    },
+    features: {
+      ensure: async () => { calls.push('features'); return { initialized: true, teardownRegistered: true }; },
+      teardown: async () => teardownCalls.push('features')
+    },
+    bridge: {
+      ensure: async () => { calls.push('bridge'); return { initialized: true, teardownRegistered: true }; },
+      observeInitial: async () => { calls.push('observe'); return { attempted: true, kind: 'STATE_UNKNOWN' }; },
+      teardown: async () => teardownCalls.push('bridge')
+    },
+    coordination: {
+      ensure: async () => { calls.push('coordination'); return { disposition: 'OWNER' }; },
+      teardown: async () => teardownCalls.push('coordination')
+    }
+  };
+  const lifecycle = createController(adapters, { initiallyOwnedAdapters: ['ownership'] });
+
+  const bootTask = lifecycle.boot();
+  await atPersistence;
+  const disableTask = lifecycle.setMode(MODES.DISABLED);
+  releasePersistence();
+  await bootTask;
+  const disabled = await disableTask;
+
+  assert.equal(disabled.state, 'UNINITIALIZED');
+  assert.equal(disabled.reason, 'user-disabled');
+  assert.deepEqual(calls, ['ownership', 'persistence']);
+  assert.deepEqual(teardownCalls, ['persistence', 'ownership']);
 });
 
 test('teardown is idempotent and releases owned adapters once', async () => {

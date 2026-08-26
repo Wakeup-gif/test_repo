@@ -59,8 +59,11 @@ function createFakeDocument() {
     body: null,
     createElement: () => new FakeElement(doc),
     querySelectorAll: selector => {
-      if (selector !== `#${ROOT_ID}`) return [];
-      return nodes.filter(node => node.isConnected && node.id === ROOT_ID);
+      if (selector === `#${ROOT_ID}`) return nodes.filter(node => node.isConnected && node.id === ROOT_ID);
+      if (selector === '[data-squarecoil-companion-root="rebuild"]') {
+        return nodes.filter(node => node.isConnected && node.dataset.squarecoilCompanionRoot === 'rebuild');
+      }
+      return [];
     }
   };
   const host = {
@@ -105,6 +108,46 @@ test('runtime UI refuses a foreign timer root instead of taking it over', async 
 
   const ui = createRuntimeUi({ document: doc, runtimeInstanceId: 'r1', buildId: BUILD_ID });
   await assert.rejects(() => ui.ensure(), /ownership-conflict:foreign-timer-root/);
+});
+
+test('runtime UI refuses to adopt an unknown rebuild root without ownership identity', async () => {
+  const doc = createFakeDocument();
+  const ambiguous = doc.createElement('section');
+  ambiguous.id = ROOT_ID;
+  ambiguous.dataset.squarecoilCompanionRoot = 'rebuild';
+  doc.body.appendChild(ambiguous);
+
+  const ui = createRuntimeUi({ document: doc, runtimeInstanceId: 'r1', buildId: BUILD_ID });
+  await assert.rejects(() => ui.ensure(), /ownership-conflict:root-runtime-identity-missing/);
+});
+
+test('known owned root can restore metadata stripped after initialization', async () => {
+  const doc = createFakeDocument();
+  const ui = createRuntimeUi({ document: doc, runtimeInstanceId: 'r1', buildId: BUILD_ID });
+  await ui.ensure();
+  const owned = doc.querySelectorAll(`#${ROOT_ID}`)[0];
+  delete owned.dataset.runtimeInstanceId;
+  delete owned.dataset.buildId;
+
+  const result = await ui.ensure();
+  assert.equal(result.interactionReady, true);
+  assert.equal(owned.dataset.runtimeInstanceId, 'r1');
+  assert.equal(owned.dataset.buildId, BUILD_ID);
+});
+
+test('connected owned root with a changed id is repaired without leaking a second root', async () => {
+  const doc = createFakeDocument();
+  const ui = createRuntimeUi({ document: doc, runtimeInstanceId: 'r1', buildId: BUILD_ID, documentToken: 'document-token-owned-root-01' });
+  await ui.ensure();
+  const owned = doc.querySelectorAll(`#${ROOT_ID}`)[0];
+
+  owned.id = 'ussign-job-timer-renamed';
+  const result = await ui.ensure();
+
+  assert.equal(result.interactionReady, true);
+  assert.equal(owned.id, ROOT_ID);
+  assert.equal(doc.querySelectorAll(`#${ROOT_ID}`).length, 1);
+  assert.equal(doc._nodes.filter(node => node.isConnected).length, 1);
 });
 
 test('teardown removes the owned root and interaction readiness', async () => {

@@ -30,6 +30,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          test -z "$(git status --porcelain --untracked-files=all)"
           npm --prefix browser-extension/squarecoil-companion run check:b1
 
       - name: Validate generated JavaScript syntax
@@ -42,39 +43,47 @@ jobs:
             node --check "$file"
           done < <(find "$ROOT/dist" -type f -name '*.js' -print0)
 
-      - name: Build lean Chrome and Edge packages
+      - name: Build and validate byte-identical Chrome and Edge packages
         shell: bash
         run: |
           set -euo pipefail
           ROOT="browser-extension/squarecoil-companion"
           VERSION=$(node -p "require('./${ROOT}/manifest.json').version")
           PACKAGE_ROOT="$RUNNER_TEMP/squarecoil-package"
-          rm -rf "$PACKAGE_ROOT"
+          EVIDENCE_ROOT="$RUNNER_TEMP/squarecoil-evidence"
+          rm -rf "$PACKAGE_ROOT" "$EVIDENCE_ROOT"
           mkdir -p "$PACKAGE_ROOT/dist" "$PACKAGE_ROOT/popup"
+          mkdir -p "$EVIDENCE_ROOT"
           cp "$ROOT/manifest.json" "$PACKAGE_ROOT/manifest.json"
           cp "$ROOT/dist/"*.js "$PACKAGE_ROOT/dist/"
           cp "$ROOT/dist/build-info.json" "$PACKAGE_ROOT/dist/build-info.json"
           cp "$ROOT/popup/popup.html" "$PACKAGE_ROOT/popup/popup.html"
           cp "$ROOT/popup/popup.css" "$PACKAGE_ROOT/popup/popup.css"
 
-          build_package() {
-            LABEL="$1"
-            OUT="$GITHUB_WORKSPACE/SquareCoil-Companion-v${VERSION}-B1-${LABEL}.zip"
-            (cd "$PACKAGE_ROOT" && zip -r "$OUT" . >/dev/null)
-            unzip -l "$OUT" | grep -q 'manifest.json'
-            unzip -l "$OUT" | grep -q 'dist/background.js'
-            unzip -l "$OUT" | grep -q 'dist/companion-app.js'
-            unzip -l "$OUT" | grep -q 'dist/content-controller.js'
-            unzip -l "$OUT" | grep -q 'popup/popup.html'
-            if unzip -l "$OUT" | grep -q 'tests/'; then
-              echo 'Test fixtures leaked into package' >&2
-              exit 1
-            fi
-            echo "Built $OUT"
-          }
+          node "$ROOT/scripts/validate-package.js" "$PACKAGE_ROOT" --expected-source-sha "$GITHUB_SHA" --evidence "$EVIDENCE_ROOT/package-root.json"
+          CANONICAL="$RUNNER_TEMP/SquareCoil-Companion-v${VERSION}-B1.zip"
+          (cd "$PACKAGE_ROOT" && zip -X -r "$CANONICAL" . >/dev/null)
+          CHROME_OUT="$GITHUB_WORKSPACE/SquareCoil-Companion-v${VERSION}-B1-CHROME.zip"
+          EDGE_OUT="$GITHUB_WORKSPACE/SquareCoil-Companion-v${VERSION}-B1-EDGE.zip"
+          cp "$CANONICAL" "$CHROME_OUT"
+          cp "$CANONICAL" "$EDGE_OUT"
+          cmp --silent "$CHROME_OUT" "$EDGE_OUT"
 
-          build_package CHROME
-          build_package EDGE
+          for label in CHROME EDGE; do
+            archive="$GITHUB_WORKSPACE/SquareCoil-Companion-v${VERSION}-B1-${label}.zip"
+            extracted="$RUNNER_TEMP/squarecoil-${label,,}"
+            rm -rf "$extracted"
+            mkdir -p "$extracted"
+            unzip -q "$archive" -d "$extracted"
+            node "$ROOT/scripts/validate-package.js" "$extracted" --expected-source-sha "$GITHUB_SHA" --evidence "$EVIDENCE_ROOT/${label,,}.json"
+          done
+          CHROME_SHA=$(sha256sum "$CHROME_OUT" | awk '{print $1}')
+          EDGE_SHA=$(sha256sum "$EDGE_OUT" | awk '{print $1}')
+          test "$CHROME_SHA" = "$EDGE_SHA"
+          {
+            printf '%s  %s\n' "$CHROME_SHA" "$(basename "$CHROME_OUT")"
+            printf '%s  %s\n' "$EDGE_SHA" "$(basename "$EDGE_OUT")"
+          } | tee "$EVIDENCE_ROOT/archive-sha256.txt"
 
       - name: Upload Chrome B1 package
         uses: actions/upload-artifact@v4
@@ -89,5 +98,13 @@ jobs:
         with:
           name: squarecoil-companion-b1-edge
           path: SquareCoil-Companion-v*-B1-EDGE.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload B1 package evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: squarecoil-companion-b1-package-evidence
+          path: ${{ runner.temp }}/squarecoil-evidence/*
           if-no-files-found: error
           retention-days: 30

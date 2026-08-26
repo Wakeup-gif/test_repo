@@ -1,128 +1,78 @@
-# SquareCoil Companion Rebuild - Next Chat Handoff
+# SquareCoil Companion Rebuild - B1 Controlled Repair Handoff
 
-**Use this file to continue the project in a new ChatGPT conversation.**
-
-## Current project state
+## Verified project baseline
 
 - Repository: `Wakeup-gif/test_repo`
 - Production `main`: `9378da24f393b40066816133e7fa0f48063115f0`
-- Production package: v0.7.1 Chrome Interaction Recovery
-- Production `main` has not been modified by rebuild work.
-- Settled planning branch: `planning/squarecoil-companion-rebuild`
-- Settled planning checkpoint: `82207dcdf2e7f4c6d8b346c787433574c75e0a38`
-- Active implementation branch: `rebuild/squarecoil-companion-b1-lifecycle`
-- Current B1 branch head before this handoff commit: `fac68612010d31edd8167270da41b245b41dfcec`
-- Core B1 implementation commit: `c109fed7c1bdfab3a3023a58d1ba8966d5fe26b5`
-- Current-head B1 validation run: GitHub Actions run `32926277039`, all steps passed.
+- Planning branch when B1 repair began: `42057ae7894a0f0051212a60cf764688a566b7d8`
+- B1 branch: `rebuild/squarecoil-companion-b1-lifecycle`
+- B1 remote baseline before repair: `c0afb241d91141ed818d9395ac14257207ad59ed`
+- Framework and Logic L0-L8: settled
+- B1: `NOT_SETTLED / VALIDATION_CANDIDATE`
+- B2: `BLOCKED / UNAPPROVED-DRAFT`
 
-## Framework / logic status
+Production `main`, the planning branch, and the quarantined B2 drafts are outside the controlled B1 repair and must remain unchanged.
 
-Framework and Logic L0-L8 are settled. The planning branch contains the complete recovery package:
+## Read first
+
+Read these repository files before continuing:
 
 1. `REBUILD-START-HERE.md`
 2. `docs/REBUILD-MASTER-PLAN.md`
 3. `docs/LOGIC-STAGE-PLAN.md`
 4. `logic/L0-INVARIANTS.md`
 5. `logic/L1-LIFECYCLE.md`
-6. `logic/L2-STATE-TIME-MIGRATION.md`
-7. `logic/L3-SQUARECOIL-BRIDGE.md`
-8. `logic/L4-TIMER-BEHAVIOR.md`
-9. `logic/L5-TIME-VIEWS-WORKSPACE.md`
-10. `logic/L6-DATA-SAFETY-BACKUP.md`
-11. `logic/L7-SETTINGS-SUPPORT-THEMES.md`
-12. `logic/L8-ACCEPTANCE-HANDOFF.md`
+6. `logic/L8-ACCEPTANCE-HANDOFF.md`
+7. `implementation/B1-SHELL-LIFECYCLE.md`
 
-Do not redefine those contracts during implementation unless a real contradiction is found. If a contradiction is found, stop local invention, document it, amend the owning logic contract deliberately, and add a regression test.
+The planning branch also contains the later L2-L7 product contracts. They remain settled specifications, but B1 must not implement their behavior.
 
-## B1 implementation status
+## Recovered B1 state
 
-B1 = **Shell / Lifecycle**.
+The original B1 branch contained a useful shell/lifecycle implementation, but review found evidence and correctness gaps. The authorized controlled repair addresses:
 
-Implemented on `rebuild/squarecoil-companion-b1-lifecycle`:
+- truthful READY and degraded-state classification;
+- one runtime/root owner per exact document;
+- cancellation-safe boot, recovery, and teardown;
+- sticky failed cleanup with explicit teardown-only retry;
+- ownership-last release and partial-initialization cleanup;
+- strict legacy, malformed, unreadable, orphan, build, package-version, candidate-fingerprint, and document identity handling;
+- service-worker restart, BFCache, navigation, and disable/re-enable safety;
+- stale callback, settings, injection, and teardown race fencing;
+- package source identity and exact-byte validation;
+- branded Chrome and Edge browser acceptance.
 
-- modular dependency-free source under `src/`;
-- generated MAIN-world application bundle and isolated controller via the build script;
-- one lifecycle owner and one owned `#ussign-job-timer` shell root;
-- root ownership and interaction-readiness checks;
-- persistence preflight;
-- stale/orphan root handling;
-- legacy-runtime, version-mismatch, and ownership-conflict classification;
-- idempotent teardown and bounded recovery skeleton;
-- BFCache revalidation;
-- service-worker memory treated as non-authoritative;
-- minimal popup lifecycle/enablement surface;
-- B1 Node unit tests;
-- CI build, tests, generated-JS syntax validation, lean Chrome/Edge package creation, and artifact upload.
+The real B1 runtime must continue to report:
 
-Read `implementation/B1-SHELL-LIFECYCLE.md` for the B1 implementation contract/checkpoint.
+```text
+DEGRADED / coordination-not-implemented-b1
+```
 
-### Intentional B1 live state
+That is the settled L1 boundary. One-writer coordination belongs to B2.
 
-The live B1 shell does **not** claim READY yet.
+## Current evidence status
 
-L1 requires a positive one-writer coordination result for READY. B2 owns that coordination layer, so the B1 live adapter reports:
+At this handoff checkpoint:
 
-`DEGRADED / coordination-not-implemented-b1`
+- A2 unit: 77 passed, 0 failed, 0 skipped;
+- A3 integration: 38 passed, 0 failed, 0 skipped;
+- static B1 validation: passed;
+- A1 package hardening: locally implemented; clean-candidate proof pending;
+- A4 clean branded Chrome/Edge acceptance: pending;
+- commit and push: not yet performed.
 
-This is intentional and must not be "fixed" by weakening the READY contract. Unit tests inject a valid `OWNER` coordination disposition to prove READY is reachable only when all L1 assertions pass.
+Local green tests are not acceptance by themselves. B1 remains unapproved until a clean candidate commit is packaged once, copied byte-for-byte for Chrome and Edge, validated, exercised in both branded browsers, and verified after the B1-only push.
 
-## CI evidence
+## Next action
 
-Current-head validation run `32926277039` passed:
+Finish the controlled B1 repair only:
 
-- checkout/setup;
-- build + unit tests + B1 validation;
-- generated JavaScript syntax validation;
-- lean Chrome package build;
-- lean Edge package build;
-- Chrome artifact upload;
-- Edge artifact upload.
+1. complete fail-closed A1 package and identity validation;
+2. re-run A1-A3 with no skips;
+3. create the immutable candidate commit on the B1 branch;
+4. build one canonical archive and verify byte-identical Chrome/Edge copies;
+5. run the full A4 fixture set in branded Chrome and Edge against those exact bytes;
+6. record the evidence, push only B1, and verify remote and protected heads;
+7. stop and request `REVIEW B2` only if every B1 gate passes.
 
-Earlier core implementation run `32926203944` also passed.
-
-## Next action in the new chat
-
-**Do not start B2 immediately.**
-
-The next task is:
-
-> Review and harden B1 against settled L0/L1/L8, inspect the implementation branch and CI evidence, fix any lifecycle/shell gaps on the same B1 branch, re-run validation, and only then mark B1 settled/green for B2.
-
-Review especially:
-
-- one runtime/root ownership;
-- root-only readiness impossible;
-- interaction readiness;
-- safe stale-root recovery;
-- version/legacy/ownership conflict behavior;
-- teardown idempotency and resource cleanup;
-- bounded recovery;
-- BFCache/service-worker restart behavior;
-- enable/disable lifecycle semantics;
-- no old `page/timer-*.js` patch stack injected by the rebuilt controller;
-- no B2 Timer State/Ledger/coordination behavior implemented prematurely;
-- CI/package contents and branch isolation;
-- whether B1 needs additional deterministic/browser fixture coverage before freeze.
-
-After B1 review/hardening passes, the next implementation stage is **B2: State / Ledger / Bridge / Core Timer**.
-
-## Interaction shorthand
-
-The established workflow is:
-
-- after a stage is drafted/implemented, `start` means review/harden that stage first;
-- do not jump to the next stage before applying the review fixes;
-- when no review fixes remain and the stage is explicitly settled, a later `start` may begin the next stage.
-
-## Do not touch
-
-- Do not modify production `main` during B1/B2 development.
-- Do not merge the rebuild into production merely because CI parses/builds.
-- Do not use package success as proof of browser interaction health.
-- Do not reintroduce independent Settings DOM patch scripts or multiple timer-state writers.
-- Do not silently prune historical time.
-- Do not invent SquareCoil clock state.
-
-## Recommended prompt for the next chat
-
-> Continue the SquareCoil Companion rebuild in `Wakeup-gif/test_repo`. Work from branch `rebuild/squarecoil-companion-b1-lifecycle`. First read `browser-extension/squarecoil-companion/implementation/NEXT-CHAT-HANDOFF.md`, then `REBUILD-START-HERE.md`, `implementation/B1-SHELL-LIFECYCLE.md`, `logic/L1-LIFECYCLE.md`, and `logic/L8-ACCEPTANCE-HANDOFF.md`. Framework + L0-L8 are settled. B1 is implemented and CI-green but still needs its review/hardening pass. Review B1, apply fixes on the B1 branch, re-run validation, and do not start B2 until B1 is explicitly settled. Production `main` must remain untouched at `9378da24f393b40066816133e7fa0f48063115f0`.
+Do not start B2, modify `main`, merge, publish a release, or claim browser success from parse/package checks.

@@ -5,8 +5,10 @@
   "description": "Dependency-free build and test tooling for the staged SquareCoil Companion rebuild.",
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "node --test tests/b1/*.test.js",
+    "test:unit": "node --test tests/b1/*.test.js",
+    "test:integration": "node --test tests/b1-integration/*.test.js",
+    "test": "npm run build && npm run test:unit && npm run test:integration",
     "validate": "node scripts/validate.js",
-    "check:b1": "npm run build && npm test && npm run validate"
+    "check:b1": "npm test && npm run validate"
   }
 }

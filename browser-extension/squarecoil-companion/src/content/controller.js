@@ -1,12 +1,41 @@
 'use strict';
 
+const {
+  DOCUMENT_TOKEN_DATASET_KEY,
+  isSupportedTopLevelContext,
+  isConcreteDocumentToken
+} = require('../core/document-eligibility');
+const { BUILD_ID, CANDIDATE_FINGERPRINT } = require('../core/build-identity');
+
 const DEFAULTS = Object.freeze({ timerEnabled: true });
 const BOOT_MESSAGE = 'SC_COMPANION_BOOT';
 const ENABLE_MESSAGE = 'SC_COMPANION_SET_ENABLED';
 const REVALIDATE_MESSAGE = 'SC_COMPANION_REVALIDATE';
+const TRANSPORT_RETRY_DELAYS_MS = Object.freeze([250, 1000, 3000]);
+const PACKAGE_VERSION = String(chrome.runtime.getManifest().version || '0.0.0');
 
 (function startContentController() {
+  if (!isSupportedTopLevelContext(window)) return;
+
   let bootRequested = false;
+  let responseEpoch = 0;
+  let transportRetryAttempt = 0;
+  let transportRetryTimer = null;
+
+  function createDocumentToken() {
+    if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') return globalThis.crypto.randomUUID();
+    return `document-${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+  }
+
+  function ensureDocumentToken() {
+    const root = document.documentElement;
+    if (!root) return null;
+    const existing = root.dataset[DOCUMENT_TOKEN_DATASET_KEY];
+    if (isConcreteDocumentToken(existing)) return existing;
+    const token = createDocumentToken();
+    root.dataset[DOCUMENT_TOKEN_DATASET_KEY] = token;
+    return token;
+  }
 
   function setDataset(key, value) {
     const root = document.documentElement;
@@ -19,6 +48,9 @@ const REVALIDATE_MESSAGE = 'SC_COMPANION_REVALIDATE';
     const classification = result?.classification || 'UNKNOWN';
     const healthState = result?.health?.state || null;
     const attention = Boolean(
+      !result ||
+      result?.ok === false ||
+      result?.transportError ||
       result?.reloadRequired ||
       classification === 'DEGRADED_SAME_BUILD' ||
       classification === 'FAILED_SAME_BUILD' ||
@@ -34,33 +66,90 @@ const REVALIDATE_MESSAGE = 'SC_COMPANION_REVALIDATE';
     setDataset('squarecoilCompanionReloadRequired', result?.reloadRequired ? 'true' : null);
   }
 
+  function effectiveEnabled(result, fallback) {
+    if (typeof result?.enabled === 'boolean') return result.enabled;
+    if (result?.health?.mode === 'ENABLED') return true;
+    if (result?.health?.mode === 'DISABLED') return false;
+    return Boolean(fallback);
+  }
+
+  function clearTransportRetry(resetAttempt = true) {
+    if (transportRetryTimer !== null) clearTimeout(transportRetryTimer);
+    transportRetryTimer = null;
+    if (resetAttempt) transportRetryAttempt = 0;
+  }
+
+  function scheduleTransportRetry(message, enabled, expectedEpoch) {
+    if (transportRetryTimer !== null || transportRetryAttempt >= TRANSPORT_RETRY_DELAYS_MS.length) return;
+    const delay = TRANSPORT_RETRY_DELAYS_MS[transportRetryAttempt];
+    transportRetryAttempt += 1;
+    transportRetryTimer = setTimeout(() => {
+      transportRetryTimer = null;
+      if (expectedEpoch !== responseEpoch) return;
+      const epoch = ++responseEpoch;
+      send(message).then(result => {
+        handleResult(epoch, result, enabled, message);
+      }).catch(() => {});
+    }, delay);
+  }
+
+  function handleResult(epoch, result, fallbackEnabled, retryMessage) {
+    if (epoch !== responseEpoch) return false;
+    const enabled = effectiveEnabled(result, fallbackEnabled);
+    setDataset('squarecoilCompanionEnabled', enabled ? 'true' : 'false');
+    renderResult(result, enabled);
+    if (!result || result.transportError === true || result.classification === 'TRANSPORT_ERROR') {
+      bootRequested = false;
+      scheduleTransportRetry(retryMessage, enabled, epoch);
+      return true;
+    }
+    clearTransportRetry();
+    bootRequested = enabled && Boolean(result.ok || result.reloadRequired);
+    return true;
+  }
+
   async function send(message) {
+    const documentToken = ensureDocumentToken();
+    if (!documentToken) return null;
     try {
-      return await chrome.runtime.sendMessage(message);
+      return await chrome.runtime.sendMessage({
+        ...message,
+        documentToken,
+        buildId: BUILD_ID,
+        packageVersion: PACKAGE_VERSION,
+        candidateFingerprint: CANDIDATE_FINGERPRINT
+      });
     } catch (error) {
-      setDataset('squarecoilCompanionController', 'error');
-      setDataset('squarecoilCompanionControllerReason', String(error?.message || error));
-      return null;
+      return {
+        ok: false,
+        classification: 'TRANSPORT_ERROR',
+        reason: String(error?.message || error),
+        transportError: true
+      };
     }
   }
 
   async function syncEnabled() {
+    clearTransportRetry();
+    const epoch = ++responseEpoch;
     try {
       const settings = await chrome.storage.local.get(DEFAULTS);
+      if (epoch !== responseEpoch) return;
       const enabled = settings.timerEnabled !== false;
+      setDataset('squarecoilCompanionEnabled', enabled ? 'true' : 'false');
       if (!enabled) {
         bootRequested = false;
-        const result = await send({ type: ENABLE_MESSAGE, enabled: false });
-        renderResult(result, false);
+        const result = await send({ type: BOOT_MESSAGE });
+        handleResult(epoch, result, false, { type: BOOT_MESSAGE });
         return;
       }
 
       if (bootRequested) return;
       bootRequested = true;
       const result = await send({ type: BOOT_MESSAGE });
-      renderResult(result, true);
-      if (!result || (!result.ok && !result.reloadRequired)) bootRequested = false;
+      handleResult(epoch, result, true, { type: BOOT_MESSAGE });
     } catch (error) {
+      if (epoch !== responseEpoch) return;
       bootRequested = false;
       setDataset('squarecoilCompanionController', 'error');
       setDataset('squarecoilCompanionControllerReason', String(error?.message || error));
@@ -77,12 +166,14 @@ const REVALIDATE_MESSAGE = 'SC_COMPANION_REVALIDATE';
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local' || !changes.timerEnabled) return;
+    clearTransportRetry();
     const enabled = changes.timerEnabled.newValue !== false;
+    setDataset('squarecoilCompanionEnabled', enabled ? 'true' : 'false');
     bootRequested = enabled;
-    send({ type: ENABLE_MESSAGE, enabled }).then(result => {
-      renderResult(result, enabled);
-      if (enabled && !result?.ok && !result?.reloadRequired) bootRequested = false;
-      if (!enabled) bootRequested = false;
+    const epoch = ++responseEpoch;
+    const message = { type: ENABLE_MESSAGE, enabled };
+    send(message).then(result => {
+      handleResult(epoch, result, enabled, message);
     }).catch(() => {
       if (enabled) bootRequested = false;
     });
@@ -90,7 +181,12 @@ const REVALIDATE_MESSAGE = 'SC_COMPANION_REVALIDATE';
 
   window.addEventListener('pageshow', event => {
     if (!event.persisted) return;
-    send({ type: REVALIDATE_MESSAGE }).then(result => renderResult(result, true)).catch(() => {});
+    clearTransportRetry();
+    const epoch = ++responseEpoch;
+    const message = { type: REVALIDATE_MESSAGE };
+    send(message).then(result => {
+      handleResult(epoch, result, document.documentElement?.dataset?.squarecoilCompanionEnabled !== 'false', message);
+    }).catch(() => {});
   });
 
   scheduleBoot();

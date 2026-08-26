@@ -1,145 +1,85 @@
 # B1 Implementation: Shell / Lifecycle
 
-**Branch:** `rebuild/squarecoil-companion-b1-lifecycle`  
-**Status:** Settled - ready for B2  
-**Initial implementation commit:** `c109fed7c1bdfab3a3023a58d1ba8966d5fe26b5`  
-**Hardened code head:** `466b074035a51a058db99dccbf7a158fbc753c16`  
-**Hardening validation run:** `32927221407` - success  
-**Depends on:** settled L0-L1  
-**Does not implement:** L2 Timer State/Time Ledger/coordination, L3 native clock interpretation, or later feature behavior.
+**Branch:** `rebuild/squarecoil-companion-b1-lifecycle`
 
-## What B1 implements
+**Status:** `NOT_SETTLED / VALIDATION_CANDIDATE`
+
+**Repair baseline:** `c0afb241d91141ed818d9395ac14257207ad59ed`
+
+**Depends on:** settled L0-L1 and the L8 acceptance rules
+
+**Does not implement:** B2 Timer State, Time Ledger, or one-writer coordination behavior.
+
+## Current decision
+
+The earlier B1 checkpoint is historical evidence, not current acceptance proof. Review found lifecycle, orchestration, package-identity, and browser-fixture gaps. The controlled repair remains unaccepted until all A1-A4 gates pass against one immutable candidate commit and one byte-identical Chrome/Edge archive.
+
+B2 remains blocked. Production `main`, the planning branch, and the quarantined B2 drafts are not part of this repair.
+
+## B1 scope
+
+B1 owns only the extension shell and lifecycle boundary:
 
 - dependency-free modular source under `src/`;
-- generated runtime bundles under `dist/` via `npm run build`;
+- one generated MAIN-world application bundle;
 - one isolated content controller;
-- one MAIN-world Companion application bundle;
-- one page lifecycle owner/global;
-- one owned `#ussign-job-timer` shell root;
-- interaction-readiness probing that does not depend on root existence alone;
-- persistence read/write preflight in the extension controller;
-- explicit legacy-runtime, version-mismatch, orphan-root, and ownership-conflict probes;
-- safe orphan-root removal only when ownership is unambiguous;
-- idempotent runtime boot/teardown and bounded lifecycle recovery;
-- BFCache revalidation hook;
-- service-worker memory is not used as authoritative page-boot state;
-- minimal popup for enablement and lifecycle health;
-- Node built-in unit tests for readiness, recovery, teardown, registry, runtime probing, and root recreation;
-- CI build/test/validation plus lean Chrome/Edge B1 package artifacts.
+- one page lifecycle owner and one owned `#ussign-job-timer` root;
+- exact top-level SquareCoil document eligibility;
+- persistence preflight;
+- strict runtime, root, claim, build, package-version, candidate-fingerprint, and document identity checks;
+- safe orphan handling that removes only positively owned current-document artifacts;
+- idempotent boot, teardown, explicit failed-cleanup retry, and bounded recovery;
+- BFCache, navigation, service-worker restart, disable/re-enable, and stale-callback fencing;
+- a minimal popup for enablement, cleanup retry, and lifecycle health;
+- package validation and branded Chrome/Edge acceptance fixtures.
 
 ## Intentional B1 degraded state
 
-L1 requires a positive one-writer coordination result before `READY`.
-
-B2 owns that coordination system. Therefore the real B1 page bootstrap supplies:
+L1 requires positive one-writer coordination before `READY`. B2 owns that coordination system, so the real B1 page adapter must preserve:
 
 ```text
 coordinationDisposition = UNAVAILABLE_B1
+DEGRADED / coordination-not-implemented-b1
 ```
 
-and the live B1 shell truthfully reports:
+Tests may inject an `OWNER` disposition to prove the READY contract, but production B1 must not weaken the contract or implement B2 prematurely.
 
-```text
-DEGRADED
-coordination-not-implemented-b1
-```
+## Controlled repair requirements
 
-Unit tests inject a positive `OWNER` adapter to prove the lifecycle reaches `READY` only when every L1 readiness assertion passes.
+The repair must prove all of the following before B1 can be settled:
 
-This is intentional. B1 must not weaken the READY contract simply to show a green status before B2 exists.
+1. A1 static/package validation is complete and fail-closed.
+2. A2 unit tests cover lifecycle ownership, teardown, runtime probing, settings ordering, and package/fixture invariants without skips.
+3. A3 integration fixtures execute the generated runtime bundles and cover lifecycle races at deterministic boundaries.
+4. A4 loads one clean immutable package in branded Chrome and branded Edge and exercises the required browser behaviors.
+5. The archive SHA-256, extracted inventory digest, build identity, and source commit agree.
+6. The source checkout is clean and its actual Git HEAD matches the package metadata.
+7. No production, planning, B2, manifest permission expansion, remote executable content, or unrelated source enters the diff.
 
-## B1 review and hardening
+## Current local evidence
 
-The first green implementation was not frozen immediately. Review found and corrected lifecycle defects that package validation alone did not catch.
+The repair worktree currently passes:
 
-### Fixed in hardening
+- A2 unit: 77 passed, 0 failed, 0 skipped;
+- A3 integration: 38 passed, 0 failed, 0 skipped;
+- static B1 validation: passed.
 
-1. A runtime labeled `READY` is no longer classified healthy merely because one root exists. The external probe also requires the complete readiness snapshot and a live interaction probe.
-2. Recreating a removed timer root now rebinds the interaction controller to the new root instead of retaining a stale bound-listener flag.
-3. L1 `R1` is now positively checked through an ownership adapter instead of being hard-coded `true`.
-4. Sentinel identities such as `runtime-unknown` / `build-unknown` cannot satisfy READY.
-5. Teardown invalidates and waits for in-flight boot/recovery/readiness work, preventing READY from publishing after disable/teardown begins.
-6. Incomplete teardown remains `FAILED / teardown-incomplete`; the page runtime global is preserved so a replacement runtime cannot be stacked over unreleased resources.
-7. Ownership-conflict exceptions become immediate reload-safe `FAILED` states rather than generic recoverable degradation.
-8. Recoverable boot/revalidation failures use bounded recovery. The intentional B1 coordination limitation is excluded from pointless recovery loops.
-9. Orphan-root cleanup races re-probe the page before declaring an ownership conflict, avoiding a false reload warning when another valid boot won the race.
-10. Build/stage identity now comes from one canonical `src/core/build-identity.js` source and is validated against generated build metadata.
-11. The isolated content controller reports degraded/reload-required states as attention rather than treating every reusable runtime as healthy.
+These are pre-commit local results. They do not settle B1. A1 package hardening is locally implemented, but it and the final A4 Chrome/Edge run must still pass against clean bytes from the exact candidate commit.
 
-### Added regressions
+## Historical evidence classification
 
-Tests now cover:
+Earlier commits, workflow runs, and Chrome/Edge package hashes recorded by prior handoffs remain useful historical evidence only. They did not include the complete current A4 browser contract and must not be cited as proof that this repair is settled.
 
-- dead interaction under a nominal READY state;
-- incomplete readiness under a nominal READY state;
-- removed-root recreation and interaction rebinding;
-- positive lifecycle-owner requirement;
-- invalid/sentinel runtime identity;
-- disable during BOOTING;
-- ownership conflict classification;
-- incomplete teardown blocking later boot;
-- runtime/root metadata mismatch;
-- UNINITIALIZED runtime global not being mistaken for a fresh page.
+## Acceptance record
 
-## Hardening validation evidence
+The final acceptance record must identify:
 
-GitHub Actions run `32927221407` passed all required B1 steps on hardened code head `466b074035a51a058db99dccbf7a158fbc753c16`:
+- the exact tested implementation commit;
+- the canonical archive filename and SHA-256;
+- the extracted package inventory digest;
+- Chrome and Edge executable versions and hashes;
+- A1, A2, A3, and A4 case totals;
+- the remote B1 head after push;
+- unchanged `main`, planning, and quarantined B2 state.
 
-1. checkout;
-2. Node setup;
-3. `npm run check:b1` (build + unit tests + validation);
-4. generated JavaScript syntax checks;
-5. lean Chrome/Edge package construction;
-6. Chrome artifact upload;
-7. Edge artifact upload.
-
-Artifacts:
-
-```text
-squarecoil-companion-b1-chrome
-sha256:80973c7628345181c4013d39ff1da567ac16f51b903af2ed65912210f8bc8453
-
-squarecoil-companion-b1-edge
-sha256:fd254aa5395da12334f6f9d3b390f29a6d1d1b96f1f732ad625447760fb83aef
-```
-
-These are development-stage B1 packages, not Stable release artifacts.
-
-## Development commands
-
-From `browser-extension/squarecoil-companion`:
-
-```bash
-npm run build
-npm test
-npm run validate
-```
-
-or:
-
-```bash
-npm run check:b1
-```
-
-`dist/` is generated and intentionally not committed. Run the build before loading the branch as an unpacked extension. CI packages only the runtime files needed by Chrome/Edge and excludes tests/source fixtures.
-
-## B1 completion gate result
-
-- lifecycle ownership/readiness contract: PASS
-- root-only/dead-interaction false READY regression: PASS
-- boot/disable/teardown serialization: PASS
-- safe failed-teardown behavior: PASS
-- root recreation interaction binding: PASS
-- bounded recoverable lifecycle path: PASS
-- `check:b1`: PASS
-- generated JavaScript syntax: PASS
-- Chrome B1 artifact: PASS
-- Edge B1 artifact: PASS
-- legacy `page/timer-*.js` injection removed from rebuilt controller: PASS
-- production `main` unchanged at `9378da24f393b40066816133e7fa0f48063115f0`: PASS
-
-Full packaged browser smoke and Stable acceptance remain governed by L8/B6. B1 is settled for its implementation scope and may be used as the base for B2.
-
-**Next stage:** B2 - State / Ledger / Bridge / Core Timer.
-
-B2 has not started in this B1 hardening pass.
+Until that record is written from verified evidence, the only correct next action is to finish and validate the controlled B1 repair. Do not start B2.

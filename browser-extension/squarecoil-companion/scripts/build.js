@@ -2,7 +2,9 @@
 
 const fs = require('fs');
 const path = require('path');
-const { BUILD_ID, BUILD_STAGE } = require('../src/core/build-identity');
+const { execFileSync } = require('child_process');
+const { BUILD_ID, BUILD_STAGE, CANDIDATE_FINGERPRINT } = require('../src/core/build-identity');
+const { computeCandidateFingerprint } = require('./candidate-identity');
 
 const root = path.resolve(__dirname, '..');
 const dist = path.join(root, 'dist');
@@ -12,6 +14,37 @@ const entries = [
   ['src/content/controller.js', 'content-controller.js'],
   ['src/popup/popup.js', 'popup.js']
 ];
+
+function gitOutput(args, description) {
+  try {
+    return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch (error) {
+    throw new Error(`Unable to ${description}: ${error.message}`);
+  }
+}
+
+function sourceIdentity() {
+  const sourceSha = gitOutput(['rev-parse', 'HEAD'], 'resolve the authoritative Git HEAD').toLowerCase();
+  if (!/^[0-9a-f]{40}$/.test(sourceSha)) throw new Error('A concrete 40-character Git source SHA is required');
+
+  for (const [name, rawValue] of [
+    ['GITHUB_SHA', process.env.GITHUB_SHA],
+    ['SC_BUILD_SOURCE_SHA', process.env.SC_BUILD_SOURCE_SHA]
+  ]) {
+    const expectedSha = String(rawValue || '').trim().toLowerCase();
+    if (!expectedSha) continue;
+    if (!/^[0-9a-f]{40}$/.test(expectedSha)) throw new Error(`${name} must be a concrete 40-character Git SHA`);
+    if (expectedSha !== sourceSha) {
+      throw new Error(`${name} ${expectedSha} does not match authoritative Git HEAD ${sourceSha}`);
+    }
+  }
+
+  const sourceDirty = gitOutput(
+    ['status', '--porcelain', '--untracked-files=all'],
+    'inspect source-tree dirtiness'
+  ).length > 0;
+  return { sourceSha, sourceDirty };
+}
 
 function slash(value) {
   return value.split(path.sep).join('/');
@@ -76,11 +109,16 @@ function bundle(entryId) {
     `})();\n`;
 }
 
+const identity = sourceIdentity();
+const candidateFingerprint = computeCandidateFingerprint(root);
+if (!/^[0-9a-f]{64}$/.test(candidateFingerprint)) throw new Error('Candidate fingerprint must be a concrete SHA-256');
+
 fs.rmSync(dist, { recursive: true, force: true });
 fs.mkdirSync(dist, { recursive: true });
 
 for (const [input, output] of entries) {
-  const code = bundle(slash(input));
+  const code = bundle(slash(input)).split(CANDIDATE_FINGERPRINT).join(candidateFingerprint);
+  if (code.includes(CANDIDATE_FINGERPRINT)) throw new Error(`Candidate fingerprint placeholder remained in dist/${output}`);
   fs.writeFileSync(path.join(dist, output), code, 'utf8');
   console.log(`Built dist/${output}`);
 }
@@ -90,5 +128,7 @@ fs.writeFileSync(path.join(dist, 'build-info.json'), JSON.stringify({
   packageVersion: manifest.version,
   buildId: BUILD_ID,
   stage: BUILD_STAGE,
-  sourceSha: process.env.GITHUB_SHA || process.env.SC_BUILD_SOURCE_SHA || null
+  candidateFingerprint,
+  sourceSha: identity.sourceSha,
+  sourceDirty: identity.sourceDirty
 }, null, 2) + '\n');

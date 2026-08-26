@@ -19,7 +19,9 @@
     {
       "matches": ["https://ussignandmill.squarecoil.net/*"],
       "js": ["dist/content-controller.js"],
-      "run_at": "document_start"
+      "run_at": "document_start",
+      "all_frames": false,
+      "match_about_blank": false
     }
   ]
 }
