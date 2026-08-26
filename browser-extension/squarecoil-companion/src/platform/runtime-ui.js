@@ -9,7 +9,7 @@ function createRuntimeUi(options = {}) {
   const runtimeInstanceId = String(options.runtimeInstanceId || 'runtime-unknown');
   const buildId = String(options.buildId || 'build-unknown');
   let root = null;
-  let listenerBound = false;
+  let boundRoot = null;
 
   function interactionHandler(event) {
     const detail = event && event.detail;
@@ -46,14 +46,23 @@ function createRuntimeUi(options = {}) {
     return element;
   }
 
+  function unbind() {
+    if (boundRoot) {
+      try { boundRoot.removeEventListener(PROBE_EVENT, interactionHandler); } catch (_) {}
+    }
+    boundRoot = null;
+  }
+
   function bind() {
-    if (!root || listenerBound) return;
+    if (!root) return;
+    if (boundRoot === root) return;
+    unbind();
     root.addEventListener(PROBE_EVENT, interactionHandler);
-    listenerBound = true;
+    boundRoot = root;
   }
 
   function probeInteraction() {
-    if (!root || !listenerBound) return false;
+    if (!root || !root.isConnected || boundRoot !== root) return false;
     const token = `${runtimeInstanceId}:${Date.now()}:${Math.random()}`;
     const detail = { token, ackToken: null, ackRuntimeInstanceId: null };
     const EventCtor = (doc.defaultView && doc.defaultView.CustomEvent) || CustomEvent;
@@ -72,6 +81,9 @@ function createRuntimeUi(options = {}) {
       }
       if (existing.dataset.runtimeInstanceId && existing.dataset.runtimeInstanceId !== runtimeInstanceId) {
         throw new Error('ownership-conflict:root-owned-by-another-runtime');
+      }
+      if (existing.dataset.buildId && existing.dataset.buildId !== buildId) {
+        throw new Error('ownership-conflict:root-build-mismatch');
       }
       root = existing;
     } else {
@@ -102,8 +114,7 @@ function createRuntimeUi(options = {}) {
   }
 
   async function teardown() {
-    if (root && listenerBound) root.removeEventListener(PROBE_EVENT, interactionHandler);
-    listenerBound = false;
+    unbind();
     if (root && root.isConnected) root.remove();
     root = null;
   }
