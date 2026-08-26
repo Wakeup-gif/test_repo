@@ -2,16 +2,14 @@
   "manifest_version": 3,
   "name": "US Sign SquareCoil Companion",
   "version": "0.7.1",
-  "version_name": "0.7.1 Chrome Interaction Recovery",
-  "description": "SquareCoil Job Timer companion for Edge and Chrome with stale-root recovery, stable interaction controls, Solid/Glass timer finishes, website themes, dark-theme logo, CSV backup/restore, and versioned update support.",
+  "version_name": "0.7.1 Rebuild B1 Lifecycle Development",
+  "description": "SquareCoil Companion rebuild B1 lifecycle scaffold for Chrome and Edge. Development branch only.",
   "permissions": ["storage", "scripting"],
   "host_permissions": [
-    "https://ussignandmill.squarecoil.net/*",
-    "https://raw.githubusercontent.com/Wakeup-gif/test_repo/*",
-    "https://i.imgur.com/*"
+    "https://ussignandmill.squarecoil.net/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "dist/background.js"
   },
   "action": {
     "default_title": "SquareCoil Companion",
@@ -20,8 +18,7 @@
   "content_scripts": [
     {
       "matches": ["https://ussignandmill.squarecoil.net/*"],
-      "css": ["styles/site-theme.css", "styles/site-theme-v070.css"],
-      "js": ["content/theme-controller.js"],
+      "js": ["dist/content-controller.js"],
       "run_at": "document_start"
     }
   ]

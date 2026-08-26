@@ -9,61 +9,33 @@
 <body>
   <main>
     <header>
-      <div class="mark">US</div>
       <div>
         <h1>SquareCoil Companion</h1>
-        <p>Edge + Chrome job workspace</p>
+        <p id="stage">B1 · Shell / Lifecycle</p>
       </div>
+      <span id="version">v0.7.1</span>
     </header>
 
-    <section>
-      <h2>Job Timer Appearance</h2>
-      <div class="modes" role="radiogroup" aria-label="Job Timer Appearance">
-        <button type="button" class="mode" data-theme="light" role="radio" aria-checked="false">
-          <span class="swatch light"></span>
-          <span><b>Light</b><small>Bright timer widget</small></span>
-        </button>
-        <button type="button" class="mode" data-theme="dark" role="radio" aria-checked="false">
-          <span class="swatch dark"></span>
-          <span><b>Dark</b><small>Sleek timer widget</small></span>
-        </button>
-        <button type="button" class="mode" data-theme="auto" role="radio" aria-checked="false">
-          <span class="swatch auto"></span>
-          <span><b>Auto</b><small>Follow system</small></span>
-        </button>
+    <section class="control-row">
+      <div>
+        <strong>Companion enabled</strong>
+        <small>Controls the rebuilt page runtime only.</small>
       </div>
+      <label class="switch">
+        <input id="enabled" type="checkbox" checked>
+        <span aria-hidden="true"></span>
+      </label>
     </section>
 
-    <section>
-      <h2>Panel Finish</h2>
-      <div class="modes" role="radiogroup" aria-label="Job Timer Panel Finish">
-        <button type="button" class="mode" data-surface="solid" role="radio" aria-checked="false">
-          <span class="swatch solid"></span>
-          <span><b>Solid</b><small>Maximum clarity and contrast</small></span>
-        </button>
-        <button type="button" class="mode" data-surface="glass" role="radio" aria-checked="false">
-          <span class="swatch glass"></span>
-          <span><b>Glass / Blur</b><small>Frosted translucent timer shell</small></span>
-        </button>
-      </div>
+    <section class="health" aria-live="polite">
+      <div><span>Probe</span><b id="classification">Checking…</b></div>
+      <div><span>Lifecycle</span><b id="lifecycle">Checking…</b></div>
+      <div><span>Reason</span><b id="reason">—</b></div>
+      <div><span>Runtime</span><code id="runtimeId">—</code></div>
+      <p>B1 intentionally stays degraded on a live page until B2 adds one-writer coordination.</p>
+      <button id="refresh" type="button">Refresh health</button>
     </section>
-
-    <section class="updates">
-      <h2>Extension</h2>
-      <div class="version-card">
-        <div class="version-row"><span>Installed</span><b id="installedVersion">v0.7.0</b></div>
-        <div class="version-row"><span>Latest published</span><b id="latestVersion">Checking…</b></div>
-        <p id="updateMessage">Checking update channel…</p>
-        <p id="releaseNotes" class="release-notes" hidden></p>
-        <button type="button" id="checkUpdate" class="check-update">Check for update</button>
-      </div>
-    </section>
-
-    <footer>
-      <span class="dot"></span>
-      <span id="status">Ready</span>
-    </footer>
   </main>
-  <script src="popup.js"></script>
+  <script src="../dist/popup.js"></script>
 </body>
 </html>

@@ -1,0 +1,123 @@
+'use strict';
+
+const ROOT_ID = 'ussign-job-timer';
+const ROOT_MARKER = 'rebuild';
+const PROBE_EVENT = 'squarecoil-companion:interaction-probe';
+
+function createRuntimeUi(options = {}) {
+  const doc = options.document || document;
+  const runtimeInstanceId = String(options.runtimeInstanceId || 'runtime-unknown');
+  const buildId = String(options.buildId || 'build-unknown');
+  let root = null;
+  let listenerBound = false;
+
+  function interactionHandler(event) {
+    const detail = event && event.detail;
+    if (!detail || !detail.token) return;
+    detail.ackRuntimeInstanceId = runtimeInstanceId;
+    detail.ackToken = detail.token;
+  }
+
+  function createRoot() {
+    const host = doc.body || doc.documentElement;
+    if (!host) throw new Error('timer root host unavailable');
+    const element = doc.createElement('section');
+    element.id = ROOT_ID;
+    element.dataset.squarecoilCompanionRoot = ROOT_MARKER;
+    element.dataset.runtimeInstanceId = runtimeInstanceId;
+    element.dataset.buildId = buildId;
+    element.setAttribute('role', 'status');
+    element.setAttribute('aria-live', 'polite');
+    element.style.cssText = [
+      'position:fixed',
+      'right:18px',
+      'bottom:18px',
+      'z-index:2147483000',
+      'max-width:320px',
+      'padding:10px 12px',
+      'border-radius:12px',
+      'background:#1f252b',
+      'color:#f5f7f8',
+      'font:13px/1.35 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
+      'box-shadow:0 10px 30px rgba(0,0,0,.22)'
+    ].join(';');
+    element.innerHTML = '<strong>SquareCoil Companion</strong><div data-sc-status>Starting lifecycle…</div>';
+    host.appendChild(element);
+    return element;
+  }
+
+  function bind() {
+    if (!root || listenerBound) return;
+    root.addEventListener(PROBE_EVENT, interactionHandler);
+    listenerBound = true;
+  }
+
+  function probeInteraction() {
+    if (!root || !listenerBound) return false;
+    const token = `${runtimeInstanceId}:${Date.now()}:${Math.random()}`;
+    const detail = { token, ackToken: null, ackRuntimeInstanceId: null };
+    const EventCtor = (doc.defaultView && doc.defaultView.CustomEvent) || CustomEvent;
+    root.dispatchEvent(new EventCtor(PROBE_EVENT, { detail }));
+    return detail.ackToken === token && detail.ackRuntimeInstanceId === runtimeInstanceId;
+  }
+
+  async function ensure() {
+    const roots = [...doc.querySelectorAll(`#${ROOT_ID}`)];
+    if (roots.length > 1) throw new Error('ownership-conflict:multiple-timer-roots');
+
+    if (roots.length === 1) {
+      const existing = roots[0];
+      if (existing.dataset.squarecoilCompanionRoot !== ROOT_MARKER) {
+        throw new Error('ownership-conflict:foreign-timer-root');
+      }
+      if (existing.dataset.runtimeInstanceId && existing.dataset.runtimeInstanceId !== runtimeInstanceId) {
+        throw new Error('ownership-conflict:root-owned-by-another-runtime');
+      }
+      root = existing;
+    } else {
+      root = createRoot();
+    }
+
+    root.dataset.runtimeInstanceId = runtimeInstanceId;
+    root.dataset.buildId = buildId;
+    bind();
+
+    return {
+      rootCount: 1,
+      owned: true,
+      interactionReady: probeInteraction(),
+      teardownRegistered: true
+    };
+  }
+
+  function setLifecycle(snapshot) {
+    if (!root || !snapshot) return;
+    root.dataset.lifecycleState = snapshot.state || 'UNKNOWN';
+    root.dataset.lifecycleReason = snapshot.reason || '';
+    const status = root.querySelector('[data-sc-status]');
+    if (status) {
+      const suffix = snapshot.reason && snapshot.reason !== 'ready' ? ` · ${snapshot.reason}` : '';
+      status.textContent = `${snapshot.state || 'UNKNOWN'}${suffix}`;
+    }
+  }
+
+  async function teardown() {
+    if (root && listenerBound) root.removeEventListener(PROBE_EVENT, interactionHandler);
+    listenerBound = false;
+    if (root && root.isConnected) root.remove();
+    root = null;
+  }
+
+  function snapshot() {
+    return {
+      rootPresent: Boolean(root && root.isConnected),
+      interactionReady: probeInteraction(),
+      runtimeInstanceId,
+      buildId
+    };
+  }
+
+  return { ensure, teardown, setLifecycle, snapshot, probeInteraction };
+}
+
+module.exports = { ROOT_ID, ROOT_MARKER, PROBE_EVENT, createRuntimeUi };
