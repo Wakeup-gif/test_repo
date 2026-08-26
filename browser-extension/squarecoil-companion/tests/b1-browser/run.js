@@ -1399,7 +1399,12 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
       const after = await waitFor(async () => serviceWorkerTarget(await browserCdp.send('Target.getTargets'), extensionId), 'service-worker restart', options.timeoutMs);
       const authorityAfter = await waitFor(async () => {
         const snapshot = await bridge.authoritySnapshot();
-        return snapshot?.healthy === true && snapshot.workerInstanceId !== authorityBefore.workerInstanceId ? snapshot : null;
+        return snapshot?.healthy === true &&
+          ['OWNER', 'OBSERVER_CONNECTED'].includes(snapshot.disposition) &&
+          isConcreteIdentity(snapshot.workerInstanceId) &&
+          snapshot.workerInstanceId !== authorityBefore.workerInstanceId
+          ? snapshot
+          : null;
       }, 'autonomous isolated-authority heartbeat reconnection to the restarted worker', options.timeoutMs);
       targets = await browserCdp.send('Target.getTargets');
       const state = await pageState(page);

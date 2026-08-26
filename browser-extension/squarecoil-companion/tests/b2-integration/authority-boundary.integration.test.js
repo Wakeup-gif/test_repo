@@ -122,6 +122,10 @@ test('IT-B2-PLATFORM-002 isolated content client routes read/subscribe through o
   const adapter = createBoundaryKernel();
   const context = workerContext();
   let client = null;
+  let holdReplacementConnect = false;
+  let replacementConnectReached = false;
+  let releaseReplacementConnect;
+  const replacementConnectGate = new Promise(resolve => { releaseReplacementConnect = resolve; });
   let router = createAuthorityRouter({
     adapter,
     workerInstanceId: 'worker-boundary-before',
@@ -133,7 +137,14 @@ test('IT-B2-PLATFORM-002 isolated content client routes read/subscribe through o
     })
   });
   client = createAuthorityClient({
-    send: message => router.route(context, message),
+    send: async message => {
+      const response = await router.route(context, message);
+      if (holdReplacementConnect && message.type === AUTHORITY_MESSAGES.CONNECT) {
+        replacementConnectReached = true;
+        await replacementConnectGate;
+      }
+      return response;
+    },
     runtimeInstanceId: 'runtime-boundary-0000001',
     documentToken: context.documentToken,
     heartbeatIntervalMs: 10000,
@@ -161,7 +172,15 @@ test('IT-B2-PLATFORM-002 isolated content client routes read/subscribe through o
     workerInstanceId: 'worker-boundary-after',
     randomId: ids('router-after')
   });
-  await client.heartbeat();
+  holdReplacementConnect = true;
+  const reconnecting = client.heartbeat();
+  while (!replacementConnectReached) await Promise.resolve();
+  const reconnectingSnapshot = client.snapshot();
+  assert.equal(reconnectingSnapshot.healthy, false);
+  assert.equal(reconnectingSnapshot.disposition, 'UNAVAILABLE');
+  assert.equal(reconnectingSnapshot.workerInstanceId, null);
+  releaseReplacementConnect();
+  await reconnecting;
   assert.equal(client.snapshot().healthy, true);
   assert.equal(client.snapshot().workerInstanceId, 'worker-boundary-after');
   assert.equal(Object.hasOwn(client.snapshot(), 'sessionId'), false);

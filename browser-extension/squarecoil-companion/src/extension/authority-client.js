@@ -183,6 +183,21 @@ function createAuthorityClient(options = {}) {
     revision = response.revision ?? revision;
   }
 
+  function invalidateConnectionForReconnect() {
+    // An unknown worker session is no longer healthy even while the exact
+    // principal is reconnecting. Publish the unavailable state before any
+    // replacement CONNECT can block so observers never see healthy=true with
+    // no active worker/session identity.
+    connectOutcomeUncertain = true;
+    sessionId = null;
+    workerInstanceId = null;
+    disposition = 'UNAVAILABLE';
+    coordinationEpoch = null;
+    coordinationRevision = null;
+    leaseExpiry = null;
+    publishHealth(false);
+  }
+
   async function establishConnection(operation, requestOptions = {}) {
     // Once CONNECT is dispatched, losing or rejecting a positive response can
     // leave an exact-principal session committed remotely. Keep the recovery
@@ -206,10 +221,7 @@ function createAuthorityClient(options = {}) {
       } else {
         const response = await request(AUTHORITY_MESSAGES.HEARTBEAT, { sessionId });
         if (!response?.ok && response?.reconnectRequired) {
-          connectOutcomeUncertain = true;
-          sessionId = null;
-          workerInstanceId = null;
-          disposition = 'UNAVAILABLE';
+          invalidateConnectionForReconnect();
           await establishConnection('reconnect');
         } else {
           acceptConnection(requirePositive(response, 'heartbeat'));
@@ -252,10 +264,7 @@ function createAuthorityClient(options = {}) {
       if (!sessionId) return connectAndPrepare();
       const response = await request(AUTHORITY_MESSAGES.HEARTBEAT, { sessionId });
       if (!response?.ok && response?.reconnectRequired) {
-        connectOutcomeUncertain = true;
-        sessionId = null;
-        workerInstanceId = null;
-        disposition = 'UNAVAILABLE';
+        invalidateConnectionForReconnect();
         return connectAndPrepare();
       }
       acceptConnection(requirePositive(response, 'heartbeat'));
