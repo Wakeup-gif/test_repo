@@ -80,6 +80,15 @@ function installChromeHarness({
     querySelectorAll: () => roots
   };
   global.chrome = {
+    tabs: {
+      sendMessage: async (_tabId, message) => ({
+        ok: true,
+        disconnected: true,
+        protocolVersion: message.protocolVersion,
+        documentToken: message.documentToken,
+        runtimeInstanceId: message.runtimeInstanceId
+      })
+    },
     scripting: {
       executeScript: async options => {
         if (options.files) {

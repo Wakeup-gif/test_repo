@@ -35,7 +35,7 @@ function candidateInputFiles(root) {
 
 function computeCandidateFingerprint(root) {
   const hash = crypto.createHash('sha256');
-  hash.update('squarecoil-companion-b1-candidate-v1\0', 'utf8');
+  hash.update('squarecoil-companion-rebuild-candidate-v2\0', 'utf8');
   for (const relative of candidateInputFiles(root)) {
     const absolute = path.join(root, ...relative.split('/'));
     if (!fs.existsSync(absolute) || !fs.statSync(absolute).isFile()) {

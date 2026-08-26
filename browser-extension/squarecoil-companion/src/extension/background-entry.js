@@ -6,6 +6,16 @@ const {
   isSupportedSquareCoilUrl,
   isConcreteDocumentToken
 } = require('../core/document-eligibility');
+const {
+  AUTHORITY_PROTOCOL_VERSION,
+  AUTHORITY_MESSAGES,
+  AUTHORITY_CONTROL_MESSAGES,
+  KERNEL_ONLY_DISPOSITION,
+  isAuthorityMessageType,
+  validateAuthorityRequest
+} = require('./authority-protocol');
+const { createAuthorityRouter } = require('./authority-router');
+const { createDefaultAuthorityKernel } = require('./authority-kernel');
 
 const BOOT_MESSAGE = 'SC_COMPANION_BOOT';
 const HEALTH_MESSAGE = 'SC_COMPANION_GET_HEALTH';
@@ -16,6 +26,114 @@ const PERSISTENCE_PROBE_KEY = '__scCompanionB1PersistenceProbe';
 const EXPECTED_B1_DEGRADED_REASON = 'coordination-not-implemented-b1';
 const PACKAGE_VERSION = String(chrome.runtime.getManifest().version || '0.0.0');
 const tabOperationQueues = new Map();
+
+async function publishAuthorityUpdate(update) {
+  if (!chrome.tabs || typeof chrome.tabs.sendMessage !== 'function') return false;
+  const options = update.expectedDocumentId
+    ? { documentId: update.expectedDocumentId }
+    : { frameId: 0 };
+  try {
+    await chrome.tabs.sendMessage(update.tabId, {
+      type: AUTHORITY_MESSAGES.UPDATE,
+      protocolVersion: AUTHORITY_PROTOCOL_VERSION,
+      documentToken: update.documentToken,
+      runtimeInstanceId: update.runtimeInstanceId,
+      sessionId: update.sessionId,
+      workerInstanceId: update.workerInstanceId,
+      sequence: update.sequence,
+      event: update.event
+    }, options);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+async function prepareIsolatedAuthorityTeardown(request, runtimeInstanceId) {
+  if (!chrome.tabs || typeof chrome.tabs.sendMessage !== 'function') {
+    return { ok: false, disconnected: false, reason: 'authority-content-control-unavailable' };
+  }
+  const options = request.expectedDocumentId
+    ? { documentId: request.expectedDocumentId }
+    : { frameId: 0 };
+  try {
+    const response = await chrome.tabs.sendMessage(request.tabId, {
+      type: AUTHORITY_CONTROL_MESSAGES.PREPARE_DISABLE,
+      protocolVersion: AUTHORITY_PROTOCOL_VERSION,
+      documentToken: request.documentToken,
+      runtimeInstanceId
+    }, options);
+    const runtimeMatches = runtimeInstanceId
+      ? response?.runtimeInstanceId === runtimeInstanceId
+      : (response?.runtimeInstanceId == null || String(response.runtimeInstanceId).length >= 8);
+    const valid = Boolean(
+      response?.ok === true &&
+      response.disconnected === true &&
+      response.protocolVersion === AUTHORITY_PROTOCOL_VERSION &&
+      response.documentToken === request.documentToken &&
+      runtimeMatches
+    );
+    return valid
+      ? { ok: true, disconnected: true }
+      : {
+        ok: false,
+        disconnected: false,
+        reason: response?.reason || 'authority-content-teardown-unconfirmed'
+      };
+  } catch (error) {
+    return {
+      ok: false,
+      disconnected: false,
+      reason: String(error?.message || error || 'authority-content-teardown-failed')
+    };
+  }
+}
+
+// This is the only authority router in a worker generation. B2 persistence and
+// coordination install one adapter here; page and content code never import or
+// call an authoritative store directly.
+const authorityRouter = createAuthorityRouter({ publish: publishAuthorityUpdate });
+
+function installAuthorityAdapter(adapter) {
+  return authorityRouter.installAdapter(adapter);
+}
+
+function installDefaultAuthorityAdapter(options = {}) {
+  try {
+    const adapter = createDefaultAuthorityKernel({
+      area: Object.prototype.hasOwnProperty.call(options, 'area')
+        ? options.area
+        : chrome.storage?.local,
+      lockManager: Object.prototype.hasOwnProperty.call(options, 'lockManager')
+        ? options.lockManager
+        : globalThis.navigator?.locks,
+      intl: Object.prototype.hasOwnProperty.call(options, 'intl')
+        ? options.intl
+        : globalThis.Intl,
+      configuredWorkdayZone: options.configuredWorkdayZone,
+      runtimeWorkdayZone: options.runtimeWorkdayZone,
+      now: options.now,
+      makeId: options.makeId,
+      leaseDurationMs: options.leaseDurationMs,
+      receiptLimit: options.receiptLimit
+    });
+    installAuthorityAdapter(adapter);
+    return Object.freeze({ installed: true, adapter, reason: null });
+  } catch (error) {
+    return Object.freeze({
+      installed: false,
+      adapter: null,
+      reason: String(error?.message || error)
+    });
+  }
+}
+
+// Installation is synchronous and side-effect free until the first verified
+// runtime connects. The kernel itself initializes the single persisted envelope
+// lazily under the cross-context lock. Unsupported runtimes therefore preserve
+// the intentional non-READY lifecycle state instead of falling back to an
+// unfenced writer.
+const defaultAuthorityInstallation = installDefaultAuthorityAdapter();
 
 function classifyPageProbe(probe) {
   return classifyRuntimeProbe(probe, BUILD_ID, PACKAGE_VERSION, CANDIDATE_FINGERPRINT);
@@ -149,6 +267,7 @@ async function collectPageProbe(requestValue) {
         topLevel,
         url: String(window.location.href || ''),
         documentToken: document.documentElement?.dataset?.squarecoilCompanionDocumentToken || null,
+        authorityCleanupIncomplete: document.documentElement?.dataset?.squarecoilCompanionAuthorityCleanup === 'incomplete',
         runtimeGlobalPresent: runtimeProperty.present,
         runtimeGlobalReadable: runtimeProperty.readable,
         runtimeHealthReadable,
@@ -174,6 +293,7 @@ async function collectPageProbe(requestValue) {
       eligible: false,
       topLevel: true,
       documentToken: null,
+      authorityCleanupIncomplete: false,
       runtimeGlobalPresent: false,
       runtimeGlobalReadable: true,
       runtimeHealthReadable: false,
@@ -461,7 +581,19 @@ async function cancelInjection(request, claim, bootstrap = null) {
           const bootstrapRelease = release(
             '__squareCoilCompanionBootstrap',
             expectedBootstrap,
-            ['claimId', 'runtimeInstanceId', 'documentToken', 'buildId', 'packageVersion', 'candidateFingerprint', 'persistenceAvailable', 'coordinationDisposition', 'enabled'],
+            [
+              'claimId',
+              'runtimeInstanceId',
+              'documentToken',
+              'buildId',
+              'packageVersion',
+              'candidateFingerprint',
+              'persistenceAvailable',
+              'coordinationDisposition',
+              'authorityTransportEnabled',
+              'authorityProtocolVersion',
+              'enabled'
+            ],
             'bootstrap'
           );
           if (!bootstrapRelease.ok) return { released: false, reason: bootstrapRelease.reason };
@@ -572,6 +704,9 @@ async function observeDisabledPageUnsafe(request) {
     }
     return { ...guard, enabled: false, reloadRequired: true, health: probe.runtimeSnapshot || null };
   }
+  if (probe.authorityCleanupIncomplete === true) {
+    return authorityTeardownFailureResponse(probe);
+  }
   const classification = classifyPageProbe(probe);
   if (classification === PROBE_RESULTS.NONE) {
     return { ok: true, enabled: false, classification, health: { state: 'UNINITIALIZED', mode: 'DISABLED', reason: 'user-disabled' }, ready: false, reloadRequired: false };
@@ -597,6 +732,9 @@ async function bootPageUnsafe(request) {
   let probe = await collectPageProbe(request);
   const guard = guardProbe(request, probe);
   if (guard) return { ...guard, reloadRequired: guard.reason !== 'unsupported-document', health: probe.runtimeSnapshot || null };
+  if (probe.authorityCleanupIncomplete === true) {
+    return authorityTeardownFailureResponse(probe, 'authority-teardown-incomplete', true);
+  }
   request = { ...request, documentToken: probe.documentToken, expectedDocumentId: request.expectedDocumentId || probe.browserDocumentId };
   let classification = classifyPageProbe(probe);
 
@@ -723,7 +861,11 @@ async function bootPageUnsafe(request) {
     packageVersion: PACKAGE_VERSION,
     candidateFingerprint: CANDIDATE_FINGERPRINT,
     persistenceAvailable,
-    coordinationDisposition: 'UNAVAILABLE_B1',
+    coordinationDisposition: authorityRouter.isAvailable()
+      ? KERNEL_ONLY_DISPOSITION
+      : 'UNAVAILABLE_B1',
+    authorityTransportEnabled: authorityRouter.isAvailable(),
+    authorityProtocolVersion: AUTHORITY_PROTOCOL_VERSION,
     enabled: true
   };
   const bootstrapResult = await setBootstrap(request, bootstrap);
@@ -881,10 +1023,20 @@ async function setPageEnabledUnsafe(request, enabled) {
   const enableBeforeTeardown = await reconcileNewerEnable();
   if (enableBeforeTeardown) return enableBeforeTeardown;
   if (classification === PROBE_RESULTS.NONE) {
+    if (probe.authorityCleanupIncomplete === true) {
+      const authorityCleanup = await prepareIsolatedAuthorityTeardown(request, null);
+      if (!authorityCleanup.ok) return authorityTeardownFailureResponse(probe, authorityCleanup.reason);
+      const enableAfterAuthorityCleanup = await reconcileNewerEnable();
+      if (enableAfterAuthorityCleanup) return enableAfterAuthorityCleanup;
+    }
     return { ok: true, enabled: false, classification, ready: false, reloadRequired: false, health: { state: 'UNINITIALIZED', mode: 'DISABLED', reason: 'user-disabled' } };
   }
 
   const runtimeId = probe.runtimeSnapshot?.runtimeInstanceId || probe.runtimeInstanceId;
+  const authorityCleanup = await prepareIsolatedAuthorityTeardown(request, runtimeId);
+  if (!authorityCleanup.ok) return authorityTeardownFailureResponse(probe, authorityCleanup.reason);
+  const enableAfterAuthorityCleanup = await reconcileNewerEnable();
+  if (enableAfterAuthorityCleanup) return enableAfterAuthorityCleanup;
   const result = await invokeRuntime(request, 'setEnabled', runtimeId, false);
   if (!result) return { ok: false, enabled: false, classification, reason: 'runtime-disable-unavailable', reloadRequired: true };
   probe = await collectPageProbe(request);
@@ -929,6 +1081,19 @@ async function retryTeardownUnsafe(request) {
   request = { ...request, documentToken: probe.documentToken, expectedDocumentId: request.expectedDocumentId || probe.browserDocumentId };
   const classification = classifyPageProbe(probe);
   if (classification !== PROBE_RESULTS.FAILED_SAME_BUILD || probe.runtimeSnapshot?.reason !== 'teardown-incomplete') {
+    const settings = await chrome.storage.local.get({ timerEnabled: true });
+    if (
+      settings.timerEnabled === false &&
+      [
+        PROBE_RESULTS.NONE,
+        PROBE_RESULTS.HEALTHY_SAME_BUILD,
+        PROBE_RESULTS.BOOTING_SAME_BUILD,
+        PROBE_RESULTS.RECOVERING_SAME_BUILD,
+        PROBE_RESULTS.DEGRADED_SAME_BUILD
+      ].includes(classification)
+    ) {
+      return setPageEnabledUnsafe(request, false);
+    }
     return responseForProbe(classification, probe, { reason: 'cleanup-retry-not-applicable' });
   }
   const runtimeId = probe.runtimeSnapshot.runtimeInstanceId;
@@ -1002,6 +1167,98 @@ function revalidatePage(value, context) {
   return serializeTabOperation(request, () => revalidatePageUnsafe(request));
 }
 
+function authorityTeardownFailureResponse(probe, reason = 'authority-teardown-incomplete', enabled = false) {
+  const outstanding = new Set(probe.runtimeSnapshot?.outstandingResources || []);
+  outstanding.add('authority');
+  return {
+    ok: false,
+    enabled: Boolean(enabled),
+    ready: false,
+    classification: PROBE_RESULTS.FAILED_SAME_BUILD,
+    reason,
+    reloadRequired: true,
+    cleanupAttempted: true,
+    authorityCleanupIncomplete: true,
+    health: {
+      ...(probe.runtimeSnapshot || {}),
+      state: 'FAILED',
+      mode: 'DISABLED',
+      reason: 'teardown-incomplete',
+      teardownInProgress: false,
+      outstandingResources: [...outstanding]
+    }
+  };
+}
+
+async function verifyAuthorityRuntime(request, message) {
+  let probe;
+  try {
+    probe = await collectPageProbe(request);
+  } catch (error) {
+    return { ok: false, reason: 'authority-runtime-inspection-failed', detail: String(error?.message || error) };
+  }
+  const guard = guardProbe(request, probe);
+  if (guard) return { ok: false, reason: guard.reason };
+  if (
+    probe.runtimeGlobalReadable !== true ||
+    probe.runtimeHealthReadable !== true ||
+    probe.runtimeMethodSurfaceValid !== true ||
+    probe.runtimeInstanceId !== message.runtimeInstanceId ||
+    probe.runtimeDocumentToken !== request.documentToken ||
+    probe.runtimeBuildId !== BUILD_ID ||
+    probe.runtimePackageVersion !== PACKAGE_VERSION ||
+    probe.runtimeCandidateFingerprint !== CANDIDATE_FINGERPRINT
+  ) {
+    return { ok: false, reason: 'authority-runtime-identity-mismatch' };
+  }
+  if (
+    probe.runtimeSnapshot?.mode !== 'ENABLED' ||
+    probe.runtimeSnapshot?.teardownInProgress === true ||
+    ['FAILED', 'UNINITIALIZED'].includes(probe.runtimeSnapshot?.state)
+  ) {
+    return { ok: false, reason: 'authority-runtime-not-active' };
+  }
+  return { ok: true };
+}
+
+async function handleAuthorityMessage(request, message) {
+  const validation = validateAuthorityRequest(message);
+  if (!validation.ok) {
+    return {
+      ok: false,
+      protocolVersion: AUTHORITY_PROTOCOL_VERSION,
+      type: message?.type || null,
+      requestId: message?.requestId || null,
+      workerInstanceId: authorityRouter.workerInstanceId,
+      reason: validation.reason
+    };
+  }
+  if (
+    message.type === AUTHORITY_MESSAGES.CONNECT ||
+    message.type === AUTHORITY_MESSAGES.COMMAND
+  ) {
+    const verified = await verifyAuthorityRuntime(request, message);
+    if (!verified.ok) {
+      return {
+        ok: false,
+        protocolVersion: AUTHORITY_PROTOCOL_VERSION,
+        type: message.type,
+        requestId: message.requestId || null,
+        workerInstanceId: authorityRouter.workerInstanceId,
+        reason: verified.reason,
+        detail: verified.detail || null,
+        retryable: true
+      };
+    }
+  }
+  return authorityRouter.route({
+    ...request,
+    buildId: BUILD_ID,
+    packageVersion: PACKAGE_VERSION,
+    candidateFingerprint: CANDIDATE_FINGERPRINT
+  }, message);
+}
+
 function requestFromMessage(message, sender = {}) {
   if (sender.tab && Number.isInteger(sender.tab.id)) {
     if (sender.frameId !== 0) return { error: 'unsupported-frame' };
@@ -1057,6 +1314,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === ENABLE_MESSAGE) task = setPageEnabled(request, message.enabled !== false);
   if (message?.type === REVALIDATE_MESSAGE) task = revalidatePage(request);
   if (message?.type === RETRY_TEARDOWN_MESSAGE) task = retryTeardown(request);
+  if (isAuthorityMessageType(message?.type)) task = handleAuthorityMessage(request, message);
   if (!task) return undefined;
   task.then(sendResponse).catch(error => sendResponse({ ok: false, reason: String(error?.message || error) }));
   return true;
@@ -1069,6 +1327,15 @@ module.exports = {
   ENABLE_MESSAGE,
   REVALIDATE_MESSAGE,
   RETRY_TEARDOWN_MESSAGE,
+  AUTHORITY_MESSAGES,
+  AUTHORITY_PROTOCOL_VERSION,
+  authorityRouter,
+  installAuthorityAdapter,
+  installDefaultAuthorityAdapter,
+  defaultAuthorityInstallation,
+  handleAuthorityMessage,
+  verifyAuthorityRuntime,
+  prepareIsolatedAuthorityTeardown,
   bootPage,
   getHealth,
   setPageEnabled,

@@ -94,7 +94,7 @@ function sendToActiveTab(type) {
 document.addEventListener('DOMContentLoaded', async () => {
   const manifest = chrome.runtime.getManifest();
   setText('version', `v${manifest.version}`);
-  setText('stage', 'B1 · Shell / Lifecycle');
+  setText('stage', 'B2.1 · Fenced Kernel');
 
   const settings = await chrome.storage.local.get({ timerEnabled: true });
   const toggle = document.getElementById('enabled');

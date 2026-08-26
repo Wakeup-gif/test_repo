@@ -10,6 +10,10 @@ const {
 } = require('../core/document-eligibility');
 const { createRuntimeUi } = require('../platform/runtime-ui');
 const { createBridgeShell } = require('../squarecoil/bridge-shell');
+const {
+  AUTHORITY_PROTOCOL_VERSION,
+  KERNEL_ONLY_DISPOSITION
+} = require('../extension/authority-protocol');
 
 const GLOBAL_KEY = '__squareCoilCompanionRuntime';
 const BOOTSTRAP_KEY = '__squareCoilCompanionBootstrap';
@@ -114,6 +118,8 @@ function isValidRuntimeHandle(value, documentToken, expectedPackageVersion = nul
   });
   const bridge = createBridgeShell();
   const registry = createFeatureRegistry();
+  const authorityTransportEnabled = bootstrap.authorityTransportEnabled === true &&
+    bootstrap.authorityProtocolVersion === AUTHORITY_PROTOCOL_VERSION;
 
   let pageShowBound = false;
   let healthObserver = null;
@@ -121,8 +127,8 @@ function isValidRuntimeHandle(value, documentToken, expectedPackageVersion = nul
   let monitorScheduled = false;
   let selfRetirementPromise = null;
   let runtime = null;
+  let lifecycle = null;
   let claimReleaseFailed = false;
-
   function readRootOwnership() {
     const roots = [...document.querySelectorAll('#ussign-job-timer')];
     for (const marked of document.querySelectorAll('[data-squarecoil-companion-root="rebuild"]')) {
@@ -292,12 +298,19 @@ function isValidRuntimeHandle(value, documentToken, expectedPackageVersion = nul
     teardown: async () => {}
   };
 
+  // Authority ownership lives in the isolated content controller. MAIN-world
+  // lifecycle code receives only this non-positive stage marker; it cannot
+  // create, heartbeat, mutate, or release an authoritative worker session.
   const coordination = {
-    ensure: async () => ({ disposition: bootstrap.coordinationDisposition || 'UNAVAILABLE_B1' }),
+    ensure: async () => ({
+      disposition: authorityTransportEnabled
+        ? KERNEL_ONLY_DISPOSITION
+        : (bootstrap.coordinationDisposition || 'UNAVAILABLE_B1')
+    }),
     teardown: async () => {}
   };
 
-  const lifecycle = createLifecycleController({
+  lifecycle = createLifecycleController({
     runtimeInstanceId,
     buildId: BUILD_ID,
     packageVersion,
@@ -369,7 +382,16 @@ function isValidRuntimeHandle(value, documentToken, expectedPackageVersion = nul
       documentToken,
       claimId,
       ui: ui.snapshot(),
-      bridge: bridge.snapshot()
+      bridge: bridge.snapshot(),
+      authority: {
+        kernelTransportAvailable: authorityTransportEnabled,
+        connectionHealthOwnedBy: 'ISOLATED_CONTENT',
+        enabled: authorityTransportEnabled,
+        healthy: false,
+        disposition: authorityTransportEnabled
+          ? KERNEL_ONLY_DISPOSITION
+          : (bootstrap.coordinationDisposition || 'UNAVAILABLE_B1')
+      }
     };
   }
 

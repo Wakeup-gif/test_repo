@@ -1,6 +1,6 @@
-# B1 A4 real-browser acceptance harness
+# B1 lifecycle regression and B2.1 authority-kernel browser harness
 
-This harness loads one exact unpacked package into installed, branded Google Chrome and Microsoft Edge. It serves only synthetic fixture HTML in memory. No request reaches SquareCoil or customer data.
+This harness loads one exact unpacked package into installed, branded Google Chrome and Microsoft Edge. It retains the settled B1 lifecycle gates and adds narrowly scoped B2.1 checks for the isolated authority kernel. It serves only synthetic fixture HTML in memory. No request reaches SquareCoil or customer data.
 
 ## Required package
 
@@ -19,8 +19,8 @@ The `--package` directory must contain exactly the eight allowlisted release fil
 
 `dist/build-info.json` must contain:
 
-- `buildId: "rebuild-b1-shell-lifecycle"`;
-- `stage: "B1"`;
+- `buildId: "rebuild-b2-fenced-authoritative-kernel"`;
+- `stage: "B2.1"`;
 - a lowercase 64-character `candidateFingerprint` embedded exactly in `dist/background.js`, `dist/companion-app.js`, and `dist/content-controller.js`;
 - a lowercase 40-character `sourceSha` exactly matching `--expected-source-sha`;
 - boolean `sourceDirty`, which must be `false` for acceptance.
@@ -52,7 +52,7 @@ Use `--headed` only when visible browser windows are useful. Browser executables
 - Exit `1`, status `FAIL`: a browser assertion, package check, or byte-integrity check failed.
 - Exit `2`, status `UNSUPPORTED`: a required browser/control capability could not be exercised. This is not a pass.
 
-The JSON evidence records browser/CDP identity, executable hash, extension ID/path/version, exact build/package/candidate identity, candidate embedding counts for all three runtime bundles, commanded and packaged source SHA, ZIP filename/hash, exact ZIP/extracted inventory binding, synthetic-network ledger, test results, and lifecycle/root snapshots. Evidence output must be outside the tested package and cannot overwrite the ZIP. A browser launch or extension load never counts as a gate pass by itself.
+The JSON evidence records browser/CDP identity, executable hash, extension ID/path/version, exact build/package/candidate identity, candidate embedding counts for all three runtime bundles, commanded and packaged source SHA, ZIP filename/hash, exact ZIP/extracted inventory binding, synthetic-network ledger, test results, lifecycle/root snapshots, and isolated-world authority snapshots. Evidence output must be outside the tested package and cannot overwrite the ZIP. A browser launch or extension load never counts as a gate pass by itself.
 
 Every message the harness sends directly from the content-script execution world carries the exact packaged `buildId`, `packageVersion`, and `candidateFingerprint` plus the live document token. Popup messages originate from an extension page and remain extension-origin messages; the harness does not mislabel them as content-origin traffic.
 
@@ -60,17 +60,21 @@ Every message the harness sends directly from the content-script execution world
 
 - disabled boot performs observation only;
 - concurrent/repeated boot produces one injection, runtime, and root; root inventory is the deduplicated union of the canonical timer selector and every rebuild-owned marker, so a noncanonical rebuild node cannot be hidden;
-- B1 cannot report real `READY` while coordination is unavailable;
+- MAIN lifecycle health remains `DEGRADED / coordination-not-implemented-b1`, never `READY`, while readiness reports the bounded `KERNEL_CONNECTED_B2_1` disposition;
+- the isolated content world exposes healthy authority evidence independently of MAIN-world lifecycle health;
+- two live tabs connect to one worker authority as exactly one `OWNER` and one `OBSERVER_CONNECTED`, observe the same authoritative revision, and require an explicit successful observer-disconnect acknowledgement before the observer tab closes;
 - clearly owned noncanonical rebuild-marker orphan recovery and ambiguous noncanonical rebuild-marker retention;
 - dead interaction and removed root recover without reinjection;
 - iframe and unsupported documents allocate nothing;
 - legacy runtime exclusion;
 - malformed and unreadable runtime-global exclusion;
 - build, package-version, and candidate-fingerprint mismatch reload boundaries;
-- service-worker restart reuses the live page runtime;
+- service-worker restart changes the authority worker identity, reconnects the isolated client, reuses the live page runtime, preserves `OWNER`, revision, and coordination epoch, and leaves the persisted authoritative document canonically equivalent by SHA-256;
 - real BFCache restoration produces `pageshow.persisted === true` and reuses the runtime;
 - clean disable/re-enable creates a fresh Runtime ID;
 - a delayed stale content response cannot overwrite newer disabled state;
 - a safely injected cleanup failure remains sticky until explicit cleanup-only retry succeeds.
 
-Each browser result carries the canonical stable IDs it proves: `B1-LC-001` through `B1-LC-010` and `B1-LC-012` through `B1-LC-018`. `B1-LC-011` is intentionally an A2/A3-only persistence-concurrency fixture.
+Each browser result carries the canonical stable IDs it proves: `B1-LC-001` through `B1-LC-010` and `B1-LC-012` through `B1-LC-018`. `B1-LC-011` is intentionally an A2/A3-only persistence-concurrency fixture. The B2.1-only cases carry `B2-KERNEL-001` (multi-tab OWNER/OBSERVER) and `B2-KERNEL-002` (worker-restart reconnection), plus an explicit `ISOLATED_AUTHORITY_KERNEL_ONLY` scope marker.
+
+Passing these cases proves only the fenced B2.1 authority-kernel slice and the continuing B1 lifecycle regression gates. Full B2 A4 acceptance remains **PENDING**: SquareCoil Bridge behavior, timer/state mutation, migration execution, concurrent writes, restart recovery for active timing, and complete Chrome/Edge parity must still be proven before B2 can be called settled.

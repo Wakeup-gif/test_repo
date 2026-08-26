@@ -6,6 +6,12 @@ const {
   isConcreteDocumentToken
 } = require('../core/document-eligibility');
 const { BUILD_ID, CANDIDATE_FINGERPRINT } = require('../core/build-identity');
+const {
+  AUTHORITY_PROTOCOL_VERSION,
+  AUTHORITY_CONTROL_MESSAGES,
+  KERNEL_ONLY_DISPOSITION
+} = require('../extension/authority-protocol');
+const { createAuthorityClient } = require('../extension/authority-client');
 
 const DEFAULTS = Object.freeze({ timerEnabled: true });
 const BOOT_MESSAGE = 'SC_COMPANION_BOOT';
@@ -13,6 +19,7 @@ const ENABLE_MESSAGE = 'SC_COMPANION_SET_ENABLED';
 const REVALIDATE_MESSAGE = 'SC_COMPANION_REVALIDATE';
 const TRANSPORT_RETRY_DELAYS_MS = Object.freeze([250, 1000, 3000]);
 const PACKAGE_VERSION = String(chrome.runtime.getManifest().version || '0.0.0');
+const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
 
 (function startContentController() {
   if (!isSupportedTopLevelContext(window)) return;
@@ -21,6 +28,9 @@ const PACKAGE_VERSION = String(chrome.runtime.getManifest().version || '0.0.0');
   let responseEpoch = 0;
   let transportRetryAttempt = 0;
   let transportRetryTimer = null;
+  let authorityClient = null;
+  let authorityRuntimeInstanceId = null;
+  let settingChangeQueue = Promise.resolve();
 
   function createDocumentToken() {
     if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') return globalThis.crypto.randomUUID();
@@ -44,6 +54,46 @@ const PACKAGE_VERSION = String(chrome.runtime.getManifest().version || '0.0.0');
     else root.dataset[key] = String(value);
   }
 
+  function unavailableAuthoritySnapshot() {
+    return {
+      enabled: false,
+      healthy: false,
+      disposition: 'UNAVAILABLE',
+      workerInstanceId: null,
+      coordinationEpoch: null,
+      coordinationRevision: null,
+      leaseExpiry: null,
+      revision: null,
+      subscribed: false,
+      lastSequence: 0,
+      lastError: null,
+      runtimeInstanceId: authorityRuntimeInstanceId,
+      documentToken: document.documentElement?.dataset?.[DOCUMENT_TOKEN_DATASET_KEY] || null
+    };
+  }
+
+  function authoritySnapshot() {
+    return authorityClient ? authorityClient.snapshot() : unavailableAuthoritySnapshot();
+  }
+
+  // This handle exists only in Chrome's isolated content world. The website's
+  // MAIN world cannot read or invoke it. It exposes health and a reconnect
+  // probe, never a command or session identifier.
+  Object.defineProperty(globalThis, AUTHORITY_HEALTH_KEY, {
+    configurable: false,
+    enumerable: false,
+    writable: false,
+    value: Object.freeze({
+      snapshot: authoritySnapshot,
+      revalidate: async () => {
+        if (!authorityClient) throw new Error('authority-client-unavailable');
+        await authorityClient.heartbeat();
+        return authorityClient.snapshot();
+      },
+      teardown: teardownAuthority
+    })
+  });
+
   function renderResult(result, enabled = true) {
     const classification = result?.classification || 'UNKNOWN';
     const healthState = result?.health?.state || null;
@@ -64,6 +114,14 @@ const PACKAGE_VERSION = String(chrome.runtime.getManifest().version || '0.0.0');
     setDataset('squarecoilCompanionProbe', classification);
     setDataset('squarecoilCompanionReason', result?.health?.reason || result?.reason || null);
     setDataset('squarecoilCompanionReloadRequired', result?.reloadRequired ? 'true' : null);
+  }
+
+  function renderAuthority(snapshot, error = null) {
+    const current = snapshot || authoritySnapshot();
+    setDataset('squarecoilCompanionAuthority', current.healthy ? 'connected' : 'unavailable');
+    // Detailed authority identity and failures remain inside the isolated-world
+    // health handle; the website receives no worker, lease, or error details.
+    void error;
   }
 
   function effectiveEnabled(result, fallback) {
@@ -129,6 +187,118 @@ const PACKAGE_VERSION = String(chrome.runtime.getManifest().version || '0.0.0');
     }
   }
 
+  function runtimeIdentityFromResult(result) {
+    const value = String(result?.health?.runtimeInstanceId || '');
+    return value.length >= 8 && value.length <= 200 ? value : null;
+  }
+
+  function kernelAdvertisedBy(result) {
+    return result?.health?.readiness?.coordinationDisposition === KERNEL_ONLY_DISPOSITION ||
+      result?.health?.authority?.kernelTransportAvailable === true;
+  }
+
+  async function ensureAuthority(result) {
+    if (!kernelAdvertisedBy(result)) throw new Error('authority-kernel-not-advertised');
+    const runtimeInstanceId = runtimeIdentityFromResult(result);
+    const documentToken = ensureDocumentToken();
+    if (!runtimeInstanceId || !documentToken) throw new Error('authority-runtime-identity-unavailable');
+
+    const authorityHealth = authorityClient ? authorityClient.snapshot() : null;
+    if (
+      authorityClient &&
+      (authorityRuntimeInstanceId !== runtimeInstanceId || authorityHealth?.enabled !== true)
+    ) {
+      // A new generation, or a same-generation client already fenced for
+      // teardown, must finish exact cleanup before authority is reacquired.
+      await authorityClient.teardown();
+      authorityClient = null;
+      authorityRuntimeInstanceId = null;
+    }
+    if (!authorityClient) {
+      authorityRuntimeInstanceId = runtimeInstanceId;
+      authorityClient = createAuthorityClient({
+        runtimeInstanceId,
+        documentToken,
+        send,
+        runtimeOnMessage: chrome.runtime.onMessage,
+        onHealthChange: renderAuthority
+      });
+    }
+    const connected = await authorityClient.ensure();
+    renderAuthority(authorityClient.snapshot());
+    return connected;
+  }
+
+  async function teardownAuthority() {
+    if (!authorityClient) {
+      setDataset('squarecoilCompanionAuthorityCleanup', null);
+      return { disconnected: true, absent: true };
+    }
+    const client = authorityClient;
+    try {
+      const response = await client.teardown();
+      if (authorityClient === client) {
+        authorityClient = null;
+        authorityRuntimeInstanceId = null;
+      }
+      setDataset('squarecoilCompanionAuthorityCleanup', null);
+      renderAuthority(unavailableAuthoritySnapshot());
+      return response;
+    } catch (error) {
+      setDataset('squarecoilCompanionAuthorityCleanup', 'incomplete');
+      throw error;
+    }
+  }
+
+  function onAuthorityControl(message, _sender, sendResponse) {
+    if (message?.type !== AUTHORITY_CONTROL_MESSAGES.PREPARE_DISABLE) return undefined;
+    const documentToken = ensureDocumentToken();
+    if (
+      message.protocolVersion !== AUTHORITY_PROTOCOL_VERSION ||
+      message.documentToken !== documentToken ||
+      (message.runtimeInstanceId && authorityRuntimeInstanceId && message.runtimeInstanceId !== authorityRuntimeInstanceId)
+    ) {
+      sendResponse({
+        ok: false,
+        disconnected: false,
+        reason: 'authority-control-identity-mismatch',
+        protocolVersion: AUTHORITY_PROTOCOL_VERSION,
+        documentToken,
+        runtimeInstanceId: authorityRuntimeInstanceId
+      });
+      return false;
+    }
+    teardownAuthority().then(response => sendResponse({
+      ok: true,
+      disconnected: response?.disconnected === true,
+      protocolVersion: AUTHORITY_PROTOCOL_VERSION,
+      documentToken,
+      runtimeInstanceId: message.runtimeInstanceId || authorityRuntimeInstanceId
+    }), error => sendResponse({
+      ok: false,
+      disconnected: false,
+      reason: String(error?.message || error),
+      protocolVersion: AUTHORITY_PROTOCOL_VERSION,
+      documentToken,
+      runtimeInstanceId: authorityRuntimeInstanceId || message.runtimeInstanceId
+    }));
+    return true;
+  }
+
+  if (chrome.runtime.onMessage && typeof chrome.runtime.onMessage.addListener === 'function') {
+    chrome.runtime.onMessage.addListener(onAuthorityControl);
+  }
+
+  const retirementObserver = new MutationObserver(() => {
+    const reason = document.documentElement?.dataset?.squarecoilCompanionReloadRequired;
+    if (!['runtime-ownership-lost', 'ownership-conflict'].includes(reason)) return;
+    teardownAuthority().catch(error => renderAuthority(authoritySnapshot(), error));
+  });
+  retirementObserver.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-squarecoil-companion-reload-required']
+  });
+
   async function syncEnabled() {
     clearTransportRetry();
     const epoch = ++responseEpoch;
@@ -148,6 +318,10 @@ const PACKAGE_VERSION = String(chrome.runtime.getManifest().version || '0.0.0');
       bootRequested = true;
       const result = await send({ type: BOOT_MESSAGE });
       handleResult(epoch, result, true, { type: BOOT_MESSAGE });
+      if (epoch === responseEpoch && result?.ok === true) {
+        try { await ensureAuthority(result); }
+        catch (error) { renderAuthority(authoritySnapshot(), error); }
+      }
     } catch (error) {
       if (epoch !== responseEpoch) return;
       bootRequested = false;
@@ -164,6 +338,12 @@ const PACKAGE_VERSION = String(chrome.runtime.getManifest().version || '0.0.0');
     }
   }
 
+  function queueSettingChange(task) {
+    const run = settingChangeQueue.then(task, task);
+    settingChangeQueue = run.then(() => undefined, () => undefined);
+    return run;
+  }
+
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local' || !changes.timerEnabled) return;
     clearTransportRetry();
@@ -172,8 +352,23 @@ const PACKAGE_VERSION = String(chrome.runtime.getManifest().version || '0.0.0');
     bootRequested = enabled;
     const epoch = ++responseEpoch;
     const message = { type: ENABLE_MESSAGE, enabled };
-    send(message).then(result => {
+    queueSettingChange(async () => {
+      if (epoch !== responseEpoch) return;
+      if (!enabled) {
+        try { await teardownAuthority(); }
+        catch (error) {
+          renderAuthority(authoritySnapshot(), error);
+          bootRequested = true;
+          return;
+        }
+      }
+      if (epoch !== responseEpoch) return;
+      const result = await send(message);
       handleResult(epoch, result, enabled, message);
+      if (enabled && epoch === responseEpoch && result?.ok === true) {
+        try { await ensureAuthority(result); }
+        catch (error) { renderAuthority(authoritySnapshot(), error); }
+      }
     }).catch(() => {
       if (enabled) bootRequested = false;
     });
@@ -186,7 +381,14 @@ const PACKAGE_VERSION = String(chrome.runtime.getManifest().version || '0.0.0');
     const message = { type: REVALIDATE_MESSAGE };
     send(message).then(result => {
       handleResult(epoch, result, document.documentElement?.dataset?.squarecoilCompanionEnabled !== 'false', message);
+      if (result?.ok === true) ensureAuthority(result).catch(error => renderAuthority(authoritySnapshot(), error));
     }).catch(() => {});
+  });
+
+  window.addEventListener('pagehide', event => {
+    if (event.persisted === true) return;
+    retirementObserver.disconnect();
+    teardownAuthority().catch(error => renderAuthority(authoritySnapshot(), error));
   });
 
   scheduleBoot();

@@ -6,8 +6,8 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const zlib = require('node:zlib');
 
-const CANONICAL_BUILD_ID = 'rebuild-b1-shell-lifecycle';
-const CANONICAL_STAGE = 'B1';
+const CANONICAL_BUILD_ID = 'rebuild-b2-fenced-authoritative-kernel';
+const CANONICAL_STAGE = 'B2.1';
 const FIXTURE_ORIGIN = 'https://ussignandmill.squarecoil.net';
 const FIXTURE_PATH = '/__b1_fixture__/a4.html';
 const FRAME_PATH = '/__b1_fixture__/frame.html';
@@ -17,6 +17,7 @@ const RUNTIME_KEY = '__squareCoilCompanionRuntime';
 const CLAIM_KEY = '__squareCoilCompanionInjectionClaim';
 const BOOTSTRAP_KEY = '__squareCoilCompanionBootstrap';
 const DOCUMENT_TOKEN_DATASET_KEY = 'squarecoilCompanionDocumentToken';
+const AUTHORITY_STORAGE_KEY = 'squarecoilCompanionB2AuthorityV1';
 const EXPECTED_DEGRADED_REASON = 'coordination-not-implemented-b1';
 const REQUIRED_A4_STABLE_FIXTURE_IDS = Object.freeze([
   'B1-LC-001',
@@ -36,6 +37,10 @@ const REQUIRED_A4_STABLE_FIXTURE_IDS = Object.freeze([
   'B1-LC-016',
   'B1-LC-017',
   'B1-LC-018'
+]);
+const REQUIRED_B2_1_A4_FIXTURE_IDS = Object.freeze([
+  'B2-KERNEL-001',
+  'B2-KERNEL-002'
 ]);
 const REQUIRED_PACKAGE_FILES = Object.freeze([
   'dist/background.js',
@@ -141,6 +146,16 @@ function usage() {
 
 function sha256(contents) {
   return crypto.createHash('sha256').update(contents).digest('hex');
+}
+
+function stableJson(value) {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(',')}}`;
+}
+
+function jsonSha256(value) {
+  return sha256(Buffer.from(stableJson(value)));
 }
 
 function slash(value) {
@@ -469,8 +484,8 @@ function assertExpectedB1Shell(state, label, candidateIdentity) {
   assert(state.runtimeDocumentToken === state.documentToken, `${label}: runtime/document identity differs`, state);
   assert(state.roots[0].documentToken === state.documentToken, `${label}: root/document identity differs`, state);
   const health = state.health;
-  assert(health?.state === 'DEGRADED', `${label}: B1 must remain DEGRADED until coordination exists`, health);
-  assert(health?.state !== 'READY', `${label}: B1 falsely reported READY`, health);
+  assert(health?.state === 'DEGRADED', `${label}: B2.1 lifecycle must remain DEGRADED until Bridge and Timer wiring exists`, health);
+  assert(health?.state !== 'READY', `${label}: B2.1 kernel-only shell falsely reported READY`, health);
   assert(health?.reason === EXPECTED_DEGRADED_REASON, `${label}: unexpected degraded reason`, health);
   assert(health?.buildId === candidateIdentity.buildId, `${label}: health build identity differs`, health);
   assert(health?.packageVersion === candidateIdentity.packageVersion, `${label}: health package identity differs`, health);
@@ -493,10 +508,30 @@ function assertExpectedB1Shell(state, label, candidateIdentity) {
     'teardownRegistered'
   ];
   for (const key of requiredTrue) assert(readiness[key] === true, `${label}: readiness.${key} is not true`, readiness);
-  assert(readiness.coordinationPositive === false, `${label}: B1 coordination unexpectedly reported positive`, readiness);
-  assert(readiness.coordinationDisposition === 'UNAVAILABLE_B1', `${label}: B1 coordination disposition changed`, readiness);
+  assert(readiness.coordinationPositive === false, `${label}: B2.1 kernel-only shell unexpectedly reported full coordination readiness`, readiness);
+  assert(readiness.coordinationDisposition === 'KERNEL_CONNECTED_B2_1', `${label}: B2.1 kernel connection disposition is missing`, readiness);
   assert(state.claimPresent === false, `${label}: injection claim remained after boot`, state);
   assert(state.bootstrapPresent === false, `${label}: bootstrap marker remained after boot`, state);
+}
+
+function assertHealthyB2KernelAuthority(snapshot, label, pageSnapshot = null) {
+  assert(snapshot && typeof snapshot === 'object', `${label}: isolated authority snapshot is unavailable`, snapshot);
+  assert(!snapshot.snapshotError, `${label}: isolated authority snapshot failed`, snapshot);
+  assert(snapshot.enabled === true, `${label}: isolated authority is not enabled`, snapshot);
+  assert(snapshot.healthy === true, `${label}: isolated authority is not healthy`, snapshot);
+  assert(['OWNER', 'OBSERVER_CONNECTED'].includes(snapshot.disposition), `${label}: isolated authority disposition is not positive`, snapshot);
+  assert(isConcreteIdentity(snapshot.workerInstanceId), `${label}: authority worker identity is not concrete`, snapshot);
+  assert(Number.isSafeInteger(snapshot.coordinationEpoch) && snapshot.coordinationEpoch >= 1, `${label}: coordination epoch is not concrete`, snapshot);
+  assert(Number.isSafeInteger(snapshot.coordinationRevision) && snapshot.coordinationRevision >= 0, `${label}: coordination revision is not concrete`, snapshot);
+  assert(Number.isSafeInteger(snapshot.revision) && snapshot.revision >= 0, `${label}: authoritative document revision is not concrete`, snapshot);
+  assert(snapshot.subscribed === true, `${label}: isolated authority subscription is not active`, snapshot);
+  assert(snapshot.lastError === null, `${label}: isolated authority retained an error`, snapshot);
+  assert(isConcreteIdentity(snapshot.runtimeInstanceId), `${label}: authority runtime identity is not concrete`, snapshot);
+  assert(isConcreteIdentity(snapshot.documentToken), `${label}: authority document identity is not concrete`, snapshot);
+  if (pageSnapshot) {
+    assert(snapshot.runtimeInstanceId === pageSnapshot.runtimeInstanceId, `${label}: authority/page runtime identities differ`, { snapshot, pageSnapshot });
+    assert(snapshot.documentToken === pageSnapshot.documentToken, `${label}: authority/page document identities differ`, { snapshot, pageSnapshot });
+  }
 }
 
 class ContentBridge {
@@ -604,6 +639,42 @@ class ContentBridge {
   async getStorage(keys) {
     const serialized = JSON.stringify(keys);
     return this.run(() => `chrome.storage.local.get(${serialized})`);
+  }
+
+  async authoritySnapshot() {
+    return this.run(() => `(() => {
+      const health = globalThis.__squareCoilCompanionAuthorityHealth;
+      if (!health || typeof health.snapshot !== 'function') return null;
+      try {
+        const snapshot = health.snapshot();
+        if (!snapshot || typeof snapshot !== 'object') return null;
+        return {
+          enabled: snapshot.enabled,
+          healthy: snapshot.healthy,
+          disposition: snapshot.disposition,
+          workerInstanceId: snapshot.workerInstanceId,
+          coordinationEpoch: snapshot.coordinationEpoch,
+          coordinationRevision: snapshot.coordinationRevision,
+          leaseExpiry: snapshot.leaseExpiry,
+          revision: snapshot.revision,
+          subscribed: snapshot.subscribed,
+          lastSequence: snapshot.lastSequence,
+          lastError: snapshot.lastError,
+          runtimeInstanceId: snapshot.runtimeInstanceId,
+          documentToken: snapshot.documentToken
+        };
+      } catch (error) {
+        return { snapshotError: String(error?.message || error) };
+      }
+    })()`);
+  }
+
+  async authorityTeardown() {
+    return this.run(() => `(async () => {
+      const health = globalThis.__squareCoilCompanionAuthorityHealth;
+      if (!health || typeof health.teardown !== 'function') return { disconnected: true, absent: true };
+      return health.teardown();
+    })()`);
   }
 
   async installOneShotResponseHold(type) {
@@ -736,6 +807,28 @@ function runBrowserCase(cases, family, stableFixtureIds, slug, name, task) {
   return runCase(cases, browserFixtureId(family, stableFixtureIds, slug), name, task, { stableFixtureIds });
 }
 
+function runB2KernelBrowserCase(cases, family, b2KernelFixtureIds, stableFixtureIds, slug, name, task) {
+  for (const fixtureId of b2KernelFixtureIds) {
+    if (!REQUIRED_B2_1_A4_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown B2.1 A4 fixture ID: ${fixtureId}`);
+  }
+  for (const fixtureId of stableFixtureIds) {
+    if (!REQUIRED_A4_STABLE_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown B1 A4 stable fixture ID: ${fixtureId}`);
+  }
+  const browserCode = family === 'chrome' ? 'CH' : 'ED';
+  const fixtureCode = b2KernelFixtureIds.map(value => value.replace('B2-KERNEL-', '')).join('-');
+  return runCase(
+    cases,
+    `A4-B2.1-${browserCode}-${fixtureCode}-${slug}`,
+    name,
+    task,
+    {
+      stableFixtureIds,
+      b2KernelFixtureIds,
+      b2Scope: 'ISOLATED_AUTHORITY_KERNEL_ONLY'
+    }
+  );
+}
+
 function serviceWorkerTarget(targets, extensionId) {
   return targets.targetInfos.find(target => target.type === 'service_worker' && target.url === `chrome-extension://${extensionId}/dist/background.js`) || null;
 }
@@ -757,6 +850,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
     network: { fulfilled: [], blockedUnexpected: [] },
     console: { errors: [], pageErrors: [] },
     stableFixtureCoverage: null,
+    b2KernelFixtureCoverage: null,
     cases: [],
     durationMs: null,
     cleanupWarning: null
@@ -1116,6 +1210,98 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
       };
     });
 
+    await runB2KernelBrowserCase(
+      result.cases,
+      family,
+      ['B2-KERNEL-001'],
+      [],
+      'MULTI-TAB',
+      'Two tabs share one isolated authority kernel as OWNER and OBSERVER without false READY',
+      async () => {
+        assert(activeRuntimeId, 'Initial runtime was unavailable because the prerequisite case failed');
+        const primaryAuthorityBefore = await waitFor(async () => {
+          const snapshot = await bridge.authoritySnapshot();
+          return snapshot?.healthy === true ? snapshot : null;
+        }, 'primary isolated authority health', options.timeoutMs);
+        const primaryBeforeState = await pageState(page);
+        assertExpectedB1Shell(primaryBeforeState, 'primary multi-tab shell', candidateIdentity);
+        assertHealthyB2KernelAuthority(primaryAuthorityBefore, 'primary multi-tab authority', primaryBeforeState);
+
+        const observerPage = await context.newPage();
+        let observerBridge = null;
+        let evidence = null;
+        observerPage.on('console', message => {
+          if (message.type() === 'error' || message.type() === 'warning') result.console.errors.push({ type: message.type(), text: message.text(), page: 'observer' });
+        });
+        observerPage.on('pageerror', error => result.console.pageErrors.push(`observer: ${String(error?.message || error)}`));
+        try {
+          await observerPage.goto(`${FIXTURE_ORIGIN}${FIXTURE_PATH}`, { waitUntil: 'domcontentloaded', timeout: options.timeoutMs });
+          await waitFor(async () => (await pageState(observerPage)).documentToken, 'observer content-controller document identity', options.timeoutMs);
+          observerBridge = new ContentBridge(context, observerPage, extensionId, options.timeoutMs, candidateIdentity);
+          await observerBridge.initialize();
+
+          const observerAuthority = await waitFor(async () => {
+            const snapshot = await observerBridge.authoritySnapshot();
+            return snapshot?.healthy === true ? snapshot : null;
+          }, 'observer isolated authority health', options.timeoutMs);
+          const primaryAuthority = await waitFor(async () => {
+            const snapshot = await bridge.authoritySnapshot();
+            return snapshot?.healthy === true ? snapshot : null;
+          }, 'primary authority health with observer connected', options.timeoutMs);
+          const primaryState = await pageState(page);
+          const observerState = await pageState(observerPage);
+
+          assertExpectedB1Shell(primaryState, 'primary shell with observer', candidateIdentity);
+          assertExpectedB1Shell(observerState, 'observer shell', candidateIdentity);
+          assertHealthyB2KernelAuthority(primaryAuthority, 'primary authority with observer', primaryState);
+          assertHealthyB2KernelAuthority(observerAuthority, 'observer authority', observerState);
+          assert(primaryAuthority.disposition === 'OWNER', 'First tab did not retain OWNER authority', { primaryAuthority, observerAuthority });
+          assert(observerAuthority.disposition === 'OBSERVER_CONNECTED', 'Second tab did not join as OBSERVER_CONNECTED', { primaryAuthority, observerAuthority });
+          assert(primaryAuthority.workerInstanceId === observerAuthority.workerInstanceId, 'Tabs did not connect to one worker authority', { primaryAuthority, observerAuthority });
+          assert(primaryAuthority.revision === observerAuthority.revision, 'Tabs did not observe the same authoritative revision', { primaryAuthority, observerAuthority });
+          assert(primaryState.health?.state !== 'READY' && observerState.health?.state !== 'READY', 'Kernel-only multi-tab state falsely reached READY', { primaryState, observerState });
+          evidence = {
+            primaryAuthority,
+            observerAuthority,
+            primaryRuntimeInstanceId: primaryState.runtimeInstanceId,
+            observerRuntimeInstanceId: observerState.runtimeInstanceId,
+            sharedRevision: primaryAuthority.revision,
+            sharedWorkerInstanceId: primaryAuthority.workerInstanceId
+          };
+        } finally {
+          try {
+            if (observerBridge) {
+              const observerCleanup = await observerBridge.authorityTeardown();
+              assert(observerCleanup?.disconnected === true, 'Observer authority teardown did not confirm disconnection', observerCleanup);
+              const observerAuthorityAfterCleanup = await observerBridge.authoritySnapshot();
+              assert(
+                observerAuthorityAfterCleanup?.enabled === false && observerAuthorityAfterCleanup?.healthy === false,
+                'Observer isolated authority remained active after teardown',
+                observerAuthorityAfterCleanup
+              );
+              if (evidence) {
+                evidence.observerCleanup = observerCleanup;
+                evidence.observerAuthorityAfterCleanup = observerAuthorityAfterCleanup;
+              }
+            }
+          } finally {
+            if (observerBridge) await observerBridge.detach();
+            await observerPage.close().catch(() => {});
+          }
+        }
+
+        assert(evidence, 'Multi-tab authority evidence was not captured');
+        const afterCleanup = await waitFor(async () => {
+          const snapshot = await bridge.authoritySnapshot();
+          return snapshot?.healthy === true && snapshot.disposition === 'OWNER' ? snapshot : null;
+        }, 'primary OWNER authority after observer cleanup', options.timeoutMs);
+        const fixturePages = context.pages().filter(candidate => candidate.url() === `${FIXTURE_ORIGIN}${FIXTURE_PATH}`);
+        assert(fixturePages.length === 1 && fixturePages[0] === page, 'Observer fixture page was not cleaned up', fixturePages.map(candidate => candidate.url()));
+        assertHealthyB2KernelAuthority(afterCleanup, 'primary authority after observer cleanup', await pageState(page));
+        return { ...evidence, afterCleanup, remainingFixturePages: fixturePages.length };
+      }
+    );
+
     await runBrowserCase(result.cases, family, ['B1-LC-003', 'B1-LC-014'], 'RECOVERY', 'Dead interaction and removed root recover in place', async () => {
       assert(activeRuntimeId, 'Initial runtime was unavailable because the prerequisite case failed');
       const dead = await page.evaluate(({ rootId, probeEvent }) => {
@@ -1191,21 +1377,52 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
       }
     });
 
-    await runBrowserCase(result.cases, family, ['B1-LC-005'], 'WORKER-RESTART', 'Service-worker restart reuses the live page runtime', async () => {
+    await runB2KernelBrowserCase(result.cases, family, ['B2-KERNEL-002'], ['B1-LC-005'], 'WORKER-RESTART', 'Service-worker restart reconnects isolated authority while reusing the live page runtime', async () => {
       assert(activeRuntimeId, 'Initial runtime was unavailable because the prerequisite case failed');
+      const authorityBefore = await waitFor(async () => {
+        const snapshot = await bridge.authoritySnapshot();
+        return snapshot?.healthy === true ? snapshot : null;
+      }, 'isolated authority before service-worker restart', options.timeoutMs);
+      assertHealthyB2KernelAuthority(authorityBefore, 'authority before service-worker restart', await pageState(page));
+      const persistedBeforeResult = await bridge.getStorage([AUTHORITY_STORAGE_KEY]);
+      const persistedBefore = persistedBeforeResult?.[AUTHORITY_STORAGE_KEY];
+      assert(persistedBefore && typeof persistedBefore === 'object', 'Persisted authority envelope was unavailable before service-worker restart', { recordPresent: Boolean(persistedBefore) });
+      assert(persistedBefore.document && typeof persistedBefore.document === 'object', 'Persisted authoritative document was unavailable before service-worker restart', { documentPresent: Boolean(persistedBefore?.document) });
+      assert(persistedBefore.document.revision === authorityBefore.revision, 'Persisted and isolated authority revisions differed before restart', { authorityBefore, persistedBeforeRevision: persistedBefore.document.revision });
+      const persistedDocumentBeforeSha256 = jsonSha256(persistedBefore.document);
       let targets = await browserCdp.send('Target.getTargets');
       const before = await waitFor(async () => serviceWorkerTarget(await browserCdp.send('Target.getTargets'), extensionId), 'extension service-worker target', options.timeoutMs);
       const closed = await browserCdp.send('Target.closeTarget', { targetId: before.targetId });
       assert(closed.success === true, 'Browser did not close the service-worker target', closed);
       await waitFor(async () => !serviceWorkerTarget(await browserCdp.send('Target.getTargets'), extensionId), 'service-worker termination', options.timeoutMs);
-      const response = await bridge.send({ type: MESSAGES.HEALTH });
+      const response = await bridge.send({ type: MESSAGES.REVALIDATE });
       const after = await waitFor(async () => serviceWorkerTarget(await browserCdp.send('Target.getTargets'), extensionId), 'service-worker restart', options.timeoutMs);
+      const authorityAfter = await waitFor(async () => {
+        const snapshot = await bridge.authoritySnapshot();
+        return snapshot?.healthy === true && snapshot.workerInstanceId !== authorityBefore.workerInstanceId ? snapshot : null;
+      }, 'autonomous isolated-authority heartbeat reconnection to the restarted worker', options.timeoutMs);
       targets = await browserCdp.send('Target.getTargets');
       const state = await pageState(page);
       assertExpectedB1Shell(state, 'service-worker restart', candidateIdentity);
+      assertHealthyB2KernelAuthority(authorityAfter, 'authority after service-worker restart', state);
       assert(state.runtimeInstanceId === activeRuntimeId, 'Worker restart replaced the live page runtime', state);
       assert(response?.health?.runtimeInstanceId === activeRuntimeId, 'Restarted worker did not reuse the live runtime', response);
       assert(response?.classification === 'DEGRADED_SAME_BUILD', 'Restarted worker returned an unexpected classification', response);
+      assert(before.targetId !== after.targetId, 'Service-worker target identity did not change across restart', { before, after });
+      assert(authorityAfter.workerInstanceId !== authorityBefore.workerInstanceId, 'Isolated authority retained the terminated worker identity', { authorityBefore, authorityAfter });
+      assert(authorityBefore.disposition === 'OWNER' && authorityAfter.disposition === 'OWNER', 'Worker restart did not preserve OWNER disposition', { authorityBefore, authorityAfter });
+      assert(authorityAfter.revision === authorityBefore.revision, 'Worker restart changed the authoritative document revision', { authorityBefore, authorityAfter });
+      assert(authorityAfter.coordinationEpoch === authorityBefore.coordinationEpoch, 'Worker restart changed the live ownership epoch', { authorityBefore, authorityAfter });
+      const persistedAfterResult = await bridge.getStorage([AUTHORITY_STORAGE_KEY]);
+      const persistedAfter = persistedAfterResult?.[AUTHORITY_STORAGE_KEY];
+      assert(persistedAfter && typeof persistedAfter === 'object', 'Persisted authority envelope was unavailable after service-worker restart', { recordPresent: Boolean(persistedAfter) });
+      assert(persistedAfter.document && typeof persistedAfter.document === 'object', 'Persisted authoritative document was unavailable after service-worker restart', { documentPresent: Boolean(persistedAfter?.document) });
+      assert(persistedAfter.document.revision === authorityAfter.revision, 'Persisted and isolated authority revisions differed after restart', { authorityAfter, persistedAfterRevision: persistedAfter.document.revision });
+      const persistedDocumentAfterSha256 = jsonSha256(persistedAfter.document);
+      assert(persistedDocumentAfterSha256 === persistedDocumentBeforeSha256, 'Worker restart changed the packaged persisted authoritative document', {
+        persistedDocumentBeforeSha256,
+        persistedDocumentAfterSha256
+      });
       assert(tracker.companionCount() === primaryBootParseBaseline + 1, 'Worker restart reinjected the companion bundle', tracker.snapshot());
       return {
         beforeTargetId: before.targetId,
@@ -1214,6 +1431,16 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
         terminationObserved: true,
         serviceWorkerTargets: targets.targetInfos.filter(target => target.type === 'service_worker' && target.url.startsWith(`chrome-extension://${extensionId}/`)),
         response,
+        authorityBefore,
+        authorityAfter,
+        persistedDocumentBefore: {
+          revision: persistedBefore.document.revision,
+          sha256: persistedDocumentBeforeSha256
+        },
+        persistedDocumentAfter: {
+          revision: persistedAfter.document.revision,
+          sha256: persistedDocumentAfterSha256
+        },
         runtimeInstanceId: state.runtimeInstanceId,
         companionBundleParses: tracker.companionCount()
       };
@@ -1415,6 +1642,23 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
         name: 'Mandatory stable A4 fixture register coverage',
         status: 'FAIL',
         error: `Missing stable fixture IDs: ${result.stableFixtureCoverage.missing.join(', ')}`
+      });
+    }
+    const observedB2KernelFixtureIds = [...new Set(result.cases.flatMap(testCase => testCase.b2KernelFixtureIds || []))].sort();
+    result.b2KernelFixtureCoverage = {
+      scope: 'B2.1_ISOLATED_AUTHORITY_KERNEL_ONLY',
+      fullB2Acceptance: 'PENDING',
+      required: [...REQUIRED_B2_1_A4_FIXTURE_IDS],
+      observed: observedB2KernelFixtureIds,
+      missing: REQUIRED_B2_1_A4_FIXTURE_IDS.filter(fixtureId => !observedB2KernelFixtureIds.includes(fixtureId))
+    };
+    if (result.b2KernelFixtureCoverage.missing.length) {
+      result.cases.push({
+        id: `A4-B2.1-${family === 'chrome' ? 'CH' : 'ED'}-FIXTURE-COVERAGE`,
+        name: 'Mandatory B2.1 isolated authority-kernel fixture coverage',
+        b2Scope: 'ISOLATED_AUTHORITY_KERNEL_ONLY',
+        status: 'FAIL',
+        error: `Missing B2.1 fixture IDs: ${result.b2KernelFixtureCoverage.missing.join(', ')}`
       });
     }
     const failedCases = result.cases.filter(testCase => testCase.status === 'FAIL');

@@ -15,6 +15,8 @@ const REQUIRED_BUNDLES = Object.freeze([
 const ROOT_ID = 'ussign-job-timer';
 const INTERACTION_PROBE_EVENT = 'squarecoil-companion:interaction-probe';
 const SUPPORTED_URL = 'https://ussignandmill.squarecoil.net/jobs/123';
+const AUTHORITY_PROTOCOL_VERSION = 1;
+const AUTHORITY_PREPARE_DISABLE = 'SC_COMPANION_AUTHORITY_PREPARE_DISABLE';
 
 function cloneSerializable(value) {
   if (value === undefined) return undefined;
@@ -490,7 +492,9 @@ class FakePage {
       crypto: this.harness.deterministicCrypto,
       queueMicrotask,
       setTimeout,
-      clearTimeout
+      clearTimeout,
+      setInterval: callback => page.window.setInterval(callback),
+      clearInterval: id => page.window.clearInterval(id)
     };
   }
 
@@ -667,9 +671,19 @@ class A3Harness {
     this.runtimeOnMessage = new ChromeEvent();
     this.runtimeOnInstalled = new ChromeEvent();
     this.storageOnChanged = new ChromeEvent();
+    this.contentRuntimeOnMessage = new Map();
     this.storage = new FakeStorageArea(this.storageOnChanged, options.storage || {});
     this.responseGate = new ResponseGate();
     this._nextTabId = 1;
+    this.authorityKernelEnabled = options.authorityKernel === true;
+    let authorityLockQueue = Promise.resolve();
+    this.authorityLockManager = Object.freeze({
+      request: (_name, _options, callback) => {
+        const run = authorityLockQueue.then(callback, callback);
+        authorityLockQueue = run.then(() => undefined, () => undefined);
+        return run;
+      }
+    });
   }
 
   createPage(options = {}) {
@@ -699,14 +713,21 @@ class A3Harness {
       },
       scripting: {
         executeScript: details => this._executeScript(details)
+      },
+      tabs: {
+        sendMessage: (tabId, message, options) => this._dispatchContentMessage(tabId, message, options)
       }
     };
   }
 
   _contentChrome(page) {
+    if (!this.contentRuntimeOnMessage.has(page.tabId)) {
+      this.contentRuntimeOnMessage.set(page.tabId, new ChromeEvent());
+    }
     return {
       runtime: {
         getManifest: () => ({ version: this.buildInfo.packageVersion }),
+        onMessage: this.contentRuntimeOnMessage.get(page.tabId),
         sendMessage: async message => {
           const response = await this._dispatchRuntimeMessage(message, this._senderFor(page));
           return this.responseGate.wait(message?.type, response);
@@ -728,6 +749,9 @@ class A3Harness {
       console,
       URL,
       crypto: this.deterministicCrypto,
+      navigator: this.authorityKernelEnabled
+        ? { locks: this.authorityLockManager }
+        : {},
       queueMicrotask,
       setTimeout,
       clearTimeout
@@ -768,6 +792,55 @@ class A3Harness {
       try {
         for (const listener of listeners) {
           const result = listener(cloneSerializable(message), cloneSerializable(sender), sendResponse);
+          if (result === true) asyncResponseExpected = true;
+          if (settled) break;
+        }
+        if (!settled && !asyncResponseExpected) {
+          settled = true;
+          resolve(undefined);
+        }
+      } catch (error) {
+        settled = true;
+        reject(error);
+      }
+    });
+  }
+
+  async _dispatchContentMessage(tabId, message, options = {}) {
+    const page = this.pages.get(tabId);
+    if (!page) throw new Error(`A3 content target tab is unavailable: ${tabId}`);
+    if (options.documentId && options.documentId !== page.documentId) throw new Error('A3 content target document changed');
+    if (Number.isInteger(options.frameId) && options.frameId !== page.frameId) throw new Error('A3 content target frame changed');
+    const event = this.contentRuntimeOnMessage.get(tabId);
+    const listeners = [...(event?.listeners || [])];
+    if (!listeners.length) {
+      // Most B1 orchestration fixtures intentionally exercise only the real
+      // background and MAIN bundles. With no isolated content bundle there can
+      // be no authority client or transport session to release, so acknowledge
+      // that exact absent case instead of inventing an authority allocation.
+      if (message?.type === AUTHORITY_PREPARE_DISABLE) {
+        return {
+          ok: true,
+          disconnected: true,
+          absent: true,
+          protocolVersion: AUTHORITY_PROTOCOL_VERSION,
+          documentToken: page.documentToken,
+          runtimeInstanceId: message.runtimeInstanceId || null
+        };
+      }
+      throw new Error('A3 content world has no runtime message listener');
+    }
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      let asyncResponseExpected = false;
+      const sendResponse = value => {
+        if (settled) return;
+        settled = true;
+        resolve(cloneSerializable(value));
+      };
+      try {
+        for (const listener of listeners) {
+          const result = listener(cloneSerializable(message), {}, sendResponse);
           if (result === true) asyncResponseExpected = true;
           if (settled) break;
         }

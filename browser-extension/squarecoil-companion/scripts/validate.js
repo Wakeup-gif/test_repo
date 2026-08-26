@@ -19,8 +19,10 @@ function assert(condition, message) {
 assert(manifest.manifest_version === 3, 'manifest_version must be 3');
 assert(manifest.version === release.latestVersion, `manifest version ${manifest.version} must match release metadata ${release.latestVersion}`);
 assert(manifest.version === packageMetadata.version, `manifest version ${manifest.version} must match package metadata ${packageMetadata.version}`);
-assert(JSON.stringify(manifest.permissions || []) === JSON.stringify(['storage', 'scripting']), 'B1 permissions must remain storage + scripting only');
-assert(JSON.stringify(manifest.host_permissions || []) === JSON.stringify(['https://ussignandmill.squarecoil.net/*']), 'B1 host permission must remain limited to the exact SquareCoil tenant');
+assert(BUILD_ID === 'rebuild-b2-fenced-authoritative-kernel', 'B2.1 build ID must identify the fenced authoritative kernel');
+assert(BUILD_STAGE === 'B2.1', 'B2.1 build stage must remain explicit');
+assert(JSON.stringify(manifest.permissions || []) === JSON.stringify(['storage', 'scripting']), 'Rebuild permissions must remain storage + scripting only');
+assert(JSON.stringify(manifest.host_permissions || []) === JSON.stringify(['https://ussignandmill.squarecoil.net/*']), 'Rebuild host permission must remain limited to the exact SquareCoil tenant');
 assert(JSON.stringify(Object.keys(manifest.background || {}).sort()) === JSON.stringify(['service_worker']), 'B1 background policy must contain only the service worker entry');
 assert(manifest.background?.service_worker === 'dist/background.js', 'B1 manifest must use generated dist/background.js');
 assert(manifest.action?.default_popup === 'popup/popup.html', 'B1 popup path must be explicit');
@@ -74,8 +76,43 @@ const required = [
   'scripts/candidate-identity.js'
 ];
 
+const b2KernelRequired = [
+  'src/coordination/coordinator.js',
+  'src/data/checkpoint.js',
+  'src/data/ledger.js',
+  'src/data/migration-command.js',
+  'src/data/migration-schema.js',
+  'src/data/migration.js',
+  'src/data/model.js',
+  'src/data/store.js',
+  'src/data/workday-zone.js',
+  'src/extension/authority-client.js',
+  'src/extension/authority-kernel.js',
+  'src/extension/authority-protocol.js',
+  'src/extension/authority-router.js',
+  'src/persistence/chrome-storage.js',
+  'src/timer/read-model.js',
+  'tests/b2/authority-kernel.test.js',
+  'tests/b2/authority-store.test.js',
+  'tests/b2/background-authority.test.js',
+  'tests/b2/checkpoint.test.js',
+  'tests/b2/coordination-kernel.test.js',
+  'tests/b2/ledger.test.js',
+  'tests/b2/migration-command.test.js',
+  'tests/b2/migration.test.js',
+  'tests/b2/model.test.js',
+  'tests/b2/persistence-authority.test.js',
+  'tests/b2/read-model.test.js',
+  'tests/b2/workday-zone.test.js',
+  'tests/b2-integration/authority-boundary.integration.test.js',
+  'tests/b2-integration/authority-router.integration.test.js'
+];
+
 for (const file of required) {
   assert(fs.existsSync(path.join(root, file)), `Missing B1 file: ${file}`);
+}
+for (const file of b2KernelRequired) {
+  assert(fs.existsSync(path.join(root, file)), `Missing B2.1 kernel file: ${file}`);
 }
 
 const background = fs.readFileSync(path.join(root, 'dist/background.js'), 'utf8');
@@ -132,13 +169,13 @@ function listJavaScriptFiles(directory) {
   return files;
 }
 
-const fixtureDirectories = ['tests/b1', 'tests/b1-integration', 'tests/b1-browser'];
+const fixtureDirectories = ['tests/b1', 'tests/b1-integration', 'tests/b1-browser', 'tests/b2', 'tests/b2-integration'];
 const fixtureFiles = fixtureDirectories.flatMap(directory => listJavaScriptFiles(path.join(root, directory)));
 for (const file of fixtureFiles) {
   const source = fs.readFileSync(file, 'utf8');
   const relative = path.relative(root, file).split(path.sep).join('/');
-  assert(!/\b(?:test|it|describe|suite)\s*\.\s*(?:skip|todo|only)\s*\(/.test(source), `Required B1 fixture may not be skipped, todo, or focused: ${relative}`);
-  assert(!/\b(?:skip|todo)\s*:/.test(source), `Required B1 fixture may not use skip/todo options: ${relative}`);
+  assert(!/\b(?:test|it|describe|suite)\s*\.\s*(?:skip|todo|only)\s*\(/.test(source), `Required fixture may not be skipped, todo, or focused: ${relative}`);
+  assert(!/\b(?:skip|todo)\s*:/.test(source), `Required fixture may not use skip/todo options: ${relative}`);
 }
 
 const unitFixtureMappings = [
@@ -184,12 +221,81 @@ for (const fixtureId of requiredIntegrationFixtures) {
 for (const fixtureId of requiredBrowserFixtures) {
   assert(browserFixtureIds.has(fixtureId), `A4 Chrome/Edge fixture register is missing ${fixtureId}`);
 }
+for (const fixtureId of ['B2-KERNEL-001', 'B2-KERNEL-002']) {
+  assert(browserFixtureSource.includes(fixtureId), `B2.1 browser fixture register is missing ${fixtureId}`);
+}
+
+const b2FixtureFiles = [
+  ...listJavaScriptFiles(path.join(root, 'tests/b2')),
+  ...listJavaScriptFiles(path.join(root, 'tests/b2-integration'))
+];
+const b2FixtureIdPattern = /\b(?:UT|IT)-B2-(?:[A-Z][A-Z0-9]*-)+\d{2,3}\b/g;
+const b2FixtureIds = new Map();
+let b2TestCount = 0;
+for (const file of b2FixtureFiles) {
+  const source = fs.readFileSync(file, 'utf8');
+  const relative = path.relative(root, file).split(path.sep).join('/');
+  const titles = [...source.matchAll(/\btest\s*\(\s*(['"])([^'"\r\n]+)\1/g)].map(match => match[2]);
+  b2TestCount += titles.length;
+  for (const title of titles) {
+    const match = title.match(b2FixtureIdPattern);
+    assert(match && title.startsWith(match[0]), `B2.1 test title must start with a stable fixture ID in ${relative}: ${title}`);
+  }
+  for (const match of source.matchAll(b2FixtureIdPattern)) {
+    const owners = b2FixtureIds.get(match[0]) || [];
+    owners.push(relative);
+    b2FixtureIds.set(match[0], owners);
+  }
+}
+for (const [fixtureId, owners] of b2FixtureIds) {
+  assert(owners.length === 1, `B2.1 fixture ID must be unique: ${fixtureId} appears in ${owners.join(', ')}`);
+}
+assert(b2FixtureIds.size === b2TestCount, `Every B2.1 test must own exactly one stable fixture ID (${b2FixtureIds.size} IDs for ${b2TestCount} tests)`);
+const requiredB2FixtureFamilies = [
+  'UT-B2-FENCE-',
+  'UT-B2-MIG-',
+  'UT-B2-CP-',
+  'UT-B2-LEDGER-',
+  'UT-B2-MODEL-',
+  'UT-B2-ZONE-',
+  'UT-B2-READ-',
+  'UT-B2-AUTH-',
+  'UT-B2-PERSIST-',
+  'IT-B2-AUTH-',
+  'IT-B2-PERSIST-',
+  'IT-B2-PLATFORM-'
+];
+for (const family of requiredB2FixtureFamilies) {
+  assert([...b2FixtureIds.keys()].some(fixtureId => fixtureId.startsWith(family)), `B2.1 fixture register is missing family ${family}*`);
+}
+
+const sourceFiles = listJavaScriptFiles(path.join(root, 'src'));
+const authorityStorageKey = 'squarecoilCompanionB2AuthorityV1';
+const authorityStorageKeyOwners = sourceFiles.filter(file => fs.readFileSync(file, 'utf8').includes(authorityStorageKey));
+assert(authorityStorageKeyOwners.length === 1, 'The B2.1 authoritative storage key must have one source owner');
+assert(path.relative(root, authorityStorageKeyOwners[0]).split(path.sep).join('/') === 'src/extension/authority-kernel.js', 'The B2.1 authoritative storage key must be owned by authority-kernel.js');
+const backgroundSource = fs.readFileSync(path.join(root, 'src/extension/background-entry.js'), 'utf8');
+const contentSource = fs.readFileSync(path.join(root, 'src/content/controller.js'), 'utf8');
+const pageSource = fs.readFileSync(path.join(root, 'src/page/entry.js'), 'utf8');
+assert(backgroundSource.includes("require('./authority-kernel')"), 'The worker must import the real B2.1 authority kernel');
+assert(backgroundSource.includes('const defaultAuthorityInstallation = installDefaultAuthorityAdapter();'), 'The worker must install the B2.1 authority kernel at startup');
+assert(background.includes(authorityStorageKey), 'The generated worker bundle must contain the B2.1 authority storage key');
+assert(background.includes('authority-web-locks-required'), 'The generated worker bundle must preserve fail-closed cross-context locking');
+assert(contentSource.includes("require('../extension/authority-client')"), 'The isolated content controller must own the B2.1 authority client');
+assert(!contentSource.includes('postMessage'), 'The isolated authority boundary must not use page postMessage');
+assert(!pageSource.includes('createAuthorityClient'), 'MAIN-world code must not own an authoritative client');
+assert(!fs.existsSync(path.join(root, 'src/extension/authority-page-relay.js')), 'A MAIN-world authority relay must not exist');
+const companionBundle = fs.readFileSync(path.join(root, 'dist/companion-app.js'), 'utf8');
+const contentBundle = fs.readFileSync(path.join(root, 'dist/content-controller.js'), 'utf8');
+assert(!companionBundle.includes('src/extension/authority-client.js'), 'The MAIN bundle must not package the authority client');
+assert(contentBundle.includes('src/extension/authority-client.js'), 'The isolated content bundle must package the authority client');
+assert(!contentBundle.includes('squarecoil-companion-authority-v1'), 'The isolated content bundle must not expose the retired page authority channel');
 
 const serializedManifest = JSON.stringify(manifest);
 assert(!serializedManifest.includes('raw.githubusercontent.com'), 'B1 manifest should not request raw GitHub host permission');
 assert(!serializedManifest.includes('i.imgur.com'), 'B1 manifest should not request image host permission');
 
-console.log(`B1 validation passed for SquareCoil Companion v${manifest.version}`);
+console.log(`B2.1 kernel validation passed for SquareCoil Companion v${manifest.version}`);
 console.log(`Canonical build identity: ${BUILD_ID} (${BUILD_STAGE}).`);
-console.log('Lifecycle shell uses one generated MAIN-world application bundle and one isolated content controller.');
-console.log(`Fixture register validated: ${unitFixtureMappings.length} A2 mappings, ${requiredIntegrationFixtures.length} A3 IDs, ${requiredBrowserFixtures.length} A4 IDs; no skipped/todo/focused fixtures.`);
+console.log('The worker owns one fenced authority kernel; only the isolated content controller owns its versioned client transport.');
+console.log(`Fixture register validated: ${unitFixtureMappings.length} B1 A2 mappings, ${requiredIntegrationFixtures.length} B1 A3 IDs, ${requiredBrowserFixtures.length} B1 A4 IDs, 2 B2.1 A4 IDs, ${b2FixtureIds.size} B2.1 stable IDs; no skipped/todo/focused fixtures.`);
