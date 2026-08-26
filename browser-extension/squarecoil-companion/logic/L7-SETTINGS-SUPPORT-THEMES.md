@@ -1,62 +1,63 @@
 # SquareCoil Companion Rebuild
 ## Logic Stage L7: Settings, Themes, Support, and Developer Support
 
-**Status:** Ready for review  
+**Status:** Settled - ready for L8  
 **Logic stage:** L7  
 **Depends on:** L0 invariants, L1 lifecycle, L2 state/time/migration, L3 SquareCoil Bridge, L4 core timer behavior, L5 time views/workspace, L6 data safety/backup  
 **Framework authority:** `docs/REBUILD-MASTER-PLAN.md`  
-**Purpose:** Define Settings navigation, preferences, appearance/theme behavior, Support/Feedback, diagnostics privacy, and optional developer-support behavior without allowing secondary UI features to own Timer State, lifecycle health, or authoritative historical time.
+**Purpose:** Define Settings navigation, preferences, appearance/theme behavior, Support/Feedback, diagnostics privacy, and optional developer-support behavior without allowing secondary UI features to own Timer State, lifecycle health, authoritative time, or unsafe native SquareCoil behavior.
 
 ---
 
 # 1. Scope and Ownership
 
-L7 owns behavior for:
+L7 owns:
 
 - Settings router/navigation;
-- Settings open/close/back behavior;
-- Settings route persistence/reset policy;
-- state-independent accessibility/focus behavior needed for safe Settings interaction;
+- open/close/back/recovery route behavior;
+- focus/keyboard safety;
+- dirty-draft loss protection;
+- preference mutation and cross-tab preference concurrency;
 - Timer Appearance: Light / Dark / Auto;
 - Panel Finish: Solid / Glass;
 - SquareCoil Website Theme: Original / Refined Light / Sleek Dark;
-- logo switching/fallback behavior;
-- Timer Limits preference editing/validation;
-- routing to L5 Library views and L6 Archives & Backup;
-- Support ticket form;
-- Feedback form;
-- diagnostics whitelist/preview/copy behavior;
-- mail-client transport behavior;
-- support transport fallback;
+- native-UI/accessibility safety for themes;
+- theme/logo application and fallback;
+- Timer Limits editing/validation;
+- routing to L5 Library and L6 Archives & Backup;
+- navigation behavior while L6 mutations are staged/committing;
+- Support ticket and Feedback forms;
+- diagnostics whitelist, frozen preview, copy, and privacy behavior;
+- mail-client transport and fallbacks;
 - Developer Support page;
-- Buy Me a Coffee external-link behavior;
-- Cash App QR/tag display/copy behavior;
+- Buy Me a Coffee external navigation;
+- Cash App QR/tag display/copy;
 - optional/free/no-nag/no-tracking rules;
-- failure isolation for all secondary presentation/support features.
+- failure isolation for all secondary features.
 
-L7 does **not**:
+L7 does not:
 
-- change SquareCoil company clock state;
+- clock the user in/out of SquareCoil;
 - write Timer State directly;
 - calculate Today/Week/Total independently;
-- redefine backup/delete/import semantics;
+- redefine L6 data mutation semantics;
 - implement payment processing;
-- collect donation/payment information;
-- define final CSS polish or exact visual spacing.
+- collect payment credentials or donation status;
+- define final CSS polish/spacing.
 
-> Settings owns preference/navigation UI. Feature services own their domain behavior. Timer State remains owned by L2/L4.
+> Settings owns navigation and preference interaction. Domain services own their behavior. Timer State remains owned by L2/L4.
 
-**Settled scope**
+**Settled**
 
 ---
 
-# 2. Settings Router Ownership
+# 2. One Settings Router
 
 Exactly one Settings router is owned by the single Companion renderer.
 
-Feature modules do not patch Settings DOM after render and do not insert controls through MutationObserver chains.
+Feature modules do not patch Settings DOM after render and do not insert normal controls through MutationObserver chains.
 
-Canonical Settings routes support at least:
+Canonical routes include at least:
 
 ```text
 SETTINGS_HOME
@@ -72,15 +73,13 @@ SEND_FEEDBACK
 DEVELOPER_SUPPORT
 ```
 
-L6 may expose nested Archives & Backup subroutes through the same router.
+L6 may expose nested Archives & Backup routes through the same router.
 
 **Settled**
 
 ---
 
 # 3. Settings Home Information Architecture
-
-Settings Home presents these logical groups:
 
 ```text
 TIMER APPEARANCE
@@ -110,135 +109,187 @@ ABOUT
 Support the Developer
 ```
 
-The exact card/list styling is visual implementation. Grouping and ownership are settled.
+Exact cards/icons/layout are visual implementation. Grouping and ownership are settled.
+
+---
+
+# 4. Open / Back / Close / Recovery
+
+## 4.1 Open
+
+Opening Settings:
+
+- does not alter Selected Context or Timer State;
+- records the invoking control for focus return;
+- opens `SETTINGS_HOME` by default.
+
+## 4.2 Subroutes and Back
+
+Back returns one Settings level. A nested L6 route returns to its immediate parent before Home.
+
+Settings Back is not browser Back and does not alter SquareCoil URL/history.
+
+## 4.3 Close
+
+Close returns to the main Companion surface with Selected Context and Timer State unchanged.
+
+## 4.4 Reopen
+
+After Settings is fully closed, reopening starts at `SETTINGS_HOME`. Do not reopen stale Delete/Restore/Support screens.
+
+## 4.5 Runtime recovery/rebuild
+
+If the renderer/lifecycle recovers or rebuilds Settings after a runtime recovery:
+
+- transient route stacks are discarded;
+- recovered Settings starts at Home;
+- no destructive confirmation is recreated as already approved;
+- no Support draft is restored from durable storage;
+- timing state remains governed by L1-L4.
 
 **Settled**
 
 ---
 
-# 4. Open / Close / Back Behavior
+# 5. Dirty Draft Loss Protection
 
-## 4.1 Open Settings
+Transient drafts may exist for:
 
-Opening Settings from the timer:
+- Ticket/Feedback forms;
+- Timer Limit edits before Save;
+- L6 import/restore conflict review state when exposed through Settings.
 
-- does not change Selected Context;
-- does not pause/resume timing;
-- opens `SETTINGS_HOME` by default;
-- records the element/control that opened Settings so focus can return when closed.
+If Back/Close/route navigation would discard a materially modified uncommitted draft, Settings must not silently lose it.
 
-## 4.2 Open subview
-
-Choosing a Settings destination pushes/navigates to that route inside the Companion router.
-
-## 4.3 Back
-
-`Back` returns one Settings level.
-
-For first-level destinations:
+Allowed behavior:
 
 ```text
-Subview -> SETTINGS_HOME
+Keep Editing
+Discard Draft / Leave
 ```
 
-For L6 nested destinations, Back returns to the immediate parent inside Archives & Backup before returning Home.
+or an equivalent explicit loss decision.
 
-Back never changes timing or browser page navigation.
+Exceptions:
 
-## 4.4 Close Settings
+- an unchanged/empty draft may close without confirmation;
+- unexpected full page/lifecycle loss may discard transient Support drafts because L7 intentionally does not persist private message bodies.
 
-Close returns to the main Companion timer/view state without changing current Selected Context or Timer State.
-
-## 4.5 Reopen policy
-
-Settings route is transient UI state and is not persisted as durable application preference.
-
-After Settings is fully closed, reopening starts at `SETTINGS_HOME` rather than restoring a stale destructive/support subview.
+The app must not solve draft loss by secretly storing Support content in preferences, backup, Activity Log, or diagnostics.
 
 **Settled**
 
 ---
 
-# 5. Browser History Isolation
+# 6. Focus, Keyboard, and Destructive-Control Safety
 
-Internal Settings navigation does not manipulate SquareCoil's browser history or URL merely to represent Settings routes.
+Requirements:
 
-The Back control in Settings is an application-router action, not browser Back.
+- opening Settings moves focus into Settings;
+- route changes move focus to the new heading/meaningful control;
+- close returns focus to the opener when it still exists;
+- hidden controls are not focusable;
+- Enter/Space use native focused-control semantics;
+- Escape may cancel/close the topmost safe Settings layer but never Pause/Resume/Delete underneath;
+- underlying timer shortcuts are suppressed while focus is inside Settings input/form/dialog controls;
+- destructive confirmation does not default-focus the destructive action when a safer Cancel/Back target is appropriate;
+- an Enter key that opened a destructive dialog cannot leak through and confirm it;
+- canceling a destructive confirmation creates no mutation.
 
-External navigation such as Open Job or developer-support links follows its own explicit navigation contract.
-
-**Settled**
-
----
-
-# 6. Focus and Keyboard Safety
-
-Settings must remain keyboard-operable without introducing timing shortcuts by accident.
-
-Behavioral requirements:
-
-- opening Settings moves focus into the Settings surface or its first meaningful heading/control;
-- closing returns focus to the control that opened Settings when that control still exists;
-- route changes move focus to the new view heading/first meaningful target;
-- Tab/Shift+Tab follow normal focus order;
-- Enter/Space activate the focused control according to native semantics;
-- Escape may close the topmost non-destructive dialog or Settings surface when safe, but must never trigger timer Pause/Resume/Delete;
-- destructive confirmation cannot be accepted solely because a globally handled key event leaked from the underlying timer;
-- hidden Settings controls are not keyboard-focusable.
-
-Exact focus-trap implementation is an implementation detail.
+Exact focus-trap implementation is not logic.
 
 **Settled**
 
 ---
 
-# 7. Preference Mutation Contract
+# 7. L6 Operation Navigation Safety
 
-Settings preferences are durable non-time application data.
+Settings must respect the L6 Data Mutation Lock.
 
-A preference change:
+## Before authoritative commit
 
-1. validates the requested value;
-2. applies through the Preferences service;
-3. publishes one preference revision/change event;
-4. renderer/theme service reacts idempotently;
-5. unrelated Timer State/Time Ledger data is untouched.
+A staged import/restore/delete plan is still cancelable. Back/Close may cancel that uncommitted staged plan after any dirty-review guard required by the route.
 
-Invalid preference values are rejected and the last valid value remains authoritative.
+## While authoritative commit is in progress
 
-Preference changes do not directly write another feature's storage representation.
+Once an L6 atomic commit has begun:
+
+- Settings must not claim the operation was canceled;
+- the destructive/import control is disabled from duplicate activation;
+- route/close behavior must preserve access to a terminal result, or clearly indicate the operation continues if the UI is allowed to close;
+- no second mutation is started by navigation.
+
+## After terminal result
+
+Success/failure is shown from L6's actual result. Settings does not infer success from button activation.
 
 **Settled**
 
 ---
 
-# 8. First-Install Defaults
+# 8. Preference Mutation Contract
 
-First-install defaults are:
+Durable preferences use the Preferences service.
+
+A committed change:
+
+1. validates value(s);
+2. verifies expected preference revision where a stale draft could overwrite newer changes;
+3. commits one coherent preference revision;
+4. publishes one preference-change snapshot/event;
+5. renderer/theme service reacts idempotently;
+6. Timer State/Ledger remain untouched.
+
+If persistence fails:
+
+- UI returns to or displays the last committed preference value;
+- it does not pretend the new value is durable;
+- feature-level error is shown;
+- timer health is unaffected unless the failure reveals an independent core persistence problem under L1.
+
+**Settled**
+
+---
+
+# 9. Cross-Tab Preference Concurrency
+
+Durable preferences synchronize across tabs.
+
+For immediate single-value controls such as Timer Appearance, the latest successfully committed preference revision becomes authoritative.
+
+For multi-field drafts such as Timer Limits:
+
+- the form records the preference revision it began from;
+- if another tab commits new limits before this draft saves, the stale draft must not silently overwrite them;
+- Save rechecks the base revision;
+- stale draft is rejected/refreshed or requires explicit rebase/re-entry.
+
+Per-tab transient route/focus/Support drafts never synchronize.
+
+**Settled**
+
+---
+
+# 10. First-Install Defaults
 
 ```text
 Timer Appearance = Light
 Panel Finish      = Solid
 Website Theme     = Original
+Yellow            = 60 minutes
+Orange            = 120 minutes
+Red               = 240 minutes
 ```
 
-Timer threshold defaults remain the L4 values:
-
-```text
-Yellow = 60 minutes
-Orange = 120 minutes
-Red    = 240 minutes
-```
-
-Migration of existing valid preferences should preserve user choices rather than reapplying first-install defaults.
+Valid migrated preferences survive the rebuild. First-install defaults are not reapplied over existing valid user choices.
 
 **Settled**
 
 ---
 
-# 9. Timer Appearance
+# 11. Timer Appearance
 
-Canonical preference:
+Canonical durable preference:
 
 ```text
 LIGHT
@@ -246,48 +297,27 @@ DARK
 AUTO
 ```
 
-Timer Appearance affects Companion UI only. It does not change the SquareCoil website theme.
+Timer Appearance changes Companion UI only.
 
-## 9.1 Light
+## AUTO
 
-Resolve Companion timer presentation to Light.
+- durable preference remains `AUTO`;
+- effective Light/Dark follows the current system/browser color-scheme signal;
+- system changes update effective presentation live;
+- if signal is unavailable, effective presentation falls back to Light while preference remains Auto and a noncritical diagnostic may record the fallback.
 
-## 9.2 Dark
+Auto listener ownership is lifecycle/theme-service managed:
 
-Resolve Companion timer presentation to Dark.
-
-## 9.3 Auto
-
-Auto retains the durable preference `AUTO` and resolves presentation from the current system/browser color-scheme signal.
-
-While Auto is selected:
-
-- system light/dark changes update Companion presentation live;
-- the durable preference remains Auto rather than being rewritten to Light/Dark on every system change;
-- no timer/state mutation occurs.
-
-If system color-scheme detection is unavailable/invalid, resolve presentation to Light as the safe default while retaining `AUTO` and record a noncritical diagnostic disposition.
+- at most one current color-scheme listener exists per runtime;
+- leaving Auto removes/deactivates Auto-only listener behavior;
+- teardown invalidates old listeners;
+- repeated theme application cannot stack listeners.
 
 **Settled**
 
 ---
 
-# 10. Timer Appearance Failure Isolation
-
-If a timer appearance presentation layer fails:
-
-- Timer State and lifecycle timer ownership remain untouched;
-- renderer falls back to a readable base/default presentation when possible;
-- preference failure is reported at feature/presentation level;
-- no extra runtime/root is created as a recovery technique.
-
-A theme/style failure alone cannot cause timer accrual to stop.
-
-**Settled**
-
----
-
-# 11. Panel Finish
+# 12. Panel Finish
 
 Canonical preference:
 
@@ -296,50 +326,68 @@ SOLID
 GLASS
 ```
 
-Panel Finish is independent from Timer Appearance.
+Finish is independent from Timer Appearance.
 
-Examples:
+Glass requirements:
+
+- blur is limited to useful outer surfaces/tabs rather than every nested panel;
+- text/controls remain readable and interaction-safe;
+- first-install default is Solid;
+- finish never changes timing.
+
+If Glass is unsupported, unsafe, or incompatible with an accessibility/high-contrast environment:
 
 ```text
-Light + Solid
-Light + Glass
-Dark + Solid
-Dark + Glass
-Auto-resolved Dark + Glass
+preference = GLASS
+effectiveFinish = SOLID_FALLBACK
 ```
 
-Glass is optional presentation treatment.
-
-Behavioral requirements:
-
-- expensive blur is concentrated on outer shell/tabs rather than every nested component;
-- nested content remains readable and interaction-safe;
-- finish never changes Timer State;
-- first-install default is Solid.
+Retain the user's preference, show a nonblocking availability note when useful, avoid repeated expensive retries, and allow effective Glass to return if capability later becomes safe.
 
 **Settled**
 
 ---
 
-# 12. Glass Capability Fallback
+# 13. Presentation Accessibility Precedence
 
-If the platform/browser cannot safely provide the required Glass treatment:
+Timer/Website presentation must not fight browser accessibility modes.
 
-- retain the user's durable `GLASS` preference;
-- resolve the current effective finish to `SOLID_FALLBACK`;
-- optionally show a concise nonblocking availability note in Settings;
-- do not repeatedly retry expensive unsupported effects;
-- do not degrade timer lifecycle health.
+When forced-colors/high-contrast/reduced-transparency capabilities make custom presentation unsafe or unreadable:
 
-When capability later becomes available, the effective finish may return to Glass without rewriting the preference.
+- preserve durable user preference;
+- reduce/suspend custom visual treatment as needed;
+- prefer readable native/system focus, text, control, border, and status treatment;
+- Glass may resolve Solid;
+- custom website colors may resolve to a safer effective theme treatment without rewriting the selected Website Theme preference.
+
+Presentation preferences never outrank usable controls or semantic state clarity.
 
 **Settled**
 
 ---
 
-# 13. SquareCoil Website Theme
+# 14. Theme Semantic Safety
 
-Canonical Website Theme preference:
+Timer and Website themes are presentation only.
+
+A theme must not:
+
+- alter native form values;
+- change native action targets/URLs;
+- hide required native controls;
+- remove disabled/read-only/error meaning;
+- make focused controls indistinguishable;
+- replace native content text with fabricated business data;
+- recolor danger/warning/success/hold states so their semantic distinction is lost;
+- intercept SquareCoil clock actions as part of styling.
+
+If a selector cannot be styled safely, leave that native element unmodified rather than broad-guessing.
+
+**Settled**
+
+---
+
+# 15. Website Theme Preference
 
 ```text
 ORIGINAL
@@ -347,104 +395,70 @@ REFINED_LIGHT
 SLEEK_DARK
 ```
 
-Website Theme affects native SquareCoil presentation only. It is independent from Timer Appearance/Finish.
+Website Theme affects native SquareCoil presentation only and is independent from Timer Appearance/Finish.
+
+## ORIGINAL
+
+Remove only Companion-owned website-theme artifacts and restore native presentation as closely as possible. Use native logo.
+
+## REFINED_LIGHT
+
+Preserve recognizable SquareCoil structure/proportions; apply restrained readability/contrast cleanup; preserve native semantic colors; use native logo until an approved light custom asset exists.
+
+## SLEEK_DARK
+
+Preserve structure/proportions; use graphite/charcoal hierarchy; avoid glaring white outlines/wallpaper by default; preserve semantic colors; use the approved configured dark logo when available.
+
+No light logo is fabricated.
 
 **Settled**
 
 ---
 
-# 14. Original Website Theme
-
-`ORIGINAL` means Companion website-theme presentation is removed and native SquareCoil appearance is restored as closely as possible to the unmodified site.
-
-The theme service must remove only presentation artifacts/classes/styles/logo substitutions it owns.
-
-It must not reset unrelated native/user application state simply to restore Original.
-
-Native SquareCoil logo is used.
-
-**Settled**
-
----
-
-# 15. Refined Light Website Theme
-
-`REFINED_LIGHT`:
-
-- keeps recognizable SquareCoil structure/proportions;
-- applies restrained readability/contrast cleanup;
-- preserves native semantic status colors;
-- uses the native SquareCoil logo until an approved light custom asset is explicitly supplied.
-
-A custom light logo must not be fabricated by the extension.
-
-**Settled**
-
----
-
-# 16. Sleek Dark Website Theme
-
-`SLEEK_DARK`:
-
-- preserves SquareCoil structure/proportions;
-- uses graphite/charcoal hierarchy;
-- avoids glaring white outlines;
-- preserves semantic colors such as danger/warning/info/success/hold where meaningful;
-- avoids decorative wallpaper as a default requirement;
-- uses the approved configured dark-logo asset when available.
-
-Presentation remains subordinate to native content usability.
-
-**Settled**
-
----
-
-# 17. Website Logo Policy and Fallback
-
-Logo behavior:
+# 16. Logo Policy and Failure
 
 ```text
 Original       -> native logo
-Refined Light  -> native logo until approved light asset exists
-Sleek Dark     -> configured approved dark logo when available
+Refined Light  -> native logo until approved light asset
+Sleek Dark     -> approved configured dark logo when available
 ```
 
-If the dark-logo asset fails to load:
+If dark logo fails:
 
 - Sleek Dark may remain active;
-- native logo is restored/used as fallback;
-- the failure is a noncritical presentation diagnostic;
-- timer lifecycle/state remain healthy.
+- native logo is used/restored;
+- failure is feature-level only;
+- no timer/lifecycle restart occurs.
 
-Switching away from Sleek Dark restores the native logo unless another explicitly approved theme-specific asset is configured.
-
-**Settled**
-
----
-
-# 18. Website Theme Application Contract
-
-Website-theme application is idempotent.
-
-Changing themes:
-
-1. resolves current theme preference;
-2. removes/replaces only Companion-owned website-theme artifacts;
-3. applies the new presentation;
-4. verifies enough presentation ownership to avoid duplicate style/theme layers;
-5. emits a feature-level result.
-
-Repeated application of the same theme must not stack duplicate style tags/classes/listeners.
-
-Website-theme failure cannot create a second Companion runtime or timer root.
+Switching away from Sleek Dark restores native logo unless another approved theme asset is explicitly configured.
 
 **Settled**
 
 ---
 
-# 19. Timer Limits Settings
+# 17. Website Theme Application / Reapplication
 
-Timer Limits edit the L4 threshold preferences only.
+Theme application is idempotent.
+
+It:
+
+1. reads one committed preference snapshot;
+2. removes/replaces only Companion-owned presentation artifacts;
+3. applies the current effective treatment;
+4. verifies it did not create duplicate owned layers;
+5. reports feature-level status.
+
+Repeated application cannot stack style tags/classes/listeners.
+
+Known page/lifecycle changes may request targeted reapplication. The theme service must not use a broad document-wide mutation patch loop as normal UI construction.
+
+Original/native restoration removes only what the theme service owns.
+
+**Settled**
+
+---
+
+# 18. Timer Limits
 
 Fields:
 
@@ -461,86 +475,83 @@ integer minutes
 1 <= Yellow <= Orange <= Red
 ```
 
-Behavior:
+Rules:
 
-- invalid draft values do not replace current valid thresholds;
-- field/view displays a validation error;
-- valid save publishes one preference update;
-- threshold changes recalculate presentation status from canonical Today values;
-- changing a threshold never creates/ends time.
+- edits are transient until Save;
+- invalid draft does not replace committed thresholds;
+- Save uses the preference-revision rules above;
+- successful Save emits one coherent threshold snapshot;
+- threshold presentation recalculates from canonical Today values;
+- threshold changes never create/end time;
+- Reset to Defaults requires explicit activation and restores 60/120/240 through the same preference commit path.
 
-A `Reset to Defaults` action may restore 60/120/240 after explicit user activation.
+Unsaved changed limits are protected by the dirty-draft rule.
 
 **Settled**
 
 ---
 
-# 20. Library Routes
+# 19. Restored Preference Batch
 
-Settings Library routes delegate to settled L5/L6 read/action services:
+L6 may restore multiple compatible preferences in one atomic restore.
+
+L7 consumes the committed preference snapshot as one coherent revision:
+
+- do not render intermediate half-restored combinations;
+- resolve Timer Appearance/Finish/Website Theme after the restore preference commit;
+- capability/accessibility fallbacks still apply;
+- Support drafts/routes are not restored;
+- no restored preference creates live Timer State.
+
+**Settled**
+
+---
+
+# 20. Library / Archives Routing Boundary
 
 ```text
 Recent Jobs       -> L5
 Time Overview     -> L5
 History           -> L5
-Activity Log      -> L5/non-authoritative activity service
+Activity Log      -> Activity/L5 view
 Archives & Backup -> L6
 ```
 
-The router may display loading/empty/error states but does not recreate their data logic.
+Archives & Backup may route to Browse Archives, Full Backup, Restore, Time Report, History CSV, Import History, Clear Recent, Manage Archived, Delete All Archived Data, Wipe All Time History, and nested L6 review/conflict screens.
+
+Settings owns routing. L5/L6 own data semantics.
 
 **Settled**
 
 ---
 
-# 21. Archives & Backup Routing
+# 21. Support Boundary
 
-`ARCHIVES_BACKUP` is the parent route for L6 actions such as:
+Initial support transport is the user's default mail client via `mailto:`.
 
-- Browse Archives;
-- Download Full Backup;
-- Restore Backup;
-- Export Time Report;
-- Export History CSV;
-- Import History CSV;
-- Clear Recent;
-- Manage Archived Jobs;
-- danger actions such as Delete All Archived Data / Wipe All Time History.
-
-Settings router owns navigation/back behavior only.
-
-L6 continues to own validation, protection, confirmation, import/export, and destructive semantics.
-
-**Settled**
-
----
-
-# 22. Support Module Boundary
-
-Support is a secondary feature and never controls timer health.
-
-Initial transport is the user's default email client through a composed `mailto:` action.
-
-The extension:
-
-- does not send mail silently;
-- does not require SMTP/API credentials;
-- does not run a support backend in the first release;
-- does not expose SquareCoil/customer data unless the user explicitly types it into the message or opts into whitelisted diagnostics.
-
-Destination email is configured as:
+Configured destination:
 
 ```text
 cristian@ussignandmill.com
 ```
 
+The extension:
+
+- never silently sends support mail;
+- requires no SMTP/API credentials;
+- runs no hidden support backend in first release;
+- does not automatically attach private SquareCoil data;
+- clearly exposes the recipient before the user opens the mail draft.
+
+The user remains responsible for reviewing/sending in their mail client.
+
 **Settled**
 
 ---
 
-# 23. Submit a Ticket Form
+# 22. Ticket Form
 
-Ticket types:
+Types:
 
 ```text
 Bug
@@ -549,7 +560,7 @@ Question
 Other
 ```
 
-Required fields:
+Required:
 
 ```text
 Type
@@ -565,19 +576,19 @@ Include Diagnostics
 
 Validation:
 
-- Type must be one supported value;
-- Subject must contain non-whitespace text;
-- Description must contain non-whitespace text;
-- implementation may enforce reasonable field-length limits with clear errors;
-- validation failure never clears the user's typed draft.
+- supported Type;
+- non-whitespace Subject and Description;
+- reasonable explicit field-length limits may be enforced;
+- disallowed control characters in mail subject/header-like fields are normalized/rejected safely;
+- validation never clears the draft.
 
 **Settled**
 
 ---
 
-# 24. Send Feedback Form
+# 23. Feedback Form
 
-Feedback categories:
+Categories:
 
 ```text
 Suggestion
@@ -586,67 +597,84 @@ Feature Idea
 General Feedback
 ```
 
-Required fields:
+Required:
 
 ```text
 Category
 Description
 ```
 
-Optional:
+Optional Subject/short title and Include Diagnostics.
 
-```text
-Subject / short title
-Include Diagnostics
-```
+If Subject is empty, email may use a generic category-derived subject. User Description is not rewritten.
 
-If Subject is omitted, the composed email may derive a concise generic subject from the category without altering the user's description.
-
-Validation failure preserves the draft.
+Validation preserves draft.
 
 **Settled**
 
 ---
 
-# 25. Email Composition
+# 24. Support Draft Lifecycle
 
-Support email composition is deterministic plain-text output.
+Ticket/Feedback message bodies are transient private Settings state.
 
-Conceptual Ticket subject:
+- immediate preview/back retains the draft;
+- navigating away/closing with a non-empty modified draft invokes the dirty-draft loss guard;
+- after explicit discard/full close, draft is removed;
+- first release does not persist message bodies into Preferences, Activity Log, Full Backup, History CSV, or diagnostics.
+
+Unexpected page/runtime loss may discard the draft rather than secretly persisting private content.
+
+**Settled**
+
+---
+
+# 25. Deterministic Email Composition
+
+Ticket subject concept:
 
 ```text
 [SquareCoil Companion][Bug] User subject
 ```
 
-Conceptual Feedback subject:
+Feedback subject concept:
 
 ```text
 [SquareCoil Companion Feedback][UI / UX] Optional subject
 ```
 
-Body includes only:
+Body contains only:
 
 - user-entered fields;
-- optional explicit diagnostic block when enabled;
-- minimal app/version header needed to identify the Companion report.
+- minimal Companion version/report header;
+- the exact frozen diagnostic block when diagnostics are enabled.
 
-All mailto subject/body values are URI-encoded.
+Mailto recipient/subject/body are safely URI-encoded. User-entered newlines remain body content, not executable headers.
 
-The extension does not auto-submit the message after opening the mail client.
+The UI action must communicate that it opens an email draft/mail application rather than proving delivery. It may be labeled `Open Email Draft`, `Submit by Email`, or equivalent only if accompanying semantics do not falsely imply automatic sending.
 
 **Settled**
 
 ---
 
-# 26. Diagnostics Are Opt-In
+# 26. Diagnostics Opt-In and Frozen Snapshot
 
-Diagnostics inclusion in Ticket/Feedback is **off by default**.
+Diagnostics are off by default for every Ticket/Feedback draft.
 
-The user must explicitly enable `Include Diagnostics` for that message.
+When the user enables Include Diagnostics:
 
-Before email composition, the form exposes the exact diagnostic text to be included or provides an equivalent preview path.
+1. generate one whitelist-only diagnostic snapshot;
+2. show the exact text to the user;
+3. associate that snapshot with the current Support draft;
+4. compose/copy using that exact displayed snapshot.
 
-The user can disable diagnostics again without losing their ticket/feedback draft.
+Diagnostics are **not silently regenerated after preview** in a way that could add unseen fields or changed values.
+
+The user may explicitly `Refresh Diagnostics`, which replaces the visible snapshot before composition.
+
+Disabling diagnostics removes the diagnostic block without altering the Support draft.
+
+The diagnostic snapshot is transient and is not saved in backup/preferences/activity.
 
 **Settled**
 
@@ -654,9 +682,7 @@ The user can disable diagnostics again without losing their ticket/feedback draf
 
 # 27. Diagnostics Whitelist
 
-Safe diagnostics are generated only from an explicit whitelist.
-
-Allowed categories:
+Allowed output categories:
 
 ```text
 Companion package/version
@@ -672,60 +698,65 @@ runtime/root count health summary
 current timestamp
 ```
 
-Optional safe health booleans/counts may be added only when they do not expose job/customer/history content.
+`coarse SquareCoil page type` must be a bounded category such as project-page/general-page/unknown. It must not embed job IDs, URL paths with identifiers, query strings, labels, customer names, or page text.
 
-Diagnostics must **not automatically include**:
+Optional safe booleans/counts require privacy review before joining the whitelist.
+
+Automatically excluded:
 
 ```text
 customer names
-project/job descriptions
+project/job names/descriptions
+project/job numbers or Context IDs
 project notes
-job numbers / active Context IDs
-full current URL/query string
-page body/form content
-Time Ledger records
-Today/Job Total history
-CSV contents
-backup contents
-Support draft contents beyond the message itself
-SquareCoil private response payloads
+full URL/query/path containing identifiers
+native page body/form text
+Time Ledger/session/history data
+Today/Job Total values
+CSV/backup contents
+Support draft contents beyond the actual user-written email message
+SquareCoil response payloads
 cookies/tokens/credentials
 email/account identifiers
-full raw user-agent when a coarse browser/version value is sufficient
+raw full user-agent when coarse browser/version is sufficient
+clipboard contents
 ```
 
-Adding a new diagnostic field requires explicit privacy review; it cannot silently expand the whitelist.
+A new diagnostic field cannot silently expand the whitelist.
 
 **Settled**
 
 ---
 
-# 28. Copy Diagnostics
+# 28. Copy Diagnostics / Message
 
-`Copy Diagnostics` generates the same current whitelist output used by Support preview.
+`Copy Diagnostics` inside a Support draft copies the currently visible frozen diagnostic snapshot.
 
-Behavior:
+A standalone diagnostics action outside a Support draft may generate a fresh current whitelist snapshot, but the text is shown before/with copy.
 
-- shows/uses only whitelisted fields;
-- copy action never includes hidden extra metadata;
-- clipboard failure falls back to visible selectable text/manual copy;
-- clipboard failure does not affect timer health;
-- copying diagnostics does not submit/send them anywhere.
+Copy Message uses the same composed content visible to the user.
+
+Clipboard failure:
+
+- provides selectable/manual-copy text;
+- does not transmit anything;
+- does not affect timer health.
+
+Hidden metadata is never appended to copied text.
 
 **Settled**
 
 ---
 
-# 29. Submit by Email / Mailto Behavior
+# 29. Mailto Launch and Fallback
 
-On valid Support submission:
+On a valid Support action:
 
-1. build the deterministic subject/body;
-2. include diagnostics only if opted in;
-3. open a `mailto:` target to the configured support email;
-4. leave actual sending to the user's mail client.
+1. build deterministic recipient/subject/body from current draft and frozen diagnostics;
+2. open the configured `mailto:` target;
+3. keep the user responsible for actual mail-client send.
 
-Because browsers cannot reliably prove that a local mail handler successfully opened, the Support screen also keeps a visible fallback such as:
+Because the browser cannot reliably prove a mail handler opened/sent, Support keeps fallbacks such as:
 
 ```text
 Copy Message
@@ -733,47 +764,22 @@ Copy Diagnostics
 Copy Support Email
 ```
 
-After mailto launch, UI may say conceptually:
+The UI must not say `Ticket sent` or `Feedback sent` merely because mailto was opened.
 
-> If your mail app did not open, copy the message instead.
+If mailto content is too large:
 
-It must not falsely claim `Ticket sent` merely because the mailto URL was opened.
-
-**Settled**
-
----
-
-# 30. Mailto Size / Composition Failure
-
-If composed mailto content is too large or cannot be safely generated:
-
-- do not truncate the user's description/diagnostics silently and call it complete;
-- keep the draft intact;
-- offer Copy Message / Copy Diagnostics;
-- optionally omit diagnostics only after explicit user choice;
-- timer state remains unaffected.
+- keep draft intact;
+- do not silently truncate Description/diagnostics and call it complete;
+- offer Copy Message;
+- diagnostics may be omitted only after explicit user choice.
 
 **Settled**
 
 ---
 
-# 31. Support Draft Lifecycle
+# 30. Support Activity Privacy
 
-Ticket/Feedback drafts are transient Settings state by default.
-
-Navigating between Support form and its immediate preview/back path preserves the current draft during that open Settings session.
-
-Closing Settings may discard the transient draft unless a future explicit Save Draft feature is added.
-
-The first release does not persist Support message bodies into general preferences, diagnostics, Activity Log, or backups.
-
-**Settled**
-
----
-
-# 32. Support Activity Logging
-
-Activity Log may record only minimal non-content events such as:
+Activity Log may record minimal non-content events such as:
 
 ```text
 support-ticket-mailto-opened
@@ -781,163 +787,161 @@ support-feedback-mailto-opened
 diagnostics-copied
 ```
 
-It must not store:
+It never stores Subject, Description, diagnostic block, copied body, recipient-entered private content, or job/customer information from the Support draft.
 
-- Subject;
-- Description;
-- diagnostic text;
-- copied message body;
-- customer/job details contained in a user draft.
-
-Support Activity is never authoritative time.
+Activity failure does not affect Support draft contents or timing.
 
 **Settled**
 
 ---
 
-# 33. Future Support Transport Boundary
+# 31. Future Support Transport Boundary
 
-Support uses a transport interface conceptually:
+Conceptual interface:
 
 ```text
 SupportTransport.compose(message)
 SupportTransport.submitOrOpen(message)
 ```
 
-Initial implementation:
+First release:
 
 ```text
 EmailTransport -> mailto/default mail client
 ```
 
-A future API transport may be added only with separate privacy/security design. L7 does not authorize hidden network submission or embedded credentials.
+Any future API transport requires a separate privacy/security contract. L7 does not authorize hidden network submission, analytics payloads, or embedded support credentials.
 
 **Settled**
 
 ---
 
-# 34. Developer Support Is Separate from Technical Support
+# 32. Developer Support Boundary
 
-Developer Support lives at:
+Developer Support lives under:
 
 ```text
 ABOUT
 -> Support the Developer
 ```
 
-It is not a Ticket/Feedback destination and does not receive diagnostics.
+It is separate from Ticket/Feedback and receives no diagnostics.
 
-It must clearly communicate:
+It must clearly state:
 
-- the Companion is free;
+- Companion is free;
 - updates are free;
 - tips are optional;
-- no feature is locked behind payment.
+- no feature is payment-gated.
+
+It never auto-opens on install/update/startup.
 
 **Settled**
 
 ---
 
-# 35. Developer Support Content Contract
+# 33. Developer Support Content
 
-Developer Support page supports:
+Supports:
 
 ```text
-Playful short copy
+short playful/workplace-appropriate copy
 Buy Me a Coffee button
-Cash App QR image
+Cash App QR
 Cash App cashtag/name
 Copy Cash App name
-free / free-updates / optional-tip statement
+free/free-updates/optional-tip statement
 ```
 
-Tone may use restrained caffeine/bug-fix/weird-div/tiny-development-gremlin humor while remaining workplace-appropriate.
+Tone may use restrained caffeine, bug-fix, weird-div, and tiny-development-gremlin humor.
 
-The page must not become a modal nag or interrupt normal timer work.
+No persistent donation badge/reminder appears on the timer.
 
 **Settled**
 
 ---
 
-# 36. Missing Developer-Support Configuration
+# 34. Developer Support Configuration
 
 Configuration still required outside logic:
 
 ```text
 Buy Me a Coffee URL
 Cash App cashtag/name
-Cash App QR packaged asset
+Cash App QR packaged/approved asset
 ```
 
-Missing configuration does not block L7 or timer implementation.
+Missing config:
 
-Behavior:
+- does not block timer/Settings/L7;
+- does not fabricate a placeholder destination;
+- hides or clearly disables only the unavailable method;
+- leaves remaining configured methods functional.
 
-- unavailable payment method is hidden or shown as clearly unavailable;
-- no placeholder link/cashtag/QR is fabricated;
-- remaining configured developer-support methods continue to work;
-- Settings/Timer lifecycle remains healthy.
+A missing approved light Website Theme logo is similarly nonblocking and Refined Light keeps native logo.
 
 **Settled**
 
 ---
 
-# 37. Buy Me a Coffee Link
+# 35. External Developer-Support Link Safety
+
+A configured Buy Me a Coffee destination must:
+
+- use HTTPS;
+- match the approved configured destination/host policy;
+- reject `javascript:`, `data:`, or other executable/non-web schemes;
+- open through intentional external navigation, normally a new tab/window;
+- use opener isolation where applicable;
+- receive no Companion-added job ID, Context, diagnostics, history, user identifier, donation-tracking token, or other private query parameter.
+
+Companion does not read a donation result back from the destination.
+
+A destination site may have its own independent privacy behavior, but Companion does not add tracking to infer completion.
+
+**Settled**
+
+---
+
+# 36. Cash App QR / Cashtag
 
 If configured:
 
-- URL must be a valid intentional HTTPS external destination;
-- activation opens the external destination explicitly, normally in a new browser tab/window;
-- implementation uses normal safe external-link isolation such as no opener relationship where applicable;
-- navigation does not send diagnostics, timer history, job Context, or donation-tracking identifier from Companion;
-- failed navigation is a feature-level error only.
+- QR is a packaged/approved asset;
+- cashtag/name is displayed from validated configuration;
+- Copy copies only that configured text;
+- clipboard failure provides manual copy;
+- no dynamic payment request is generated from user/job data;
+- no payment status is tracked;
+- no card/bank/Cash App login credentials pass through Companion.
 
-No donation result is read back into Companion.
-
-**Settled**
-
----
-
-# 38. Cash App QR / Cashtag
-
-If configured:
-
-- QR image is a packaged/approved asset referenced by configuration;
-- Companion does not generate a payment request dynamically from user data;
-- cashtag/name is displayed exactly as configured after basic configuration validation;
-- Copy copies only the configured cashtag/name;
-- clipboard failure provides visible/manual-copy fallback;
-- no payment status is tracked.
-
-The extension does not handle card, bank, Cash App login, or payment credentials.
+If QR is missing, the QR control degrades locally without breaking the cashtag or timer.
 
 **Settled**
 
 ---
 
-# 39. No Nag / No Tracking Rules
+# 37. No Nag / No Donation Tracking
 
 Developer Support must never:
 
-- show startup nags;
-- show update nags;
-- auto-open after install/update;
-- display persistent donation badges on the timer;
-- reduce functionality for non-donors;
-- alter timer limits or access based on donation;
-- track whether the user donated;
-- store payment status;
-- use analytics to infer donation completion.
+- auto-open on install/update/startup;
+- place persistent donation nags/badges on timer;
+- reduce features for non-donors;
+- change thresholds/access based on donation;
+- store donation status;
+- infer donation completion through analytics;
+- include developer-support status in timer decisions.
 
-The user sees Developer Support only by intentionally navigating to it.
+The page is reached only through intentional navigation.
 
 **Settled**
 
 ---
 
-# 40. Secondary Feature Failure Isolation
+# 38. Secondary Feature Failure Isolation
 
-Failure of any of these must not stop or restart timer tracking:
+These failures are secondary unless they reveal an independent core failure:
 
 ```text
 Timer theme styling
@@ -946,27 +950,28 @@ Website theme
 custom logo
 Support form
 mailto launch
-clipboard copy
+clipboard
 Developer Support
-external developer-support link
+external link
 QR asset
 ```
 
-A failed secondary feature:
+A secondary failure:
 
-- exposes a local feature-level error/fallback;
-- may record privacy-safe diagnostic status;
-- does not create a second runtime;
-- does not clear Timer State/history;
-- does not downgrade lifecycle unless the failure reveals an independent core problem already covered by L1.
+- shows local fallback/error;
+- may produce privacy-safe feature status;
+- creates no second runtime/root;
+- clears no Timer State/history;
+- does not stop accrual;
+- does not mark lifecycle DEGRADED solely because a decorative/support feature failed.
 
 **Settled**
 
 ---
 
-# 41. Settings Loading / Error States
+# 39. Settings Loading / Error Safety
 
-Settings routes distinguish:
+Routes distinguish:
 
 ```text
 loading
@@ -978,86 +983,64 @@ error
 
 Rules:
 
-- failure in one destination does not blank unrelated Settings Home sections;
-- known prior data is not silently replaced with zero because a read failed;
-- Retry is offered where the underlying feature supports safe retry;
-- a destructive action is not enabled while its required L6 data/protection state is unknown;
-- error screens preserve a path Back/Home/Close.
+- one failed route does not blank unrelated Settings Home sections;
+- prior known values are not silently replaced with zero on read failure;
+- Retry appears only when safe/idempotent;
+- destructive actions remain disabled while required L6 protection/state is unknown;
+- Back/Home/Close remain reachable unless an authoritative L6 commit is in the protected in-progress phase from Section 7;
+- error UI never guesses mutation success.
 
 **Settled**
 
 ---
 
-# 42. Settings and Timer State Isolation
+# 40. Settings / Timer Isolation
 
 Settings navigation itself never:
 
 - pauses/resumes a Context;
-- changes Selected Context unless the invoked L5 feature explicitly performs a normal selection action;
 - clocks into SquareCoil;
 - finalizes a session;
 - changes Today/Total;
 - changes Recent/Archive except through explicit L5/L6 actions.
 
-Opening Settings while ACTIVE must leave the timer running normally.
+An L5 route may explicitly select a Context as an ordinary view action; that selection remains timing-neutral.
+
+Opening Settings while ACTIVE leaves tracking running normally.
 
 **Settled**
 
 ---
 
-# 43. Cross-Tab Preference Synchronization
+# 41. L7 Invariants
 
-Durable presentation/settings preferences synchronize across live Companion tabs through the normal preference/state event channel.
-
-Rules:
-
-- another tab receiving a preference change updates presentation idempotently;
-- per-tab transient route/focus state is not forcibly synchronized;
-- one tab opening Developer Support does not open it in other tabs;
-- one tab choosing Timer Dark may update Timer Appearance in other tabs because that is durable preference;
-- one tab's Support draft is never synchronized to another tab.
-
-**Settled**
-
----
-
-# 44. Preference Import / Restore Interaction
-
-L6 Restore may import compatible preferences according to its Merge/Replace policy.
-
-After a restored preference revision commits:
-
-- L7 re-resolves effective Timer Appearance/Finish/Website Theme;
-- invalid/unavailable effective presentation falls back according to L7 capability rules;
-- no restored preference may create live Timer State;
-- Support drafts and Developer Support navigation are never restored from backup.
-
-**Settled**
-
----
-
-# 45. L7 Invariants
-
-- **SETTINGS-01:** One router/renderer owns Settings UI.
-- **SETTINGS-02:** Settings routes never become Timer State writers.
-- **SETTINGS-03:** Closing/reopening Settings returns to Home rather than stale destructive routes.
-- **SETTINGS-04:** Focus/keyboard behavior cannot leak destructive/timer commands to underlying UI.
-- **PREF-01:** First install defaults Light / Solid / Original.
-- **PREF-02:** Auto retains Auto preference while resolving current system Light/Dark.
-- **PREF-03:** Glass capability failure may fall back visually without changing timing.
-- **THEME-01:** Website Theme is independent from Timer Appearance.
-- **THEME-02:** Original restores Companion-owned website-theme modifications only.
-- **THEME-03:** Refined Light uses native logo until an approved light asset exists.
-- **THEME-04:** Sleek Dark logo failure falls back to native logo without timer failure.
-- **THEME-05:** Theme application is idempotent and cannot stack duplicate presentation layers.
-- **LIMIT-01:** Timer Limit validation preserves `1 <= Yellow <= Orange <= Red`.
-- **SUPPORT-01:** Ticket/Feedback messages are user-triggered and not silently sent.
-- **SUPPORT-02:** Diagnostics are opt-in, previewable, and whitelist-only.
-- **SUPPORT-03:** Diagnostics automatically exclude job/customer/history/private SquareCoil content.
-- **SUPPORT-04:** Mailto launch is not falsely reported as a sent ticket.
-- **SUPPORT-05:** Support drafts/message contents are not stored in Activity/backup/preferences by default.
+- **SETTINGS-01:** One router/renderer owns Settings.
+- **SETTINGS-02:** Settings routes are not Timer State writers.
+- **SETTINGS-03:** Reopen/recovery returns to Home, never a stale destructive route.
+- **SETTINGS-04:** Modified transient drafts are not silently discarded by ordinary navigation.
+- **SETTINGS-05:** Keyboard/focus events cannot leak timer/destructive commands through Settings.
+- **SETTINGS-06:** In-progress L6 commit cannot be falsely canceled or duplicated by Settings navigation.
+- **PREF-01:** First install defaults Light/Solid/Original and 60/120/240.
+- **PREF-02:** Auto retains Auto while resolving system appearance.
+- **PREF-03:** Auto/theme listeners are idempotent and teardown-safe.
+- **PREF-04:** Stale multi-field preference drafts cannot silently overwrite a newer cross-tab revision.
+- **PREF-05:** Restored preference batches apply as one coherent committed snapshot.
+- **THEME-01:** Website Theme is independent from Timer Appearance/Finish.
+- **THEME-02:** Themes are presentation only and cannot alter native SquareCoil business/action semantics.
+- **THEME-03:** Accessibility/native usability outranks decorative theme treatment.
+- **THEME-04:** Original removes only Companion-owned site-theme artifacts.
+- **THEME-05:** Refined Light uses native logo until approved light asset exists.
+- **THEME-06:** Sleek Dark logo failure falls back native without timer failure.
+- **THEME-07:** Theme application cannot stack duplicate presentation/listener layers.
+- **LIMIT-01:** `1 <= Yellow <= Orange <= Red` and invalid/stale drafts cannot overwrite valid committed limits.
+- **SUPPORT-01:** Support messages are user-triggered and never silently sent.
+- **SUPPORT-02:** Diagnostics are off by default, whitelist-only, previewed, and frozen to the visible snapshot used for composition.
+- **SUPPORT-03:** Diagnostics exclude job/customer/history/private SquareCoil content.
+- **SUPPORT-04:** Mailto launch is not ticket-delivery confirmation.
+- **SUPPORT-05:** Support message/diagnostic snapshots are not durably stored by default.
+- **SUPPORT-06:** Support recipient is visible and composed fields are safely encoded.
 - **DEV-01:** Developer Support is optional, free-feature preserving, and non-nagging.
-- **DEV-02:** Missing payment configuration never fabricates destinations or breaks Settings.
+- **DEV-02:** Missing payment configuration never fabricates a destination or breaks Settings.
 - **DEV-03:** Companion never handles payment credentials or tracks donation completion.
 - **FAIL-01:** Secondary presentation/support failure cannot become timer failure.
 
@@ -1065,251 +1048,234 @@ After a restored preference revision commits:
 
 ---
 
-# 46. Acceptance Scenarios
+# 42. Acceptance Scenarios
 
-## S1 Open Settings while ACTIVE
+## S1 Settings while ACTIVE
+ACTIVE A continues; Settings opens Home; no timer mutation.
 
-ACTIVE A continues running; Settings opens Home; no timer mutation.
+## S2 Close/Reopen
+Close preserves timer/selection. Reopen begins Home, not prior destructive/support route.
 
-## S2 Close Settings
+## S3 Runtime recovery while Settings open
+Recovered Settings begins Home; no old destructive approval or Support draft is resurrected.
 
-Return to main timer with same Selected Context and operational state.
-
-## S3 Reopen Settings
-
-After full close, Settings reopens at Home, not prior Delete/Restore/Support subview.
-
-## S4 Back from Time Overview
-
-Returns to Settings Home; browser/SquareCoil page navigation unchanged.
+## S4 Back isolation
+Time Overview Back returns Settings Home; browser/SquareCoil page does not navigate.
 
 ## S5 Nested Archives Back
+Nested L6 route -> Archives & Backup parent -> Home.
 
-Nested restore/archive screen -> Archives & Backup parent -> Settings Home.
+## S6 Dirty Support close
+Modified Ticket draft + Close -> explicit Keep Editing/Discard choice; draft not silently lost.
 
-## S6 Keyboard Close
+## S7 Dirty limits route leave
+Modified unsaved limits + route leave -> loss guard; committed limits unchanged until Save.
 
-Escape closes a safe topmost Settings layer but never triggers Pause/Resume/Delete underneath.
+## S8 Keyboard leak safety
+Enter/Escape used in Settings cannot Pause/Resume/Delete underlying timer.
 
-## S7 First install defaults
+## S9 Destructive dialog key safety
+Key used to open a Delete dialog does not auto-confirm it; Cancel is safely reachable.
 
-Timer Light + Solid + Website Original.
+## S10 L6 staged restore Back
+Before commit, Back may cancel staged plan after applicable review guard; no data mutation occurred.
 
-## S8 Existing migrated preferences
+## S11 L6 commit already started
+Close/Back cannot claim cancellation or launch a duplicate commit; terminal L6 result remains authoritative.
 
-Valid existing preference survives rebuild instead of being overwritten by first-install default.
+## S12 First-install defaults
+Light + Solid + Original + 60/120/240.
 
-## S9 Timer Dark
+## S13 Migrated preferences
+Valid existing choices survive instead of being reset to defaults.
 
-Companion timer changes to Dark; native SquareCoil Website Theme remains unchanged.
+## S14 Timer Dark independence
+Timer becomes Dark; Website Theme remains unchanged.
 
-## S10 Auto system switch
+## S15 Auto system switch
+Auto + OS Light->Dark changes effective timer while preference remains Auto.
 
-Auto + OS changes light to dark -> effective Companion timer changes; durable preference remains Auto.
+## S16 Auto unavailable
+Effective Light fallback; preference Auto; timer healthy.
 
-## S11 Auto detection unavailable
+## S17 Auto listener idempotency
+Repeated Auto application/recovery leaves exactly one current color-scheme listener.
 
-Effective timer resolves Light fallback; preference remains Auto; timer health unaffected.
+## S18 Glass unsupported/accessibility fallback
+Preference remains Glass; effective Solid fallback; no timer degradation.
 
-## S12 Glass supported
+## S19 High contrast / forced colors
+Custom appearance yields to readable system/native treatment without rewriting user preference.
 
-Glass selected -> effective Glass presentation; no timing change.
+## S20 Original Website Theme
+Only Companion site-theme artifacts are removed; native controls/data remain intact and logo restored.
 
-## S13 Glass unsupported
+## S21 Refined Light
+Restrained native-like treatment with native logo; no fabricated light logo.
 
-Preference remains Glass, effective Solid fallback, feature note/diagnostic allowed, timer remains healthy.
+## S22 Sleek Dark
+Dark site treatment applies independently and preserves native control semantics/status meaning.
 
-## S14 Website Original
+## S23 Dark-logo failure
+Native logo fallback; no runtime/timer restart.
 
-Companion-owned website theme artifacts removed; native SquareCoil logo restored.
+## S24 Same theme reapplied
+No duplicate styles/classes/listeners.
 
-## S15 Refined Light
+## S25 Native selector no longer matches
+Theme leaves unknown element alone rather than broad-guessing/hiding native UI.
 
-Refined Light applies restrained site treatment and native logo; no fabricated light logo.
+## S26 Invalid limit ordering
+120/60/240 Save rejected; committed thresholds unchanged.
 
-## S16 Sleek Dark
+## S27 Valid limit save
+Ordered limits save once and threshold presentation updates without timing change.
 
-Dark theme applies independently from Timer Appearance and uses configured dark logo when available.
+## S28 Stale cross-tab limits draft
+Tab 2 saves new limits after Tab 1 opened editor; Tab 1 stale Save cannot silently overwrite Tab 2.
 
-## S17 Dark logo failure
+## S29 Restored preference batch
+Dark + Glass + Sleek Dark restore commit renders as one coherent post-restore preference snapshot, not intermediate combinations.
 
-Sleek Dark remains usable with native-logo fallback; no timer/lifecycle restart.
+## S30 Ticket validation
+Missing Subject/Description blocks mailto and preserves draft.
 
-## S18 Reapply same Website Theme
+## S31 Valid Bug ticket
+Configured support recipient is visible; encoded mailto contains typed fields; mail client decides actual send.
 
-No duplicate style tags/classes/listeners are stacked.
+## S32 Feedback without Subject
+Generic category subject is derived; Description preserved.
 
-## S19 Threshold invalid ordering
+## S33 Diagnostics default off
+No diagnostics until explicitly enabled.
 
-Yellow 120 / Orange 60 / Red 240 -> save rejected; prior valid thresholds remain.
+## S34 Diagnostics preview freeze
+Preview shows snapshot A. System state changes. Email still uses visible snapshot A unless user explicitly Refreshes Diagnostics.
 
-## S20 Threshold valid save
+## S35 Diagnostics refresh
+User refreshes -> preview becomes snapshot B; composition uses B.
 
-60/120/240 or another ordered valid set saves once and presentation recalculates without changing time.
+## S36 Diagnostics privacy
+Jobs/customers/history exist but diagnostic block contains no job number/label/URL identifier/history/CSV/backup/token/private payload.
 
-## S21 Reset thresholds
+## S37 Coarse page type
+Project page diagnostic says a bounded type such as `project-page`, not `/project.php?id=260702` or job 260702.
 
-Explicit Reset returns defaults; no timer boundary created.
+## S38 Copy Diagnostics
+Copies exactly visible diagnostic snapshot; sends nothing.
 
-## S22 Ticket missing subject
+## S39 Clipboard unavailable
+Manual selectable text remains; timer unaffected.
 
-Validation error; description/type/draft preserved; no mailto opened.
+## S40 Mail handler unavailable
+No false Sent status; Copy Message/Email fallback remains.
 
-## S23 Valid Bug ticket
+## S41 Mailto too large
+Draft intact; no silent truncation; copy fallback and explicit diagnostics omission choice available.
 
-Build encoded mailto to configured support email with typed subject/description; mail client decides actual send.
+## S42 Support Activity privacy
+Activity may record mailto-opened event but not Subject/Description/diagnostic text.
 
-## S24 Feedback without optional subject
+## S43 Support full close after explicit discard
+Draft is removed and is not in backup/preferences/activity.
 
-Valid generic subject derived from category; description preserved exactly.
+## S44 Developer Support free statement
+Companion/updates free, tips optional, no feature gate.
 
-## S25 Diagnostics default off
+## S45 Missing developer config
+No fabricated URL/cashtag/QR; only unavailable method degrades.
 
-Ticket contains no diagnostic block until user explicitly opts in.
+## S46 Buy Me a Coffee safe link
+Only approved HTTPS destination opens; Companion adds no job/diagnostic/donation-tracking identifier.
 
-## S26 Diagnostics preview
+## S47 Invalid external scheme
+`javascript:`/`data:`/unapproved destination is rejected and not opened.
 
-Preview shows exact whitelist output that will be appended.
+## S48 Cash App configured
+Approved QR + exact configured cashtag/name; copy only that value; no payment status tracking.
 
-## S27 Diagnostics privacy
+## S49 QR missing
+QR degrades locally while other Settings/timer features remain healthy.
 
-Current job/customer/history exists but diagnostics contain no job number, label, URL query, history rows, CSV, backup, token, or private page payload.
+## S50 No donation nag
+Install/update/startup never auto-opens Developer Support or shows persistent timer donation badge.
 
-## S28 Copy Diagnostics
+## S51 Cross-tab appearance
+Tab 1 changes Dark; Tab 2 adopts durable preference while keeping independent route/Selected Context.
 
-Copies only visible whitelist output; nothing is transmitted.
+## S52 Cross-tab Support isolation
+Tab 1 Support draft never appears in Tab 2.
 
-## S29 Clipboard unavailable
+## S53 Preference persistence failure
+Requested theme change fails to persist -> last committed preference remains authoritative; UI does not pretend durable success.
 
-Selectable diagnostics/message remain available for manual copy; timer unaffected.
+## S54 Feature route failure
+Support/Theme/Activity route fails -> unrelated Settings Home and timer remain usable.
 
-## S30 Mail handler unavailable
+## S55 Destructive-state unknown
+Delete/Wipe controls remain unavailable until L6 protection facts are known.
 
-Mailto may fail to visibly open; UI does not say Sent and provides Copy Message/Email fallback.
+## S56 Theme change during provisional timer
+L4 provisional/hold truth remains unchanged while presentation changes.
 
-## S31 Mailto too large
+## S57 Production General while Settings open
+Theme/Support/Settings interactions do not modify General Context timing.
 
-Draft is preserved; content is not silently truncated; Copy Message offered.
+## S58 Degraded Bridge diagnostics
+Diagnostic block may report coarse Bridge state but never the last/current job identity.
 
-## S32 Support draft Back
+## S59 Website/Timer theme axes
+Original site + Dark timer and Sleek Dark site + Light timer both work without cross-writing preferences.
 
-Moving to preview/back inside same Settings session preserves draft.
-
-## S33 Close Support draft
-
-Closing Settings may discard transient draft; it is not silently written into backup/preferences/activity.
-
-## S34 Support Activity privacy
-
-Activity may record `support-ticket-mailto-opened` but not subject/description/diagnostic block.
-
-## S35 Developer Support free statement
-
-Page clearly states Companion and updates are free and tips optional.
-
-## S36 Missing all developer-support config
-
-Page does not fabricate URL/cashtag/QR; unavailable methods are hidden/disabled gracefully; timer remains healthy.
-
-## S37 Buy Me a Coffee configured
-
-Intentional HTTPS external navigation opens; no job/history/diagnostics tracking parameters are added by Companion.
-
-## S38 Cash App configured
-
-Approved QR shown; cashtag copied exactly; no payment status tracked.
-
-## S39 QR asset missing
-
-Cash App QR method degrades locally; Settings and timer remain healthy.
-
-## S40 No donation nag
-
-Install/update/startup never auto-opens Developer Support and no timer badge appears.
-
-## S41 Cross-tab Timer Appearance
-
-Tab 1 chooses Dark -> Tab 2 updates durable timer appearance; Tab 2's current Settings route/Selected Context remain independent.
-
-## S42 Cross-tab Support draft
-
-Tab 1 draft never appears in Tab 2.
-
-## S43 Restored appearance preference
-
-L6 Restore commits valid Dark/Glass preference -> L7 applies it; unavailable Glass still falls back safely.
-
-## S44 Feature route failure
-
-Activity/Support/Theme subview fails -> Back/Home/Close remain usable; timer state/history untouched.
-
-## S45 Destructive state unknown
-
-Archives & Backup cannot enable a destructive action until L6 protection/current-state facts are loaded.
-
-## S46 Original site theme with Dark timer
-
-Native SquareCoil stays Original while Companion timer remains Dark; axes are independent.
-
-## S47 Sleek Dark site with Light timer
-
-SquareCoil is Sleek Dark while Companion timer stays Light; axes are independent.
-
-## S48 General Context active while Settings open
-
-Settings actions/presentation changes do not modify Production General timing.
-
-## S49 Theme switch during active provisional time
-
-Provisional timer status/time truth stays intact while presentation theme changes.
-
-## S50 Support diagnostics during degraded Bridge
-
-Diagnostics may report coarse Bridge capability/lifecycle state but do not include the last job/context identity.
+## S60 Support diagnostics not restored
+Backup/restore does not restore a Support draft, diagnostic snapshot, or previous Support route.
 
 ---
 
-# 47. Continuity States After L7
+# 43. Continuity States After L7
 
 ## Settled
 
 - one Settings router/renderer;
-- Home IA and transient route policy;
-- open/close/back/browser-history isolation;
-- keyboard/focus safety contract;
-- preference validation/change events;
+- Home IA and transient route/reset behavior;
+- dirty-draft loss protection;
+- focus/keyboard/destructive-dialog safety;
+- L6 in-progress mutation navigation behavior;
+- preference validation, persistence failure, and revision concurrency;
+- coherent restore preference batches;
 - first-install defaults;
-- Timer Light/Dark/Auto including Auto fallback/system-change behavior;
-- Solid/Glass independence and capability fallback;
-- Original/Refined Light/Sleek Dark independence;
-- native-logo/light-logo/dark-logo policy and failure fallback;
-- idempotent website-theme application;
-- Timer Limit validation/reset behavior;
-- Library/Archives routing boundaries;
-- mailto-based initial Support transport;
-- Ticket/Feedback categories/validation;
-- opt-in diagnostics preview and explicit whitelist/exclusions;
+- Timer Light/Dark/Auto and listener lifecycle;
+- Solid/Glass and accessibility fallback;
+- Website Original/Refined Light/Sleek Dark independence;
+- theme semantic/accessibility safety;
+- native/light/dark logo policy and fallback;
+- idempotent targeted theme reapplication;
+- Timer Limit validation/reset/stale-draft behavior;
+- L5/L6 routing ownership;
+- mailto-based Support transport;
+- Ticket/Feedback validation and draft privacy;
+- opt-in frozen diagnostics preview with explicit whitelist/exclusions;
 - Copy Diagnostics/Message fallbacks;
-- Support draft privacy/lifecycle;
-- minimal non-content Support activity logging;
-- future support transport boundary;
+- safe mailto composition and no false delivery claim;
+- minimal non-content Support Activity;
+- future Support transport privacy boundary;
 - Developer Support free/optional/no-nag/no-tracking behavior;
-- missing developer-support config fallback;
-- external-link and Cash App QR/copy behavior;
+- missing developer config fallback;
+- safe approved external-link behavior;
+- Cash App QR/copy behavior;
 - secondary feature failure isolation;
-- cross-tab preference synchronization with per-tab transient state isolation.
+- cross-tab durable preference sync with per-tab transient isolation.
 
 ## Provisional
 
-- exact Settings visual layout/spacing/icons;
+- exact Settings visual layout/icons/spacing;
 - exact final microcopy/status labels;
-- exact theme CSS tokens/selector implementation;
-- exact Glass capability detection method;
+- exact theme CSS tokens/selectors;
+- exact Glass/accessibility capability detection mechanics;
 - exact approved dark-logo packaging/reference implementation;
-- future approved light custom-logo asset;
-- exact field-length limits for Support forms;
-- exact mailto size threshold;
-- Buy Me a Coffee URL;
+- future approved light-logo asset;
+- exact Support field-length/mailto-size thresholds;
+- exact Buy Me a Coffee approved URL/host;
 - Cash App cashtag/name;
 - Cash App QR packaged asset;
 - exact playful Developer Support copy.
@@ -1317,10 +1283,10 @@ Diagnostics may report coarse Bridge capability/lifecycle state but do not inclu
 ## Open for L8 / implementation
 
 - cross-module failure-priority matrix;
-- final user-visible error wording across core vs secondary failures;
-- exact browser smoke-test fixtures for Settings/theme/Support;
-- theme-selector regression fixtures against current SquareCoil DOM;
-- mailto/clipboard/browser-external-link test harness behavior;
+- final core-vs-secondary user-visible error hierarchy;
+- Settings/theme/Support browser smoke fixtures;
+- SquareCoil theme-selector regression fixtures;
+- mailto/clipboard/external-link harness behavior;
 - Chrome/Edge acceptance parity.
 
 ## Blocked
@@ -1329,12 +1295,12 @@ None.
 
 ---
 
-# 48. L7 Readiness Judgment
+# 44. L7 Readiness Judgment
 
-**Status: Ready for review**
+**Status: Settled - ready for L8**
 
-L7 is ready for review when Settings, presentation themes, Support/Feedback, diagnostics, and Developer Support can be implemented without introducing a second timer/UI owner, leaking private SquareCoil content by default, confusing mailto launch with ticket delivery, or allowing optional presentation/payment-link failures to affect timer health.
+L7 now defines Settings navigation, draft safety, preference concurrency, presentation/accessibility boundaries, Support privacy/transport, diagnostics preview guarantees, and Developer Support behavior strongly enough that L8 can integrate failures/acceptance without implementation inventing secondary-feature semantics.
 
-If accepted and hardened, the next stage is:
+Next stage:
 
 **L8: Failure Behavior, Acceptance Criteria, and Implementation Handoff**
