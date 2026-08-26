@@ -2,7 +2,9 @@
 
 **Branch:** `rebuild/squarecoil-companion-b2-fenced-kernel`
 
-**Status:** `IMPLEMENTED / BROWSER ACCEPTANCE PENDING`
+**Status:** `IMPLEMENTED / BROWSER ACCEPTANCE COMPLETE / PASS`
+
+**Browser-tested implementation:** `afba339c401b77aa74e6be5bde90add8ac9e8098`
 
 **Baseline:** settled B1 at `c59b88fad941003507954e9cba66214c360ea368`
 
@@ -81,9 +83,11 @@ two installed-browser fixtures:
 - `B2-KERNEL-001`: two real tabs obtain one OWNER and one OBSERVER_CONNECTED on the same worker and document revision without false `READY`;
 - `B2-KERNEL-002`: service-worker restart changes worker identity, reconnects autonomously on the scheduled isolated heartbeat, preserves the page Runtime Instance ID, OWNER disposition, revision, coordination epoch, and the canonical persisted-document SHA-256.
 
-The A4 harness must use one exact clean package in branded Chrome and branded
-Edge, synthetic pages only, and immutable archive/package inventories. Until
-that run succeeds, this document remains `BROWSER ACCEPTANCE PENDING`.
+The A4 harness used one exact clean package in branded Chrome and branded Edge,
+synthetic pages only, and immutable archive/package inventories. Both browsers
+passed all 16 cases, including both B2.1 kernel fixtures. The exact package,
+browser, hash, and proof-boundary record is
+[`B2-KERNEL-EVIDENCE.md`](B2-KERNEL-EVIDENCE.md).
 
 ## Protected boundaries
 
