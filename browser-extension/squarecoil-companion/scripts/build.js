@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { BUILD_ID, BUILD_STAGE } = require('../src/core/build-identity');
 
 const root = path.resolve(__dirname, '..');
 const dist = path.join(root, 'dist');
@@ -87,6 +88,7 @@ for (const [input, output] of entries) {
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
 fs.writeFileSync(path.join(dist, 'build-info.json'), JSON.stringify({
   packageVersion: manifest.version,
-  buildId: 'rebuild-b1-shell-lifecycle',
-  stage: 'B1'
+  buildId: BUILD_ID,
+  stage: BUILD_STAGE,
+  sourceSha: process.env.GITHUB_SHA || process.env.SC_BUILD_SOURCE_SHA || null
 }, null, 2) + '\n');
