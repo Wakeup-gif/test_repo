@@ -1,11 +1,11 @@
 # SquareCoil Companion Rebuild
 ## Logic Stage L4: Core Timer Behavior
 
-**Status:** Ready for review  
+**Status:** Settled — ready for L5  
 **Logic stage:** L4  
 **Depends on:** L0 invariants, L1 lifecycle, L2 state/time/migration, L3 SquareCoil Bridge  
 **Framework authority:** `docs/REBUILD-MASTER-PLAN.md`  
-**Purpose:** Define how normalized SquareCoil observations and explicit Companion user actions change Shared Timer State and Time Ledger behavior without letting UI modules or the Bridge become alternate state writers.
+**Purpose:** Define how normalized SquareCoil observations and explicit Companion actions change authoritative Timer State and Time Ledger behavior without allowing UI, Bridge, or secondary tabs to become alternate state writers.
 
 ---
 
@@ -15,41 +15,35 @@ L4 owns:
 
 - new Context start behavior;
 - remembered Context Pending behavior;
-- Resume;
-- Start Fresh;
-- Local Pause;
-- Local Resume;
-- native Context switching;
-- Context leave;
-- full clock-out;
+- Pending verification continuity;
+- Resume and Start Fresh;
+- Local Pause and Local Resume;
+- native Context switching, leave, and clock-out;
 - same-Context verification;
-- unknown/conflict safety handling;
-- strong unconfirmed clock-out handling;
-- conservative detected-transition boundaries;
-- recovery from interrupted prior sessions;
-- selected vs active behavior;
-- auto-focus/expand intent on real native Context changes;
-- time-threshold semantics;
-- protection rules for destructive actions.
+- unknown/conflict safety behavior;
+- strong unconfirmed clock-out behavior;
+- shared Accrual Safety Hold behavior;
+- conservative transition boundaries;
+- controlled reload/disable behavior;
+- interrupted-session recovery;
+- selected vs active isolation;
+- native Context focus/expand intent;
+- timer threshold semantics;
+- destructive-action protection;
+- cross-tab command timestamp validation;
+- session start/end provenance.
 
-L4 does **not**:
+L4 does **not** interpret raw SquareCoil DOM/AJAX evidence, own persistence technology, define Time Overview presentation, or define L6 archive/backup/delete workflows.
 
-- interpret raw SquareCoil DOM/AJAX evidence;
-- write state outside the authoritative L2 state service;
-- define Time Overview presentation;
-- define archive/delete/backup implementation;
-- define final Settings styling.
-
-> L3 says what SquareCoil evidence means.  
-> L4 says what the Companion timer does with that evidence.
+> L3 says what SquareCoil evidence means. L4 says what the Companion timer does with it.
 
 ---
 
 # 2. Authoritative Mutation Rule
 
-Every timer transition is applied through the single authoritative state service defined by L2.
+Every timer transition goes through the single fenced state service defined by L2.
 
-A timer transition may atomically affect:
+A timer transaction may atomically affect:
 
 - Shared Timer State;
 - Time Ledger Segments;
@@ -57,7 +51,7 @@ A timer transition may atomically affect:
 - Recovery Checkpoint;
 - revision/commit/fencing metadata.
 
-No UI handler, Bridge handler, workspace feature, or secondary tab may independently edit timer JSON.
+No UI handler, Bridge handler, workspace feature, or observer tab directly edits timer JSON or appends time.
 
 **Settled**
 
@@ -65,7 +59,7 @@ No UI handler, Bridge handler, workspace feature, or secondary tab may independe
 
 # 3. Canonical Operational Timer States
 
-Within one Companion data scope, committed timing state is exactly one of:
+Committed Timer State is exactly one of:
 
 ```text
 IDLE
@@ -74,7 +68,7 @@ PENDING(contextId)
 LOCAL_PAUSED(contextId)
 ```
 
-These map to L2 mutually exclusive records:
+Mapping:
 
 ```text
 IDLE         active=null, pending=null, localPause=null
@@ -83,52 +77,42 @@ PENDING      active=null, pending!=null, localPause=null
 LOCAL_PAUSED active=null, pending=null, localPause!=null
 ```
 
-`Selected Context` remains separate UI/view state.
+`Selected Context` remains UI/view state only.
+
+An **Accrual Safety Hold** is not a fifth timer state. It is authoritative shared metadata attached to `ACTIVE` that caps its current running contribution.
 
 **Settled**
 
 ---
 
-# 4. Current SquareCoil Context vs Timer State
+# 4. SquareCoil Context vs Timer State
 
-The Companion may be in one of several valid combinations:
+Valid combinations include:
 
 ```text
-SquareCoil Context A + ACTIVE A
-SquareCoil Context A + PENDING A
-SquareCoil Context A + LOCAL_PAUSED A
-SquareCoil Context A + IDLE briefly during reconciliation
+SquareCoil A + ACTIVE A
+SquareCoil A + PENDING A
+SquareCoil A + LOCAL_PAUSED A
+SquareCoil A + IDLE briefly during reconciliation
 SquareCoil no Context + IDLE
 ```
 
-Invalid committed combinations include:
-
-```text
-SquareCoil verified A + ACTIVE B
-ACTIVE A + LOCAL_PAUSED A
-ACTIVE A + PENDING A
-```
-
-If current SquareCoil evidence contradicts committed Active identity, L4 must reconcile before further authoritative accrual.
+A committed `ACTIVE B` while fresh SquareCoil evidence positively supports A is invalid and must reconcile before further accrual.
 
 **Settled**
 
 ---
 
-# 5. Historical-Time Test
+# 5. Remembered Context Test
 
-A Context is considered **remembered** when its authoritative history is greater than zero.
-
-Conceptually:
+A Context is remembered when authoritative prior Companion time is greater than zero:
 
 ```text
 remembered = attributed Ledger duration > 0
           or legacyUnattributedMs > 0
 ```
 
-The existence of a Job Index record alone does not make a Context remembered.
-
-A previously seen Context with zero recorded time is treated as a new zero-history Context for timer-start logic.
+A Job Index record alone does not make a Context remembered.
 
 **Settled**
 
@@ -136,9 +120,7 @@ A previously seen Context with zero recorded time is treated as a new zero-histo
 
 # 6. Safe Start Anchor
 
-When L3 detects/confirms a Context, L4 derives one **safe start anchor** for any new session caused by that observation.
-
-Priority:
+For a new session caused by SquareCoil observation, choose the newest trustworthy start point in this order:
 
 ```text
 1. compatible NATIVE_CONFIRMED boundaryAtMs
@@ -146,9 +128,7 @@ Priority:
 3. fresh observedAtMs
 ```
 
-The anchor must never be earlier than evidence actually supports.
-
-A click timestamp is never a safe start anchor by itself.
+A start anchor may never predate what evidence supports. A click timestamp alone is never a valid SquareCoil start anchor.
 
 **Settled**
 
@@ -156,27 +136,17 @@ A click timestamp is never a safe start anchor by itself.
 
 # 7. New Zero-History Context
 
-Given:
+If SquareCoil positively supports Context B, B has zero prior authoritative time, and no valid state must be preserved:
 
-- no current ACTIVE/PENDING/LOCAL_PAUSED state that should be preserved; and
-- L3 emits a positive Context observation for Context B; and
-- Context B has zero historical Companion time;
+1. ensure B exists in the Context Index;
+2. create new `cycleId` and `sessionId`;
+3. set `ACTIVE(B)`;
+4. set `startedAtMs = safeStartAnchor`;
+5. initialize verification metadata only from L3-eligible evidence;
+6. update Recovery Checkpoint;
+7. commit once.
 
-L4 automatically starts Companion tracking for B.
-
-Transaction:
-
-1. ensure Context B exists in Job/Context Index;
-2. create a new `cycleId`;
-3. create a new `sessionId`;
-4. set `active.contextId = B`;
-5. set `active.startedAtMs = safeStartAnchor`;
-6. set `lastVerifiedAtMs` only from eligible L3 evidence;
-7. clear incompatible Pending/Local Pause state;
-8. update Recovery Checkpoint;
-9. commit once.
-
-No Resume prompt is shown for a true zero-history Context.
+A true zero-history Context auto-starts. No Resume prompt is shown.
 
 **Settled**
 
@@ -184,36 +154,50 @@ No Resume prompt is shown for a true zero-history Context.
 
 # 8. Remembered Context Detection
 
-Given a positively observed Context B with prior authoritative Companion history and no valid Local Pause marker for B:
+If SquareCoil positively supports remembered Context B and no valid Local Pause recovery applies:
 
-- do not auto-start accrual;
+- do not auto-start;
 - enter `PENDING(B)`;
-- store a safe start anchor from the observation;
-- expose Resume / Start Fresh as user choices later through UI;
-- do not accrue while Pending until the user makes a valid choice.
-
-Pending protects the user from accidentally joining separate work periods without deciding how to continue.
+- capture a safe start anchor;
+- begin Pending continuity tracking;
+- offer Resume / Start Fresh when verification permits;
+- accrue no Companion time while Pending.
 
 **Settled**
 
 ---
 
-# 9. Pending Record Requirements
+# 9. Pending Record and Verification Continuity
 
-A Pending record must support at minimum:
+Pending must support at least:
 
 ```text
 contextId
 safeStartAnchorMs
+lastContinuityVerifiedAtMs
+continuityState = VALID | BROKEN | UNKNOWN
 detectedAtMs
 source
 boundaryCertainty
 createdAtMs
 ```
 
-The Pending record does not own a copied elapsed total. Job Total is always queried from the Time Ledger.
+The original Pending anchor remains usable only while current SquareCoil evidence supports continuous presence of the same Context.
 
-If SquareCoil leaves or changes away from the Pending Context before the user acts, that Pending state is cleared/replaced through the appropriate native transition logic.
+## 9.1 Continuity remains valid
+
+Fresh eligible same-Context verification updates `lastContinuityVerifiedAtMs`. If verification gaps remain within the timer verification-grace policy and no contrary transition evidence exists, the original Pending anchor remains valid.
+
+## 9.2 Continuity becomes broken
+
+If the same Context cannot be positively verified for longer than the grace policy, or Bridge evidence indicates an unresolved transition/conflict:
+
+- mark Pending continuity `BROKEN` or `UNKNOWN`;
+- do not retroactively cover the unverified gap;
+- when the same Context is later freshly verified, replace the pending safe start anchor with that new safe evidence anchor;
+- remain Pending until the user chooses Resume / Start Fresh.
+
+A long-unverified Pending interval is never silently backfilled merely because the Context later looks the same.
 
 **Settled**
 
@@ -221,25 +205,24 @@ If SquareCoil leaves or changes away from the Pending Context before the user ac
 
 # 10. Resume from Pending
 
-A Resume action is valid only when:
+Resume is valid only when:
 
-1. Shared Timer State is `PENDING(A)`;
-2. current SquareCoil evidence positively supports the same Context A;
-3. Bridge state is not UNKNOWN/CONFLICT/UNAVAILABLE for the required verification;
-4. current writer/fencing ownership is valid.
+1. state is `PENDING(A)`;
+2. fresh SquareCoil evidence positively supports A;
+3. Bridge is sufficiently healthy;
+4. writer/fencing ownership is valid;
+5. the Pending anchor represents the current verified continuity period.
 
 If valid:
 
-- create a new `sessionId`;
-- continue the existing/current `cycleId` when one is meaningfully available, otherwise create one;
-- start the new session at the Pending `safeStartAnchorMs`;
+- create new `sessionId`;
+- continue the existing logical `cycleId` when meaningful, otherwise create one;
+- start at the current valid Pending safe anchor;
 - clear Pending;
-- set ACTIVE A;
-- preserve all historical time.
+- set `ACTIVE(A)`;
+- preserve all prior historical time.
 
-The interval between Context detection and the user's Resume choice is included because SquareCoil was positively observed in A from the safe anchor onward.
-
-Resume must never start before the safe anchor.
+If Pending continuity was broken, Resume starts from the refreshed safe anchor, not from the original old detection time.
 
 **Settled**
 
@@ -247,27 +230,23 @@ Resume must never start before the safe anchor.
 
 # 11. Start Fresh from Pending
 
-Start Fresh is valid under the same SquareCoil verification requirements as Resume.
+Start Fresh uses the same verification/continuity requirements as Resume.
 
 If valid:
 
-- preserve all prior Time Ledger history;
-- preserve legacyUnattributedMs;
+- preserve all prior Ledger history and `legacyUnattributedMs`;
 - preserve Job/Context Total;
-- create a **new cycleId**;
-- create a new `sessionId`;
-- start at the Pending `safeStartAnchorMs`;
+- create a **new `cycleId`** and new `sessionId`;
+- start at the current valid Pending safe anchor;
 - clear Pending;
 - set ACTIVE for the same Context.
 
-Difference:
-
 ```text
-Resume      = continue prior logical cycle when available
-Start Fresh = create a new logical cycle
+Resume      = continue prior logical cycle when meaningful
+Start Fresh = begin a new logical cycle
 ```
 
-Start Fresh does **not** mean reset historical Job Total to zero.
+Start Fresh never resets historical Job Total.
 
 **Settled**
 
@@ -275,13 +254,12 @@ Start Fresh does **not** mean reset historical Job Total to zero.
 
 # 12. Stale Pending Action
 
-If the user clicks Resume/Start Fresh but current SquareCoil state no longer positively supports the Pending Context:
+If Resume/Start Fresh arrives after SquareCoil or authoritative state moved away from Pending A:
 
-- reject the action;
-- do not create a new session;
-- do not fabricate elapsed time;
-- reconcile Pending with the newest L3 event;
-- UI later communicates that the SquareCoil Context changed.
+- reject it as stale;
+- create no session;
+- add no time;
+- return normalized rejection so UI refreshes.
 
 **Settled**
 
@@ -289,39 +267,34 @@ If the user clicks Resume/Start Fresh but current SquareCoil state no longer pos
 
 # 13. Local Pause
 
-Local Pause is allowed only when:
+Local Pause is valid only for current `ACTIVE(A)` and a current valid writer command targeting that session.
 
-- Shared Timer State is ACTIVE(A);
-- the current user action targets A;
-- current writer ownership is valid.
-
-Local Pause does **not** call SquareCoil clock APIs.
+It never calls a SquareCoil clock API.
 
 Transaction:
 
-1. choose pause boundary = user Local Pause action time;
-2. finalize the current ACTIVE session to that boundary;
-3. append day-split Ledger Segments atomically;
-4. clear ACTIVE;
-5. create `LOCAL_PAUSED(A)` marker;
-6. preserve current cycleId for later Local Resume;
-7. update Recovery Checkpoint;
-8. commit once.
-
-SquareCoil remains unchanged.
+1. validate the command timestamp under Section 35;
+2. choose the validated Local Pause boundary;
+3. if an earlier Safety Hold exists, do not finalize beyond the hold;
+4. finalize current session through the valid boundary;
+5. append day-split Ledger Segments;
+6. clear ACTIVE;
+7. create `LOCAL_PAUSED(A)` preserving `cycleId`;
+8. update checkpoint;
+9. commit once.
 
 **Settled**
 
 ---
 
-# 14. Local Pause Verification Behavior
+# 14. Local Pause Verification
 
-While `LOCAL_PAUSED(A)` and SquareCoil continues to verify A:
+While `LOCAL_PAUSED(A)` and SquareCoil continues to support A:
 
-- Companion does not accrue time;
-- Context verification may update observed/metadata state but does not remove Local Pause;
-- same-Context heartbeats never auto-resume;
-- page reload/restart preserves Local Pause candidate behavior through L2 recovery.
+- no Companion time accrues;
+- same-Context verification never auto-resumes;
+- metadata may update;
+- Local Pause survives ordinary page reload/restart reconciliation when still compatible.
 
 **Settled**
 
@@ -329,74 +302,65 @@ While `LOCAL_PAUSED(A)` and SquareCoil continues to verify A:
 
 # 15. Local Resume
 
-Local Resume is valid only when:
+Local Resume requires:
 
-1. state is `LOCAL_PAUSED(A)`;
-2. current SquareCoil evidence positively supports A;
-3. Bridge is sufficiently healthy to verify A;
-4. current writer ownership is valid.
+- `LOCAL_PAUSED(A)`;
+- fresh positive SquareCoil support for A;
+- healthy-enough Bridge verification;
+- valid fenced writer ownership.
 
 If valid:
 
-- create a new `sessionId`;
-- preserve the prior cycleId;
-- start at the Local Resume user-action timestamp;
+- create new `sessionId`;
+- preserve prior `cycleId`;
+- start at validated Local Resume user-action time;
 - clear Local Pause;
 - set ACTIVE A;
-- do not backfill the locally paused interval.
+- never backfill the locally paused interval.
 
-If SquareCoil no longer supports A, Resume is unavailable/rejected.
+If SquareCoil no longer supports A, reject Resume.
 
 **Settled**
 
 ---
 
-# 16. Native Direct Context Switch A to B
+# 16. Direct Native Context Switch A → B
 
-L3 may emit `CONTEXT_CHANGED A -> B` for one native transition episode.
+On one L3 `CONTEXT_CHANGED A → B` transition:
 
 If ACTIVE A:
 
-1. finalize A using the boundary policy in Section 24;
+1. finalize A using Section 25 boundary policy;
 2. clear ACTIVE A;
-3. evaluate B through the incoming-Context rule:
-   - zero history -> auto-start B;
-   - remembered -> PENDING B;
-4. use the incoming B safe start anchor from L3;
-5. commit all compatible changes atomically where one transition transaction is appropriate.
+3. evaluate B:
+   - zero history → auto-start B;
+   - remembered → PENDING B;
+4. use B's own safe incoming anchor;
+5. commit compatible switch changes atomically.
 
-If PENDING A:
-
-- clear Pending A;
-- evaluate B normally.
-
-If LOCAL_PAUSED A:
-
-- clear Local Pause A because SquareCoil left A;
-- no extra A time is finalized because Local Pause already ended accrual;
-- evaluate B normally.
+If PENDING A, clear Pending A and evaluate B. If LOCAL_PAUSED A, clear Local Pause A and evaluate B without adding A time.
 
 **Settled**
 
 ---
 
-# 17. Distinct Leave then Enter Transitions
+# 17. Distinct Leave then Enter
 
-When L3 preserves two native boundaries, for example:
+If L3 preserves separate native boundaries:
 
 ```text
 10:00:00 CONTEXT_LEFT A
 10:00:20 CONTEXT_DETECTED B
 ```
 
-L4 must preserve the gap.
+then:
 
-- finalize A at its leave boundary;
-- state becomes IDLE after leaving A;
-- do not attribute the gap to A or B;
-- evaluate/start/prompt B only at B's own safe start anchor.
+- finalize A at 10:00:00;
+- enter IDLE;
+- attribute the 20-second gap to neither A nor B;
+- evaluate B at B's own 10:00:20 anchor.
 
-Distinct native transitions may not be collapsed into one seamless A -> B Companion session.
+Distinct native transitions never collapse into one seamless Companion interval.
 
 **Settled**
 
@@ -406,23 +370,11 @@ Distinct native transitions may not be collapsed into one seamless A -> B Compan
 
 On confirmed `CONTEXT_LEFT`:
 
-If ACTIVE A:
+- ACTIVE A → finalize A at valid boundary, then IDLE;
+- PENDING A → clear Pending, then IDLE;
+- LOCAL_PAUSED A → clear Local Pause, then IDLE.
 
-- finalize A using the event boundary policy;
-- clear ACTIVE;
-- enter IDLE.
-
-If PENDING A:
-
-- clear Pending;
-- enter IDLE.
-
-If LOCAL_PAUSED A:
-
-- clear Local Pause;
-- enter IDLE.
-
-Reason metadata must distinguish `context-left` from full clock-out.
+Historical end reason is `native-context-left`, distinct from company clock-out.
 
 **Settled**
 
@@ -432,20 +384,11 @@ Reason metadata must distinguish `context-left` from full clock-out.
 
 On confirmed `CLOCKED_OUT`:
 
-If ACTIVE A:
+- ACTIVE A → finalize once using valid boundary;
+- PENDING/LOCAL_PAUSED → clear non-running state;
+- enter IDLE.
 
-- finalize A using the event boundary policy;
-- clear ACTIVE.
-
-If PENDING/LOCAL_PAUSED:
-
-- clear that non-running state.
-
-Then enter IDLE.
-
-Reason metadata must represent company clock-out distinctly from project/context leave.
-
-A full clock-out never deletes historical time.
+End reason is `native-clock-out`. Historical time is never deleted.
 
 **Settled**
 
@@ -453,910 +396,654 @@ A full clock-out never deletes historical time.
 
 # 20. Same-Context Verification
 
-On `CONTEXT_VERIFIED(A)`:
+On eligible `CONTEXT_VERIFIED(A)`:
 
-## ACTIVE A
+- ACTIVE A: same session continues; eligible evidence may advance `lastVerifiedAtMs`;
+- PENDING A: remain Pending and update Pending continuity metadata;
+- LOCAL_PAUSED A: remain Local Paused;
+- IDLE + positive A: reconcile A as new/remembered/valid Local Pause recovery.
 
-- keep current session;
-- no session boundary;
-- eligible evidence may advance `lastVerifiedAtMs`;
-- metadata may update.
-
-## PENDING A
-
-- remain Pending;
-- refresh verification metadata if useful;
-- do not auto-start.
-
-## LOCAL_PAUSED A
-
-- remain Local Paused;
-- do not accrue.
-
-## IDLE with positively observed A
-
-This is a reconciliation condition. L4 re-evaluates A as if positively detected:
-
-- zero history -> auto-start;
-- remembered -> Pending;
-- preserved valid Local Pause candidate -> Local Paused.
+Same-context verification creates no timer boundary.
 
 **Settled**
 
 ---
 
-# 21. Context Metadata Update
+# 21. Metadata Update
 
-`CONTEXT_METADATA_UPDATED` never creates a timer boundary by itself.
+`CONTEXT_METADATA_UPDATED` for the same Context:
 
-For the same Context identity:
-
-- update Job/Context Index display metadata;
-- preserve ACTIVE/PENDING/LOCAL_PAUSED state;
-- preserve sessionId/cycleId;
-- preserve Job Total.
+- updates Context Index metadata;
+- preserves timer state, sessionId, cycleId, and totals;
+- creates no timer boundary.
 
 **Settled**
 
 ---
 
-# 22. Strong Unconfirmed Clock-Out Safety Hold
+# 22. Shared Accrual Safety Hold
 
-L3 may provide strong unconfirmed clock-out transition evidence after SquareCoil successfully completes action 2 but post-state confirmation is temporarily unavailable.
+A Safety Hold affects authoritative elapsed calculations and therefore **must be shared state**, not per-tab UI state.
 
-L4 applies an **Accrual Safety Hold** to an ACTIVE Context.
-
-The hold is an operational modifier of ACTIVE, not a new canonical timer state.
-
-Logical fields:
+Logical ACTIVE modifier:
 
 ```text
-holdAtMs
-reason
-transitionCandidateId
-createdAtMs
+active.safetyHold = {
+  holdAtMs,
+  reason,
+  transitionCandidateId?,
+  createdAtMs,
+  revision
+}
 ```
+
+Only the authoritative writer may set/clear it through a normal state transaction.
 
 While held:
 
-- displayed/virtual running contribution is capped at `holdAtMs`;
-- no new elapsed time is added beyond the hold boundary;
-- the active record is not yet finalized solely from unconfirmed current state.
-
-Resolution:
-
-### Later confirmed CLOCKED_OUT
-Finalize at the correlated native action-2 boundary/holdAtMs and enter IDLE.
-
-### Later positive same-Context verification
-Remove the Safety Hold. The original ACTIVE session continues from its original startedAtMs, including the temporarily held interval, because fresh SquareCoil evidence contradicted the suspected clock-out.
-
-### Later confirmed different Context
-Finalize the prior Context using the compatible hold/native boundary, then evaluate the new Context.
+- all tabs cap the virtual running contribution at `holdAtMs`;
+- no tab may independently continue counting past the hold;
+- the active session is not necessarily finalized yet;
+- later resolution atomically clears/finalizes the hold.
 
 **Settled**
 
 ---
 
-# 23. STATE_UNKNOWN / STATE_CONFLICT Handling
+# 23. Strong Unconfirmed Native Clock-Out
 
-A transient unknown/conflict must not immediately destroy a valid ACTIVE session.
+When L3 reports successful action-2 completion but post-state verification is temporarily unavailable:
 
-Default verification grace policy:
+- set shared Safety Hold at the action-2 boundary;
+- retain ACTIVE only as unresolved operational state;
+- stop displayed/authoritative running contribution beyond the hold;
+- aggressively re-verify.
 
-```text
-verificationGraceMs approximately 90 seconds
-```
+## 23.1 Later confirmed clock-out
 
-The exact duration is configurable implementation policy.
+Finalize at the correlated action-2 boundary and enter IDLE.
 
-## 23.1 Within grace
+## 23.2 Evidence specifically disproves the same action-2 transition
 
-If ACTIVE A and current Bridge state becomes UNKNOWN/CONFLICT without a strong native mutation candidate:
+Continuity may be restored **only** when fresh evidence is specifically correlated to that same transition episode and demonstrates that the suspected action-2 state did not take effect.
 
-- retain ACTIVE A provisionally;
+Then:
+
+- clear Safety Hold;
+- keep original session continuity;
+- include the temporarily held interval.
+
+## 23.3 Same Context merely appears later
+
+A later observation of the same Context by itself does **not** prove uninterrupted continuity. The user could have clocked out and later clocked back into the same job.
+
+If the action-2 episode was not specifically disproved:
+
+1. finalize the prior session at the action-2 hold boundary;
+2. leave any unverified gap unattributed;
+3. evaluate the newly observed same Context as a new current observation;
+4. because it is remembered, normal Pending behavior applies unless another explicit rule applies.
+
+This prevents a real clock-out/re-entry from being erased just because the job identity matches.
+
+**Settled**
+
+---
+
+# 24. UNKNOWN / CONFLICT and Provisional Time
+
+Default `verificationGraceMs` is approximately 90 seconds; exact value is configurable policy.
+
+## 24.1 Within grace
+
+If ACTIVE A becomes UNKNOWN/CONFLICT without strong transition evidence:
+
+- retain ACTIVE provisionally;
 - do not advance `lastVerifiedAtMs`;
-- allow current display to continue provisionally;
-- expose verification-degraded status to later UI;
-- aggressively re-verify according to L1/L3 bounded policy.
+- current displayed contribution may continue **provisionally**;
+- trigger re-verification.
 
-## 23.2 Same Context returns within grace
+## 24.2 Same Context returns within grace
 
-If positive verification of A returns before grace expires:
+If A is positively verified before grace expires:
 
-- ACTIVE remains continuous;
-- no session boundary;
-- provisional interval remains part of the current session.
+- session remains continuous;
+- provisional interval becomes normal evidence-backed continuity under this grace rule.
 
-## 23.3 Grace expires
+## 24.3 Grace expires
 
-If positive verification does not return before grace expires:
+If positive verification does not return:
 
-- apply an Accrual Safety Hold at the latest trustworthy `lastVerifiedAtMs`;
-- stop further provisional running contribution;
-- do not fabricate a clock-out or new Context;
-- lifecycle remains degraded according to L1/L3 health.
+- set shared Safety Hold at latest trustworthy `lastVerifiedAtMs`;
+- stop further running contribution;
+- do not fabricate clock-out or another Context.
 
-## 23.4 Same Context returns after hold/grace expiry
+## 24.4 Reconciliation may reduce displayed provisional time
 
-A later same-Context observation does not prove uninterrupted SquareCoil continuity across the long unknown gap.
+Because provisional time is not yet finalized history, later reconciliation may cap it to an earlier evidence-backed boundary. The displayed Today/current total may therefore legitimately decrease.
 
-Therefore:
+This is **not historical deletion**. It is replacement of provisional elapsed display with authoritative evidence-backed time.
 
-1. finalize the evidence-backed prior session through the hold/lastVerified boundary if not already finalized;
-2. leave the unverified gap unattributed;
-3. start a new session from the fresh re-verification safe anchor;
-4. preserve the same cycleId unless a separate Start Fresh action occurs.
+L5 must visually distinguish provisional/degraded time so this correction does not look like unexplained data loss.
 
-No automatic backfill is allowed for the unknown gap.
+## 24.5 Same Context returns after long unknown gap
+
+- finalize prior evidence-backed session through hold/lastVerified boundary if needed;
+- leave unknown gap unattributed;
+- start/evaluate a new current period from fresh anchor;
+- preserve cycleId unless Start Fresh creates a new cycle;
+- never backfill the unknown gap automatically.
 
 **Settled**
 
 ---
 
-# 24. Event Boundary Policy
+# 25. Event Boundary Policy
 
-When an ACTIVE session must be finalized because SquareCoil left/changed/clocked out, choose the end boundary conservatively.
+When an ACTIVE session must end:
 
-## 24.1 Native-confirmed boundary
+## Native-confirmed
 
-If L3 supplies compatible:
+Use compatible `NATIVE_CONFIRMED boundaryAtMs`, clamped no earlier than session start.
 
-```text
-boundaryCertainty = NATIVE_CONFIRMED
-boundaryAtMs
-```
+## Detected within verification grace
 
-use that boundary, clamped no earlier than session start.
-
-## 24.2 Detected boundary with fresh verification
-
-If transition is DETECTED and:
+If:
 
 ```text
 boundaryAtMs - lastVerifiedAtMs <= verificationGraceMs
 ```
 
-use the detected boundary.
+use detected boundary.
 
-## 24.3 Detected boundary after long unverified gap
+## Detected after long unverified gap
 
-If:
+Use `lastVerifiedAtMs`; leave remaining gap unattributed.
 
-```text
-boundaryAtMs - lastVerifiedAtMs > verificationGraceMs
-```
+## Existing Safety Hold
 
-use `lastVerifiedAtMs` as the conservative end boundary.
-
-The remaining gap is not automatically attributed.
-
-## 24.4 Existing Safety Hold
-
-If a compatible earlier Safety Hold exists, finalization cannot extend beyond the hold without positive evidence resolving it.
+Finalization cannot extend past an unresolved earlier compatible Safety Hold.
 
 **Settled**
 
 ---
 
-# 25. Initial Boot with Current SquareCoil Context
+# 26. Controlled Page Reload / Runtime Teardown While ACTIVE
 
-After L1/L3 initialize and current SquareCoil Context is positively observed:
+Runtime teardown or page reload is **not itself a SquareCoil timer boundary**.
 
-1. apply any L2 Recovery Checkpoint reconciliation first;
-2. then evaluate the current Context:
-   - valid Local Pause candidate for same Context -> LOCAL_PAUSED;
-   - zero history -> ACTIVE from safe fresh anchor;
-   - remembered history -> PENDING;
-3. never restore live ACTIVE solely because old persisted state said Active.
+On controlled document teardown while ACTIVE:
 
-**Settled**
+- do not finalize to unload/teardown time merely because the document is closing;
+- checkpoint session/context/cycle/start/lastVerified and controlled-continuation metadata;
+- stop the old runtime from writing after teardown;
+- require fresh SquareCoil verification on the new document.
 
----
+## 26.1 Short controlled reload, same Context
 
-# 26. Recovery Checkpoint Reconciliation
+If fresh boot positively verifies the same Context within the verification-grace continuity window, no contrary transition evidence exists, and checkpoint ownership is valid:
 
-Suppose prior runtime ended unexpectedly while ACTIVE A.
+- the current logical session may continue across the controlled reload;
+- no duplicate Ledger segment is created merely for reload;
+- the short reload interval may remain part of the same verified-grace continuity period.
 
-L2 may provide evidence-backed recoverable time through `lastVerifiedAtMs`.
+## 26.2 Reload continuity cannot be proven
 
-## 26.1 Current SquareCoil again verifies A
+If the verification gap exceeds grace, Context differs, or evidence conflicts:
 
-- finalize any not-yet-ledgered evidence-backed prior interval through prior `lastVerifiedAtMs`;
-- do not backfill the crash/unknown gap;
-- start/evaluate a new current session from the fresh observation anchor;
-- if existing history now exists, the normal remembered/Pending policy applies unless recovery-specific UX later explicitly permits continuation.
-
-For the first rebuilt release, conservative default is **Pending** for a recovered remembered Context rather than silently auto-resuming across an unknown interruption.
-
-## 26.2 Current SquareCoil verifies B
-
-- preserve/finalize only evidence-backed prior A time;
+- preserve/finalize only time through last trustworthy verification;
 - do not bridge the gap;
-- evaluate B normally.
-
-## 26.3 Current SquareCoil has no Context
-
-- preserve/finalize evidence-backed prior A time only;
-- enter IDLE.
+- evaluate fresh current Context normally.
 
 **Settled**
 
 ---
 
-# 27. Local Pause Recovery
+# 27. Disable Companion While Timing
 
-If L2 restores a reliable Local Pause candidate for A and fresh SquareCoil evidence still supports A:
+Disabling Companion stops **Companion accrual only** and never changes SquareCoil's company clock.
+
+If ACTIVE A:
+
+- validate disable command timestamp;
+- if ACTIVE is healthy and has no earlier Safety Hold, finalize through the validated disable timestamp;
+- if a Safety Hold/long unverified condition exists, do not finalize beyond the latest evidence-backed hold boundary;
+- clear active operational state as part of controlled disable teardown;
+- record `endReason = companion-disabled`.
+
+If PENDING/LOCAL_PAUSED, clear or persist only the durable non-live disposition needed by teardown; no new time is created.
+
+On re-enable, current SquareCoil Context is freshly verified. A Context with historical time follows remembered/Pending behavior; re-enable never silently resumes old accrual.
+
+**Settled**
+
+---
+
+# 28. Unexpected Recovery Checkpoint Reconciliation
+
+An unexpected crash/interruption is distinct from controlled reload continuity.
+
+For prior ACTIVE A, preserve/finalize only evidence-backed prior time through prior `lastVerifiedAtMs`.
+
+- current SquareCoil A: do not backfill crash gap; conservative first-release default is remembered A → Pending for the new current period;
+- current SquareCoil B: preserve prior A evidence-backed time and evaluate B normally;
+- no current Context: preserve prior A evidence-backed time and enter IDLE.
+
+Checkpoint evidence never directly recreates live Active state.
+
+**Settled**
+
+---
+
+# 29. Local Pause Recovery
+
+Reliable Local Pause A + fresh SquareCoil A:
 
 - restore `LOCAL_PAUSED(A)`;
-- do not convert to Pending;
+- do not enter Pending;
 - do not auto-start;
-- Local Resume remains an explicit user action.
+- Local Resume remains explicit.
 
-If SquareCoil no longer supports A:
-
-- clear the Local Pause marker;
-- evaluate the actual current SquareCoil Context normally.
+If SquareCoil no longer supports A, clear the marker and evaluate actual current state.
 
 **Settled**
 
 ---
 
-# 28. Selected Context Behavior
+# 30. Selected Context Behavior
 
-Selected Context is UI state only.
+If `ACTIVE=A` and `SELECTED=B`:
 
-If:
-
-```text
-ACTIVE = A
-SELECTED = B
-```
-
-then:
-
-- A continues accruing;
-- B may display its own Today/Job Total/history;
-- selecting B does not Pause A;
-- selecting B does not start B;
-- B must not visually impersonate the running Context.
-
-A real native SquareCoil Context transition may request UI focus on the incoming Context, but selection itself never causes the transition.
+- A keeps accruing;
+- B may show its own Today/Total/history;
+- selecting B does not pause A or start B;
+- B must not visually impersonate Running A.
 
 **Settled**
 
 ---
 
-# 29. Auto-Focus / Expand Intent
+# 31. Native Context Focus / Expand Intent
 
-To preserve established useful behavior:
+A real confirmed native Context identity change may request UI focus/select/expand for the incoming Context.
 
-- an actual confirmed native Context identity change may request the UI to select/focus the incoming Context;
-- an actual new native Context may request expansion of a manually collapsed timer so the user sees the change;
-- same-Context verification/heartbeat must never reopen a manually collapsed timer;
-- metadata-only updates must not reopen it;
-- selecting another saved tab manually does not clock into it.
+Same-Context heartbeat and metadata updates must not reopen a manually collapsed timer.
 
-The state service emits UI intent; the renderer implements presentation in L5.
+UI intent never causes timing by itself.
 
 **Settled**
 
 ---
 
-# 30. Threshold Semantics
+# 32. Threshold Semantics
 
-Timer thresholds remain configurable:
+Thresholds apply to **Context Today**, including valid current contribution, not lifetime Job Total.
 
-```text
-Yellow
-Orange
-Red
-```
-
-For the rebuild, threshold level is based on **Context Today** time, not lifetime Job Total.
-
-Reason:
-
-- Job Total may span many days and would otherwise remain permanently Red once a long-running project crosses the limit;
-- Today represents the current day's useful time-on-job signal;
-- current running contribution is included according to L2/L4 rules.
-
-Default values remain conceptually:
+Default policy:
 
 ```text
-Yellow 60 minutes
-Orange 120 minutes
-Red 240 minutes
+Yellow 60m
+Orange 120m
+Red 240m
 ```
 
-Validation requires:
+Validation:
 
 ```text
 1 <= Yellow <= Orange <= Red
 ```
 
-Thresholds are presentation/status signals only. Crossing a threshold never changes Timer State.
+Thresholds are presentation/status only and never alter Timer State.
 
 **Settled**
 
 ---
 
-# 31. Protected Context Rule
+# 33. Protected Context Rule
 
-A Context is **protected from ordinary destructive/workspace removal** when any of these are true:
+A Context is protected from ordinary workspace/destructive removal when any is true:
 
-- it is ACTIVE;
-- it is PENDING;
-- it is LOCAL_PAUSED;
-- it is the current positively observed SquareCoil Context;
-- a current transition/recovery episode still ties it to unresolved native clock evidence.
+- ACTIVE;
+- PENDING;
+- LOCAL_PAUSED;
+- current positively observed SquareCoil Context;
+- tied to unresolved native transition/recovery evidence;
+- ACTIVE with Safety Hold.
 
-Protected Contexts cannot be:
+Protected Contexts cannot be removed by ordinary Archive, Clear Recent, Hide that makes state inaccessible, or ordinary Delete controls.
 
-- deleted;
-- archived through ordinary Archive;
-- removed by Clear Recent;
-- hidden when hiding would make active/pending state inaccessible.
-
-L6 defines explicit destructive data operations, but ordinary workspace actions must respect protection.
+L6 may define separately confirmed destructive operations.
 
 **Settled**
 
 ---
 
-# 32. Tab Hide Rule
+# 34. Cross-Tab Command Rule
 
-A Context tab may be hidden only when it is not protected.
+Pause, Resume, Start Fresh, disable, and other authoritative commands from any tab route through the single L2 writer.
 
-Hiding:
+Commands carry at minimum:
 
-- changes workspace visibility only;
-- never deletes Time Ledger data;
-- never changes Job Total;
-- never changes SquareCoil state.
+```text
+commandId
+contextId
+expectedRevision
+expectedSessionId when applicable
+originatedAtMs
+originRuntimeId
+```
 
-If a hidden Context later becomes current through SquareCoil, it is automatically made visible before/with incoming Context focus intent.
+Observer tabs never perform fallback timer writes.
 
-**Settled**
-
----
-
-# 33. Cross-Tab Command Rule
-
-User timer actions from any tab must flow through the L2 single-writer coordination service.
-
-For Pause, Resume, Start Fresh, or any authoritative transition command:
-
-- observer tab does not directly mutate state;
-- current fenced owner processes the command, or safe ownership transfer occurs;
-- command carries expected revision/context so stale commands can be rejected;
-- retries are idempotent and must not create duplicate sessions.
+Retries are idempotent by `commandId`.
 
 **Settled**
 
 ---
 
-# 34. Stale User Command
+# 35. User-Action Timestamp Validation
 
-A user command is stale when its expected Context/revision no longer matches current authoritative state.
+User action time may be used for local Companion boundaries only when the authoritative writer proves it belongs to the current expected state.
 
-Examples:
+Rules:
 
-- user clicks Resume A after SquareCoil already moved to B;
-- user clicks Pause A after another tab already clocked out;
-- user clicks Start Fresh on an old Pending prompt after state changed.
+- expected revision/context/session must still match;
+- action time cannot predate current session start or another newer authoritative boundary;
+- an implausibly future timestamp is clamped to owner receive time within a small clock-skew tolerance or rejected;
+- a stale command with intervening authoritative state change is rejected rather than retroactively altering history;
+- a valid delayed observer command may retain its originating action timestamp when all expected-state checks still pass.
 
-Stale commands:
+Exact clock-skew tolerance is configurable implementation policy.
 
-- do not mutate authoritative time;
-- do not create sessions;
-- return a normalized rejection so UI can refresh.
-
-**Settled**
-
----
-
-# 35. Bridge Unavailable While Idle
-
-If the Bridge becomes UNAVAILABLE while Timer State is IDLE:
-
-- remain IDLE;
-- do not invent a Context;
-- lifecycle may become DEGRADED according to L1;
-- automatic tracking cannot begin until positive SquareCoil evidence returns.
+This applies to Local Pause, Local Resume, Companion Disable, and other local user-timestamp boundaries.
 
 **Settled**
 
 ---
 
-# 36. Bridge Unavailable While Pending / Local Paused
+# 36. Bridge Unavailable Behavior
+
+## IDLE
+Remain IDLE. Do not invent Context.
 
 ## PENDING A
-
-- retain Pending A temporarily as remembered user decision state;
-- disable Resume/Start Fresh until A is positively verified again;
-- if later evidence shows another Context/no Context, reconcile normally.
+Retain Pending temporarily, but mark continuity unknown/broken according to Section 9. Disable Resume/Start Fresh until A is freshly verified.
 
 ## LOCAL_PAUSED A
+Retain Local Pause; no accrual; disable Local Resume until A is verified.
 
-- retain Local Pause marker;
-- disable Local Resume until A is positively verified again;
-- no accrual occurs.
-
-**Settled**
-
----
-
-# 37. Bridge Unavailable While Active
-
-If Bridge health becomes UNAVAILABLE while ACTIVE A:
-
-- apply the same verification-grace policy as prolonged STATE_UNKNOWN;
-- do not immediately fabricate clock-out;
-- after grace expiry, cap accrual at latest trustworthy `lastVerifiedAtMs` with a Safety Hold;
-- do not auto-backfill an unknown gap when Bridge later returns.
+## ACTIVE A
+Apply UNKNOWN grace then shared Safety Hold at latest trustworthy verification. Never auto-backfill the unavailable gap.
 
 **Settled**
 
 ---
 
-# 38. Persistence Failure During Active Timing
+# 37. Persistence Failure During ACTIVE
 
-L1/L2 define that normal READY cannot continue when authoritative persistence is unavailable.
+If authoritative persistence cannot safely commit:
 
-L4 behavior:
-
-- do not silently pretend timer mutations were durably committed;
-- retain explicit unsafely-uncommitted condition only through the state service's recovery mechanism;
-- do not let UI actions bypass persistence through a second storage path;
-- if persistence cannot safely recover, apply accrual safety/failure behavior rather than accumulating unbounded uncommitted history.
-
-Exact durable retry mechanism remains an implementation detail of L2 storage.
+- do not report the transition as durably successful;
+- do not create an alternate UI/storage write path;
+- expose explicit persistence degradation through L1/L2;
+- do not accumulate unbounded uncommitted authoritative history;
+- use state-service recovery/safety behavior only.
 
 **Settled**
 
 ---
 
-# 39. Reason Vocabulary for Historical Segments
+# 38. Session Provenance: Start Cause vs End Reason
 
-Canonical timer-transition reasons should distinguish at minimum:
+Start and end provenance are separate dimensions.
+
+Canonical `startCause` includes:
+
+```text
+new-context
+resume
+start-fresh
+local-resume
+native-switch-in
+controlled-reload-continuation
+recovery-new-period
+```
+
+Canonical `endReason` includes:
 
 ```text
 native-context-switch
 native-context-left
 native-clock-out
 local-pause
-resume
-start-fresh
-new-context-start
-recovery-finalize
-unknown-gap-conservative-end
+companion-disabled
+conservative-end
+persistence-safety
 ```
 
-Reason metadata supports history/activity understanding but does not create separate time identity.
+A session is not labeled `resume` as its end reason, and a clock-out is not used as a start cause.
 
-Exact display labels are deferred to L5/L7.
+Time Ledger/session provenance should preserve both dimensions when available. L2's generic historical `reason` field should map to end reason for finalized segments unless the final schema explicitly stores both fields directly.
 
-**Settled conceptual vocabulary**
-
----
-
-# 40. Core Timer Invariants
-
-## TIMER-01
-
-At most one Context accrues Companion time.
-
-## TIMER-02
-
-Selected Context never changes native or Companion timing by selection alone.
-
-## TIMER-03
-
-Zero-history positively observed Context auto-starts from a safe evidence anchor.
-
-## TIMER-04
-
-Remembered positively observed Context enters Pending unless valid Local Pause recovery applies.
-
-## TIMER-05
-
-Pending accrues no time until valid Resume/Start Fresh.
-
-## TIMER-06
-
-Start Fresh preserves all prior Job/Context Total.
-
-## TIMER-07
-
-Local Pause never mutates SquareCoil.
-
-## TIMER-08
-
-Local Resume never backfills the local-pause interval.
-
-## TIMER-09
-
-Same-project metadata/department changes create no timer boundary.
-
-## TIMER-10
-
-Confirmed native Context changes finalize the prior active session once.
-
-## TIMER-11
-
-Distinct L3 native transition boundaries remain distinct in Timer history.
-
-## TIMER-12
-
-Unknown/conflict state never fabricates clock-out or a new Context.
-
-## TIMER-13
-
-Prolonged unverified state is conservatively capped rather than indefinitely accrued.
-
-## TIMER-14
-
-A later same-Context observation after a long unverified gap does not backfill that gap automatically.
-
-## TIMER-15
-
-Strong unconfirmed native clock-out evidence may freeze accrual before final state confirmation.
-
-## TIMER-16
-
-Protected Contexts cannot be removed by ordinary housekeeping.
-
-## TIMER-17
-
-Cross-tab commands use one fenced authoritative writer.
-
-## TIMER-18
-
-Thresholds are based on Today, not lifetime Job Total, and never change Timer State.
-
-**All Settled**
-
----
-
-# 41. State Transition Matrix
-
-| Current state | L3 / user input | Result |
-|---|---|---|
-| IDLE | CONTEXT new zero-history B | ACTIVE B |
-| IDLE | CONTEXT remembered B | PENDING B |
-| IDLE | recovered valid Local Pause B + CONTEXT B | LOCAL_PAUSED B |
-| ACTIVE A | CONTEXT_VERIFIED A | ACTIVE A |
-| ACTIVE A | metadata update A | ACTIVE A |
-| ACTIVE A | CONTEXT_CHANGED A->B | finalize A, evaluate B |
-| ACTIVE A | CONTEXT_LEFT | finalize A, IDLE |
-| ACTIVE A | CLOCKED_OUT | finalize A, IDLE |
-| ACTIVE A | Local Pause | finalize A, LOCAL_PAUSED A |
-| ACTIVE A | UNKNOWN/CONFLICT brief | ACTIVE A provisional |
-| ACTIVE A | UNKNOWN/CONFLICT prolonged | ACTIVE A + Safety Hold |
-| PENDING A | Resume with verified A | ACTIVE A |
-| PENDING A | Start Fresh with verified A | ACTIVE A, new cycle |
-| PENDING A | CONTEXT_CHANGED/LEFT/CLOCKED_OUT | clear Pending, reconcile new state |
-| LOCAL_PAUSED A | Local Resume with verified A | ACTIVE A |
-| LOCAL_PAUSED A | same Context verify | LOCAL_PAUSED A |
-| LOCAL_PAUSED A | CONTEXT_CHANGED/LEFT/CLOCKED_OUT | clear Local Pause, reconcile |
-| any | stale user command | no mutation, normalized rejection |
+Provenance metadata never creates separate time identity.
 
 **Settled**
 
 ---
 
-# 42. L4 Acceptance Scenarios
-
-## C1. Brand-new job
-
-Job A has no history and SquareCoil positively detects A.
-
-Expected:
-- Companion auto-starts A;
-- session starts at safe observation/native boundary;
-- no Resume prompt.
-
-## C2. Remembered job
-
-Job A has historical time and SquareCoil detects A.
-
-Expected:
-- state becomes PENDING A;
-- no accrual while Pending;
-- Resume and Start Fresh are available when A remains verified.
-
-## C3. Resume delayed by 45 seconds
-
-A enters Pending at 10:00:00, user presses Resume at 10:00:45, SquareCoil remains verified A.
-
-Expected:
-- Active session starts at safe Pending anchor 10:00:00;
-- the 45 seconds are included;
-- no time before 10:00:00 is invented.
-
-## C4. Start Fresh preserves history
-
-A has 12h historical time, enters Pending, user chooses Start Fresh.
-
-Expected:
-- prior 12h remains;
-- new cycleId created;
-- new session begins at safe Pending anchor;
-- Job Total continues from prior history plus new accrual.
-
-## C5. Local Pause
-
-A is ACTIVE and user selects Local Pause at 11:15:00.
-
-Expected:
-- current session finalizes at 11:15:00;
-- state becomes LOCAL_PAUSED A;
-- SquareCoil native clock is untouched.
-
-## C6. Local Resume
-
-A remains SquareCoil Context while Local Paused. User resumes at 11:25:00.
-
-Expected:
-- new session begins at 11:25:00;
-- 10-minute pause is not backfilled;
-- prior cycle continues.
-
-## C7. Local Resume after SquareCoil changed
-
-A is Local Paused but SquareCoil now verifies B.
-
-Expected:
-- Resume A rejected/unavailable;
-- Local Pause A cleared by Context transition;
-- B evaluated normally.
-
-## C8. Active A direct switch to new B
-
-Native-confirmed A -> B at 12:00:00, B has zero history.
-
-Expected:
-- finalize A at 12:00:00;
-- auto-start B from 12:00:00;
-- one real transition boundary.
-
-## C9. Active A direct switch to remembered B
-
-Expected:
-- finalize A;
-- B becomes Pending;
-- no B accrual until user choice.
-
-## C10. Distinct action-4/action-3 gap
-
-A leaves at 10:00:00, B enters at 10:00:20.
-
-Expected:
-- A ends at 10:00:00;
-- 20-second gap unattributed;
-- B evaluates at 10:00:20.
-
-## C11. Same project department change
-
-SquareCoil action 3 changes department but project ID remains A.
-
-Expected:
-- same ACTIVE session continues;
-- no new session/cycle;
-- label metadata may update.
-
-## C12. Full clock-out
-
-ACTIVE A receives confirmed CLOCKED_OUT at native boundary 15:00:00.
-
-Expected:
-- finalize A once at 15:00:00;
-- enter IDLE;
-- history reason identifies clock-out.
-
-## C13. Context leave while Pending
-
-A is Pending and receives CONTEXT_LEFT.
-
-Expected:
-- clear Pending;
-- no historical duration added;
-- enter IDLE.
-
-## C14. Brief unknown recovers
-
-ACTIVE A becomes STATE_UNKNOWN for 20 seconds, then verified A returns within grace.
-
-Expected:
-- session remains continuous;
-- no artificial boundary;
-- interval remains included.
-
-## C15. Long unknown gap
-
-ACTIVE A loses verification longer than grace.
-
-Expected:
-- Safety Hold at latest trustworthy verification;
-- no further running contribution after hold;
-- no fabricated clock-out.
-
-## C16. Same Context returns after long unknown gap
-
-A returns positively after Safety Hold/grace expiry.
-
-Expected:
-- prior evidence-backed session ends at hold/lastVerified boundary;
-- unknown gap remains unattributed;
-- new A session begins from fresh anchor;
-- no automatic backfill.
-
-## C17. Strong unconfirmed action 2
-
-SquareCoil successfully completes action 2 but post-state verification is temporarily unavailable.
-
-Expected:
-- Safety Hold at action-2 boundary;
-- no further provisional accrual;
-- state is not yet confirmed CLOCKED_OUT.
-
-## C18. Strong action 2 later contradicted
-
-Following C17, fresh SquareCoil evidence confirms A is still current.
-
-Expected:
-- Safety Hold removed;
-- original active session continuity restored;
-- interval is included because positive evidence contradicted suspected clock-out.
-
-## C19. Strong action 2 later confirmed
-
-Following C17, clock-out is confirmed.
-
-Expected:
-- finalize at action-2 boundary;
-- enter IDLE;
-- no double finalization.
-
-## C20. Recovery checkpoint same Context
-
-Prior runtime crashed while A active; fresh boot again verifies A.
-
-Expected:
-- preserve only evidence-backed prior time through old lastVerifiedAt;
-- unknown crash gap not backfilled;
-- remembered A enters conservative Pending for the new current period.
-
-## C21. Recovery checkpoint different Context
-
-Prior A, current B.
-
-Expected:
-- preserve only evidence-backed A time;
-- evaluate B normally;
-- no gap bridging.
-
-## C22. Local Pause survives reload
-
-Reliable Local Pause A marker exists and fresh SquareCoil verifies A.
-
-Expected:
-- restore LOCAL_PAUSED A;
-- no Pending and no auto-start.
-
-## C23. Selected inactive Job B
-
-ACTIVE A, user selects B.
-
-Expected:
-- A continues;
-- B does not start;
-- B cannot visually claim Running state.
-
-## C24. Same-Context heartbeat while collapsed
-
-ACTIVE A is manually collapsed, heartbeat verifies A.
-
-Expected:
-- remains collapsed;
-- no auto-expand.
-
-## C25. Real native switch while collapsed
-
-ACTIVE A collapsed, SquareCoil switches to B.
-
-Expected:
-- timer may request select/focus B and expand so change is visible;
-- timing transition follows normal A/B rules.
-
-## C26. Threshold after multiple days
-
-A has 25h lifetime Job Total but only 30m Today.
-
-Expected:
-- threshold status uses 30m Today;
-- lifetime total does not make A permanently Red.
-
-## C27. Protected Context housekeeping
-
-A is current SquareCoil Context and Local Paused.
-
-Expected:
-- Archive/Delete/Clear Recent ordinary actions are unavailable for A.
-
-## C28. Hidden inactive Context becomes current
-
-B is hidden and inactive, then SquareCoil switches to B.
-
-Expected:
-- B is made visible;
-- incoming Context focus intent may select it;
-- timing evaluated normally.
-
-## C29. Observer-tab stale Resume
-
-Observer tab shows Pending A; owner already transitioned to B before command arrives.
-
-Expected:
-- Resume A rejected as stale;
-- no session created;
-- observer refreshes from authoritative state.
-
-## C30. Persistence failure during switch
-
-A -> B transition cannot commit atomically.
-
-Expected:
-- transition not presented as successfully durable;
-- no alternate UI storage write occurs;
-- lifecycle/state layer enters persistence degradation/recovery path.
+# 39. Core Timer Invariants
+
+- **TIMER-01:** At most one Context accrues.
+- **TIMER-02:** Selection alone never changes timing.
+- **TIMER-03:** Zero-history positive Context auto-starts from safe evidence.
+- **TIMER-04:** Remembered Context enters Pending unless valid Local Pause recovery applies.
+- **TIMER-05:** Pending accrues no time before valid user choice.
+- **TIMER-06:** Pending retroactive start never crosses a broken/unverified continuity gap.
+- **TIMER-07:** Start Fresh preserves historical totals.
+- **TIMER-08:** Local Pause never mutates SquareCoil.
+- **TIMER-09:** Local Resume never backfills paused time.
+- **TIMER-10:** Same-project metadata changes create no boundary.
+- **TIMER-11:** Distinct native transitions remain distinct in history.
+- **TIMER-12:** Unknown/conflict never fabricates clock-out or Context.
+- **TIMER-13:** Prolonged uncertainty is capped, not accrued indefinitely.
+- **TIMER-14:** Provisional display may be corrected downward without deleting finalized history.
+- **TIMER-15:** Shared Safety Hold is one authoritative cross-tab modifier.
+- **TIMER-16:** Same Context appearing later does not by itself disprove a successful action-2 transition.
+- **TIMER-17:** Controlled runtime teardown is not itself a work boundary.
+- **TIMER-18:** Companion disable stops local tracking without clocking out SquareCoil.
+- **TIMER-19:** Protected Contexts survive ordinary housekeeping.
+- **TIMER-20:** Cross-tab commands use one fenced writer and validated timestamps.
+- **TIMER-21:** Start cause and end reason remain semantically separate.
+- **TIMER-22:** Thresholds use Today and never alter state.
+
+**All Settled**
 
 ---
 
-# 43. Continuity States After L4
+# 40. Transition Matrix
+
+| Current | Input | Result |
+|---|---|---|
+| IDLE | new zero-history B | ACTIVE B |
+| IDLE | remembered B | PENDING B |
+| IDLE | valid Local Pause recovery B | LOCAL_PAUSED B |
+| ACTIVE A | verified A | ACTIVE A |
+| ACTIVE A | metadata A | ACTIVE A |
+| ACTIVE A | switch A→B | finalize A, evaluate B |
+| ACTIVE A | Context left | finalize A, IDLE |
+| ACTIVE A | clock-out | finalize A, IDLE |
+| ACTIVE A | Local Pause | finalize A, LOCAL_PAUSED A |
+| ACTIVE A | brief unknown | ACTIVE A provisional |
+| ACTIVE A | prolonged unknown | ACTIVE A + shared Safety Hold |
+| ACTIVE A | strong unconfirmed action 2 | ACTIVE A + shared Safety Hold |
+| PENDING A | verified Resume | ACTIVE A |
+| PENDING A | verified Start Fresh | ACTIVE A, new cycle |
+| PENDING A | continuity broken | PENDING A with refreshed future anchor required |
+| LOCAL_PAUSED A | verified Local Resume | ACTIVE A |
+| any | stale user command | reject, no mutation |
+
+**Settled**
+
+---
+
+# 41. Acceptance Scenarios
+
+## C1 Brand-new job
+Zero-history A is positively observed → ACTIVE A at safe anchor, no Resume prompt.
+
+## C2 Remembered job
+Remembered A is positively observed → PENDING A, no accrual.
+
+## C3 Pending Resume with continuous verification
+A enters Pending at 10:00 and remains positively verified; user resumes at 10:00:45 → session may start at 10:00 safe anchor.
+
+## C4 Pending verification gap
+A enters Pending at 10:00, Bridge loses trustworthy verification beyond grace, then A is freshly seen at 10:10 → Resume cannot backfill to 10:00; safe anchor resets to fresh verified period.
+
+## C5 Start Fresh
+12h prior A remains intact; new cycle begins at valid current Pending anchor.
+
+## C6 Local Pause / Resume
+Pause boundary ends session; SquareCoil unchanged. Resume starts new session at validated resume action time; pause gap excluded.
+
+## C7 Direct switch A→new B
+Native-confirmed switch at noon → A ends once at noon; B begins from B anchor.
+
+## C8 Direct switch A→remembered B
+A ends; B becomes Pending.
+
+## C9 Distinct action-4/action-3 gap
+A leaves at 10:00, B enters at 10:00:20 → 20 seconds unattributed.
+
+## C10 Same-project department change
+Same project ID → same session/cycle, no boundary.
+
+## C11 Confirmed clock-out
+ACTIVE A + confirmed action-2 boundary → finalize once, IDLE.
+
+## C12 Brief unknown recovers
+20-second UNKNOWN inside grace then A verifies → continuous session.
+
+## C13 Long unknown
+Past grace → shared Safety Hold at latest trustworthy verification; no further contribution.
+
+## C14 Provisional correction
+Timer displayed provisionally beyond last verification; later conservative reconciliation caps earlier → displayed time may decrease, finalized Ledger history is not deleted.
+
+## C15 Same Context after long unknown
+Old A ends at evidence-backed hold; unknown gap excluded; fresh A creates new current period.
+
+## C16 Strong action 2 later confirmed
+Hold at action-2 boundary; confirmation → finalize there and IDLE.
+
+## C17 Strong action 2 specifically disproved
+Fresh evidence correlated to same action-2 episode proves it did not take effect → clear hold and preserve original continuity.
+
+## C18 Same Context appears later after action 2
+No specific disproof, A appears later → old A ends at action-2 boundary; later A is treated as new remembered observation/Pending, not seamless continuation.
+
+## C19 Shared Safety Hold cross-tab
+Two tabs view ACTIVE A; owner sets Safety Hold → both cap at same `holdAtMs`; observer cannot keep counting independently.
+
+## C20 Controlled reload same Context within grace
+Reload itself creates no segment boundary; fresh same-A verification within grace may continue logical session without duplicate time.
+
+## C21 Controlled reload after long gap
+Gap exceeds grace → preserve only through prior lastVerified; do not bridge gap.
+
+## C22 Unexpected crash
+Prior A checkpoint + fresh A after crash → preserve only old evidence-backed time; conservative new period is Pending.
+
+## C23 Local Pause survives reload
+Valid Local Pause A + fresh A → restore LOCAL_PAUSED A, no auto-start.
+
+## C24 Companion disable while healthy ACTIVE
+Disable at valid command time → finalize local tracking at disable boundary, SquareCoil untouched, end reason `companion-disabled`.
+
+## C25 Companion disable while Safety Held
+Disable cannot extend finalized time beyond earlier hold/evidence-backed boundary.
+
+## C26 Re-enable while SquareCoil still on A
+A has history → remembered A enters Pending; no silent auto-resume.
+
+## C27 Observer Local Pause timestamp
+Observer sends Pause with expected revision/session and valid originating timestamp → owner may use that timestamp. If state changed first, reject stale command.
+
+## C28 Impossible/future command timestamp
+Writer clamps within permitted skew or rejects; cannot create future or pre-session history.
+
+## C29 Selected inactive B
+ACTIVE A + user selects B → A runs; B does not start or impersonate running state.
+
+## C30 Same-Context heartbeat while collapsed
+No auto-expand.
+
+## C31 Real native switch while collapsed
+May request incoming focus/expand; timing still follows normal transition logic.
+
+## C32 Threshold after many days
+A lifetime 25h, Today 30m → threshold uses 30m, not lifetime total.
+
+## C33 Protected Context housekeeping
+Current/Active/Pending/LocalPaused/Held Context cannot be ordinarily archived/cleared/hidden destructively.
+
+## C34 Hidden inactive B becomes current
+B becomes visible and timing evaluates normally.
+
+## C35 Stale Resume from observer tab
+Owner already moved to B → stale Resume A rejected; no session created.
+
+## C36 Persistence failure during switch
+A→B cannot atomically commit → not presented as durable success; no alternate storage path.
+
+## C37 Start/end provenance
+Resume-created session that later clocks out records `startCause=resume`, `endReason=native-clock-out`; these are not conflated.
+
+## C38 Pending no-history false positive avoided
+A Job Index record with zero authoritative time is still treated as zero-history and may auto-start.
+
+---
+
+# 42. Continuity States After L4
 
 ## Settled
 
-- canonical IDLE/ACTIVE/PENDING/LOCAL_PAUSED behavior;
+- IDLE/ACTIVE/PENDING/LOCAL_PAUSED behavior;
 - zero-history auto-start;
-- remembered Context Pending behavior;
-- Pending safe-start anchor;
-- Resume vs Start Fresh cycle semantics;
-- Start Fresh preserves total history;
-- Local Pause/Resume behavior;
-- direct Context switch behavior;
-- distinct native transition gaps;
-- Context-left vs full-clock-out handling;
-- same-Context verification behavior;
-- metadata updates create no boundary;
-- strong unconfirmed clock-out Safety Hold;
-- short unknown/conflict grace and prolonged conservative hold;
-- no automatic backfill after long unverified gap;
-- native-confirmed vs detected conservative end-boundary policy;
-- Recovery Checkpoint reconciliation behavior;
+- remembered Context Pending;
+- Pending continuity proof and anchor reset after unverified gaps;
+- Resume vs Start Fresh;
+- Local Pause/Resume;
+- direct and distinct native transitions;
+- context-left vs full clock-out;
+- shared authoritative Safety Hold;
+- action-2 same-Context re-entry safety;
+- provisional-time correction semantics;
+- conservative unknown/conflict handling;
+- controlled reload continuity vs unexpected crash recovery;
+- Companion disable/re-enable timer behavior;
 - selected vs active isolation;
-- actual Context-change focus/expand intent;
 - threshold semantics based on Today;
 - protected Context rules;
-- cross-tab authoritative command routing;
-- stale user-command rejection.
+- cross-tab command timestamp validation;
+- separate startCause/endReason provenance.
 
 ## Provisional
 
-- exact `verificationGraceMs` value around the 90-second default;
-- exact UI wording for Safety Hold/verification degraded states;
-- exact cycleId continuation rule when very old/imported history has no meaningful prior cycle;
-- exact implementation form of Accrual Safety Hold metadata.
+- exact `verificationGraceMs` around 90-second default;
+- exact command clock-skew tolerance;
+- exact UI wording for provisional/Safety Hold states;
+- exact cycle continuation choice when imported history lacks meaningful cycle metadata;
+- exact persistence field shape for Safety Hold/provenance.
 
 ## Open for later stages
 
-- final main-view and Time Overview display rules (L5);
-- history presentation labels (L5);
-- archive/delete/clear exact workflows (L6);
-- manual correction workflows if later added (L6/L8);
-- final error/disabled-button UX (L5/L7);
-- automated timer fixture implementation (L8/build).
+- main timer/Time Overview presentation (L5);
+- visual provisional-time indicator (L5);
+- history presentation of start/end provenance (L5);
+- archive/delete/clear workflows (L6);
+- final error/disabled-action UX (L5/L7);
+- automated fixture implementation (L8/build).
 
 ## Blocked
 
@@ -1364,12 +1051,12 @@ None.
 
 ---
 
-# 44. L4 Readiness Judgment
+# 43. L4 Readiness Judgment
 
-**Status: Ready for review**
+**Status: Settled — ready for L5**
 
-L4 is complete when the Timer service can consume normalized L3 events and user commands through the single L2 state writer without inventing start/end boundaries, silently backfilling unknown time, conflating Local Pause with SquareCoil clock state, or allowing ordinary UI selection to change timing.
+L4 now defines timer starts, Pending continuity, local controls, native switches, uncertainty handling, shared Safety Holds, reload/disable behavior, recovery, cross-tab commands, and historical provenance strongly enough that L5 can present timer/time state without inventing behavior.
 
-If accepted, the next stage is:
+Next stage:
 
 **L5: Time Views, Recent Jobs, History, and Job Navigation**
