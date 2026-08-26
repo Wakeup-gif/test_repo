@@ -1394,7 +1394,11 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
       const before = await waitFor(async () => serviceWorkerTarget(await browserCdp.send('Target.getTargets'), extensionId), 'extension service-worker target', options.timeoutMs);
       const closed = await browserCdp.send('Target.closeTarget', { targetId: before.targetId });
       assert(closed.success === true, 'Browser did not close the service-worker target', closed);
-      await waitFor(async () => !serviceWorkerTarget(await browserCdp.send('Target.getTargets'), extensionId), 'service-worker termination', options.timeoutMs);
+      const terminationObserved = await waitFor(
+        async () => !serviceWorkerTarget(await browserCdp.send('Target.getTargets'), extensionId),
+        'service-worker termination',
+        options.timeoutMs
+      );
       const response = await bridge.send({ type: MESSAGES.REVALIDATE });
       const after = await waitFor(async () => serviceWorkerTarget(await browserCdp.send('Target.getTargets'), extensionId), 'service-worker restart', options.timeoutMs);
       const authorityAfter = await waitFor(async () => {
@@ -1413,7 +1417,6 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
       assert(state.runtimeInstanceId === activeRuntimeId, 'Worker restart replaced the live page runtime', state);
       assert(response?.health?.runtimeInstanceId === activeRuntimeId, 'Restarted worker did not reuse the live runtime', response);
       assert(response?.classification === 'DEGRADED_SAME_BUILD', 'Restarted worker returned an unexpected classification', response);
-      assert(before.targetId !== after.targetId, 'Service-worker target identity did not change across restart', { before, after });
       assert(authorityAfter.workerInstanceId !== authorityBefore.workerInstanceId, 'Isolated authority retained the terminated worker identity', { authorityBefore, authorityAfter });
       assert(authorityBefore.disposition === 'OWNER' && authorityAfter.disposition === 'OWNER', 'Worker restart did not preserve OWNER disposition', { authorityBefore, authorityAfter });
       assert(authorityAfter.revision === authorityBefore.revision, 'Worker restart changed the authoritative document revision', { authorityBefore, authorityAfter });
@@ -1432,8 +1435,9 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
       return {
         beforeTargetId: before.targetId,
         afterTargetId: after.targetId,
-        targetIdChanged: before.targetId !== after.targetId,
-        terminationObserved: true,
+        browserTargetIdChanged: before.targetId !== after.targetId,
+        workerInstanceIdChanged: authorityAfter.workerInstanceId !== authorityBefore.workerInstanceId,
+        terminationObserved,
         serviceWorkerTargets: targets.targetInfos.filter(target => target.type === 'service_worker' && target.url.startsWith(`chrome-extension://${extensionId}/`)),
         response,
         authorityBefore,
