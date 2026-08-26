@@ -1,7 +1,7 @@
 # SquareCoil Companion Rebuild
 ## Logic Stage L5: Time Views, Recent Jobs, History, and Job Navigation
 
-**Status:** Ready for review  
+**Status:** Settled - ready for L6  
 **Logic stage:** L5  
 **Depends on:** L0 invariants, L1 lifecycle, L2 state/time/migration, L3 SquareCoil Bridge, L4 core timer behavior  
 **Framework authority:** `docs/REBUILD-MASTER-PLAN.md`  
@@ -14,90 +14,108 @@
 L5 owns behavior for:
 
 - main timer information hierarchy;
-- Selected vs Active/Pending/Local-Paused presentation;
-- current operational-status presentation;
-- provisional and Safety-Hold time presentation;
-- state-appropriate main actions;
-- timer tab selection/expand behavior;
-- Recent membership and visible-tab behavior;
-- hidden/overflow behavior;
-- Recent status display;
-- Time Overview queries and ordering;
-- Today / This Week / By Day / By Job views;
-- Context detail by date;
+- Selected vs operational Context presentation;
+- operational and native-clock status presentation;
+- provisional and Safety-Hold presentation;
+- state-appropriate actions and action targeting;
+- tab selection, collapse, expand, visible capacity, overflow, hide, and order;
+- Recent membership and row behavior;
+- Time Overview;
+- Today / This Week / By Day / By Context views;
+- Context detail;
+- Workday Time Zone disclosure;
 - legacy-unattributed-time disclosure;
-- History session reconstruction/order/fields;
+- History reconstruction/order/fields;
 - History vs Activity Log separation;
-- Open Job behavior;
-- local search-assisted job lookup;
+- Open Job and local search-assisted navigation;
 - invalid/missing job navigation behavior;
-- large-history incremental loading expectations.
+- large-history incremental retrieval behavior;
+- read-model snapshot consistency across asynchronous views.
 
 L5 does **not**:
 
 - recalculate time independently of L2/L4;
 - change Timer State from selection/navigation alone;
-- define archive/delete data mutation semantics beyond the already-settled protection/intent distinctions;
+- define archive/delete mutation semantics beyond settled protection/intent distinctions;
 - define Full Backup/CSV behavior;
-- define final visual styling/themes;
-- define final keyboard/focus polish beyond behavior necessary to avoid timing side effects.
+- define final theme/styling details.
 
 > L2/L4 own what time exists. L5 owns how that truth is exposed and navigated.
 
-**Settled scope**
+**Settled**
 
 ---
 
-# 2. Read-Model Contract
+# 2. Canonical Read-Model Contract
 
 Every L5 view reads through one canonical query/read-model layer backed by L2 state, Ledger, Context Index, and L4 operational state.
 
-A view must never recompute its own independent version of:
+No view independently recomputes:
 
 ```text
 Today
 Today Total
 This Week
 Job Total / Context Total
-Current running contribution
+Current Session
+current running contribution
 Safety Hold cap
 legacyUnattributedMs
 ```
 
-A read snapshot should carry enough metadata to identify:
+A read snapshot supports at least:
 
 ```text
 stateRevision
 queryAtMs
 workdayZone
-operational Context/status
-Selected Context
-provisional/held disposition when applicable
+workdayZoneDisposition
+selectedContextId
+operationalContextId
+operationalStatus
+nativeClockDisposition
+provisional/hold disposition
 ```
 
-Different views may format the same values differently, but they must derive from the same authoritative query result.
+Formatting may differ by view. Source values and semantics may not.
 
 **Settled**
 
 ---
 
-# 3. Main Timer Has Two Truths to Preserve
+# 3. Snapshot Revision Consistency
 
-The main timer must preserve both:
+One rendered logical view must not combine incompatible asynchronous revisions.
+
+Rules:
+
+- each asynchronous result carries the revision/snapshot identity it was derived from;
+- an older result arriving after a newer accepted revision cannot overwrite the newer view;
+- related values presented together should come from one compatible snapshot or clearly identified revalidation state;
+- transient refresh failure preserves last successful values instead of replacing them with zero;
+- if a new authoritative revision invalidates a provisional value, every affected live view reconciles from the new canonical snapshot.
+
+Example that is forbidden:
 
 ```text
-A. what the user is viewing
-B. what the Companion is actually doing
+Main Timer: Job A Today from revision 51
+Recent row A: Job A Today from stale revision 49
 ```
 
-These are represented by:
+for an already-known newer revision where the mismatch is caused only by late async rendering.
+
+**Settled**
+
+---
+
+# 4. Selected Truth vs Operational Truth
+
+The UI preserves two distinct facts:
 
 ```text
 Selected Context
 Operational Context = ACTIVE | PENDING | LOCAL_PAUSED | none
 ```
-
-When Selected Context differs from the Operational Context, the UI must make that difference explicit.
 
 Example:
 
@@ -106,80 +124,78 @@ ACTIVE = Job A
 SELECTED = Job B
 ```
 
-The user may inspect Job B's Today, Total, and History, while Job A continues to accrue.
+The user may inspect B's Today, Total, and History while A continues accruing.
 
-Job B must never be labeled or animated as the running job merely because it is selected.
+B must never appear Running merely because it is selected.
 
 **Settled**
 
 ---
 
-# 4. Current Tracking Strip
+# 5. Current Context Strip
 
-Whenever a non-IDLE operational Context exists, the read model exposes a **Current Tracking Strip** independent of Selected Context.
+The earlier conceptual name `Current Tracking Strip` is replaced by **Current Context Strip** because PENDING and LOCAL_PAUSED are operational Contexts but are not actively tracking time.
 
-It identifies at minimum:
+Whenever a non-IDLE operational Context exists, the read model exposes a compact Current Context Strip independent of selection.
+
+It supports:
 
 ```text
 operationalContextId
-operationalContextLabel
-operationalStatus
-Today for that Context
-provisional/hold flag if applicable
+label
+semantic status
+Today
+provisional/hold flag
 ```
 
 Behavior:
 
-- if Selected = Operational Context, the renderer may visually integrate this truth into the main header rather than duplicate it;
-- if Selected != Operational Context, a persistent compact indication of the actual operational Context is required;
-- the strip may provide `Focus Current` / equivalent navigation intent;
-- focusing current changes Selected Context only and never changes timing.
+- Selected = Operational may integrate this truth into the main header instead of duplicating it;
+- Selected != Operational requires persistent indication of the real operational Context;
+- the strip status must say Running, Awaiting Choice, Locally Paused, Verification Hold, etc. rather than generically saying Tracking;
+- `Focus Current` changes selection only;
+- strip actions, if any, must visibly target the operational Context and obey the same command rules as main actions.
 
-This is the primary protection against Selected Context visually impersonating the running/pending/paused Context.
+During a short reconciliation where SquareCoil positively identifies a Context but Timer State has not settled yet, the strip may show `SYNCING` for that identified Context. It must not claim Running until L4 state supports it.
 
 **Settled**
 
 ---
 
-# 5. Main Time Hierarchy
+# 6. Main Time Hierarchy
 
-For a selected Job Context, the main expanded timer prioritizes:
+For a selected Job Context:
 
 ```text
 Primary   = Recorded Today / Today
 Secondary = Job Total
-Tertiary  = Current Session when currently ACTIVE and useful
+Tertiary  = Current Session only when this selected Context is ACTIVE
 ```
 
-For a selected General Context:
+For a General Context:
 
 ```text
 Primary   = Recorded Today / Today
 Secondary = Context Total
-Tertiary  = Current Session when currently ACTIVE and useful
+Tertiary  = Current Session only when ACTIVE
 ```
 
 Rules:
 
-- Today is the most prominent useful elapsed measure;
-- Job/Context Total remains visible but secondary;
-- Current Session must not visually compete with Today as the main measure;
-- current-session time is shown only for the actual ACTIVE Context;
-- Pending time is not counted as a current session before Resume/Start Fresh;
-- Local-Paused time does not continue increasing;
-- Safety-Held time is capped according to L4.
-
-Exact typography/wording is deferred to visual implementation, but hierarchy is settled.
+- Today is the primary useful measure;
+- Total remains visible but secondary;
+- Current Session must not compete visually with Today;
+- Pending anchor time is not counted before Resume/Start Fresh commits;
+- Local Pause does not keep increasing;
+- Safety-Held values stop at the shared hold boundary.
 
 **Settled**
 
 ---
 
-# 6. Semantic Presentation Statuses
+# 7. Semantic Presentation Statuses
 
-L5 uses presentation statuses derived from L4 state. They are not new Timer States.
-
-Canonical semantic statuses:
+These are presentation statuses, not Timer States:
 
 ```text
 RUNNING
@@ -191,53 +207,43 @@ NOT_RUNNING
 SYNCING
 ```
 
-## 6.1 RUNNING
+## 7.1 Status mapping
 
-Selected Context is ACTIVE, no Safety Hold is set, and current verification is normal.
+- `RUNNING`: selected Context is ACTIVE with normal verification and no hold.
+- `RUNNING_PROVISIONAL`: ACTIVE during L4 short verification grace with provisional contribution.
+- `VERIFICATION_HOLD`: ACTIVE with shared Safety Hold.
+- `AWAITING_CHOICE`: PENDING.
+- `LOCALLY_PAUSED`: LOCAL_PAUSED.
+- `NOT_RUNNING`: selected historical/inactive Context.
+- `SYNCING`: transient reconciliation before a safer semantic status is known.
 
-## 6.2 RUNNING_PROVISIONAL
+## 7.2 Status precedence
 
-Selected Context is ACTIVE during the short L4 UNKNOWN/CONFLICT grace period and displayed running time includes provisional contribution.
+For one selected Context, use this precedence where multiple presentation modifiers could appear:
 
-The UI must indicate that the value is being verified and may reconcile.
+```text
+VERIFICATION_HOLD
+RUNNING_PROVISIONAL
+RUNNING
+AWAITING_CHOICE
+LOCALLY_PAUSED
+SYNCING
+NOT_RUNNING
+```
 
-## 6.3 VERIFICATION_HOLD
+The precedence does not change Timer State. It only prevents conflicting labels such as simultaneously displaying Running and Verification Hold.
 
-Selected Context is ACTIVE with a shared L4 Safety Hold.
+`SYNCING` must not erase a known durable Pending or Local-Paused truth merely because a view is refreshing.
 
-Time is capped at `holdAtMs` and must not visually continue increasing.
-
-This status must not be labeled merely `Paused`, because it is not a user Local Pause.
-
-## 6.4 AWAITING_CHOICE
-
-Selected Context is PENDING and awaiting Resume / Start Fresh.
-
-No Pending interval is counted until a valid user choice commits.
-
-## 6.5 LOCALLY_PAUSED
-
-Selected Context is `LOCAL_PAUSED`.
-
-This is a Companion-local pause and must not imply SquareCoil is clocked out.
-
-## 6.6 NOT_RUNNING
-
-Selected Context is historical/inactive and is not the current operational Context.
-
-## 6.7 SYNCING
-
-Used only during a short reconciliation interval where SquareCoil/Timer State has not yet safely settled into another presentation status.
-
-**Settled semantic mapping; final labels may be refined in L7**
+**Settled mapping; final words may be refined in L7**
 
 ---
 
-# 7. Global Native Clock Disposition
+# 8. Native Clock Disposition Is Separate
 
-Context presentation status and SquareCoil native clock disposition are different concepts.
+Native SquareCoil disposition and Context presentation status are different dimensions.
 
-L5 may expose global native disposition such as:
+Possible global native disposition includes:
 
 ```text
 SquareCoil clocked out
@@ -245,107 +251,109 @@ No trackable project/context
 SquareCoil state unknown
 ```
 
-Rules:
+A historical selected Job B remains `NOT_RUNNING` even when the global disposition says SquareCoil clocked out.
 
-- `CLOCKED_OUT` must not be shown as if every historical selected Context itself has a `Clocked Out` timer state;
-- `NO_TRACKABLE_CONTEXT` must remain distinct from full clock-out;
-- if a historical Job B is selected while SquareCoil is clocked out, Job B is `NOT_RUNNING` while the global native disposition may say clocked out.
+`NO_TRACKABLE_CONTEXT` remains distinct from full company clock-out.
 
 **Settled**
 
 ---
 
-# 8. Provisional Time Presentation
+# 9. Provisional Time Propagation
 
-L4 permits provisional displayed time during a short verification gap and permits that displayed value to decrease after conservative reconciliation.
-
-Any L5 value containing provisional running contribution must expose:
+Any value containing L4 provisional running contribution exposes:
 
 ```text
 isProvisional = true
 ```
 
-At minimum this applies to:
+This applies as relevant to:
 
 - selected Context Today;
-- selected Context Total when it includes the same running contribution;
+- selected Context Total;
 - Today Total;
 - This Week;
-- active row inside Today-by-Context;
-- current-session display.
+- active Today-by-Context row;
+- current-session display;
+- Context Detail live totals.
 
-Behavior:
+Rules:
 
-- provisional values must be visually distinguishable from finalized/normal values;
-- a later downward correction must update all affected views consistently;
-- the UI must not describe this as deleted history;
-- finalized Ledger history is unchanged by provisional-display correction.
-
-**Settled**
-
----
-
-# 9. Safety Hold Presentation
-
-When ACTIVE has a Safety Hold:
-
-- all live views stop increasing beyond the shared hold boundary;
-- status becomes `VERIFICATION_HOLD`;
-- the UI indicates that Companion is waiting for/needs SquareCoil verification;
-- the Context still counts as operational/protected;
-- the user must not be led to believe SquareCoil itself was paused by Companion.
-
-A Safety Hold is therefore visible enough to explain why elapsed time stopped moving.
+- only values containing provisional contribution are marked provisional;
+- unrelated historical Context totals remain normal;
+- later conservative correction may reduce provisional display values;
+- all affected views reconcile consistently;
+- finalized Ledger history is not described as deleted.
 
 **Settled**
 
 ---
 
-# 10. Pending Anchor Presentation
+# 10. Safety Hold Presentation
 
-A Pending Context may expose its current valid safe anchor to help the user understand Resume / Start Fresh behavior.
+When ACTIVE has a shared Safety Hold:
 
-Example conceptual information:
+- all live views stop increasing beyond `holdAtMs`;
+- status is `VERIFICATION_HOLD`;
+- the UI makes the verification problem visible enough to explain the stopped timer;
+- the Context remains operational and protected;
+- wording must not imply Companion paused the native SquareCoil clock.
+
+**Settled**
+
+---
+
+# 11. Pending Anchor Presentation
+
+A Pending Context may show its current valid safe anchor so Resume/Start Fresh behavior is understandable.
+
+Conceptual information:
 
 ```text
 Awaiting choice
-Tracking can begin from 10:14 AM if resumed now
+Can begin from 10:14 AM if resumed now
 ```
 
 Rules:
 
-- the Pending anchor is informational and is not yet added to Today/Total;
-- if continuity breaks and L4 refreshes the safe anchor, L5 must display the refreshed anchor rather than stale original time;
-- exact microcopy is deferred.
+- Pending anchor is informational and not yet added to Today/Total;
+- if L4 breaks continuity and refreshes the anchor, L5 replaces the old anchor immediately;
+- a stale old anchor must not remain visible after authoritative revision changes.
 
-**Settled behavior**
+**Settled**
 
 ---
 
-# 11. Main Actions by State
+# 12. Main Action Targeting
 
-Main actions are derived from actual state, not merely Selected Context existence.
+Actions are always scoped to an explicit Context and current authoritative revision.
 
-## 11.1 ACTIVE selected
+If Selected != Operational:
 
-Available conceptually:
+- actions in the main selected panel target Selected Context only;
+- the panel must not expose `Local Pause` as though it targeted an inactive selected Context;
+- any operational action exposed from the Current Context Strip must identify that operational target.
+
+Selection itself never performs a timer command.
+
+**Settled**
+
+---
+
+# 13. Main Actions by State
+
+## ACTIVE selected
 
 ```text
 Local Pause
 Open Job (Job Context only)
 ```
 
-Archive/Clear/Delete ordinary controls are unavailable because the Context is protected.
+## ACTIVE + Safety Hold selected
 
-## 11.2 ACTIVE with Safety Hold
+Local Pause may remain available subject to L4 hold/boundary rules. Open Job remains available.
 
-Local Pause may remain available, but L4 prevents finalization beyond the hold.
-
-Open Job remains available for a Job Context.
-
-## 11.3 PENDING selected
-
-Available:
+## PENDING selected
 
 ```text
 Resume
@@ -353,86 +361,75 @@ Start Fresh
 Open Job (Job Context only)
 ```
 
-Protected workspace/destructive controls remain unavailable.
-
-## 11.4 LOCAL_PAUSED selected
-
-Available:
+## LOCAL_PAUSED selected
 
 ```text
 Local Resume
 Open Job (Job Context only)
 ```
 
-Protected workspace/destructive controls remain unavailable.
-
-## 11.5 Inactive selected
+## Inactive selected
 
 May expose:
 
 ```text
 Open Job
-Hide from visible tabs
+Hide from Tabs
 Archive
 Delete Job Data
 ```
 
-subject to L4 protection and L6 destructive/archive contracts.
+subject to L4 protection and L6 mutation contracts.
 
-## 11.6 General Context
+General Contexts have no fabricated Open Job action.
 
-A General Context has no `Open Job` action unless a future explicit navigation contract exists.
-
-**Settled action availability; L6 owns destructive mutation/confirmation details**
+**Settled availability; L6 owns mutation/confirmation details**
 
 ---
 
-# 12. Collapse and Expand
+# 14. Collapse, Expand, and Selection
 
-Established interaction behavior is preserved:
-
-- single click on a Context tab selects/focuses it only;
-- double click may select and expand the timer;
-- manual collapse is remembered at runtime according to UI state policy;
-- same-Context verification/heartbeat must not reopen a manually collapsed timer;
-- metadata updates must not reopen it;
-- a real native Context identity transition may request expansion so the new work state is visible.
-
-Expansion/collapse never changes Timer State by itself.
+- single click on a Context tab selects it only;
+- double click may select + expand;
+- manual collapse is runtime UI state;
+- same-Context heartbeat does not reopen a manually collapsed timer;
+- metadata-only update does not reopen it;
+- real native Context identity change may request incoming focus/expand;
+- collapse/expand never changes Timer State.
 
 **Settled**
 
 ---
 
-# 13. Initial Selection
+# 15. Initial Selection
 
-On a fresh rendered UI, choose Selected Context in this order:
+Initial selection priority:
 
 ```text
-1. operational Context if L4 emits current-focus intent
-2. valid lastSelectedContextId when still available to view
+1. operational Context when current-focus intent exists
+2. valid lastSelectedContextId still available to view
 3. most recently seen visible Recent Context
 4. none / empty main state
 ```
 
-A user manually selecting another Context after boot overrides automatic initial selection until a later real native Context transition legitimately requests focus.
+A manual selection remains until the user changes it or a later real native Context transition legitimately requests incoming focus.
+
+A workspace visibility change from another tab must not silently reinterpret selection as a timer action.
 
 **Settled**
 
 ---
 
-# 14. Recent Is Workspace Membership
+# 16. Recent Is Workspace Membership
 
 Recent is not History and not a retention cap.
-
-A Context is in Recent because it belongs to the user's current working set.
 
 A Context normally enters/returns to Recent when:
 
 - SquareCoil positively observes it as current; or
-- the user explicitly chooses `Show in Recent` / restore-to-workspace behavior from another view.
+- the user explicitly chooses Show in Recent / restore-to-workspace.
 
-Merely viewing a History row or opening a project URL does not by itself have to add the Context to Recent.
+Merely viewing History, Context Detail, or opening a project URL does not automatically add it to Recent.
 
 Historical Ledger data remains regardless of Recent membership.
 
@@ -440,165 +437,161 @@ Historical Ledger data remains regardless of Recent membership.
 
 ---
 
-# 15. Recent Last-Seen Metadata
+# 17. Native Last Seen vs Recorded Activity
 
-Positive current SquareCoil observation may update the Context's `lastSeenAtMs` / equivalent workspace metadata.
+Two timestamps must not be conflated:
 
-UI selection alone does not pretend that a Context was newly seen in SquareCoil.
+```text
+lastSeenAtMs
+lastRecordedActivityAtMs
+```
 
-This metadata may drive Recent ordering/overflow choices but does not alter time.
+- `lastSeenAtMs` means SquareCoil positively observed the Context as current.
+- `lastRecordedActivityAtMs` derives from authoritative Companion time/session activity.
+
+UI selection updates neither timestamp.
+
+Recent/overflow ordering may use native last-seen workspace metadata. By-Context time ordering uses authoritative recorded activity.
 
 **Settled**
 
 ---
 
-# 16. Visible Timer Tab Capacity
+# 18. Visible Tab Capacity
 
-To preserve established compact behavior, the first rebuilt release uses a default visible numbered-job-tab capacity of:
+Initial policy:
 
 ```text
 maxVisibleJobTabs = 5
 ```
 
-This is a workspace presentation limit, **not** a Recent membership limit and never a historical retention limit.
+This counts numbered Job Context tabs only.
 
-Production General / recognized General Contexts do not consume a numbered-job slot under this compatibility rule.
+It is a **soft presentation capacity**, not a membership/history invariant.
 
-The exact capacity may become configurable later without changing time/history semantics.
+General Contexts such as Production General do not consume a numbered-job slot.
+
+If safety/UX rules cannot satisfy the limit without hiding a protected or currently inspected Context, the UI may temporarily exceed five rather than violate those rules.
 
 **Settled default policy**
 
 ---
 
-# 17. Overflow Instead of Destruction
+# 19. Automatic Overflow
 
-When the visible numbered-job capacity is full and a new current Job Context must be shown:
+When a new current numbered Job must become visible and capacity is full:
 
-1. protected/current Contexts remain visible;
-2. manually protected operational state cannot be displaced;
-3. choose an eligible inactive, unprotected visible Job Context for overflow using least-recently-seen workspace order;
-4. move that Context out of visible tabs into Recent overflow;
-5. do not remove it from Recent;
-6. do not delete/archive its Time Ledger history.
+1. protected/current Contexts stay visible;
+2. avoid displacing the current Selected Context when another eligible inactive tab exists;
+3. among remaining eligible inactive unprotected tabs, choose least-recently-seen, with durable tab order as deterministic tie-break;
+4. move that Context to Recent overflow;
+5. retain Recent membership and all history.
 
-A hidden/overflow Context that later becomes current through SquareCoil is made visible before/with current-focus intent.
+If no safe candidate exists without hiding protected/Selected operational UX, temporarily exceed capacity.
+
+A hidden/overflow Context that becomes current is automatically shown before/with current-focus intent.
 
 **Settled**
 
 ---
 
-# 18. Manual Hide
+# 20. Manual Hide
 
-Hide affects visible-tab workspace only.
+Hide affects tab visibility only.
 
 Allowed only for unprotected Contexts.
 
 Hide:
 
-- does not remove authoritative history;
-- does not alter Job Total;
-- does not alter SquareCoil;
-- does not necessarily remove Recent membership;
-- persists as workspace preference until the Context becomes operational or the user shows it again.
+- preserves history/Total;
+- does not alter SquareCoil or Timer State;
+- may preserve Recent membership;
+- persists until shown again or current-state visibility overrides it.
 
-If SquareCoil later makes a hidden Context current, current-state visibility outranks the hide preference.
+If another tab applies a durable Hide to a Context currently Selected in this tab:
+
+- the visible tab chrome may disappear;
+- the current detail view may remain selected for inspection until the user selects another Context;
+- timing never changes from this workspace synchronization.
+
+This avoids remote workspace changes forcibly changing another tab's inspection target.
 
 **Settled**
 
 ---
 
-# 19. Tab Order
+# 21. Tab Order
 
-Visible timer tabs are draggable/reorderable.
-
-Rules:
+Visible tabs are reorderable.
 
 - order is durable workspace metadata;
-- reordering never changes Recent history or timing;
-- cross-tab updates synchronize the durable order without changing another tab's Selected Context;
-- when a previously hidden/overflow Context returns, preserve its prior relative order when practical; otherwise place it in a deterministic incoming position without rewriting timer state.
-
-The exact drag implementation is not part of logic.
+- reorder changes no time or status;
+- cross-tab order synchronizes without forcing another tab's Selected Context;
+- a returning hidden/overflow Context keeps prior relative order when practical, otherwise uses deterministic placement.
 
 **Settled**
 
 ---
 
-# 20. Recent Jobs View
+# 22. Recent Jobs View
 
-Recent Jobs provides a broader workspace list than the compact timer tabs.
-
-Each row should be able to expose:
+Recent rows support:
 
 ```text
-Context identity / label
+Context label/identity
 Today
-Job Total or Context Total
-last seen / recent activity
-semantic operational status
-visible vs hidden/overflow state
+Job/Context Total
+last seen
+last recorded activity
+semantic status
+visible / hidden / overflow state
 ```
 
-Running/Pending/Local-Paused/Held status must be derived from L4, not inferred from row selection.
+Operational status always derives from L4, never row selection.
 
 **Settled**
 
 ---
 
-# 21. View vs Show
-
-Recent Jobs separates two intents:
+# 23. View vs Show
 
 ```text
 View
 Show in Tabs
 ```
 
-- `View` selects the Context for inspection.
-- `Show in Tabs` changes visible workspace state when allowed.
+- View selects Context for inspection.
+- Show in Tabs changes visible workspace state when allowed.
 
-Neither action starts/resumes timing.
+Neither starts/resumes timing.
 
-If a Context is already visible, `Show in Tabs` is unnecessary/no-op.
+Showing an already visible Context is a no-op.
 
 **Settled**
 
 ---
 
-# 22. Clear Recent / Archive / Delete Distinction
+# 24. Clear Recent / Archive / Delete Distinction
 
-L5 must communicate distinct intents:
+L5 communicates three different intents:
 
 ```text
-Clear Recent = workspace cleanup, non-destructive to authoritative time
+Clear Recent = non-destructive workspace cleanup
 Archive      = move Context to archive workspace state, time preserved
-Delete Data  = explicit destructive data operation
+Delete Data  = explicitly destructive operation
 ```
 
-Rules:
+Protected Contexts cannot participate in ordinary Clear Recent/Archive/Delete controls.
 
-- protected Contexts cannot participate in ordinary Clear Recent/Archive/Delete actions;
-- Clear Recent must never be presented with wording that implies authoritative time deletion;
-- Archive must not be described as deleting hours;
-- Delete must be visually/semantically distinct and is completed only through the L6 contract;
-- L6 decides Clear Recent's final membership destination and destructive confirmation details.
+L6 defines exact mutation destination, confirmation, and deletion scope.
 
-**Settled presentation distinction; mutation details deferred to L6**
+**Settled presentation distinction**
 
 ---
 
-# 23. Time Overview Structure
+# 25. Time Overview Structure
 
-Time Overview answers four different user questions without requiring export:
-
-```text
-How much time have I recorded today?
-How much this week?
-What did I spend today on?
-How much time exists for each day/job overall?
-```
-
-Required destinations/sections:
+Required destinations:
 
 ```text
 Today Total
@@ -609,75 +602,98 @@ By Job/Context
 Context Detail
 ```
 
-All values come from L2 query rules, including L4 running/provisional/hold behavior.
+All values come from L2/L4 read queries.
 
 **Settled**
 
 ---
 
-# 24. Today Total
+# 26. Workday Time Basis Disclosure
 
-`Today Total` is L2's sum across all attributed Contexts for the current Workday Time Zone date plus valid current contribution.
+`Today`, `By Day`, and `This Week` use L2's persisted Workday Time Zone, not whichever clock the UI happens to run under.
 
-Presentation rules:
+L5 must expose the time basis when it could otherwise surprise the user.
+
+At minimum disclose when:
+
+- Workday Time Zone is the explicit UTC fallback;
+- current device/browser zone differs from persisted Workday Time Zone;
+- diagnostics indicate fallback/uncertain zone disposition.
+
+Conceptual information:
+
+```text
+Time basis: America/New_York
+```
+
+or:
+
+```text
+Time basis: UTC fallback
+```
+
+The UI must not silently relabel historical dates using the current device zone.
+
+**Settled**
+
+---
+
+# 27. Today Total
+
+Today Total:
 
 - includes Job and General Contexts;
-- includes the ACTIVE Context's valid running contribution;
-- may be marked provisional if that contribution is provisional;
+- includes valid ACTIVE current contribution;
+- is provisional only when included contribution is provisional;
 - excludes legacy-unattributed balance;
-- does not independently sum rounded display values from rows.
+- is not computed by summing rounded displayed rows.
 
 **Settled**
 
 ---
 
-# 25. Today by Job / Context
+# 28. Today by Job / Context
 
-The user-facing section may be titled `Today by Job`, but its data includes all Contexts with time today, including General Contexts.
+Canonical data concept is `Today by Job/Context`, even if compact UI later uses shorter wording.
 
 Default ordering:
 
 ```text
-1. highest Today duration first
-2. ties by most recent activity
-3. stable Context identity as final deterministic tie-break
+1. highest Today duration
+2. most recent authoritative activity
+3. stable Context identity
 ```
 
-Each row exposes at least:
+Rows expose:
 
 ```text
 Context label
-Today duration
+Today
 semantic status when operational
 provisional/hold indicator when applicable
 ```
 
-Zero-duration Contexts are normally omitted from the time-allocation list unless they are operational and showing them helps explain current state.
+Zero-duration Contexts are normally omitted unless operational status makes the row useful.
 
 **Settled**
 
 ---
 
-# 26. This Week
+# 29. This Week
 
-`This Week` uses L2's current week query policy.
+Uses L2's week policy.
 
-It:
-
-- includes attributed Ledger time inside the current reporting week;
+- includes attributed Ledger time in current reporting week;
 - includes valid current contribution;
-- may be provisional when current contribution is provisional;
-- excludes `legacyUnattributedMs` because that balance has no date attribution.
-
-L5 does not recalculate week boundaries itself.
+- propagates provisional status when that contribution is provisional;
+- excludes legacy-unattributed balance;
+- L5 does not hardcode week boundaries separately.
 
 **Settled**
 
 ---
 
-# 27. By Day
-
-By Day presents daily attributed Companion time.
+# 30. By Day
 
 Default ordering:
 
@@ -685,126 +701,118 @@ Default ordering:
 newest localDate first
 ```
 
-Each date row may expose:
+Each row may expose:
 
 ```text
 localDate
 Daily Total
-number of contributing Contexts
-optional top Context summary
+contributing Context count
+optional top-Context summary
 ```
 
-Selecting a date opens/reveals that day's Context allocation using the same Ledger attribution rules.
+Selecting date reveals that day's Context allocation from canonical Ledger attribution.
 
-Legacy-unattributed time is not assigned to a fake day.
+Legacy-unattributed balance receives no fake day.
 
 **Settled**
 
 ---
 
-# 28. By Job / Context
+# 31. By Job / Context
 
-By Job/Context lists known Contexts with authoritative Companion time.
+Lists Contexts with authoritative Companion time.
 
 Default ordering:
 
 ```text
-most recent authoritative activity first
+most recent authoritative recorded activity first
 ```
 
-Rows expose at least:
+`most recent authoritative recorded activity` means the latest finalized Ledger session/end activity, or current valid operational contribution when that Context is currently active. A mere UI selection or native last-seen event without recorded time does not move a Context upward in this time-centric view.
+
+Rows support:
 
 ```text
-Context label / job number
-Job Total or Context Total
+Context label/job number
+Job Total / Context Total
 Today when useful
-last recorded activity date/time
-legacy-unattributed indicator when present
+last recorded activity
+legacy-unattributed indicator
 ```
-
-The view may later support user sort/search options, but default behavior must remain deterministic.
 
 **Settled default ordering**
 
 ---
 
-# 29. Context Detail
+# 32. Context Detail
 
-Context Detail is the canonical human-readable drilldown for one Job/General Context.
-
-Summary includes:
+Summary:
 
 ```text
 Recorded Today
 This Week for this Context
 Job Total / Context Total
-current semantic status when applicable
+semantic operational status if applicable
 ```
 
-Detail includes:
+Detail:
 
 ```text
 daily attributed totals
 finalized logical sessions
-legacy-unattributed balance when present
+legacy-unattributed balance
+current-session area when ACTIVE
 Open Job for valid Job Context
-Show/View workspace actions when applicable
+workspace actions when applicable
 ```
 
-The daily sum may legitimately be less than Job Total when legacy-unattributed time exists. The UI must explain that difference rather than invent daily allocation.
+Daily sum may be lower than Total when legacy-unattributed time exists. Explain the difference rather than fabricating allocation.
 
 **Settled**
 
 ---
 
-# 30. Legacy Unattributed Time Disclosure
+# 33. Legacy Unattributed Time Disclosure
 
-When `legacyUnattributedMs > 0`, L5 must disclose it in Context Detail and any overall-total view where its presence could otherwise make totals look inconsistent.
+When `legacyUnattributedMs > 0`, disclose it wherever otherwise-hidden undated balance would make totals appear inconsistent.
 
 Conceptual presentation:
 
 ```text
-Job Total                 18h 00m
-Dated Companion history   12h 00m
-Older imported time        6h 00m
+Job Total                    18h
+Dated Companion history      12h
+Older time without date detail 6h
 ```
 
-Rules:
+Do not assign it to Today/Week/By Day or invent sessions.
 
-- do not assign the older balance to Today/This Week/By Day;
-- do not invent session timestamps;
-- do not hide the balance merely to make daily totals appear to add up;
-- final wording may be softened/refined, but the distinction must remain understandable.
+Final wording may be refined, but the distinction remains.
 
 **Settled**
 
 ---
 
-# 31. Empty States
+# 34. Empty States
 
-Empty states must distinguish why no rows exist.
-
-Examples of semantic empty conditions:
+Empty conditions are distinct:
 
 ```text
 No Companion time recorded today
-No Companion history yet
+No dated Companion history yet
 No recent jobs in the workspace
 No matching job found
-No dated history available; imported total exists
+No dated history available; undated legacy balance exists
 ```
 
-An empty History result must not be rendered as `0h Job Total` when legacy-unattributed balance exists.
+Legacy-unattributed balance prevents falsely showing `0h total` or `no history` when total time actually exists.
 
-Empty states do not mutate data.
-
-**Settled semantics; final microcopy deferred**
+**Settled semantics**
 
 ---
 
-# 32. Loading / Stale / Error States
+# 35. Loading / Stale / Error States
 
-Views should distinguish:
+Views distinguish:
 
 ```text
 loading
@@ -814,558 +822,516 @@ stale/revalidating
 error
 ```
 
-Rules:
-
-- do not replace known loaded totals with zero during transient refresh failure;
-- if a read snapshot is stale while revalidating, preserve the last successful value with stale/revalidating indication;
-- persistence/read failure is surfaced according to L1/L8 rather than silently presenting zero history;
-- a failed optional navigation/search lookup must not affect timer health.
-
-**Settled**
-
----
-
-# 33. Large-History Retrieval
-
-Large history must remain accessible without silently pruning authoritative records.
-
-Behavioral requirements:
-
-- views load history incrementally rather than requiring every Ledger row in the initial render;
-- pagination/cursor/virtualization is acceptable implementation detail;
-- loading more rows cannot change prior totals because totals come from canonical aggregate queries, not currently rendered rows;
-- absence from the current rendered page is not absence from History;
-- no hard UI page size becomes a data-retention cap.
-
-A default page/chunk size is implementation policy.
+- known values do not flash to zero on transient refresh failure;
+- stale data remains visibly stale/revalidating;
+- older async results cannot overwrite newer accepted revision;
+- persistence/read failure follows L1/L8 failure behavior;
+- optional navigation/search failure does not affect timer health.
 
 **Settled**
 
 ---
 
-# 34. History Is Finalized Work History
+# 36. Large-History Retrieval
 
-History represents finalized Companion-recorded sessions/history.
+Large history remains fully accessible.
 
-The current in-progress ACTIVE session is not silently inserted into finalized History as if it were complete.
-
-Current operational time is represented in:
-
-- main timer;
-- Time Overview live totals;
-- optional current-session area in Context Detail.
-
-Once finalized, that session appears in History.
+- load incrementally;
+- pagination/cursor/virtualization is implementation detail;
+- totals come from canonical aggregate queries, not rendered page rows;
+- absence from current page does not mean absence from history;
+- page/chunk size can never become a retention cap.
 
 **Settled**
 
 ---
 
-# 35. Logical Session Reconstruction
+# 37. History Contains Finalized Work
 
-L2 may split one logical Session into multiple Ledger Segments at midnight.
+History represents finalized Companion-recorded sessions.
 
-History should normally present that as **one logical session**, reconstructed by stable `sessionId`, rather than making one overnight work period look like multiple separate starts.
+An in-progress ACTIVE session:
+
+- contributes to live Today/Total;
+- may appear in a clearly separate current-session area;
+- is not inserted into finalized History as if complete.
+
+After finalization it becomes History.
+
+**Settled**
+
+---
+
+# 38. Logical Session Reconstruction
+
+Midnight-split Ledger Segments may reconstruct into one logical History session only when grouping is safe.
+
+Required grouping evidence:
+
+- same stable `sessionId`;
+- same Context identity;
+- compatible cycle/provenance;
+- segments are non-overlapping and form one plausible logical interval.
+
+Do not group merely because timestamps are adjacent.
 
 Example:
 
 ```text
-Session 23:55 → 00:25 = 30m
+Session 23:55 -> 00:25 = 30m
+History: one logical 30m session
+By Day: Day 1 = 5m, Day 2 = 25m
 ```
 
-History may show one 30m session, while By Day correctly allocates:
-
-```text
-Day 1 = 5m
-Day 2 = 25m
-```
-
-If safe session reconstruction is not possible for legacy data, preserve separate evidence rather than invent grouping.
+If legacy/corrupt records cannot be safely reconstructed, preserve separate evidence rather than invent grouping.
 
 **Settled**
 
 ---
 
-# 36. History Ordering
+# 39. History Ordering
 
 Default logical-session ordering:
 
 ```text
-newest effective end time first
-```
-
-For equal end times:
-
-```text
-newest start time
+newest effective end time
+then newest start time
 then stable session identity
 ```
 
-Within a Context/day drilldown, the same deterministic ordering applies.
-
-History ordering never changes Ledger identity or timestamps.
+Ordering never mutates timestamps or Ledger identity.
 
 **Settled**
 
 ---
 
-# 37. History Row Data
+# 40. History Row Data
 
-A compact logical session row should be able to expose:
+Compact row supports:
 
 ```text
-Context / job number
+Context/job
 local date or date range
-start time
-end time
+start
+end
 duration
 ```
 
-Expanded/detail information may expose:
+Expanded detail may expose:
 
 ```text
 startCause
 endReason
-source/certainty when meaningful
-migration/import provenance when meaningful
-daily allocation for cross-midnight session
+source/certainty when useful
+migration/import provenance when useful
+daily allocation for cross-midnight sessions
 ```
 
-Rules:
+Normal rows need not expose internal diagnostics. Conservative/recovery/imported rows must expose enough provenance to explain unusual boundaries.
 
-- normal rows need not overwhelm the user with internal diagnostics;
-- conservative/recovery/imported records should expose enough provenance to explain unusual boundaries;
-- Start Cause and End Reason remain separate per L4;
-- display formatting never rewrites source precision.
+Start Cause and End Reason remain separate per L4.
 
 **Settled**
 
 ---
 
-# 38. History vs Activity Log
-
-History and Activity Log answer different questions.
+# 41. History vs Activity Log
 
 ```text
 History      = when Companion time was recorded
-Activity Log = what Companion/application events occurred
+Activity Log = what application events occurred
 ```
 
-History must not be polluted with theme changes, support actions, tab reorders, or other non-time activity.
+Theme changes, tab reorders, support actions, etc. do not become History rows.
 
-Activity Log may reference timer actions for diagnostics, but Activity Log entries are never used to calculate History totals.
+Activity Log is never used to calculate time totals.
 
 **Settled**
 
 ---
 
-# 39. Open Job
+# 42. Open Job
 
-`Open Job` is available only for a Job Context with a valid recognized positive SquareCoil project ID.
+Available only for a Job Context with a valid positive SquareCoil project ID.
 
-Canonical navigation target:
+Canonical target:
 
 ```text
 /project.php?id=${projectId}
 ```
 
-For example:
+Open Job:
 
-```text
-job:260702
-→ /project.php?id=260702
-```
+- is navigation only;
+- does not clock into the job;
+- does not Resume/Start Fresh;
+- does not add time;
+- may open same/new tab according to UI/user browser behavior.
 
-Rules:
-
-- Open Job is navigation only;
-- it does not clock into the job;
-- it does not Resume/Start Fresh;
-- it does not alter Active/Pending/Local Pause state;
-- it does not add Companion time;
-- normal browser link behavior may permit same-tab/new-tab navigation depending UI implementation/user modifier.
+If same-tab navigation reloads the Companion, L4 controlled reload rules govern continuity. Navigation itself is not a work boundary.
 
 **Settled**
 
 ---
 
-# 40. General Context Navigation
+# 43. General Context Navigation
 
-General Contexts such as Production General have no fabricated project URL.
+Production General and other General Contexts receive no fabricated project URL.
 
-The UI must not generate:
-
-```text
-/project.php?id=0
-```
-
-as an `Open Job` action for Production General.
-
-If a future audited General-context destination exists, it requires a separate explicit navigation contract.
+Never create `/project.php?id=0` as Open Job for Production General.
 
 **Settled**
 
 ---
 
-# 41. Search-Assisted Job Lookup
+# 44. Search-Assisted Job Lookup
 
-Job lookup is a navigation convenience, not a clock feature.
-
-Initial search sources:
+Initial local sources:
 
 ```text
-1. local Job/Context Index by project ID
-2. local known labels/names/aliases when available
-3. exact valid six-digit project-number direct navigation candidate
+1. Job/Context Index exact project ID
+2. known local labels/names/aliases when available
+3. exact syntactically valid six-digit direct-navigation candidate
 ```
 
-Behavior:
-
-- local matching may be fuzzy for labels but project-ID identity remains exact;
-- selecting a search result selects/views or opens the job according to explicit user action;
-- merely typing/searching does not add the job to Recent;
-- merely opening a job URL does not start Companion timing;
-- SquareCoil must later positively observe a Context before timer logic reacts.
-
-No unaudited SquareCoil server search endpoint is invented by L5.
+- label matching may be fuzzy;
+- project identity remains exact;
+- typing/searching does not add Recent membership;
+- search does not create time;
+- opening a job does not start tracking;
+- no unaudited SquareCoil server-search endpoint is invented.
 
 **Settled initial contract**
 
 ---
 
-# 42. Exact Six-Digit Direct Navigation Candidate
+# 45. Exact Six-Digit Direct Navigation
 
-When the user enters an exact syntactically valid six-digit job number not already in the local Index, the UI may offer:
+For exact syntactically valid six-digit input absent from local Index, UI may offer:
 
 ```text
 Open job 260702
 ```
 
-using the canonical project URL.
+This does not:
 
-This action:
+- create a durable Context from typed text;
+- add Recent membership;
+- create time.
 
-- does not create a durable Job Context record solely from typed text;
-- does not add Recent membership;
-- does not create time;
-- relies on SquareCoil page/navigation truth after opening.
-
-If SquareCoil later proves the ID invalid/closed/inaccessible, normal page behavior stands; Companion does not fabricate metadata.
+SquareCoil navigation/page truth determines what exists after opening.
 
 **Settled**
 
 ---
 
-# 43. Invalid / Missing Job ID
+# 46. Invalid / Missing Job ID
 
 If a Context lacks a valid positive project ID:
 
-- no `Open Job` link is generated;
-- no guessed URL is generated from arbitrary label numbers;
-- the UI may display the Context/history normally;
-- navigation failure does not mutate timer/history.
+- no Open Job link;
+- no guessed URL from arbitrary label numbers;
+- history remains viewable;
+- navigation failure changes no timer/history state.
 
-Invalid free-form job search input returns a non-destructive `No matching job` / invalid-input state.
+Invalid free-form search returns a non-destructive no-match/invalid-input state.
 
 **Settled**
 
 ---
 
-# 44. Navigation and Recent Membership
-
-Navigation and workspace membership are separate.
-
-Examples:
+# 47. Navigation vs Recent Membership
 
 ```text
-View historical Job A → does not automatically make A Recent
-Open Job A URL         → does not automatically make A Recent
-SquareCoil observes A  → A returns/enters Recent
-Show in Recent A       → explicit workspace membership action
+View historical A       -> no automatic Recent membership
+Open Job A              -> no automatic Recent membership
+SquareCoil observes A   -> A enters/returns Recent
+Show in Recent A        -> explicit workspace membership
 ```
 
-This prevents browsing old history from cluttering the active workspace.
+Browsing history must not clutter the active workspace.
 
 **Settled**
 
 ---
 
-# 45. Threshold Presentation Separation
+# 48. Threshold vs Operational Status
 
-L4 threshold level derives from Context Today.
+L4 threshold level derives from Context Today and is distinct from Running/Pending/etc.
 
-L5 may present threshold color/accent in main view or tabs, but threshold state is distinct from operational status.
+An inactive Context with 4h Today may have Red threshold accent but remains `NOT_RUNNING`.
 
-Example:
-
-```text
-Inactive Job B with 4h recorded today
-```
-
-may carry a Red time-threshold indication but must not appear `RUNNING`.
-
-Likewise `RUNNING` is not itself a threshold color.
+Running is not itself a threshold color.
 
 **Settled**
 
 ---
 
-# 46. View Consistency Across Tabs
+# 49. Cross-Tab View Consistency
 
-Cross-tab behavior:
-
-- authoritative Today/Total/status values synchronize from shared state/ledger revisions;
-- each tab may keep its own Selected Context;
-- a reorder/visibility workspace change may synchronize when durable;
-- one tab selecting Job B does not force every other tab to select B;
-- actual native Context change may emit current-focus intent independently in each live UI;
-- no tab derives a separate running total.
+- authoritative values/status synchronize by shared revisions;
+- each tab keeps independent selection;
+- durable reorder/visibility may synchronize;
+- remote visibility change does not forcibly turn selection into another Context or timer command;
+- real native Context change may emit incoming-focus intent to each UI;
+- no tab maintains a separate running total.
 
 **Settled**
 
 ---
 
-# 47. L5 Behavior Invariants
+# 50. L5 Behavior Invariants
 
-- **VIEW-01:** Today/Week/Total are read from one canonical query model.
-- **VIEW-02:** Selected Context and Operational Context remain visibly distinguishable.
-- **VIEW-03:** Only the actual ACTIVE Context may present a current running session.
-- **VIEW-04:** Provisional time is marked and may reconcile downward without deleting finalized history.
-- **VIEW-05:** Safety Hold stops visible accrual across all views at the same shared boundary.
-- **VIEW-06:** Pending anchor information is not counted as elapsed before a valid choice commits.
-- **VIEW-07:** Recent is workspace membership, not time retention.
-- **VIEW-08:** Visible-tab capacity never deletes/archives authoritative history.
-- **VIEW-09:** Protected Contexts remain accessible and cannot be silently displaced from the operational UI.
-- **VIEW-10:** Clear Recent, Archive, and Delete remain distinct intents.
-- **VIEW-11:** Time Overview includes Job and General Contexts consistently.
-- **VIEW-12:** Legacy unattributed time is disclosed, never assigned to fake dates.
-- **VIEW-13:** History presents finalized logical sessions, not current running state as completed history.
-- **VIEW-14:** Midnight-split Ledger Segments may reconstruct into one logical History session.
-- **VIEW-15:** History and Activity Log remain separate data concepts.
-- **VIEW-16:** Open Job/navigation never changes timing by itself.
-- **VIEW-17:** General Contexts do not receive fabricated project URLs.
-- **VIEW-18:** Searching/viewing history does not automatically clutter Recent.
-- **VIEW-19:** Threshold presentation cannot impersonate operational Running state.
-- **VIEW-20:** Large-history paging cannot become a retention cap.
+- **VIEW-01:** All time views use one canonical read/query model.
+- **VIEW-02:** Selected and Operational Context remain visibly distinguishable.
+- **VIEW-03:** The Current Context Strip never calls Pending/Local-Paused generically Running/Tracking.
+- **VIEW-04:** Only actual ACTIVE Context may present Current Session.
+- **VIEW-05:** Provisional contribution is marked only on values that include it and may reconcile downward.
+- **VIEW-06:** Shared Safety Hold caps every live view at one boundary.
+- **VIEW-07:** Pending anchor is informational until a valid choice commits.
+- **VIEW-08:** Main/strip actions always identify the Context they target.
+- **VIEW-09:** Recent is workspace membership, not historical retention.
+- **VIEW-10:** Visible-tab capacity is soft and may never hide protected operational truth.
+- **VIEW-11:** Automatic overflow avoids the user's currently Selected Context when another candidate exists.
+- **VIEW-12:** Clear Recent, Archive, and Delete remain distinct intents.
+- **VIEW-13:** Time Overview includes Job and General Contexts consistently.
+- **VIEW-14:** Today/Week/By-Day obey persisted Workday Time Zone and disclose surprising/fallback basis.
+- **VIEW-15:** Legacy unattributed time is disclosed and never assigned fake dates.
+- **VIEW-16:** Finalized History is separate from current running state.
+- **VIEW-17:** Midnight segments reconstruct only with safe stable-session evidence.
+- **VIEW-18:** History and Activity Log remain separate.
+- **VIEW-19:** Open Job/navigation never changes timing by itself.
+- **VIEW-20:** General Contexts receive no fabricated project URL.
+- **VIEW-21:** Search/view/navigation does not silently add Recent membership.
+- **VIEW-22:** Threshold status cannot impersonate Running status.
+- **VIEW-23:** Large-history paging cannot become a retention cap.
+- **VIEW-24:** Older async view results cannot overwrite newer accepted authoritative revisions.
+- **VIEW-25:** Native `lastSeen` and authoritative `lastRecordedActivity` remain different metadata.
 
 **All Settled**
 
 ---
 
-# 48. Acceptance Scenarios
+# 51. Acceptance Scenarios
 
-## V1. Active equals Selected
+## V1 Active equals Selected
+ACTIVE A + SELECTED A -> A shows Running; Today primary, Total secondary, Current Session tertiary.
 
-ACTIVE A and SELECTED A → main shows A as Running, A Today primary, Job Total secondary, current session tertiary.
+## V2 Selected differs from Active
+ACTIVE A + SELECTED B -> B shows its own values as Not Running; Current Context Strip identifies Running A.
 
-## V2. Selected differs from Active
+## V3 Pending strip semantics
+PENDING A while B selected -> strip identifies A as Awaiting Choice, not generically Running/Tracking.
 
-ACTIVE A, SELECTED B → B shows its own historical values as Not Running; Current Tracking Strip identifies Running A.
+## V4 Focus current
+From V2, Focus Current selects A only; timing unchanged.
 
-## V3. Focus current
+## V5 Pending selected
+PENDING A -> valid safe anchor shown; Resume/Start Fresh available; Pending interval not yet added.
 
-From V2, user chooses Focus Current → Selected becomes A; timing is unchanged.
+## V6 Pending anchor refresh
+L4 breaks continuity and replaces anchor -> old anchor disappears; new authoritative anchor is shown.
 
-## V4. Pending selected
+## V7 Local Pause
+LOCAL_PAUSED A -> stable Today/Total, Locally Paused status; no native clock-out implication.
 
-PENDING A → main shows Awaiting Choice, Resume/Start Fresh, and valid current Pending anchor; Pending interval is not yet added to Today.
+## V8 Provisional running
+ACTIVE A enters short verification grace -> affected live values are marked provisional.
 
-## V5. Pending anchor refresh
+## V9 Provisional correction
+Later conservative reconciliation reduces contribution -> every affected live view updates; finalized History rows remain.
 
-Pending continuity breaks and L4 replaces anchor → L5 stops showing the old anchor and displays the new valid anchor.
+## V10 Unrelated value not provisional
+A is provisional-active while historical B is selected -> B's historical Total is not marked provisional merely because A is.
 
-## V6. Local Pause
+## V11 Safety Hold
+ACTIVE A + hold -> all live A/aggregate views stop at same hold; Verification Hold visible.
 
-LOCAL_PAUSED A → Today/Total remain visible and stable; status is Locally Paused; SquareCoil is not labeled clocked out.
+## V12 Status precedence
+ACTIVE A with Safety Hold during degraded verification -> UI shows Verification Hold, not simultaneous Running + Syncing labels.
 
-## V7. Provisional running time
+## V13 Historical selection while native clocked out
+Selected historical B -> B Not Running; global native disposition may say SquareCoil clocked out.
 
-ACTIVE A enters short verification grace → live values are marked provisional and may continue temporarily.
+## V14 Five visible jobs + incoming F
+New current F is shown. Eligible inactive unprotected overflow candidate moves out; no history/Recent membership deleted.
 
-## V8. Provisional correction
+## V15 Selected tab protected from automatic overflow when alternatives exist
+Five tabs visible, B selected, other eligible inactive tabs exist, F arrives -> overflow chooses another eligible tab before B.
 
-V7 later reconciles to an earlier conservative boundary → all affected live totals update consistently downward; History does not lose finalized rows.
+## V16 No safe overflow candidate
+Capacity cannot be met without hiding protected/selected operational UX -> temporarily exceed five rather than violate safety/inspection rules.
 
-## V9. Safety Hold
+## V17 General Context with five numbered jobs
+Production General may remain visible without consuming numbered-job slot.
 
-ACTIVE A gains Safety Hold → main and all Time Overview values stop increasing at shared hold; status explains verification hold.
+## V18 Hidden job becomes current
+Hidden B becomes current -> shown before/with incoming focus intent.
 
-## V10. Historical selection while SquareCoil clocked out
+## V19 Remote hide while selected elsewhere
+Tab 1 hides inactive B while Tab 2 is inspecting B -> Tab 2 may lose B tab chrome but may keep B detail selected; timing unchanged.
 
-SELECTED B is historical and native disposition is CLOCKED_OUT → B is Not Running; global native clock may say clocked out.
+## V20 Reorder tabs
+Reorder changes durable workspace order only.
 
-## V11. Five visible jobs then new job
+## V21 Single click tab
+Selects only; no timing mutation.
 
-Five numbered inactive jobs are visible, SquareCoil makes new Job F current → eligible least-recently-seen inactive job moves to Recent overflow, F becomes visible; no history is deleted.
+## V22 Double click tab
+Select + expand only; no timing mutation.
 
-## V12. General Context with five numbered jobs
+## V23 Same-context heartbeat collapsed
+Manual collapse remains collapsed.
 
-Production General may remain visible without consuming a numbered-job slot under the initial compatibility rule.
+## V24 Native switch collapsed
+May request incoming focus/expand; timing remains L4-owned.
 
-## V13. Hidden job becomes current
+## V25 Action targeting while viewing inactive B
+ACTIVE A + SELECTED B -> B panel does not expose Local Pause as if B were active. Any Pause control for A must explicitly target A.
 
-Hidden B becomes current in SquareCoil → B is automatically shown before/with current focus intent.
+## V26 Today Total includes General
+A=2h + Production General=1h today -> Today Total 3h.
 
-## V14. Reorder tabs
+## V27 Today ordering
+A=2h, B=1h, General=30m -> A, B, General absent tie overrides.
 
-User drags B before A → durable workspace order changes; no timing or Today values change.
+## V28 Week excludes legacy balance
+5h dated this week + 20h legacy-unattributed -> This Week 5h; Total includes 25h plus other valid history/current time.
 
-## V15. Select tab
+## V29 Workday zone differs from device
+Persisted zone America/New_York, device temporarily another zone -> Today/By-Day still follow persisted zone and UI discloses time basis when needed.
 
-Single-click B → Selected B only; no clock/timer mutation.
+## V30 UTC fallback
+No valid IANA zone at first run and L2 uses UTC fallback -> time views disclose UTC fallback rather than silently implying local dates.
 
-## V16. Double-click tab
+## V31 By Day
+Newest date first; date drilldown uses canonical allocation.
 
-Double-click B → select/expand B; no timing mutation.
+## V32 By-Context ordering ignores mere selection
+User selects old Job B without recording time -> selection alone does not move B to top of most-recent-recorded-activity ordering.
 
-## V17. Same-context heartbeat collapsed
+## V33 Cross-midnight session
+23:55->00:25 with same stable session -> History may show one 30m session; By Day allocates 5m/25m.
 
-A is manually collapsed, heartbeat verifies A → remains collapsed.
+## V34 Unsafe session reconstruction
+Adjacent legacy rows without trusted same-session identity -> remain separate rather than invent one session.
 
-## V18. Native switch collapsed
+## V35 Legacy unattributed detail
+12h dated + 6h undated legacy -> Total 18h and 6h disclosed separately.
 
-Native A→B occurs while collapsed → UI may request B focus/expand; timing transition remains L4-owned.
+## V36 Empty Today with older history
+Today says no time recorded today, not no history exists.
 
-## V19. Today Total with General
+## V37 No dated history but legacy balance
+Do not show 0h/no-history; disclose undated balance.
 
-Job A 2h + Production General 1h today → Today Total = 3h; General is included.
+## V38 Refresh failure
+Prior successful values remain with stale/error indication; do not flash to zero.
 
-## V20. Today row ordering
+## V39 Late old async response
+Revision 52 view is accepted, then slow revision 51 response arrives -> revision 51 cannot overwrite it.
 
-A=2h, B=1h, General=30m → Today rows order A, B, General unless tie rules apply.
+## V40 Large history
+Only first chunk of 10,000 sessions rendered -> aggregate totals remain complete; paging is not retention.
 
-## V21. Week excludes legacy balance
+## V41 Current session not finalized History
+ACTIVE A contributes live totals but not a completed History row.
 
-A has 5h dated this week + 20h legacy-unattributed → This Week shows 5h; Job Total includes 25h plus other history/current contribution.
+## V42 History provenance
+Resume-created session later clocks out -> expanded detail may show startCause=resume and endReason=native-clock-out separately.
 
-## V22. By Day
+## V43 Activity separation
+Theme change/tab reorder may appear in Activity Log, never time History.
 
-Newest date is listed first; selecting it reveals that day's Context allocation from Ledger attribution.
+## V44 Open valid job
+Open 260702 -> `/project.php?id=260702`; navigation action itself changes no timing.
 
-## V23. Cross-midnight session
+## V45 Same-tab Open Job during ACTIVE
+Navigation causes page lifecycle change -> L4 controlled reload continuity rules apply; Open Job itself is not treated as work boundary.
 
-One session 23:55→00:25 → History shows one logical 30m session while By Day shows 5m / 25m allocations.
+## V46 Production General navigation
+No `/project.php?id=0` action.
 
-## V24. Legacy unattributed detail
+## V47 Search known job
+Search known 260702 -> View/Open explicit; search itself changes neither Recent nor timing.
 
-A has 12h dated + 6h legacy-unattributed → Context Detail shows Job Total 18h and separately discloses 6h older imported/unattributed time.
+## V48 Search unknown exact six-digit
+May offer direct Open; no durable Context/time until SquareCoil later proves it.
 
-## V25. Empty today
+## V49 Invalid search
+No guessed URL; non-destructive invalid/no-match state.
 
-No attributed/current time today but older history exists → Today empty state says no time recorded today, not no history exists.
+## V50 Historical View does not clutter Recent
+Viewing archived/old A does not return A to Recent.
 
-## V26. No history but imported total
+## V51 Threshold vs status
+Inactive A with 4h Today may be Red but remains Not Running.
 
-No dated sessions but legacy-unattributed balance exists → do not show `No history / 0h`; disclose imported/undated balance.
+## V52 Protected Recent row
+Pending/Active/LocalPaused/Held row has ordinary Clear/Archive/Delete unavailable.
 
-## V27. Loading failure
+## V53 Cross-tab independent selection
+Tab 1 selects A, Tab 2 selects B; both share time/status truth while retaining independent selection.
 
-Time Overview refresh fails after a prior successful read → do not flash totals to zero; keep prior values with stale/error state.
-
-## V28. Large history
-
-Only first chunk of 10,000-session history is rendered → overall totals remain complete and Load More/virtualization does not imply older time was deleted.
-
-## V29. Current session not finalized History
-
-ACTIVE A is running → current session contributes to Today/Total but is not shown as a completed History session until finalized.
-
-## V30. History provenance
-
-A Resume-started session later clocked out → expanded History can show `startCause=resume`, `endReason=native-clock-out` without conflating them.
-
-## V31. Activity separation
-
-Theme change and tab reorder occur → they may appear in Activity Log but never as time History rows.
-
-## V32. Open valid job
-
-Open Job 260702 → navigate to `/project.php?id=260702`; no timing state changes from navigation action itself.
-
-## V33. Open Production General
-
-Production General → no `/project.php?id=0` Open Job action exists.
-
-## V34. Search known job
-
-Search `260702` matches local known Job → user may View/Open explicitly; search itself does not alter Recent/timing.
-
-## V35. Search exact unknown six-digit job
-
-Enter valid `260999` absent from index → may offer direct Open candidate; do not create durable Context/time until SquareCoil later proves context.
-
-## V36. Invalid search
-
-Input `ABC999` with no local match → non-destructive no-match/invalid state, no guessed job URL.
-
-## V37. Historical View does not clutter Recent
-
-Open Context Detail for archived/old A → A does not silently return to Recent just because it was viewed.
-
-## V38. Threshold vs status
-
-Inactive A has 4h Today → may show Red threshold accent but must still display Not Running.
-
-## V39. Protected row
-
-PENDING A appears in Recent → ordinary Clear Recent/Archive/Delete controls are unavailable for A.
-
-## V40. Cross-tab selection
-
-Tab 1 selects A, Tab 2 selects B → both receive same shared time/status truth while preserving independent selection.
+## V54 Native last-seen vs recorded activity
+SquareCoil briefly observes B with no recorded Companion time -> lastSeen may update, but lastRecordedActivity does not fabricate time activity.
 
 ---
 
-# 49. Continuity States After L5
+# 52. Continuity States After L5
 
 ## Settled
 
-- one read-model/query authority for all time views;
-- main Today-first hierarchy with Job/Context Total secondary;
-- current-session tertiary presentation;
-- persistent operational truth when Selected differs;
-- semantic Running/Provisional/Hold/Pending/Local-Paused/Inactive presentation states;
-- native clock disposition separate from selected Context status;
-- provisional-time and Safety-Hold presentation requirements;
-- Pending anchor disclosure semantics;
-- state-dependent main action availability;
-- single-click select / double-click expand behavior;
-- Recent membership vs visible tab distinction;
-- five numbered-job visible-tab default with overflow, not destruction;
-- General Context not consuming numbered-job slot in initial compatibility behavior;
-- durable tab order and hide/show behavior;
-- Clear Recent / Archive / Delete presentation distinction;
-- Time Overview Today/Week/Today-by-Context/By-Day/By-Context/Context-Detail behavior;
-- legacy-unattributed-time disclosure;
-- deterministic empty/loading/error semantics;
-- incremental large-history retrieval without retention caps;
+- canonical revisioned read-model authority;
+- same-view stale-result rejection;
+- Today-first main hierarchy;
+- Selected vs Operational truth separation;
+- Current Context Strip naming and semantic status behavior;
+- presentation-status precedence;
+- provisional propagation and correction;
+- Safety-Hold presentation;
+- Pending anchor presentation;
+- explicit action targeting;
+- single-click select / double-click expand;
+- Recent vs visible-tabs distinction;
+- native last-seen vs recorded-activity distinction;
+- five numbered-job soft capacity;
+- selected/protected-safe overflow behavior;
+- remote hide does not force another tab's selection change;
+- Clear Recent / Archive / Delete intent distinction;
+- Time Overview structure;
+- persisted Workday Time Zone disclosure rules;
+- Today/Week/By-Day/By-Context behavior;
+- legacy-unattributed disclosure;
+- deterministic empty/loading/stale/error behavior;
+- large-history retrieval without retention caps;
 - finalized History vs current session separation;
-- logical-session reconstruction across midnight splits;
+- safe logical-session reconstruction;
 - History ordering/fields/provenance;
 - History vs Activity Log separation;
-- Open Job and local search-assisted navigation behavior;
-- invalid/missing ID safety;
-- navigation separated from Recent/timer state;
-- threshold status separated from Running status;
-- cross-tab view consistency with independent Selected Context.
+- Open Job and local search-assisted navigation;
+- navigation separated from time/Recent membership;
+- threshold vs operational-status separation;
+- cross-tab view consistency with independent selection.
 
 ## Provisional
 
-- exact user-facing status labels/microcopy;
+- exact final user-facing labels/microcopy;
 - exact visible-tab capacity preference exposure if later configurable;
-- exact default history page/chunk size;
+- exact history page/chunk size;
 - exact local fuzzy-search ranking algorithm;
-- exact default sort-control UI beyond settled default ordering;
-- exact current-session visibility density in compact mode.
+- exact sort-control UI beyond settled defaults;
+- exact Current Session density in compact mode;
+- exact time-basis placement/iconography.
 
 ## Open for later stages
 
-- Clear Recent final destination/mutation semantics (L6);
-- archive/delete confirmations and exact deletion scope (L6);
+- Clear Recent final destination and mutation semantics (L6);
+- archive/delete confirmations and deletion scope (L6);
 - Archive browser/restore behavior (L6);
-- History CSV / Time Report behavior (L6);
-- final Settings routing, keyboard/focus polish, themes, and microcopy (L7);
-- failure-priority/acceptance integration and automated fixtures (L8/build).
+- History CSV and Time Report behavior (L6);
+- final Settings routing/themes/focus/microcopy (L7);
+- cross-module failure priorities and automated fixtures (L8/build).
 
 ## Blocked
 
@@ -1373,12 +1339,12 @@ None.
 
 ---
 
-# 50. L5 Readiness Judgment
+# 53. L5 Readiness Judgment
 
-**Status: Ready for review**
+**Status: Settled - ready for L6**
 
-L5 is complete enough for review when the UI/router can consume L2/L4 read models and present Main Timer, Recent, Time Overview, History, and Job Navigation without inventing new time calculations, allowing selection to change timing, hiding current operational truth, or confusing workspace cleanup with data deletion.
+L5 now defines Main Timer, Current Context truth, Recent/tabs, Time Overview, History, and Job Navigation strongly enough that UI implementation can remain a read/presentation layer instead of inventing time, state, workspace, or navigation semantics.
 
-If accepted and hardened, the next stage is:
+Next stage:
 
 **L6: Archive, Housekeeping, Backup, Restore, and CSV**
