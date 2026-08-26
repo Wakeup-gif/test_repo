@@ -1,8 +1,9 @@
 # SquareCoil Companion Logic Stage Plan
 
-Status: **Ready to begin staged logic**  
+Status: **Completed - L0-L8 settled; implementation dependency gates active**
+
 Companion framework source: `docs/REBUILD-MASTER-PLAN.md`  
-Purpose: hand the rebuild to Logic Systems Architect in small, reviewable stages so detailed behavior is not specified all at once and implementation does not start with unresolved state/failure rules.
+Purpose: preserve the completed staged-logic method and map settled contracts to implementation dependencies without treating dependency eligibility as authorization or acceptance proof.
 
 ---
 
@@ -438,7 +439,7 @@ Tie the logic stages together and make implementation/build work safe and testab
 
 ## Exit condition
 
-Framework + Logic are ready for staged implementation.
+Framework + Logic contracts are settled. Build stages are dependency-mapped but remain separately review-, authorization-, and evidence-gated.
 
 ---
 
@@ -446,31 +447,35 @@ Framework + Logic are ready for staged implementation.
 
 Do not begin full implementation merely because L1 is complete.
 
-Recommended implementation gating:
+Dependency eligibility is not implementation authorization and does not prove that a build stage is settled. Use `LOGIC-TRACEABILITY-MATRIX.md` for required A1-A4 gates and `../CODEX-IMPLEMENTATION-HANDOFF.md` for the verified current stage and exact authorization vocabulary.
 
-### Build Stage B1 can start after L0-L1
+Logic dependency map; these headings do not authorize implementation. Each stage additionally requires all prior applicable stages to be settled, a read-only stage review, and its exact `START Bn` authorization. At the current checkpoint the next action remains `REVIEW B1`.
+
+### Build Stage B1 logic dependencies: L0-L1
 
 Scaffold, build tooling, lifecycle skeleton, browser boot tests.
 
-### Build Stage B2 can start after L2-L4
+### Build Stage B2 logic dependencies: L2-L4
 
 State, migration, SquareCoil bridge, core timer.
 
-### Build Stage B3 can start after L5
+Dependency eligibility is not implementation authorization. B2 implementation also requires B1 to be settled, a completed read-only `REVIEW B2`, and separate exact `START B2` authorization.
+
+### Build Stage B3 logic dependency: L5
 
 Time Overview, Recent, History, Job Navigation.
 
-### Build Stage B4 can start after L6
+### Build Stage B4 logic dependency: L6
 
 Archive, housekeeping, backup, restore, CSV/reporting.
 
-### Build Stage B5 can start after L7
+### Build Stage B5 logic dependency: L7
 
 Themes, Support, Developer Support.
 
-### Chrome candidate can start after L8
+### Chrome candidate acceptance dependency: L8 plus settled B1-B6 gates
 
-Full smoke/acceptance, package, first Chrome upload candidate.
+Full smoke/acceptance, package, and first Chrome upload candidate require every applicable prior stage gate plus separate candidate/release authorization; L8 completion alone is not permission to create or publish one.
 
 Edge parity follows using the same shared source and parity tests.
 
@@ -493,8 +498,8 @@ To prevent the project from becoming too noisy:
 
 # Logic Handoff Readiness
 
-**Framework ready for logic**
+**Logic handoff complete: L0-L8 settled**
 
-Start with **L0**, not coding.
+Use the current Codex handoff to locate the authorized build-stage checkpoint. Reopen a settled logic contract only through L8's contradiction/amendment path; do not restart staged logic or treat a later-stage specification as permission for premature implementation.
 
-The Master Plan has settled the structure. These stages deliberately leave behavior detail to Logic Systems Architect while preventing it from having to invent core architecture.
+At logic closure, B1 exists but is not settled, B2 is blocked, and `REVIEW B1` is the next required authorization.

@@ -152,7 +152,7 @@ Mode = ENABLED | DISABLED
 Lifecycle = UNINITIALIZED | BOOTING | READY | DEGRADED | RECOVERING | FAILED
 ```
 
-When disabled:
+When disabled with no unresolved lifecycle failure, either before boot or after successful teardown:
 
 ```text
 Mode = DISABLED
@@ -161,6 +161,8 @@ Reason = user-disabled
 ```
 
 No runtime is injected just to represent disabled state.
+
+This is the normal clean disabled state, not permission to rewrite an unresolved failure. `FAILED / teardown-incomplete` remains authoritative while any owned safety-critical resource is still outstanding, even when Companion mode is `DISABLED`.
 
 ---
 
@@ -206,6 +208,8 @@ All features marked core-required for the current build are registered. Timer/st
 
 An idempotent teardown path is registered before READY.
 
+R8 applies to every safety-critical adapter and resource acquired by the Lifecycle Coordinator, not only the UI, Bridge, or feature registry. Every acquired core adapter must expose an idempotent teardown path before READY. Cleanup ownership remains registered until that exact teardown succeeds. A missing or throwing teardown is not a successful release and must not remove the resource from the initialized/owned set.
+
 ## R9 Positive accrual-ownership result
 
 The coordination layer positively confirms one-writer safety:
@@ -217,6 +221,10 @@ OBSERVER_CONNECTED
 ```
 
 READY cannot rely only on absence of detected conflict.
+
+`OWNER` and `OBSERVER_CONNECTED` are cross-document coordination dispositions. Each supported top-level document still owns exactly one Lifecycle Coordinator/runtime/root. Multiple tabs may be READY simultaneously, but exactly one fenced `OWNER` may commit authoritative mutations. An `OBSERVER_CONNECTED` runtime is read-capable and routes commands to the owner; it is not a second writer.
+
+During B1, unavailable real coordination must truthfully deny READY. Synthetic `OWNER`/`OBSERVER_CONNECTED` results test the lifecycle guard only; they do not prove that the B2 coordination implementation exists. The truthful B1 state remains `DEGRADED / coordination-not-implemented-b1` until B2 supplies a positive real result.
 
 ---
 
@@ -380,7 +388,7 @@ Reload-required examples:
 - legacy runtime;
 - build mismatch;
 - ambiguous multiple owners;
-- incomplete safety-critical teardown.
+- incomplete safety-critical teardown while any owned resource remains outstanding. A teardown-only cleanup retry removes the reload requirement only if it releases every outstanding owned safety-critical resource and reaches `UNINITIALIZED`; it never authorizes replacement-runtime stacking.
 
 Noncritical examples:
 
@@ -504,6 +512,12 @@ reason = teardown-incomplete
 recommendedAction = reload-page
 ```
 
+`FAILED / teardown-incomplete` is sticky for the current document. Boot—including a boot request while Companion mode is disabled—revalidate, recover, and re-enable must return the same failure and must not call an ensure, initialize, injection, or replacement-runtime path. `user-disabled` must never overwrite an unresolved `teardown-incomplete` failure.
+
+A cleanup retry is not a new boot/recovery episode. It may invoke only teardown paths whose ownership remains outstanding. Only successful release of every owned safety-critical resource may transition to `UNINITIALIZED`. Otherwise a genuine reload/new document remains required.
+
+`teardown-incomplete` is not retry-safe for the general Retry/recover path in L1-AC-21. Its only same-document retry is teardown-only cleanup. If that retry fails, the sticky failure remains. If a later teardown-only retry succeeds, lifecycle may reach `UNINITIALIZED`; only then may one fresh generation initialize.
+
 ---
 
 # 19. Page / Browser Lifecycle
@@ -543,7 +557,7 @@ Developer-mode reload follows the same rule.
 5. SquareCoil company clock unchanged;
 6. successful result -> `UNINITIALIZED / user-disabled`.
 
-If teardown is incomplete, lifecycle becomes FAILED and safe re-enable may require reload.
+If teardown is incomplete, lifecycle becomes `FAILED / teardown-incomplete`. That failure remains sticky even if another boot request arrives while mode is `DISABLED`; the request returns the failure without initialization or injection. Safe re-enable is blocked until outstanding cleanup succeeds or a genuine reload/new document replaces the runtime.
 
 ## Disable while BOOTING/RECOVERING
 
@@ -551,7 +565,7 @@ Cancel further boot/recovery as soon as safely possible and teardown resources a
 
 ## Re-enable
 
-If safely UNINITIALIZED, start one fresh BOOTING generation. If previous teardown is incomplete/reload-required, do not stack runtime; request reload.
+If safely UNINITIALIZED, start one fresh BOOTING generation. If previous teardown is incomplete/reload-required, return the existing failure, do not rewrite it as `user-disabled`, do not stack runtime, and request reload unless a cleanup retry has actually released every outstanding owned resource.
 
 ---
 
@@ -615,6 +629,10 @@ They may not change:
 
 Implementation must cover at least:
 
+For stable traceability without renumbering this settled list, scenario 1 maps to `L1-AC-01`, scenario 2 to `L1-AC-02`, and so on through `L1-AC-23`.
+
+Stage applicability for L1-AC-01 is split deliberately: B1 proves the READY predicates/guards with controlled positive and negative adapters and proves in packaged browsers that missing real coordination truthfully denies READY; B2 supplies the real R5-R7/R9 positive services and proves positive packaged READY. B1 may not fake READY, and this split does not defer its root/interaction/degraded-state browser cases.
+
 1. fresh boot -> one interactive READY runtime;
 2. repeated boot -> same runtime, no duplicate resources;
 3. orphan visible root -> safely removed/recovered;
@@ -635,8 +653,9 @@ Implementation must cover at least:
 18. disable while READY -> controlled teardown, SquareCoil unchanged;
 19. re-enable after clean disable -> fresh boot;
 20. boot request during teardown -> waits/no duplicate runtime;
-21. explicit Retry after retry-safe FAILED -> one new bounded episode;
+21. explicit Retry after retry-safe FAILED -> one new bounded episode; `teardown-incomplete` is excluded and permits teardown-only cleanup retry instead;
 22. Chrome/Edge parity for applicable scenarios.
+23. **L1-AC-23:** disable -> cleanup failure -> boot while still disabled -> re-enable keeps `FAILED / teardown-incomplete` sticky; while unresolved, no ensure/init/injection/root/listener count increases; a failed teardown-only retry stays locked; a later successful teardown-only retry reaches `UNINITIALIZED`; only then may exactly one fresh generation start. A genuine new document is the alternative recovery boundary.
 
 ---
 

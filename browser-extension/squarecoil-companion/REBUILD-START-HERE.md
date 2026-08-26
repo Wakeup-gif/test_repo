@@ -10,8 +10,16 @@ If chat context is lost or implementation direction becomes unclear, start here 
 
 **Framework status:** Settled  
 **Logic status:** L0-L8 settled  
-**Implementation readiness:** Ready for staged implementation  
-**Next implementation stage:** B1 - Shell / Lifecycle  
+**Logic closure:** Complete; evidence map, traceability matrix, and Codex handoff present
+
+**B1 status:** NOT_SETTLED / READY_FOR_REPAIR
+
+**B1 browser acceptance:** PENDING
+
+**B2 status:** BLOCKED / local draft UNAPPROVED-DRAFT
+
+**Next authorization:** `REVIEW B1`
+
 **Production baseline:** `main` at `9378da24f393b40066816133e7fa0f48063115f0`  
 **Production package:** v0.7.1 Chrome Interaction Recovery  
 **Planning branch:** `planning/squarecoil-companion-rebuild`  
@@ -23,46 +31,59 @@ Production `main` has been rechecked and still points to the v0.7.1 baseline abo
 
 ## Read in this order
 
-1. `REBUILD-START-HERE.md`
+1. `HANDOFF-NEXT-CHAT.md`
+   - Canonical recovery handoff, verified checkpoint, and stage boundary.
+
+2. `REBUILD-START-HERE.md`
    - Current recovery checkpoint, read order, and next action.
 
-2. `docs/REBUILD-MASTER-PLAN.md`
+3. `docs/REPOSITORY-EVIDENCE-MAP.md`
+   - Verified refs, source classifications, conflicts, proof boundaries, and local-draft quarantine.
+
+4. `docs/LOGIC-TRACEABILITY-MATRIX.md`
+   - Stable requirement/fixture IDs and L0-L8 -> B1-B6 -> A1-A4 gate mapping.
+
+5. `CODEX-IMPLEMENTATION-HANDOFF.md`
+   - Current B1 blocker, B2 quarantine, exact authorization vocabulary, and Git/browser proof rules.
+
+6. `docs/REBUILD-MASTER-PLAN.md`
    - Structural architecture and ownership authority.
 
-3. `docs/LOGIC-STAGE-PLAN.md`
+7. `docs/LOGIC-STAGE-PLAN.md`
    - Explains why logic was staged and maps the implementation gates.
 
-4. `logic/L0-INVARIANTS.md`
+8. `logic/L0-INVARIANTS.md`
    - Canonical vocabulary, compatibility baseline, non-negotiable invariants.
 
-5. `logic/L1-LIFECYCLE.md`
+9. `logic/L1-LIFECYCLE.md`
    - Boot, READY, duplicate prevention, recovery, teardown, reload/update behavior.
 
-6. `logic/L2-STATE-TIME-MIGRATION.md`
+10. `logic/L2-STATE-TIME-MIGRATION.md`
    - Shared Timer State, Time Ledger, Workday rules, cross-tab ownership, Recovery Checkpoint, v0.7 migration.
 
-7. `logic/L3-SQUARECOIL-BRIDGE.md`
+11. `logic/L3-SQUARECOIL-BRIDGE.md`
    - Read-only SquareCoil evidence normalization and native clock interpretation.
 
-8. `logic/L4-TIMER-BEHAVIOR.md`
+12. `logic/L4-TIMER-BEHAVIOR.md`
    - Core timer transitions: new/remembered jobs, Pending, Resume, Start Fresh, Local Pause, switches, uncertainty, Safety Holds.
 
-9. `logic/L5-TIME-VIEWS-WORKSPACE.md`
+13. `logic/L5-TIME-VIEWS-WORKSPACE.md`
    - Main timer, Recent, Time Overview, History, navigation, selected-vs-operational presentation.
 
-10. `logic/L6-DATA-SAFETY-BACKUP.md`
+14. `logic/L6-DATA-SAFETY-BACKUP.md`
     - Archive, Clear Recent, Delete, Full Backup, Restore, History CSV, Time Report CSV.
 
-11. `logic/L7-SETTINGS-SUPPORT-THEMES.md`
+15. `logic/L7-SETTINGS-SUPPORT-THEMES.md`
     - Settings router, Timer Appearance, Website Themes, Support/Feedback, diagnostics privacy, Developer Support.
 
-12. `logic/L8-ACCEPTANCE-HANDOFF.md`
+16. `logic/L8-ACCEPTANCE-HANDOFF.md`
     - Failure priority, fixture/test requirements, release blockers, Chrome/Edge gates, staged implementation handoff.
 
-13. `HANDOFF.md` and `CHROME-INTERACTION-DIAGNOSIS.md`
-    - Historical v0.7.x source material and failure context. Use as source evidence, not as the rebuild architecture.
+17. B1 implementation handoff/stage records and actual source/tests.
+    - Implementation evidence for the active review; it does not outrank settled contracts or prove browser acceptance.
 
-14. Actual implementation source before changing behavior.
+18. `HANDOFF.md` and `CHROME-INTERACTION-DIAGNOSIS.md`.
+    - Historical v0.7.x source material and failure context. Use as source evidence, not as the rebuild architecture.
 
 ---
 
@@ -126,11 +147,13 @@ Production `main` has been rechecked and still points to the v0.7.1 baseline abo
 
 ---
 
-## Implementation next action
+## Current next action
 
-Begin **Build Stage B1 - Shell / Lifecycle**.
+Perform a read-only **`REVIEW B1`** from the current B1 branch and local hardening draft. Do not edit until that review produces an approved repair slice and the user separately says `START B1`.
 
-B1 may implement:
+The B1 branch already exists. It is not settled merely because automated CI and package construction pass. The confirmed L1-AC-23 failed-cleanup sequence still permits failure erasure/reallocation, and real packaged Chrome/Edge lifecycle acceptance remains pending.
+
+B1 scope remains limited to:
 
 - source/build scaffold;
 - extension shell/platform boundary;
@@ -141,7 +164,7 @@ B1 may implement:
 - static/package validation improvements;
 - lifecycle fixture/browser tests.
 
-B1 must use `logic/L0-INVARIANTS.md` and `logic/L1-LIFECYCLE.md` as behavior authority and must not invent B2 timer behavior early.
+B1 must use `logic/L0-INVARIANTS.md`, `logic/L1-LIFECYCLE.md`, `logic/L8-ACCEPTANCE-HANDOFF.md`, and the traceability matrix as authority. It must not invent B2 timer behavior early. Preserve `DEGRADED / coordination-not-implemented-b1` until B2 implements real coordination.
 
 The staged build sequence is:
 
@@ -176,4 +199,4 @@ These are intentionally nonblocking because L7/L8 define safe fallback behavior:
 
 ## Recovery instruction for a new chat / implementation session
 
-> Continue the SquareCoil Companion rebuild from `planning/squarecoil-companion-rebuild` in `Wakeup-gif/test_repo`. Read `browser-extension/squarecoil-companion/REBUILD-START-HERE.md`, then `docs/REBUILD-MASTER-PLAN.md`, `docs/LOGIC-STAGE-PLAN.md`, and `logic/L0-INVARIANTS.md` through `logic/L8-ACCEPTANCE-HANDOFF.md` in order before making architecture or behavior decisions. Framework + Logic are settled and the next stage is B1 Shell / Lifecycle. Production `main` must remain at the v0.7.1 baseline until staged rebuild acceptance permits promotion.
+> Continue the SquareCoil Companion rebuild from `planning/squarecoil-companion-rebuild` in `Wakeup-gif/test_repo`. Read `HANDOFF-NEXT-CHAT.md` first, then Start Here, Repository Evidence Map, Logic Traceability Matrix, canonical Codex handoff, Master Plan, Logic Stage Plan, L0-L8, and the active B1 evidence in the prescribed order. Framework + Logic are settled and the closure package is complete. B1 exists but is NOT_SETTLED / READY_FOR_REPAIR; browser acceptance is PENDING; B2 is BLOCKED. Production `main` must remain at v0.7.1. Do not edit until the user gives the exact stage authorization; the next required command is `REVIEW B1`.

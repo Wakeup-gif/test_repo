@@ -30,9 +30,13 @@ Planning/specification branch:
 
 `planning/squarecoil-companion-rebuild`
 
-Verified planning head at handoff creation:
+Audited planning base before logic closure:
 
-`82207dcdf2e7f4c6d8b346c787433574c75e0a38`
+`20842abc973abd3ac0704f2cf18875007a8f07c5`
+
+Verified B1 implementation head before logic closure:
+
+`c0afb241d91141ed818d9395ac14257207ad59ed`
 
 Production branch:
 
@@ -48,23 +52,26 @@ Production package:
 
 **Important:** production `main` is intentionally still the old v0.7.1 implementation. Planning and settled logic are on the planning branch. Do not rewrite production `main` merely because the rebuild specs are finished.
 
-Before doing anything, re-fetch both branch heads because commits may have advanced after this handoff was written.
+Before doing anything, re-fetch planning, B1, and `main` because commits may have advanced after this handoff was written.
 
 ---
 
 # 2. Current exact resume point
 
-The rebuild framework and detailed logic are **complete and settled through L8**.
+The rebuild framework and detailed logic are **complete and settled through L8**, and the logic-closure evidence/traceability package is present.
 
-The next stage is **Build Stage B1 — Shell / Lifecycle**.
+B1 already exists. It is **NOT_SETTLED / READY_FOR_REPAIR**. Its packaged Chrome/Edge lifecycle acceptance is **PENDING**, and B2 is **BLOCKED / UNAPPROVED-DRAFT**.
 
 Do **not** restart logic at L6 or L7 just because an older conversation summary says that. The canonical `REBUILD-START-HERE.md` and `logic/L8-ACCEPTANCE-HANDOFF.md` now establish:
 
 ```text
 Framework: settled
 Logic: L0-L8 settled
-Implementation: ready for staged implementation
-Next: B1 Shell / Lifecycle
+Logic closure: complete
+B1: NOT_SETTLED / READY_FOR_REPAIR
+B1 browser acceptance: PENDING
+B2: BLOCKED
+Next authorization: REVIEW B1
 ```
 
 No rebuild implementation has yet been promoted to production `main`.
@@ -79,20 +86,22 @@ Read in this order:
 
 1. `browser-extension/squarecoil-companion/HANDOFF-NEXT-CHAT.md`
 2. `browser-extension/squarecoil-companion/REBUILD-START-HERE.md`
-3. `browser-extension/squarecoil-companion/docs/REBUILD-MASTER-PLAN.md`
-4. `browser-extension/squarecoil-companion/docs/LOGIC-STAGE-PLAN.md`
-5. `browser-extension/squarecoil-companion/logic/L0-INVARIANTS.md`
-6. `browser-extension/squarecoil-companion/logic/L1-LIFECYCLE.md`
-7. `browser-extension/squarecoil-companion/logic/L2-STATE-TIME-MIGRATION.md`
-8. `browser-extension/squarecoil-companion/logic/L3-SQUARECOIL-BRIDGE.md`
-9. `browser-extension/squarecoil-companion/logic/L4-TIMER-BEHAVIOR.md`
-10. `browser-extension/squarecoil-companion/logic/L5-TIME-VIEWS-WORKSPACE.md`
-11. `browser-extension/squarecoil-companion/logic/L6-DATA-SAFETY-BACKUP.md`
-12. `browser-extension/squarecoil-companion/logic/L7-SETTINGS-SUPPORT-THEMES.md`
-13. `browser-extension/squarecoil-companion/logic/L8-ACCEPTANCE-HANDOFF.md`
-14. `browser-extension/squarecoil-companion/HANDOFF.md`
-15. `browser-extension/squarecoil-companion/CHROME-INTERACTION-DIAGNOSIS.md` if needed for v0.7 failure history
-16. Actual current source files before modifying implementation.
+3. `browser-extension/squarecoil-companion/docs/REPOSITORY-EVIDENCE-MAP.md`
+4. `browser-extension/squarecoil-companion/docs/LOGIC-TRACEABILITY-MATRIX.md`
+5. `browser-extension/squarecoil-companion/CODEX-IMPLEMENTATION-HANDOFF.md`
+6. `browser-extension/squarecoil-companion/docs/REBUILD-MASTER-PLAN.md`
+7. `browser-extension/squarecoil-companion/docs/LOGIC-STAGE-PLAN.md`
+8. `browser-extension/squarecoil-companion/logic/L0-INVARIANTS.md`
+9. `browser-extension/squarecoil-companion/logic/L1-LIFECYCLE.md`
+10. `browser-extension/squarecoil-companion/logic/L2-STATE-TIME-MIGRATION.md`
+11. `browser-extension/squarecoil-companion/logic/L3-SQUARECOIL-BRIDGE.md`
+12. `browser-extension/squarecoil-companion/logic/L4-TIMER-BEHAVIOR.md`
+13. `browser-extension/squarecoil-companion/logic/L5-TIME-VIEWS-WORKSPACE.md`
+14. `browser-extension/squarecoil-companion/logic/L6-DATA-SAFETY-BACKUP.md`
+15. `browser-extension/squarecoil-companion/logic/L7-SETTINGS-SUPPORT-THEMES.md`
+16. `browser-extension/squarecoil-companion/logic/L8-ACCEPTANCE-HANDOFF.md`
+17. B1 implementation handoff/stage records and actual source/tests.
+18. `browser-extension/squarecoil-companion/HANDOFF.md` and `CHROME-INTERACTION-DIAGNOSIS.md` as historical production evidence.
 
 `HANDOFF.md` is historical v0.7.x source context. It is useful evidence but **does not outrank the rebuild Master Plan or L0-L8**.
 
@@ -102,7 +111,7 @@ Read in this order:
 
 ## Before every implementation session
 
-1. Fetch `planning/squarecoil-companion-rebuild` and `main` heads.
+1. Fetch `planning/squarecoil-companion-rebuild`, `rebuild/squarecoil-companion-b1-lifecycle`, and `main` heads.
 2. Confirm production `main` has not unexpectedly moved.
 3. Read `REBUILD-START-HERE.md` and the logic files applicable to the build stage.
 4. Fetch the actual source files you intend to change.
@@ -113,11 +122,11 @@ Read in this order:
 
 Treat `planning/squarecoil-companion-rebuild` as the recoverable specification checkpoint.
 
-For implementation, use a separate rebuild implementation branch rather than writing directly to production `main`. If no B1 implementation branch already exists, create one from the current planning head. A reasonable name is:
+The existing B1 implementation branch is:
 
-`rebuild/squarecoil-companion-b1`
+`rebuild/squarecoil-companion-b1-lifecycle`
 
-Do not invent a second implementation branch if one already exists; inspect branches first.
+Do not create a second B1 branch or write implementation to planning or production `main`. Inspect the existing B1 worktree and preserve its unapproved local changes during `REVIEW B1`.
 
 ## During implementation
 
@@ -697,7 +706,7 @@ The exact tested artifact bytes must be the bytes promoted to candidate/release.
 
 # 10. Build stages B1-B6
 
-## B1 — Shell / Lifecycle — **NEXT**
+## B1 — Shell / Lifecycle — **NOT_SETTLED / READY_FOR_REPAIR**
 
 Depends on L0-L1.
 
@@ -746,22 +755,19 @@ Run full regressions, packaged Chrome browser acceptance, fixture matrices, priv
 
 ---
 
-# 11. How to start B1 in the next chat
+# 11. How to review B1 in the next chat
 
-Do not immediately write a giant rewrite.
+Begin read-only. Do not edit until `REVIEW B1` has produced an approved repair slice and the user separately gives `START B1`.
 
 First:
 
-1. Re-fetch current planning branch head and `main`.
-2. Read Start Here + Master Plan + L0/L1 + L8 B1/acceptance sections.
-3. Inspect the current v0.7.1 extension tree and manifest/background/content/page files to understand what will be replaced/migrated.
-4. Inspect whether a rebuild implementation branch already exists.
-5. If not, create a B1 implementation branch from the planning head; do not start from stale `main` alone because the planning branch contains the settled specs.
-6. Decide/document the minimal build/scaffold shape needed to preserve modular source with consolidated runtime ownership.
-7. Implement only B1 boundaries first.
-8. Add deterministic lifecycle tests as each behavior is built.
-9. Run static/package checks and real Chromium lifecycle smoke appropriate to B1.
-10. Re-fetch committed files and report actual status honestly.
+1. Re-fetch current planning, B1, and `main` heads.
+2. Read the evidence map, traceability matrix, Codex handoff, L0/L1, and L8 B1/acceptance sections.
+3. Inspect the existing B1 branch, local 12-file draft, workflow, and tests without changing them.
+4. Verify the full L1-AC-23 sequence: disable -> cleanup failure -> boot while disabled -> re-enable remains locked -> failed teardown-only retry remains locked -> later successful teardown-only retry releases every outstanding resource and reaches `UNINITIALIZED` -> exactly one fresh generation may then start.
+5. Review ownership/orphan classification, service-worker recovery, BFCache, stale generations, supported documents/iframes, listener duplication, and accidental B2 leakage.
+6. Report the bounded repair slice and browser acceptance status.
+7. Stop and require `START B1` before editing.
 
 Minimum B1 behaviors to prove before B2:
 
@@ -776,6 +782,8 @@ Minimum B1 behaviors to prove before B2:
 - re-enable -> fresh BOOTING generation;
 - teardown idempotent;
 - boot during teardown does not stack runtime;
+- failed cleanup remains `FAILED / teardown-incomplete` across boot while disabled, re-enable, and a failed teardown-only retry, with no new allocation;
+- a later successful teardown-only retry releases every outstanding resource and reaches `UNINITIALIZED`; only then may exactly one fresh BOOTING generation start;
 - legacy v0.7 runtime/build mismatch requires reload, not hot stacking;
 - exactly one current lifecycle/listener/resource set remains after recovery.
 
@@ -896,13 +904,22 @@ Other implementation-level choices remain deliberately open until their build st
 
 # 17. User interaction protocol for the next chat
 
-The user likes concise progress updates and staged work.
+The user likes concise progress updates and staged work. Authorization now uses exact commands; historical shorthand is superseded:
 
-Established shorthand:
+- `REVIEW B1` -> read-only B1 inspection and proposed repair slice;
+- `START B1` -> only the approved B1 repair slice on `rebuild/squarecoil-companion-b1-lifecycle`, including tests/commit/push;
+- `REVIEW B2` -> read-only B2 review after B1 is settled;
+- `START B2` -> only the separately approved B2 slice;
+- `REVIEW B3`, `REVIEW B4`, `REVIEW B5`, `REVIEW B6` -> read-only review of that named stage after its prior dependencies are settled;
+- `START B3`, `START B4`, `START B5`, `START B6` -> only that named stage;
+- `REVIEW LOGIC AMENDMENT: <scope>` -> read-only review of one named contract contradiction and proposed amendment;
+- `START LOGIC AMENDMENT: <scope>` -> only that same reviewed canonical-document amendment, never runtime/source work;
+- `PROMOTE TO MAIN` -> separately approved production promotion;
+- `CREATE RELEASE` -> separately approved release creation/publication.
 
-- If the user says **`review`**, review the current artifact/stage against prior contracts and identify contradictions/gaps.
-- If the user says **`start`** after a review, apply the review fixes, harden/update the canonical artifact, verify it, and only then mark it settled.
-- During implementation, treat **`start`** as approval to proceed with the next already-defined step/fix, not as permission to redesign unrelated areas.
+Bare `review` or `start`, and general phrases such as “continue,” “proceed,” “go ahead,” “resume,” “pick it up,” or “keep working,” are not implementation authorization. Authorization never carries between stages.
+
+Replace `<scope>` with the owning logic document and named contradiction; the prefix alone is insufficient. A build-stage command such as `START B1` never authorizes canonical logic edits. After a logic amendment, repeat the affected stage review and obtain its exact `START Bn` authorization before source work resumes.
 
 When beginning work, briefly state:
 
@@ -926,7 +943,7 @@ Do not drown the user in implementation narration while actively fixing somethin
 
 After reading the repo, respond succinctly along these lines:
 
-> I recovered the SquareCoil Companion rebuild from GitHub. The planning branch has L0-L8 settled, production `main` is still v0.7.1, and the next real stage is B1 — Shell / Lifecycle. I’ll keep production untouched, use the settled logic as authority, and start B1 by auditing the current extension tree plus the lifecycle/scaffold boundary before writing code.
+> I recovered the SquareCoil Companion rebuild from GitHub. Framework and L0-L8 are settled, the logic-closure handoff is present, and production `main` is still v0.7.1. B1 exists but is NOT_SETTLED / READY_FOR_REPAIR; browser acceptance is PENDING; B2 is BLOCKED. I’ll keep all work read-only and preserve the local drafts until you give the exact next authorization, `REVIEW B1`.
 
 Do not ask the user to explain the project again.
 
@@ -934,8 +951,8 @@ Do not ask the user to explain the project again.
 
 # 19. Immediate next action
 
-**Resume at B1 — Shell / Lifecycle implementation.**
+**Stop after logic closure and require `REVIEW B1`.**
 
-Before coding, inspect the existing extension source and current branches, then define the minimal B1 implementation slice that can be built and tested without prematurely pulling B2-B5 behavior into the shell.
+`REVIEW B1` is read-only and must inspect the existing B1 branch/local hardening, confirm the L1-AC-23 blocker and remaining lifecycle/browser gaps, then propose the minimal B1-only repair slice. `START B1` is required separately before any source edit, commit, or push.
 
 Chrome is the first rebuilt package/acceptance target, but no Chrome upload candidate should be created until the staged gates in L8 are satisfied.

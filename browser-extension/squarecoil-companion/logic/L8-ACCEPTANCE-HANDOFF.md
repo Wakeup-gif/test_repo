@@ -1,7 +1,8 @@
 # SquareCoil Companion Rebuild
 ## Logic Stage L8: Failure Behavior, Acceptance Criteria, and Implementation Handoff
 
-**Status:** Settled - ready for staged implementation  
+**Status:** Settled; logic closure package complete; build stages remain separately gated
+
 **Logic stage:** L8  
 **Depends on:** settled L0-L7 behavior contracts  
 **Framework authority:** `docs/REBUILD-MASTER-PLAN.md`  
@@ -262,6 +263,12 @@ Passing an earlier layer never substitutes for a later one.
 
 A valid ZIP and parsing JavaScript do not prove Settings interaction, timer transitions, reload recovery, or browser behavior.
 
+For B1-B5, stage completion requires the applicable A1, A2, A3, Chrome A4, and Edge-parity rows for that stage's bounded scope. A4 is not deferred wholesale to B6. B6 reruns the complete required A1-A4 suite against the exact candidate bytes and required clean-install/upgrade profiles.
+
+If required browser execution is unavailable, the affected A4 workflow status remains `PENDING` and the stage remains `NOT_SETTLED`; A1, A2, A3, CI success, JavaScript parsing, or archive creation cannot substitute for it.
+
+Workflow/evidence status (`PENDING`, `PARTIAL`, `COMPLETE`, `DEFERRED`, or `BLOCKED`) is separate from an executed gate result. Section 11 remains authoritative: an executed required gate records only `PASS`, `FAIL`, or contract-permitted `NOT_APPLICABLE`. A pending/unexecuted gate has no result and cannot settle a stage.
+
 ---
 
 # 10. Deterministic Test Environment Contract
@@ -442,6 +449,7 @@ A4 loads the actual packaged extension in Chromium.
 ## Lifecycle/runtime
 
 - one runtime/root;
+- one runtime/root means one Lifecycle Coordinator/runtime/root per supported top-level document; multiple coordinated tabs may each have one runtime while only one fenced OWNER writes;
 - Settings gear actually opens/responds;
 - collapse/expand;
 - repeated boot no duplicate resources;
@@ -449,7 +457,8 @@ A4 loads the actual packaged extension in Chromium.
 - visible-but-dead root not READY;
 - service-worker restart no duplicate runtime;
 - reload/recovery;
-- version/legacy mismatch reload-required.
+- version/legacy mismatch reload-required;
+- disable -> cleanup failure -> boot while disabled -> re-enable preserves `FAILED / teardown-incomplete` and performs no second allocation while unresolved; failed teardown-only retry stays locked; successful teardown-only retry reaches `UNINITIALIZED`; only then one fresh generation may start, with a genuine new document as the alternative boundary.
 
 ## Timer
 
@@ -822,7 +831,7 @@ Stable is blocked by any known defect that can:
 - double-record time;
 - fabricate missed/unverified time;
 - claim SquareCoil state without evidence;
-- allow two authoritative writers/runtimes;
+- allow two authoritative writers, or two lifecycle runtimes in the same supported top-level document;
 - restore/import unsafe duplicate/overlapping history;
 - bypass destructive protection/confirmation;
 - restore fake live state from file;
@@ -867,6 +876,10 @@ May implement scaffold/build tooling, extension shell, Lifecycle Coordinator, on
 
 Must not invent later Timer behavior.
 
+B1 settlement requires all applicable B1 A1-A4 rows in `docs/LOGIC-TRACEABILITY-MATRIX.md`. In particular, L1-AC-23 and packaged Chrome/Edge lifecycle acceptance may not be deferred to B6.
+
+B1 proves the READY predicate/guards with deterministic positive and negative adapters, the one-root/interaction shell, and packaged-browser truthful refusal of READY while real coordination is absent. Positive packaged L1-AC-01 with the real R5-R7/R9 services closes during B2. This applicability split does not permit B1 to fake READY and does not defer B1's own lifecycle A4 cases.
+
 ## B2 State / Ledger / Bridge / Core Timer
 
 Depends on L2-L4.
@@ -874,6 +887,10 @@ Depends on L2-L4.
 May implement persistence abstraction, Shared Timer State, Ledger/query service, coordination/fencing, migration, Recovery Checkpoint, Bridge, Timer service, core timer read model/actions.
 
 B2 contracts must be green before higher features rely on time semantics.
+
+B2 remains quarantined until B1 is settled with all applicable stage gates. Local or untracked B2 drafts are `UNAPPROVED-DRAFT` implementation evidence only. They must not be copied into B1, wired into the extension, committed, packaged, or counted as B2 acceptance. `REVIEW B2` authorizes inspection only; `START B2` is separately required after review from the verified final B1 base.
+
+The B2 core timer read model is limited to immutable service snapshots, queries, and core action interfaces required by L2-L4. It does not include L5/B3 routes or presentation views such as Recent, Time Overview, History, Context Detail, Archives, or workspace navigation.
 
 ## B3 Time Views / Workspace
 
@@ -914,14 +931,16 @@ no unresolved release-blocking defect remains in scope
 diagnostics/docs are sufficient for the next stage
 ```
 
+The applicable stage-gate rows are normative. Workflow status `PENDING`, `PARTIAL`, `DEFERRED`, or `BLOCKED`, a missing executed result, or executed result `FAIL` prevents settlement. Executed result `NOT_APPLICABLE` is permitted only when the settled contract makes that layer genuinely irrelevant and the reason is recorded; browser unavailability is not `NOT_APPLICABLE`.
+
 If implementation finds a real contradiction:
 
 1. stop local invention/workaround;
 2. document the contradiction;
-3. return to the owning Logic/Framework contract;
-4. deliberately amend canonical logic;
-5. add regression coverage;
-6. resume implementation from the amended contract.
+3. return to the owning Logic/Framework contract and obtain `REVIEW LOGIC AMENDMENT: <scope>` for a read-only proposed change;
+4. obtain `START LOGIC AMENDMENT: <same scope>` before editing canonical logic; a build-stage `START Bn` command does not authorize this;
+5. amend deliberately and add regression mapping/coverage;
+6. review the affected implementation stage again and obtain its exact `START Bn` authorization before source work resumes from the amended contract.
 
 ---
 
@@ -932,10 +951,15 @@ GitHub is the implementation handoff source of truth.
 The planning branch now contains:
 
 ```text
+HANDOFF-NEXT-CHAT.md
 REBUILD-START-HERE.md
 
 docs/REBUILD-MASTER-PLAN.md
 docs/LOGIC-STAGE-PLAN.md
+docs/REPOSITORY-EVIDENCE-MAP.md
+docs/LOGIC-TRACEABILITY-MATRIX.md
+
+CODEX-IMPLEMENTATION-HANDOFF.md
 
 logic/L0-INVARIANTS.md
 logic/L1-LIFECYCLE.md
@@ -959,7 +983,7 @@ v0.7.1 Chrome Interaction Recovery
 
 No planning/logic work has been written to production `main`.
 
-The Start Here file must identify this final logic state and B1 as the staged implementation next action.
+The Start Here file must identify this final logic state, B1 as implemented but not settled, B2 as blocked, and `REVIEW B1` as the next authorization.
 
 **Repository logic-file completeness: GREEN**
 
@@ -969,15 +993,19 @@ The Start Here file must identify this final logic state and B1 as the staged im
 
 The handoff consists of:
 
-1. Master Plan;
-2. Logic Stage Plan;
-3. L0-L8 settled logic files;
-4. Start Here recovery/index;
-5. L8 fixture/test inventory;
-6. B1-B6 dependency map;
-7. production baseline reference;
-8. known nonblocking configuration inputs;
-9. explicit rule that `main` remains production until staged rebuild acceptance permits promotion.
+1. Next Chat canonical recovery handoff;
+2. Master Plan;
+3. Logic Stage Plan;
+4. L0-L8 settled logic files;
+5. Start Here recovery/index;
+6. Repository Evidence Map;
+7. Logic Traceability Matrix;
+8. canonical Codex Implementation Handoff;
+9. L8 fixture/test inventory;
+10. B1-B6 dependency map;
+11. production baseline reference;
+12. known nonblocking configuration inputs;
+13. explicit rule that `main` remains production until staged rebuild acceptance permits promotion.
 
 An implementation session should not need the original chat transcript to recover core behavior.
 
@@ -1037,10 +1065,10 @@ At minimum:
 
 # 39. Final Readiness Judgment
 
-**Framework + Logic = Settled - ready for staged implementation**
+**Framework + Logic = Settled; logic closure package complete**
 
-The behavior contracts L0-L8 are now recoverable from Git, production `main` remains untouched, failure behavior and test evidence are explicit, and staged implementation can begin without a builder inventing time/state/data-safety semantics.
+The behavior contracts L0-L8 are recoverable from Git, production `main` remains untouched, and the evidence map, traceability matrix, and canonical Codex handoff make the current proof boundaries explicit.
 
-The next action is **Build Stage B1: Shell / Lifecycle**, not a one-pass full rewrite.
+The B1 branch exists but is **NOT_SETTLED / READY_FOR_REPAIR** because L1-AC-23 fails and packaged Chrome/Edge lifecycle acceptance remains pending. B2 is blocked and its local draft remains quarantined. The next action is exact authorization **`REVIEW B1`**, not implementation or B2.
 
 Chrome remains the first rebuilt acceptance/package target. Edge follows from the same shared source with its own parity gate.

@@ -1,8 +1,10 @@
 # SquareCoil Companion Rebuild Master Plan
 
-Status: **Framework ready for logic**  
+Status: **Framework settled; L0-L8 settled; logic closure package complete**
+
 Planning branch: `planning/squarecoil-companion-rebuild`  
 Production baseline: `main` at `9378da24f393b40066816133e7fa0f48063115f0` (`v0.7.1 Chrome Interaction Recovery`)  
+Current build-stage truth: see `../CODEX-IMPLEMENTATION-HANDOFF.md` and `LOGIC-TRACEABILITY-MATRIX.md`
 Purpose: rebuild the Companion into a stable, modular, easy-to-update Chrome/Edge extension without losing established behavior, saved job history, or the UX improvements already developed.
 
 ---
@@ -1029,7 +1031,9 @@ Do not treat this filename tree as implementation law. The ownership map is the 
 
 ---
 
-# 27. Hardened Master Work List
+# 27. Hardened Master Implementation / Acceptance Work List
+
+Checklist legend: sections A-O track implementation and acceptance evidence against the already settled Framework + L0-L8 contracts. An unchecked item means its production implementation and required test/browser proof are not complete; it does **not** reopen or unsettle the corresponding logic decision. Verbs such as “lock,” “define,” and “freeze” in this legacy work-list wording mean implement and prove conformance to the settled definition. Section P separately records completion of the canonical planning/recovery documents.
 
 ## A. Product and UX
 
@@ -1160,7 +1164,7 @@ Do not treat this filename tree as implementation law. The ownership map is the 
 
 ## N. GitHub/update/release
 
-- [ ] GitHub planning/recovery branch.
+- [x] GitHub planning/recovery branch.
 - [ ] Canonical version source.
 - [ ] Stable/Beta concept.
 - [ ] automated validation.
@@ -1184,17 +1188,20 @@ Do not treat this filename tree as implementation law. The ownership map is the 
 
 ## P. Documentation/recovery
 
-- [ ] Start-here recovery index.
-- [ ] Master rebuild plan.
-- [ ] Logic stage plan.
-- [ ] Architecture/module contracts.
-- [ ] Behavior contract.
-- [ ] State/time schema.
-- [ ] Backup/restore contract.
-- [ ] UX structure.
-- [ ] Browser parity.
-- [ ] Testing/acceptance.
-- [ ] Current checkpoint updated at every major stage.
+- [x] Start-here recovery index.
+- [x] Master rebuild plan.
+- [x] Logic stage plan.
+- [x] Architecture/module contracts.
+- [x] Behavior contract.
+- [x] State/time schema.
+- [x] Backup/restore contract.
+- [x] UX structure.
+- [x] Browser parity contract.
+- [x] Testing/acceptance contract.
+- [x] Repository evidence map.
+- [x] Logic traceability matrix.
+- [x] Canonical Codex implementation handoff.
+- [x] Current checkpoint updated for logic closure.
 
 ---
 
@@ -1265,7 +1272,7 @@ Not blockers for Logic:
 
 # 31. Readiness Gate
 
-## Framework ready for logic
+## Framework and logic settled
 
 Reason:
 
@@ -1277,7 +1284,9 @@ Reason:
 - backup/reporting/housekeeping boundaries are clear;
 - browser and GitHub direction is clear;
 - UX priorities are clear;
-- remaining uncertainty is primarily behavior-level logic or configuration.
+- L0-L8 behavior contracts are settled;
+- the evidence map and traceability matrix separate specifications from implementation proof;
+- current implementation status and authorization are delegated to the canonical Codex handoff rather than embedded as a fast-changing structural claim.
 
 ### Settled structural items
 
@@ -1308,6 +1317,6 @@ Reason:
 - custom light logo;
 - store-specific upload details.
 
-### Blockers
+### Current gate
 
-None upstream for beginning staged Logic specification.
+Framework and logic have no upstream blocker. Build stages remain evidence- and authorization-gated. At logic closure, B1 exists but is `NOT_SETTLED / READY_FOR_REPAIR` because L1-AC-23 is violated and packaged Chrome/Edge lifecycle acceptance is pending. B2 remains blocked. Reverify the canonical handoff before acting.
