@@ -2,12 +2,13 @@
 
 const { createLifecycleController, MODES } = require('../core/lifecycle');
 const { createFeatureRegistry } = require('../core/feature-registry');
+const { BUILD_ID, BUILD_STAGE } = require('../core/build-identity');
 const { createRuntimeUi } = require('../platform/runtime-ui');
 const { createBridgeShell } = require('../squarecoil/bridge-shell');
 
-const BUILD_ID = 'rebuild-b1-shell-lifecycle';
 const GLOBAL_KEY = '__squareCoilCompanionRuntime';
 const BOOTSTRAP_KEY = '__squareCoilCompanionBootstrap';
+const EXPECTED_B1_DEGRADED_REASON = 'coordination-not-implemented-b1';
 
 function randomId() {
   if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') return globalThis.crypto.randomUUID();
@@ -52,6 +53,18 @@ function randomId() {
     }
   });
 
+  const ownership = {
+    ensure: async () => ({
+      oneOwner: Boolean(
+        runtime &&
+        window[GLOBAL_KEY] === runtime &&
+        runtime.runtimeInstanceId === runtimeInstanceId &&
+        runtime.buildId === BUILD_ID
+      )
+    }),
+    teardown: async () => {}
+  };
+
   const persistence = {
     ensure: async () => ({ available: bootstrap.persistenceAvailable === true }),
     teardown: async () => {}
@@ -67,6 +80,7 @@ function randomId() {
     buildId: BUILD_ID,
     packageVersion,
     adapters: {
+      ownership,
       persistence,
       ui,
       features: registry,
@@ -76,14 +90,21 @@ function randomId() {
     onTransition: snapshot => ui.setLifecycle(snapshot)
   });
 
+  async function recoverIfNeeded(result) {
+    if (result?.state !== 'DEGRADED' || result.reason === EXPECTED_B1_DEGRADED_REASON) return result;
+    return lifecycle.recover();
+  }
+
   async function boot() {
-    const result = await lifecycle.boot();
+    let result = await lifecycle.boot();
+    result = await recoverIfNeeded(result);
     ui.setLifecycle(result);
     return getHealth();
   }
 
   async function revalidate() {
-    const result = await lifecycle.revalidate();
+    let result = await lifecycle.revalidate();
+    result = await recoverIfNeeded(result);
     ui.setLifecycle(result);
     return getHealth();
   }
@@ -96,15 +117,23 @@ function randomId() {
 
   async function teardown(reason = 'teardown-complete') {
     const result = await lifecycle.teardown(reason);
-    if (window[GLOBAL_KEY] === runtime) {
+    if (result.state === 'UNINITIALIZED' && window[GLOBAL_KEY] === runtime) {
       try { delete window[GLOBAL_KEY]; } catch (_) { window[GLOBAL_KEY] = null; }
     }
     return result;
   }
 
   async function setEnabled(enabled) {
-    if (!enabled) return lifecycle.setMode(MODES.DISABLED);
-    const result = await lifecycle.setMode(MODES.ENABLED);
+    if (!enabled) {
+      const result = await lifecycle.setMode(MODES.DISABLED);
+      if (result.state === 'UNINITIALIZED' && window[GLOBAL_KEY] === runtime) {
+        try { delete window[GLOBAL_KEY]; } catch (_) { window[GLOBAL_KEY] = null; }
+      }
+      return result;
+    }
+
+    let result = await lifecycle.setMode(MODES.ENABLED);
+    result = await recoverIfNeeded(result);
     ui.setLifecycle(result);
     return getHealth();
   }
@@ -112,7 +141,7 @@ function randomId() {
   function getHealth() {
     return {
       ...lifecycle.snapshot(),
-      buildStage: 'B1',
+      buildStage: BUILD_STAGE,
       ui: ui.snapshot(),
       bridge: bridge.snapshot()
     };
