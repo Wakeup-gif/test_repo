@@ -2,9 +2,11 @@
 
 **Branch:** `rebuild/squarecoil-companion-b1-lifecycle`
 
-**Status:** `NOT_SETTLED / VALIDATION_CANDIDATE`
+**Status:** `SETTLED / A1-A4 COMPLETE`
 
 **Repair baseline:** `c0afb241d91141ed818d9395ac14257207ad59ed`
+
+**Accepted implementation:** `f2d1769ddbe2b6966411fee3764a09b904dfe6ff`
 
 **Depends on:** settled L0-L1 and the L8 acceptance rules
 
@@ -12,7 +14,11 @@
 
 ## Current decision
 
-The earlier B1 checkpoint is historical evidence, not current acceptance proof. Review found lifecycle, orchestration, package-identity, and browser-fixture gaps. The controlled repair remains unaccepted until all A1-A4 gates pass against one immutable candidate commit and one byte-identical Chrome/Edge archive.
+The earlier B1 checkpoint is historical evidence. The controlled repair closed
+the lifecycle, orchestration, package-identity, and browser-fixture gaps. All
+applicable B1 A1-A4 gates passed against accepted implementation commit
+`f2d1769ddbe2b6966411fee3764a09b904dfe6ff` and one exact package loaded in both
+branded Chrome and branded Edge.
 
 B2 remains blocked. Production `main`, the planning branch, and the quarantined B2 drafts are not part of this repair.
 
@@ -44,9 +50,9 @@ DEGRADED / coordination-not-implemented-b1
 
 Tests may inject an `OWNER` disposition to prove the READY contract, but production B1 must not weaken the contract or implement B2 prematurely.
 
-## Controlled repair requirements
+## Settlement result
 
-The repair must prove all of the following before B1 can be settled:
+The repair proved all of the following:
 
 1. A1 static/package validation is complete and fail-closed.
 2. A2 unit tests cover lifecycle ownership, teardown, runtime probing, settings ordering, and package/fixture invariants without skips.
@@ -56,15 +62,22 @@ The repair must prove all of the following before B1 can be settled:
 6. The source checkout is clean and its actual Git HEAD matches the package metadata.
 7. No production, planning, B2, manifest permission expansion, remote executable content, or unrelated source enters the diff.
 
-## Current local evidence
+## Accepted evidence
 
-The repair worktree currently passes:
+The accepted implementation passes:
 
-- A2 unit: 77 passed, 0 failed, 0 skipped;
-- A3 integration: 38 passed, 0 failed, 0 skipped;
-- static B1 validation: passed.
+- A1 static/package: PASS against an exact eight-file clean package;
+- A2 unit: 77 passed, 0 failed, 0 skipped or todo;
+- A3 integration: 38 passed, 0 failed, 0 skipped or todo;
+- A4 Chrome: 15 of 15 PASS;
+- A4 Edge: 15 of 15 PASS;
+- GitHub Actions: completed successfully for the exact accepted implementation
+  commit.
 
-These are pre-commit local results. They do not settle B1. A1 package hardening is locally implemented, but it and the final A4 Chrome/Edge run must still pass against clean bytes from the exact candidate commit.
+The exact source, build, candidate, archive, inventory, browser, executable, test,
+workflow, protected-ref, and proof-boundary records are in
+[`B1-ACCEPTANCE-EVIDENCE.md`](B1-ACCEPTANCE-EVIDENCE.md). CI package evidence is
+kept distinct from the exact Windows package that passed A4.
 
 ## Historical evidence classification
 
@@ -72,14 +85,18 @@ Earlier commits, workflow runs, and Chrome/Edge package hashes recorded by prior
 
 ## Acceptance record
 
-The final acceptance record must identify:
+The final acceptance record identifies:
 
 - the exact tested implementation commit;
 - the canonical archive filename and SHA-256;
 - the extracted package inventory digest;
 - Chrome and Edge executable versions and hashes;
 - A1, A2, A3, and A4 case totals;
-- the remote B1 head after push;
+- the tested remote B1 implementation head and the evidence-only head
+  verification rule;
 - unchanged `main`, planning, and quarantined B2 state.
 
-Until that record is written from verified evidence, the only correct next action is to finish and validate the controlled B1 repair. Do not start B2.
+B1 is settled only for its bounded Shell / Lifecycle scope. It is not a Stable
+release candidate, and it does not prove B2 behavior or v0.7 upgrade migration.
+The correct next authorization is `REVIEW B2`. Do not start B2 without that
+read-only review and a later exact `START B2` for the approved slice.
