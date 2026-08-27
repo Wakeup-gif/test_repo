@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "US Sign SquareCoil Companion",
   "version": "0.7.1",
-  "version_name": "0.7.1 Rebuild B2.2 Trusted Transition Core Development",
-  "description": "SquareCoil Companion rebuild B2.2 trusted Bridge and Timer transition core for Chrome and Edge. Development branch only.",
+  "version_name": "0.7.1 Proto Squirel Coil Plugin",
+  "description": "Accelerated SquareCoil Companion prototype with trusted Timer/Ledger core and nested workspace UI. Development testing only.",
   "permissions": ["storage", "scripting"],
   "host_permissions": [
     "https://ussignandmill.squarecoil.net/*"
