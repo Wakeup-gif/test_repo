@@ -26,6 +26,54 @@ function freshPositiveObservation(timer, contextId, atMs, verificationGraceMs) {
     .includes(observation.type);
 }
 
+function readableDocument(source) {
+  const document = deepClone(source);
+  if (!document?.authorityView?.redacted) return document;
+  if (document.authorityView.schemaVersion !== 1) {
+    throw new Error('timer-read-model-authority-view-unsupported');
+  }
+  delete document.authorityView;
+  document.commandReceipts = {};
+  document.commandReceiptOrder = [];
+  if (document.revision > 0) {
+    document.commitFence = {
+      ownerRuntimeId: 'redacted-authority-owner',
+      coordinationEpoch: 1,
+      fencingToken: 1
+    };
+  }
+  if (document.timer?.active) {
+    if (document.timer.active.accrualOwnershipBound !== true) {
+      throw new Error('timer-read-model-active-ownership-unproven');
+    }
+    delete document.timer.active.accrualOwnershipBound;
+    document.timer.active.accrualOwnerToken = 'redacted-authority-owner';
+  }
+  if (document.checkpoint?.ownershipEvidence) {
+    const evidence = document.checkpoint.ownershipEvidence;
+    const disposition = String(evidence.disposition || '').toUpperCase();
+    if (['OWNER', 'OBSERVER_CONNECTED'].includes(disposition)) {
+      if (evidence.ownershipBound !== true) {
+        throw new Error('timer-read-model-checkpoint-ownership-unproven');
+      }
+      document.checkpoint.ownershipEvidence = {
+        ownerRuntimeId: 'redacted-authority-owner',
+        coordinationEpoch: 1,
+        fencingToken: 'redacted-authority-fence',
+        disposition
+      };
+    } else {
+      document.checkpoint.ownershipEvidence = {
+        ownerRuntimeId: null,
+        coordinationEpoch: null,
+        fencingToken: null,
+        disposition
+      };
+    }
+  }
+  return document;
+}
+
 function createTimerReadModel(getDocument, options = {}) {
   if (typeof getDocument !== 'function') throw new Error('timer-read-model-source-required');
   const now = options.now || (() => Date.now());
@@ -37,7 +85,7 @@ function createTimerReadModel(getDocument, options = {}) {
   function snapshot(view = {}) {
     const source = getDocument();
     if (!source) throw new Error('data-document-unavailable');
-    const document = deepClone(source);
+    const document = readableDocument(source);
     validateDocument(document);
     const atMs = view.atMs === undefined ? now() : view.atMs;
     if (!isTimestamp(atMs)) throw new Error('timer-read-model-at-invalid');
@@ -109,5 +157,6 @@ module.exports = {
   DEFAULT_VERIFICATION_GRACE_MS,
   operationalContextId,
   freshPositiveObservation,
+  readableDocument,
   createTimerReadModel
 };

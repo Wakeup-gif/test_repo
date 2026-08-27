@@ -70,6 +70,15 @@ function validateAuthorityRequest(message) {
     if (!String(message.command.type || '').trim()) {
       return { ok: false, reason: 'authority-command-type-invalid' };
     }
+    if (!Number.isSafeInteger(message.command.expectedRevision) || message.command.expectedRevision < 0) {
+      return { ok: false, reason: 'authority-command-expected-revision-invalid' };
+    }
+    if (
+      message.command.originRuntimeId !== undefined &&
+      !isConcreteId(message.command.originRuntimeId)
+    ) {
+      return { ok: false, reason: 'authority-command-origin-runtime-invalid' };
+    }
   }
   return { ok: true };
 }

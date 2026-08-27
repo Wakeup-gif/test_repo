@@ -19,8 +19,8 @@ function assert(condition, message) {
 assert(manifest.manifest_version === 3, 'manifest_version must be 3');
 assert(manifest.version === release.latestVersion, `manifest version ${manifest.version} must match release metadata ${release.latestVersion}`);
 assert(manifest.version === packageMetadata.version, `manifest version ${manifest.version} must match package metadata ${packageMetadata.version}`);
-assert(BUILD_ID === 'rebuild-b2-fenced-authoritative-kernel', 'B2.1 build ID must identify the fenced authoritative kernel');
-assert(BUILD_STAGE === 'B2.1', 'B2.1 build stage must remain explicit');
+assert(BUILD_ID === 'rebuild-b2-trusted-transition-core', 'B2.2 build ID must identify the trusted transition core');
+assert(BUILD_STAGE === 'B2.2', 'B2.2 build stage must remain explicit');
 assert(JSON.stringify(manifest.permissions || []) === JSON.stringify(['storage', 'scripting']), 'Rebuild permissions must remain storage + scripting only');
 assert(JSON.stringify(manifest.host_permissions || []) === JSON.stringify(['https://ussignandmill.squarecoil.net/*']), 'Rebuild host permission must remain limited to the exact SquareCoil tenant');
 assert(JSON.stringify(Object.keys(manifest.background || {}).sort()) === JSON.stringify(['service_worker']), 'B1 background policy must contain only the service worker entry');
@@ -108,11 +108,33 @@ const b2KernelRequired = [
   'tests/b2-integration/authority-router.integration.test.js'
 ];
 
+const b2TransitionRequired = [
+  'src/content/trusted-transition-core.js',
+  'src/data/command-dispatcher.js',
+  'src/data/legacy-preflight.js',
+  'src/squarecoil/bridge-engine.js',
+  'src/squarecoil/bridge-parser.js',
+  'src/squarecoil/bridge-service.js',
+  'src/timer/commands.js',
+  'src/timer/service.js',
+  'tests/b2/bridge-engine.test.js',
+  'tests/b2/bridge-parser.test.js',
+  'tests/b2/bridge-service.test.js',
+  'tests/b2/command-dispatcher.test.js',
+  'tests/b2/legacy-preflight.test.js',
+  'tests/b2/timer-service.test.js',
+  'tests/b2-integration/bridge-timer.integration.test.js',
+  'tests/b2-integration/timer-authority.integration.test.js'
+];
+
 for (const file of required) {
   assert(fs.existsSync(path.join(root, file)), `Missing B1 file: ${file}`);
 }
 for (const file of b2KernelRequired) {
-  assert(fs.existsSync(path.join(root, file)), `Missing B2.1 kernel file: ${file}`);
+  assert(fs.existsSync(path.join(root, file)), `Missing B2 foundation file: ${file}`);
+}
+for (const file of b2TransitionRequired) {
+  assert(fs.existsSync(path.join(root, file)), `Missing B2.2 transition file: ${file}`);
 }
 
 const background = fs.readFileSync(path.join(root, 'dist/background.js'), 'utf8');
@@ -224,6 +246,9 @@ for (const fixtureId of requiredBrowserFixtures) {
 for (const fixtureId of ['B2-KERNEL-001', 'B2-KERNEL-002']) {
   assert(browserFixtureSource.includes(fixtureId), `B2.1 browser fixture register is missing ${fixtureId}`);
 }
+for (const fixtureId of Array.from({ length: 5 }, (_, index) => `B2-TRANSITION-${String(index + 1).padStart(3, '0')}`)) {
+  assert(browserFixtureSource.includes(fixtureId), `B2.2 browser fixture register is missing ${fixtureId}`);
+}
 
 const b2FixtureFiles = [
   ...listJavaScriptFiles(path.join(root, 'tests/b2')),
@@ -239,7 +264,7 @@ for (const file of b2FixtureFiles) {
   b2TestCount += titles.length;
   for (const title of titles) {
     const match = title.match(b2FixtureIdPattern);
-    assert(match && title.startsWith(match[0]), `B2.1 test title must start with a stable fixture ID in ${relative}: ${title}`);
+    assert(match && title.startsWith(match[0]), `B2 test title must start with a stable fixture ID in ${relative}: ${title}`);
   }
   for (const match of source.matchAll(b2FixtureIdPattern)) {
     const owners = b2FixtureIds.get(match[0]) || [];
@@ -248,9 +273,9 @@ for (const file of b2FixtureFiles) {
   }
 }
 for (const [fixtureId, owners] of b2FixtureIds) {
-  assert(owners.length === 1, `B2.1 fixture ID must be unique: ${fixtureId} appears in ${owners.join(', ')}`);
+  assert(owners.length === 1, `B2 fixture ID must be unique: ${fixtureId} appears in ${owners.join(', ')}`);
 }
-assert(b2FixtureIds.size === b2TestCount, `Every B2.1 test must own exactly one stable fixture ID (${b2FixtureIds.size} IDs for ${b2TestCount} tests)`);
+assert(b2FixtureIds.size === b2TestCount, `Every B2 test must own exactly one stable fixture ID (${b2FixtureIds.size} IDs for ${b2TestCount} tests)`);
 const requiredB2FixtureFamilies = [
   'UT-B2-FENCE-',
   'UT-B2-MIG-',
@@ -261,12 +286,17 @@ const requiredB2FixtureFamilies = [
   'UT-B2-READ-',
   'UT-B2-AUTH-',
   'UT-B2-PERSIST-',
+  'UT-B2-BRIDGE-',
+  'UT-B2-TIMER-',
+  'UT-B2-DISPATCH-',
   'IT-B2-AUTH-',
   'IT-B2-PERSIST-',
-  'IT-B2-PLATFORM-'
+  'IT-B2-PLATFORM-',
+  'IT-B2-TIMER-',
+  'IT-B2-BRIDGE-'
 ];
 for (const family of requiredB2FixtureFamilies) {
-  assert([...b2FixtureIds.keys()].some(fixtureId => fixtureId.startsWith(family)), `B2.1 fixture register is missing family ${family}*`);
+  assert([...b2FixtureIds.keys()].some(fixtureId => fixtureId.startsWith(family)), `B2 fixture register is missing family ${family}*`);
 }
 
 const sourceFiles = listJavaScriptFiles(path.join(root, 'src'));
@@ -282,20 +312,32 @@ assert(backgroundSource.includes('const defaultAuthorityInstallation = installDe
 assert(background.includes(authorityStorageKey), 'The generated worker bundle must contain the B2.1 authority storage key');
 assert(background.includes('authority-web-locks-required'), 'The generated worker bundle must preserve fail-closed cross-context locking');
 assert(contentSource.includes("require('../extension/authority-client')"), 'The isolated content controller must own the B2.1 authority client');
+assert(contentSource.includes("require('./trusted-transition-core')"), 'The isolated content controller must own the B2.2 trusted transition coordinator');
 assert(!contentSource.includes('postMessage'), 'The isolated authority boundary must not use page postMessage');
 assert(!pageSource.includes('createAuthorityClient'), 'MAIN-world code must not own an authoritative client');
 assert(!fs.existsSync(path.join(root, 'src/extension/authority-page-relay.js')), 'A MAIN-world authority relay must not exist');
 const companionBundle = fs.readFileSync(path.join(root, 'dist/companion-app.js'), 'utf8');
 const contentBundle = fs.readFileSync(path.join(root, 'dist/content-controller.js'), 'utf8');
 assert(!companionBundle.includes('src/extension/authority-client.js'), 'The MAIN bundle must not package the authority client');
+assert(!companionBundle.includes('src/squarecoil/bridge-service.js'), 'The MAIN bundle must not package the live Bridge service');
+assert(!companionBundle.includes('src/timer/service.js'), 'The MAIN bundle must not package the Timer writer');
 assert(contentBundle.includes('src/extension/authority-client.js'), 'The isolated content bundle must package the authority client');
+assert(contentBundle.includes('src/content/trusted-transition-core.js'), 'The isolated content bundle must package the trusted B2.2 coordinator');
+assert(contentBundle.includes('src/squarecoil/bridge-service.js'), 'The isolated content bundle must package the read-only Bridge service');
+assert(contentBundle.includes("const ACTION_7_BODY = 'action=7'"), 'The packaged Bridge must retain the exact read-only action-7 body');
+assert(!contentBundle.includes('createTimerCommandHandler'), 'The isolated content bundle must not package the Timer writer implementation');
+assert(!contentBundle.includes('createMigrationCommandHandler'), 'The isolated content bundle must not package migration execution');
+assert(!contentBundle.includes('.ajaxComplete'), 'B2.2 must not install a live MAIN-world AJAX mutation-completion hook');
+assert(!/action=(?:2|3|4)(?:\D|$)/.test(contentBundle), 'B2.2 packaged Bridge must not issue native SquareCoil mutation actions');
+assert(!/localStorage\.(?:setItem|removeItem|clear)\s*\(/.test(contentBundle), 'B2.2 legacy preflight must remain read-only');
 assert(!contentBundle.includes('squarecoil-companion-authority-v1'), 'The isolated content bundle must not expose the retired page authority channel');
+assert(companionBundle.includes('coordination-not-implemented-b1'), 'B2.2 must retain the intentionally non-positive lifecycle reason');
 
 const serializedManifest = JSON.stringify(manifest);
 assert(!serializedManifest.includes('raw.githubusercontent.com'), 'B1 manifest should not request raw GitHub host permission');
 assert(!serializedManifest.includes('i.imgur.com'), 'B1 manifest should not request image host permission');
 
-console.log(`B2.1 kernel validation passed for SquareCoil Companion v${manifest.version}`);
+console.log(`B2.2 trusted transition-core validation passed for SquareCoil Companion v${manifest.version}`);
 console.log(`Canonical build identity: ${BUILD_ID} (${BUILD_STAGE}).`);
 console.log('The worker owns one fenced authority kernel; only the isolated content controller owns its versioned client transport.');
-console.log(`Fixture register validated: ${unitFixtureMappings.length} B1 A2 mappings, ${requiredIntegrationFixtures.length} B1 A3 IDs, ${requiredBrowserFixtures.length} B1 A4 IDs, 2 B2.1 A4 IDs, ${b2FixtureIds.size} B2.1 stable IDs; no skipped/todo/focused fixtures.`);
+console.log(`Fixture register validated: ${unitFixtureMappings.length} B1 A2 mappings, ${requiredIntegrationFixtures.length} B1 A3 IDs, ${requiredBrowserFixtures.length} B1 A4 IDs, 2 B2.1 A4 IDs, 5 B2.2 A4 IDs, ${b2FixtureIds.size} B2 stable IDs including B2.2 Bridge/Timer families; no skipped/todo/focused fixtures.`);

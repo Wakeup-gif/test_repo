@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 jobs:
-  validate-b2-kernel:
+  validate-b2-transition:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -26,12 +26,12 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Build, test, and validate B2.1 kernel
+      - name: Build, test, and validate B2.2 transition core
         shell: bash
         run: |
           set -euo pipefail
           test -z "$(git status --porcelain --untracked-files=all)"
-          npm --prefix browser-extension/squarecoil-companion run check:b2-kernel
+          npm --prefix browser-extension/squarecoil-companion run check:b2-transition
 
       - name: Validate generated JavaScript syntax
         shell: bash
@@ -61,16 +61,16 @@ jobs:
           cp "$ROOT/popup/popup.css" "$PACKAGE_ROOT/popup/popup.css"
 
           node "$ROOT/scripts/validate-package.js" "$PACKAGE_ROOT" --expected-source-sha "$GITHUB_SHA" --evidence "$EVIDENCE_ROOT/package-root.json"
-          CANONICAL="$RUNNER_TEMP/SquareCoil-Companion-v${VERSION}-B2-KERNEL.zip"
+          CANONICAL="$RUNNER_TEMP/SquareCoil-Companion-v${VERSION}-B2-TRUSTED-CORE.zip"
           (cd "$PACKAGE_ROOT" && zip -X -r "$CANONICAL" . >/dev/null)
-          CHROME_OUT="$GITHUB_WORKSPACE/SquareCoil-Companion-v${VERSION}-B2-KERNEL-CHROME.zip"
-          EDGE_OUT="$GITHUB_WORKSPACE/SquareCoil-Companion-v${VERSION}-B2-KERNEL-EDGE.zip"
+          CHROME_OUT="$GITHUB_WORKSPACE/SquareCoil-Companion-v${VERSION}-B2-TRUSTED-CORE-CHROME.zip"
+          EDGE_OUT="$GITHUB_WORKSPACE/SquareCoil-Companion-v${VERSION}-B2-TRUSTED-CORE-EDGE.zip"
           cp "$CANONICAL" "$CHROME_OUT"
           cp "$CANONICAL" "$EDGE_OUT"
           cmp --silent "$CHROME_OUT" "$EDGE_OUT"
 
           for label in CHROME EDGE; do
-            archive="$GITHUB_WORKSPACE/SquareCoil-Companion-v${VERSION}-B2-KERNEL-${label}.zip"
+            archive="$GITHUB_WORKSPACE/SquareCoil-Companion-v${VERSION}-B2-TRUSTED-CORE-${label}.zip"
             extracted="$RUNNER_TEMP/squarecoil-${label,,}"
             rm -rf "$extracted"
             mkdir -p "$extracted"
@@ -85,26 +85,26 @@ jobs:
             printf '%s  %s\n' "$EDGE_SHA" "$(basename "$EDGE_OUT")"
           } | tee "$EVIDENCE_ROOT/archive-sha256.txt"
 
-      - name: Upload Chrome B2.1 kernel package
+      - name: Upload Chrome B2.2 trusted-core package
         uses: actions/upload-artifact@v4
         with:
-          name: squarecoil-companion-b2-kernel-chrome
-          path: SquareCoil-Companion-v*-B2-KERNEL-CHROME.zip
+          name: squarecoil-companion-b2-trusted-core-chrome
+          path: SquareCoil-Companion-v*-B2-TRUSTED-CORE-CHROME.zip
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload Edge B2.1 kernel package
+      - name: Upload Edge B2.2 trusted-core package
         uses: actions/upload-artifact@v4
         with:
-          name: squarecoil-companion-b2-kernel-edge
-          path: SquareCoil-Companion-v*-B2-KERNEL-EDGE.zip
+          name: squarecoil-companion-b2-trusted-core-edge
+          path: SquareCoil-Companion-v*-B2-TRUSTED-CORE-EDGE.zip
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload B2.1 kernel package evidence
+      - name: Upload B2.2 trusted-core package evidence
         uses: actions/upload-artifact@v4
         with:
-          name: squarecoil-companion-b2-kernel-package-evidence
+          name: squarecoil-companion-b2-trusted-core-package-evidence
           path: ${{ runner.temp }}/squarecoil-evidence/*
           if-no-files-found: error
           retention-days: 30

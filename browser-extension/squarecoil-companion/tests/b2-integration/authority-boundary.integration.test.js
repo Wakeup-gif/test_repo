@@ -208,7 +208,7 @@ test('IT-B2-PLATFORM-003 production authority transport is isolated from MAIN an
   assert.equal(fs.existsSync(path.join(root, 'src/extension/authority-page-relay.js')), false);
 });
 
-test('IT-B2-PLATFORM-011 isolated client exposes no command method or private session identity', async () => {
+test('IT-B2-PLATFORM-011 isolated client exposes only the scoped command method and no private session identity', async () => {
   const timers = new FakeTimers();
   const adapter = createBoundaryKernel();
   const context = workerContext({ tabId: 72, documentToken: 'document-command-boundary-001' });
@@ -223,7 +223,7 @@ test('IT-B2-PLATFORM-011 isolated client exposes no command method or private se
   });
 
   await client.ensure();
-  assert.equal(Object.hasOwn(client, 'command'), false);
+  assert.equal(typeof client.command, 'function');
   assert.equal(Object.hasOwn(client.snapshot(), 'sessionId'), false);
   assert.equal(adapter.calls.command, 0);
   await client.teardown();

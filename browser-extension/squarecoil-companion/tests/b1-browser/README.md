@@ -1,6 +1,6 @@
-# B1 lifecycle regression and B2.1 authority-kernel browser harness
+# B1 lifecycle regression and B2.2 trusted transition-core browser harness
 
-This harness loads one exact unpacked package into installed, branded Google Chrome and Microsoft Edge. It retains the settled B1 lifecycle gates and adds narrowly scoped B2.1 checks for the isolated authority kernel. It serves only synthetic fixture HTML in memory. No request reaches SquareCoil or customer data.
+This harness loads one exact unpacked package into installed, branded Google Chrome and Microsoft Edge. It retains the settled B1 lifecycle and B2.1 authority-kernel gates while adding narrowly scoped B2.2 trusted transition-core checks. It serves only synthetic fixture HTML in memory. No request reaches SquareCoil or customer data.
 
 ## Required package
 
@@ -19,8 +19,8 @@ The `--package` directory must contain exactly the eight allowlisted release fil
 
 `dist/build-info.json` must contain:
 
-- `buildId: "rebuild-b2-fenced-authoritative-kernel"`;
-- `stage: "B2.1"`;
+- `buildId: "rebuild-b2-trusted-transition-core"`;
+- `stage: "B2.2"`;
 - a lowercase 64-character `candidateFingerprint` embedded exactly in `dist/background.js`, `dist/companion-app.js`, and `dist/content-controller.js`;
 - a lowercase 40-character `sourceSha` exactly matching `--expected-source-sha`;
 - boolean `sourceDirty`, which must be `false` for acceptance.
@@ -72,9 +72,14 @@ Every message the harness sends directly from the content-script execution world
 - service-worker restart changes the authority worker identity, reconnects the isolated client, reuses the live page runtime, preserves `OWNER`, revision, and coordination epoch, and leaves the persisted authoritative document canonically equivalent by SHA-256;
 - real BFCache restoration produces `pageshow.persisted === true` and reuses the runtime;
 - clean disable/re-enable creates a fresh Runtime ID;
+- the exact read-only `action=7` transport starts one authoritative Timer while lifecycle remains intentionally `DEGRADED`;
+- OWNER and OBSERVER tabs share one redacted read model, with only OWNER performing Bridge verification;
+- a synthetic Job A to Job B change closes one ledger segment and commits one authoritative revision;
+- disable finalizes non-idle Timer state exactly once and issues no native SquareCoil mutation;
+- detected legacy storage blocks Bridge and Timer writes without exposing stored values;
 - a delayed stale content response cannot overwrite newer disabled state;
 - a safely injected cleanup failure remains sticky until explicit cleanup-only retry succeeds.
 
-Each browser result carries the canonical stable IDs it proves: `B1-LC-001` through `B1-LC-010` and `B1-LC-012` through `B1-LC-018`. `B1-LC-011` is intentionally an A2/A3-only persistence-concurrency fixture. The B2.1-only cases carry `B2-KERNEL-001` (multi-tab OWNER/OBSERVER) and `B2-KERNEL-002` (worker-restart reconnection), plus an explicit `ISOLATED_AUTHORITY_KERNEL_ONLY` scope marker.
+Each browser result carries the canonical stable IDs it proves: `B1-LC-001` through `B1-LC-010` and `B1-LC-012` through `B1-LC-018`. `B1-LC-011` is intentionally an A2/A3-only persistence-concurrency fixture. The B2.1 cases carry `B2-KERNEL-001` (multi-tab OWNER/OBSERVER) and `B2-KERNEL-002` (worker-restart reconnection). The B2.2 cases carry `B2-TRANSITION-001` through `B2-TRANSITION-005` for action 7 start, owner/observer synchronization, atomic job switch, exactly-once disable, and legacy fail-closed behavior.
 
-Passing these cases proves only the fenced B2.1 authority-kernel slice and the continuing B1 lifecycle regression gates. Full B2 A4 acceptance remains **PENDING**: SquareCoil Bridge behavior, timer/state mutation, migration execution, concurrent writes, restart recovery for active timing, and complete Chrome/Edge parity must still be proven before B2 can be called settled.
+Passing these cases proves the fenced B2.1 authority-kernel slice, the partial B2.2 trusted Bridge-to-Timer transition slice, and the continuing B1 lifecycle regression gates. Full B2 acceptance remains **PENDING**: migration execution, the intentionally excluded native action 2 completion hook, broader concurrent Timer writes, and later-stage behavior must still be implemented and proven before B2 can be called settled.

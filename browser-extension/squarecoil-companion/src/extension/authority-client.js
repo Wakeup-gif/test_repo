@@ -4,7 +4,8 @@ const {
   AUTHORITY_PROTOCOL_VERSION,
   AUTHORITY_MESSAGES,
   KERNEL_ONLY_DISPOSITION,
-  isConcreteId
+  isConcreteId,
+  isPlainObject
 } = require('./authority-protocol');
 
 const POSITIVE_DISPOSITIONS = new Set(['OWNER', 'OBSERVER_CONNECTED']);
@@ -51,10 +52,12 @@ function createAuthorityClient(options = {}) {
   let lastSequence = 0;
   let lastError = null;
   let healthy = false;
+  let lastPublishedCoordination = null;
   let disposed = false;
   let heartbeatTimer = null;
   let heartbeatPromise = null;
   let connectPromise = null;
+  const commandPromises = new Set();
   let teardownPromise = null;
   let teardownRequested = false;
   let connectOutcomeUncertain = false;
@@ -79,9 +82,19 @@ function createAuthorityClient(options = {}) {
 
   function publishHealth(nextHealthy, error = null) {
     const nextError = error ? String(error?.message || error) : null;
-    const changed = healthy !== nextHealthy || lastError !== nextError;
+    const nextCoordination = [
+      disposition,
+      coordinationEpoch,
+      coordinationRevision,
+      leaseExpiry,
+      revision,
+      workerInstanceId
+    ].join('|');
+    const changed = healthy !== nextHealthy || lastError !== nextError ||
+      lastPublishedCoordination !== nextCoordination;
     healthy = nextHealthy;
     lastError = nextError;
+    lastPublishedCoordination = nextCoordination;
     if (changed) {
       try { onHealthChange(snapshot()); } catch (_) {}
     }
@@ -304,6 +317,38 @@ function createAuthorityClient(options = {}) {
     return response.result;
   }
 
+  function command(commandEnvelope) {
+    if (!isPlainObject(commandEnvelope)) {
+      return Promise.reject(new Error('authority-command-invalid'));
+    }
+    if (
+      commandEnvelope.originRuntimeId !== undefined &&
+      commandEnvelope.originRuntimeId !== runtimeInstanceId
+    ) {
+      return Promise.reject(new Error('authority-command-origin-runtime-mismatch'));
+    }
+    if (disposed) return Promise.reject(new Error('authority-client-disposed'));
+    if (teardownRequested) return Promise.reject(new Error('authority-teardown-requested'));
+    const task = (async () => {
+      await ensure();
+      const response = requirePositive(await request(AUTHORITY_MESSAGES.COMMAND, {
+        sessionId,
+        command: {
+          ...commandEnvelope,
+          originRuntimeId: runtimeInstanceId
+        }
+      }), 'command');
+      acceptConnection(response);
+      return response.result;
+    })();
+    commandPromises.add(task);
+    task.then(
+      () => commandPromises.delete(task),
+      () => commandPromises.delete(task)
+    );
+    return task;
+  }
+
   function subscribe(listener) {
     if (typeof listener !== 'function') throw new Error('authority-update-listener-invalid');
     updateListeners.add(listener);
@@ -332,6 +377,9 @@ function createAuthorityClient(options = {}) {
       }
       if (heartbeatPromise) {
         try { await heartbeatPromise; } catch (_) {}
+      }
+      if (commandPromises.size) {
+        await Promise.allSettled([...commandPromises]);
       }
 
       // A transport failure can leave CONNECT committed remotely without a
@@ -374,6 +422,7 @@ function createAuthorityClient(options = {}) {
   return Object.freeze({
     ensure,
     read,
+    command,
     subscribe,
     heartbeat,
     teardown,

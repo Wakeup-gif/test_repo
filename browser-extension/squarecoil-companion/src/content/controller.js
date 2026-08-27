@@ -12,6 +12,7 @@ const {
   KERNEL_ONLY_DISPOSITION
 } = require('../extension/authority-protocol');
 const { createAuthorityClient } = require('../extension/authority-client');
+const { createTrustedTransitionCore } = require('./trusted-transition-core');
 
 const DEFAULTS = Object.freeze({ timerEnabled: true });
 const BOOT_MESSAGE = 'SC_COMPANION_BOOT';
@@ -30,6 +31,7 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
   let transportRetryTimer = null;
   let authorityClient = null;
   let authorityRuntimeInstanceId = null;
+  let trustedCore = null;
   let settingChangeQueue = Promise.resolve();
 
   function createDocumentToken() {
@@ -76,9 +78,25 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
     return authorityClient ? authorityClient.snapshot() : unavailableAuthoritySnapshot();
   }
 
+  function coreSnapshot() {
+    return trustedCore ? trustedCore.snapshot() : {
+      initialized: false,
+      disposed: false,
+      blocked: false,
+      status: 'unavailable',
+      authorityOwner: false,
+      revision: null,
+      recoveryMode: null,
+      preflight: null,
+      bridge: null,
+      timer: null,
+      readModelError: null
+    };
+  }
+
   // This handle exists only in Chrome's isolated content world. The website's
   // MAIN world cannot read or invoke it. It exposes health and a reconnect
-  // probe, never a command or session identifier.
+  // probe and bounded Timer actions, never a session or fencing identifier.
   Object.defineProperty(globalThis, AUTHORITY_HEALTH_KEY, {
     configurable: false,
     enumerable: false,
@@ -88,9 +106,22 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
       revalidate: async () => {
         if (!authorityClient) throw new Error('authority-client-unavailable');
         await authorityClient.heartbeat();
+        if (trustedCore) {
+          await trustedCore.handleAuthoritySnapshot(authorityClient.snapshot());
+          await trustedCore.verifyNow('isolated-health-revalidate');
+        }
         return authorityClient.snapshot();
       },
-      teardown: teardownAuthority
+      coreSnapshot,
+      syncBridge: async () => {
+        if (!trustedCore) throw new Error('trusted-transition-core-unavailable');
+        return trustedCore.verifyNow('isolated-health-sync');
+      },
+      timerAction: async type => {
+        if (!trustedCore) throw new Error('trusted-transition-core-unavailable');
+        return trustedCore.userCommand(type);
+      },
+      teardown: () => teardownAuthority({ controlled: true })
     })
   });
 
@@ -122,6 +153,18 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
     // Detailed authority identity and failures remain inside the isolated-world
     // health handle; the website receives no worker, lease, or error details.
     void error;
+  }
+
+  function renderCore(snapshot, error = null) {
+    const current = snapshot || coreSnapshot();
+    setDataset('squarecoilCompanionTrustedCore', current.blocked
+      ? 'blocked'
+      : current.initialized && !current.disposed
+        ? 'partial'
+        : 'unavailable');
+    setDataset('squarecoilCompanionTrustedCoreReason', error
+      ? String(error?.message || error)
+      : current.status || null);
   }
 
   function effectiveEnabled(result, fallback) {
@@ -210,6 +253,8 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
     ) {
       // A new generation, or a same-generation client already fenced for
       // teardown, must finish exact cleanup before authority is reacquired.
+      if (trustedCore) await trustedCore.teardown();
+      trustedCore = null;
       await authorityClient.teardown();
       authorityClient = null;
       authorityRuntimeInstanceId = null;
@@ -221,15 +266,49 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
         documentToken,
         send,
         runtimeOnMessage: chrome.runtime.onMessage,
-        onHealthChange: renderAuthority
+        onHealthChange: snapshot => {
+          renderAuthority(snapshot);
+          if (trustedCore) {
+            trustedCore.handleAuthoritySnapshot(snapshot)
+              .then(renderCore, error => renderCore(coreSnapshot(), error));
+          }
+        }
       });
     }
     const connected = await authorityClient.ensure();
+    if (!trustedCore) {
+      trustedCore = createTrustedTransitionCore({
+        authorityClient,
+        legacyStorage: {
+          getItem(key) { return window.localStorage.getItem(key); }
+        },
+        bridgeEnvironment: {
+          document,
+          window,
+          fetch: (...args) => fetch(...args),
+          timers: globalThis
+        },
+        onStatusChange: renderCore
+      });
+    }
+    await trustedCore.ensure(connected);
     renderAuthority(authorityClient.snapshot());
+    renderCore(trustedCore.snapshot());
     return connected;
   }
 
-  async function teardownAuthority() {
+  async function teardownAuthority(options = {}) {
+    let controlledError = null;
+    if (trustedCore) {
+      const core = trustedCore;
+      if (options.controlled === true) {
+        try { await core.prepareControlledTeardown(); }
+        catch (error) { controlledError = error; }
+      }
+      await core.teardown();
+      if (trustedCore === core) trustedCore = null;
+      renderCore(coreSnapshot());
+    }
     if (!authorityClient) {
       setDataset('squarecoilCompanionAuthorityCleanup', null);
       return { disconnected: true, absent: true };
@@ -243,11 +322,24 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
       }
       setDataset('squarecoilCompanionAuthorityCleanup', null);
       renderAuthority(unavailableAuthoritySnapshot());
-      return response;
+      if (controlledError) {
+        setDataset('squarecoilCompanionTrustedCoreReason', 'controlled-checkpoint-failed');
+      }
+      return {
+        ...response,
+        controlledCheckpointed: options.controlled === true ? !controlledError : undefined
+      };
     } catch (error) {
       setDataset('squarecoilCompanionAuthorityCleanup', 'incomplete');
       throw error;
     }
+  }
+
+  async function prepareDisableAndTeardownAuthority() {
+    if (trustedCore) {
+      await trustedCore.prepareDisable();
+    }
+    return teardownAuthority();
   }
 
   function onAuthorityControl(message, _sender, sendResponse) {
@@ -268,7 +360,7 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
       });
       return false;
     }
-    teardownAuthority().then(response => sendResponse({
+    prepareDisableAndTeardownAuthority().then(response => sendResponse({
       ok: true,
       disconnected: response?.disconnected === true,
       protocolVersion: AUTHORITY_PROTOCOL_VERSION,
@@ -355,7 +447,7 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
     queueSettingChange(async () => {
       if (epoch !== responseEpoch) return;
       if (!enabled) {
-        try { await teardownAuthority(); }
+        try { await prepareDisableAndTeardownAuthority(); }
         catch (error) {
           renderAuthority(authoritySnapshot(), error);
           bootRequested = true;
@@ -388,7 +480,7 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
   window.addEventListener('pagehide', event => {
     if (event.persisted === true) return;
     retirementObserver.disconnect();
-    teardownAuthority().catch(error => renderAuthority(authoritySnapshot(), error));
+    teardownAuthority({ controlled: true }).catch(error => renderAuthority(authoritySnapshot(), error));
   });
 
   scheduleBoot();

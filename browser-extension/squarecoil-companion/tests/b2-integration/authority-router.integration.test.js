@@ -9,6 +9,7 @@ const {
 const { createAuthorityRouter } = require('../../src/extension/authority-router');
 const { createChromeAuthorityAdapter } = require('../../src/persistence/chrome-storage');
 const { createAuthoritativeKernel } = require('../../src/data/store');
+const { TIMER_COMMANDS } = require('../../src/timer/service');
 
 function createIdFactory(namespace) {
   let sequence = 0;
@@ -152,16 +153,31 @@ test('IT-B2-PLATFORM-005 platform boundary routes OWNER and OBSERVER through one
   const initial = await router.route(observerContext, request(AUTHORITY_MESSAGES.READ, observerRuntime, { sessionId: observer.sessionId }));
   const privateCommand = await router.route(observerContext, request(AUTHORITY_MESSAGES.COMMAND, observerRuntime, {
     sessionId: observer.sessionId,
-    command: { commandId: 'command-private-00001', type: 'PAUSE', fencingToken: 99 }
+    command: {
+      commandId: 'command-private-00001',
+      type: TIMER_COMMANDS.LOCAL_PAUSE,
+      expectedRevision: 0,
+      fencingToken: 99
+    }
+  }));
+  const revisionlessCommand = await router.route(observerContext, request(AUTHORITY_MESSAGES.COMMAND, observerRuntime, {
+    sessionId: observer.sessionId,
+    command: { commandId: 'command-no-revision-001', type: TIMER_COMMANDS.LOCAL_PAUSE }
   }));
   const commanded = await router.route(observerContext, request(AUTHORITY_MESSAGES.COMMAND, observerRuntime, {
     sessionId: observer.sessionId,
-    command: { commandId: 'command-observer-0001', type: 'PAUSE', expectedRevision: 0 }
+    command: {
+      commandId: 'command-observer-0001',
+      type: TIMER_COMMANDS.LOCAL_PAUSE,
+      expectedRevision: 0
+    }
   }));
 
   assert.deepEqual(initial.result, { revision: 0, value: 'shared:0' });
   assert.equal(privateCommand.ok, false);
   assert.equal(privateCommand.reason, 'authority-private-command-field-rejected');
+  assert.equal(revisionlessCommand.ok, false);
+  assert.equal(revisionlessCommand.reason, 'authority-command-expected-revision-invalid');
   assert.equal(commanded.ok, true);
   assert.equal(commanded.result.committedBy, ownerRuntime);
   assert.equal(adapter.calls.command.length, 1);
@@ -430,7 +446,7 @@ test('IT-B2-PLATFORM-001 real authoritative kernel is compatible without leaking
     sessionId: observer.sessionId,
     command: {
       commandId: 'real-observer-command-01',
-      type: 'PAUSE',
+      type: TIMER_COMMANDS.LOCAL_PAUSE,
       expectedRevision: 0,
       reason: 'observer-routed'
     }

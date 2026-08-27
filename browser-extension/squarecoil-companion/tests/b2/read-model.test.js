@@ -157,3 +157,46 @@ test('UT-B2-READ-005 contradictory timer state is rejected before presentation',
     /timer-state-mutual-exclusivity/
   );
 });
+
+test('UT-B2-READ-006 redacted authority views remain readable without exposing writer fencing credentials', () => {
+  const atMs = 800_000;
+  const document = createEmptyDocument({ nowMs: atMs, workdayZone: 'UTC' });
+  const contextId = addContext(document, '707');
+  document.timer.active = {
+    contextId,
+    sessionId: 'session-redacted',
+    cycleId: 'cycle-redacted',
+    startedAtMs: 790_000,
+    lastVerifiedAtMs: 795_000,
+    source: 'fixture',
+    certainty: 'VERIFIED_SERVER',
+    accrualOwnerToken: 'private-fence',
+    startCause: 'new-context',
+    safetyHold: null,
+    provisionalSinceMs: null
+  };
+  document.revision = 1;
+  document.commitId = 'data:1:fixture';
+  document.commitFence = {
+    ownerRuntimeId: 'private-owner',
+    coordinationEpoch: 4,
+    fencingToken: 9
+  };
+  const publicView = structuredClone(document);
+  delete publicView.commitFence;
+  delete publicView.commandReceipts;
+  delete publicView.commandReceiptOrder;
+  delete publicView.timer.active.accrualOwnerToken;
+  publicView.timer.active.accrualOwnershipBound = true;
+  publicView.authorityView = { schemaVersion: 1, redacted: true };
+
+  const value = createTimerReadModel(() => publicView, { now: () => atMs }).snapshot();
+  assert.equal(value.timerState, 'ACTIVE');
+  assert.equal(value.running.elapsedMs, 10_000);
+  assert.equal(JSON.stringify(value).includes('private-fence'), false);
+  publicView.timer.active.accrualOwnershipBound = false;
+  assert.throws(
+    () => createTimerReadModel(() => publicView, { now: () => atMs }).snapshot(),
+    /active-ownership-unproven/
+  );
+});

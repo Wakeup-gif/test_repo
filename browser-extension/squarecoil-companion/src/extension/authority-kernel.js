@@ -3,7 +3,7 @@
 const { createChromeAuthorityAdapter } = require('../persistence/chrome-storage');
 const { createAuthoritativeKernel } = require('../data/store');
 const { selectWorkdayZone } = require('../data/workday-zone');
-const { createMigrationCommandHandler } = require('../data/migration-command');
+const { createAuthorityCommandDispatcher } = require('../data/command-dispatcher');
 
 const AUTHORITY_STORAGE_KEY = 'squarecoilCompanionB2AuthorityV1';
 const AUTHORITY_LOCK_NAME = 'squarecoil-companion:b2-authority-v1';
@@ -35,7 +35,15 @@ function createDefaultAuthorityKernel(options = {}) {
     receiptLimit: options.receiptLimit,
     workdayZone: workdayZone.zone,
     workdayZoneDisposition: workdayZone,
-    applyCommand: createMigrationCommandHandler({ now })
+    applyCommand: createAuthorityCommandDispatcher({
+      now,
+      makeId: options.makeId,
+      verificationGraceMs: options.verificationGraceMs,
+      clockSkewMs: options.clockSkewMs,
+      buildVersion: options.buildVersion,
+      migrationHandler: options.migrationHandler,
+      timerHandler: options.timerHandler
+    })
   });
 }
 

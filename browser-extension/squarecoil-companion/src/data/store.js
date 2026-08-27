@@ -29,6 +29,9 @@ const INTERNAL_RESULT_KEYS = new Set([
   'ownerRuntimeId',
   'ownerDocumentToken',
   'ownerTabId',
+  'owner',
+  'writer',
+  'accrualOwnerToken',
   'commandReceipts',
   'commandReceiptOrder'
 ]);
@@ -204,6 +207,16 @@ function publicDocument(document) {
   delete copy.commandReceipts;
   delete copy.commandReceiptOrder;
   delete copy.commitFence;
+  copy.authorityView = { schemaVersion: 1, redacted: true };
+  if (copy.timer?.active?.accrualOwnerToken) {
+    delete copy.timer.active.accrualOwnerToken;
+    copy.timer.active.accrualOwnershipBound = true;
+  }
+  if (copy.checkpoint?.ownershipEvidence) {
+    const disposition = copy.checkpoint.ownershipEvidence.disposition;
+    const ownershipBound = ['OWNER', 'OBSERVER_CONNECTED'].includes(disposition);
+    copy.checkpoint.ownershipEvidence = { disposition, ownershipBound };
+  }
   return deepFreeze(copy);
 }
 
@@ -582,14 +595,30 @@ function createAuthoritativeKernel(options = {}) {
           commandReceipts: document.commandReceipts,
           commandReceiptOrder: document.commandReceiptOrder
         });
+        const writerPrincipal = ownerPrincipal(coordination);
+        if (!writerPrincipal) throw new Error('coordination-owner-unavailable');
+        const requester = Object.freeze({
+          runtimeId: session.runtimeId,
+          documentToken: session.documentToken,
+          tabId: session.tabId
+        });
+        const owner = Object.freeze({
+          runtimeId: writerPrincipal.runtimeId,
+          documentToken: writerPrincipal.documentToken,
+          tabId: writerPrincipal.tabId
+        });
+        const writer = Object.freeze({
+          ...owner,
+          coordinationEpoch: coordination.coordinationEpoch,
+          fencingToken: coordination.fencingToken
+        });
         const commandResult = await applyCommand(document, command, Object.freeze({
-          requester: Object.freeze({
-            runtimeId: session.runtimeId,
-            documentToken: session.documentToken,
-            tabId: session.tabId
-          }),
+          requester,
           requesterDisposition: expectedDisposition,
-          coordinationEpoch: coordination.coordinationEpoch
+          owner,
+          writer,
+          coordinationEpoch: coordination.coordinationEpoch,
+          fencingToken: coordination.fencingToken
         }));
         if (protectedMetadata !== stableStringify({
           revision: document.revision,

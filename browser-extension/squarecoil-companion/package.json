@@ -14,6 +14,7 @@
     "test": "npm run build && npm run test:unit && npm run test:integration",
     "validate": "node scripts/validate.js",
     "check:b1": "npm run build && npm run test:b1:unit && npm run test:b1:integration && npm run validate",
-    "check:b2-kernel": "npm test && npm run validate"
+    "check:b2-kernel": "npm test && npm run validate",
+    "check:b2-transition": "npm test && npm run validate"
   }
 }

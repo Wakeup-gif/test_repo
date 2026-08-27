@@ -6,6 +6,10 @@ const {
   isConcreteId,
   validateAuthorityRequest
 } = require('./authority-protocol');
+const {
+  isPublicTimerCommandType,
+  isOwnerOnlyTimerCommandType
+} = require('../data/command-dispatcher');
 
 const POSITIVE_DISPOSITIONS = new Set(['OWNER', 'OBSERVER_CONNECTED']);
 const REQUIRED_ADAPTER_METHODS = Object.freeze([
@@ -20,6 +24,13 @@ const REQUIRED_ADAPTER_METHODS = Object.freeze([
 const PRIVATE_AUTHORITY_KEYS = new Set([
   'fencingToken',
   'ownerRuntimeId',
+  'ownerDocumentToken',
+  'ownerTabId',
+  'owner',
+  'writer',
+  'requester',
+  'requesterDisposition',
+  'accrualOwnerToken',
   'commitFence',
   'commandReceipts',
   'commandReceiptOrder'
@@ -306,8 +317,27 @@ function createAuthorityRouter(options = {}) {
     if (hasPrivateAuthorityKey(message.command)) {
       return fail(message, 'authority-private-command-field-rejected');
     }
+    if (!isPublicTimerCommandType(message.command.type)) {
+      return fail(message, 'authority-command-not-public');
+    }
+    if (
+      message.command.originRuntimeId !== undefined &&
+      message.command.originRuntimeId !== session.identity.runtimeInstanceId
+    ) {
+      return fail(message, 'authority-command-origin-runtime-mismatch');
+    }
+    if (isOwnerOnlyTimerCommandType(message.command.type) && session.disposition !== 'OWNER') {
+      return fail(message, 'authority-command-owner-required');
+    }
+    const authenticatedCommand = {
+      ...message.command,
+      originRuntimeId: session.identity.runtimeInstanceId
+    };
     try {
-      const result = await adapter.command(session.adapterSession, message.command);
+      const result = await adapter.command(session.adapterSession, authenticatedCommand);
+      if (Number.isSafeInteger(result?.revision) && result.revision >= 0) {
+        session.connection = { ...session.connection, revision: result.revision };
+      }
       return response(message, publicConnection(session, { result: publicAuthorityValue(result) }));
     } catch (error) {
       return fail(message, 'authority-command-failed', { detail: errorMessage(error), retryable: false });

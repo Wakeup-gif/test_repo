@@ -6,8 +6,8 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const zlib = require('node:zlib');
 
-const CANONICAL_BUILD_ID = 'rebuild-b2-fenced-authoritative-kernel';
-const CANONICAL_STAGE = 'B2.1';
+const CANONICAL_BUILD_ID = 'rebuild-b2-trusted-transition-core';
+const CANONICAL_STAGE = 'B2.2';
 const FIXTURE_ORIGIN = 'https://ussignandmill.squarecoil.net';
 const FIXTURE_PATH = '/__b1_fixture__/a4.html';
 const FRAME_PATH = '/__b1_fixture__/frame.html';
@@ -41,6 +41,13 @@ const REQUIRED_A4_STABLE_FIXTURE_IDS = Object.freeze([
 const REQUIRED_B2_1_A4_FIXTURE_IDS = Object.freeze([
   'B2-KERNEL-001',
   'B2-KERNEL-002'
+]);
+const REQUIRED_B2_2_A4_FIXTURE_IDS = Object.freeze([
+  'B2-TRANSITION-001',
+  'B2-TRANSITION-002',
+  'B2-TRANSITION-003',
+  'B2-TRANSITION-004',
+  'B2-TRANSITION-005'
 ]);
 const REQUIRED_PACKAGE_FILES = Object.freeze([
   'dist/background.js',
@@ -484,8 +491,8 @@ function assertExpectedB1Shell(state, label, candidateIdentity) {
   assert(state.runtimeDocumentToken === state.documentToken, `${label}: runtime/document identity differs`, state);
   assert(state.roots[0].documentToken === state.documentToken, `${label}: root/document identity differs`, state);
   const health = state.health;
-  assert(health?.state === 'DEGRADED', `${label}: B2.1 lifecycle must remain DEGRADED until Bridge and Timer wiring exists`, health);
-  assert(health?.state !== 'READY', `${label}: B2.1 kernel-only shell falsely reported READY`, health);
+  assert(health?.state === 'DEGRADED', `${label}: B2.2 lifecycle must remain DEGRADED until live Bridge wiring and migration closure exist`, health);
+  assert(health?.state !== 'READY', `${label}: B2.2 partial transition core falsely reported READY`, health);
   assert(health?.reason === EXPECTED_DEGRADED_REASON, `${label}: unexpected degraded reason`, health);
   assert(health?.buildId === candidateIdentity.buildId, `${label}: health build identity differs`, health);
   assert(health?.packageVersion === candidateIdentity.packageVersion, `${label}: health package identity differs`, health);
@@ -669,6 +676,45 @@ class ContentBridge {
     })()`);
   }
 
+  async removeStorage(keys) {
+    const serialized = JSON.stringify(keys);
+    return this.run(() => `chrome.storage.local.remove(${serialized})`);
+  }
+
+  async coreSnapshot() {
+    return this.run(() => `(() => {
+      const health = globalThis.__squareCoilCompanionAuthorityHealth;
+      if (!health || typeof health.coreSnapshot !== 'function') return null;
+      return health.coreSnapshot();
+    })()`);
+  }
+
+  async syncBridge() {
+    return this.run(() => `globalThis.__squareCoilCompanionAuthorityHealth.syncBridge()`);
+  }
+
+  async timerAction(type) {
+    const serialized = JSON.stringify(type);
+    return this.run(() => `globalThis.__squareCoilCompanionAuthorityHealth.timerAction(${serialized})`);
+  }
+
+  async setLegacyValue(key, value) {
+    const serializedKey = JSON.stringify(key);
+    const serializedValue = JSON.stringify(value);
+    return this.run(() => `(() => {
+      localStorage.setItem(${serializedKey}, ${serializedValue});
+      return localStorage.getItem(${serializedKey});
+    })()`);
+  }
+
+  async removeLegacyValue(key) {
+    const serializedKey = JSON.stringify(key);
+    return this.run(() => `(() => {
+      localStorage.removeItem(${serializedKey});
+      return localStorage.getItem(${serializedKey});
+    })()`);
+  }
+
   async authorityTeardown() {
     return this.run(() => `(async () => {
       const health = globalThis.__squareCoilCompanionAuthorityHealth;
@@ -743,26 +789,47 @@ async function createScriptTracker(context, page, extensionId) {
   };
 }
 
-function fixtureHtml() {
-  return '<!doctype html><html><head><meta charset="utf-8"><title>SquareCoil B1 A4 Synthetic Fixture</title><link rel="icon" href="data:,"></head><body><main><h1>A4 synthetic lifecycle fixture</h1><p>No customer data is loaded.</p><iframe id="a4-frame" src="' + FRAME_PATH + '"></iframe></main></body></html>';
+function clockContextHtml(clockContext) {
+  const id = String(clockContext.projectId);
+  const label = String(clockContext.label);
+  return `<a href="/project.php?id=${id}">${label}</a>`;
+}
+
+function action7Html(clockContext) {
+  return `<span id="clockin-remaining-time">${clockContextHtml(clockContext)}</span>`;
+}
+
+function fixtureHtml(clockContext) {
+  const context = clockContextHtml(clockContext);
+  return '<!doctype html><html><head><meta charset="utf-8"><title>SquareCoil B2.2 A4 Synthetic Fixture</title><link rel="icon" href="data:,"></head><body><main><h1>A4 synthetic lifecycle fixture</h1><p>No customer data is loaded.</p><section class="timeclock-container"><button id="clockin" hidden>Clock in</button><button id="clockout">Clock out</button><span id="clockin-debug"></span><span id="clockin-remaining-time">' + context + '</span><div class="clock-actions"></div></section><iframe id="a4-frame" src="' + FRAME_PATH + '"></iframe></main></body></html>';
 }
 
 function frameHtml() {
   return '<!doctype html><html><head><meta charset="utf-8"><title>A4 child frame</title><link rel="icon" href="data:,"></head><body><p>Synthetic child frame</p></body></html>';
 }
 
-async function installSyntheticRouting(context, networkEvidence) {
+async function installSyntheticRouting(context, networkEvidence, transitionFixture) {
   await context.route('**/*', async route => {
     const request = route.request();
     const url = new URL(request.url());
     if (url.protocol === 'chrome-extension:') return route.continue();
     if (url.origin === FIXTURE_ORIGIN && url.pathname === FIXTURE_PATH) {
       networkEvidence.fulfilled.push(url.href);
-      return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: fixtureHtml() });
+      return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: fixtureHtml(transitionFixture.clockContext) });
     }
     if (url.origin === FIXTURE_ORIGIN && url.pathname === FRAME_PATH) {
       networkEvidence.fulfilled.push(url.href);
       return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: frameHtml() });
+    }
+    if (url.origin === FIXTURE_ORIGIN && url.pathname === '/ajax_time_clock.php') {
+      const body = request.postData() || '';
+      const record = { url: url.href, method: request.method(), body };
+      if (request.method() === 'POST' && body === 'action=7') {
+        networkEvidence.action7.push(record);
+        return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: action7Html(transitionFixture.clockContext) });
+      }
+      networkEvidence.nativeMutationAttempts.push(record);
+      return route.abort('blockedbyclient');
     }
     if (url.protocol === 'http:' || url.protocol === 'https:') {
       networkEvidence.blockedUnexpected.push({ url: url.href, resourceType: request.resourceType() });
@@ -829,6 +896,34 @@ function runB2KernelBrowserCase(cases, family, b2KernelFixtureIds, stableFixture
   );
 }
 
+function runB2TransitionBrowserCase(cases, family, fixtureIds, slug, name, task) {
+  for (const fixtureId of fixtureIds) {
+    if (!REQUIRED_B2_2_A4_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown B2.2 A4 fixture ID: ${fixtureId}`);
+  }
+  const browserCode = family === 'chrome' ? 'CH' : 'ED';
+  const fixtureCode = fixtureIds.map(value => value.replace('B2-TRANSITION-', '')).join('-');
+  return runCase(cases, `A4-B2.2-${browserCode}-${fixtureCode}-${slug}`, name, task, {
+    b2TransitionFixtureIds: fixtureIds,
+    b2Scope: 'TRUSTED_TRANSITION_CORE_PARTIAL'
+  });
+}
+
+function runB2TransitionLifecycleBrowserCase(cases, family, fixtureIds, stableFixtureIds, slug, name, task) {
+  for (const fixtureId of fixtureIds) {
+    if (!REQUIRED_B2_2_A4_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown B2.2 A4 fixture ID: ${fixtureId}`);
+  }
+  for (const fixtureId of stableFixtureIds) {
+    if (!REQUIRED_A4_STABLE_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown B1 A4 stable fixture ID: ${fixtureId}`);
+  }
+  const browserCode = family === 'chrome' ? 'CH' : 'ED';
+  const fixtureCode = fixtureIds.map(value => value.replace('B2-TRANSITION-', '')).join('-');
+  return runCase(cases, `A4-B2.2-${browserCode}-${fixtureCode}-${slug}`, name, task, {
+    stableFixtureIds,
+    b2TransitionFixtureIds: fixtureIds,
+    b2Scope: 'TRUSTED_TRANSITION_CORE_PARTIAL'
+  });
+}
+
 function serviceWorkerTarget(targets, extensionId) {
   return targets.targetInfos.find(target => target.type === 'service_worker' && target.url === `chrome-extension://${extensionId}/dist/background.js`) || null;
 }
@@ -847,7 +942,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
     browserIdentity: null,
     extension: null,
     candidateIdentity,
-    network: { fulfilled: [], blockedUnexpected: [] },
+    network: { fulfilled: [], action7: [], nativeMutationAttempts: [], blockedUnexpected: [] },
     console: { errors: [], pageErrors: [] },
     stableFixtureCoverage: null,
     b2KernelFixtureCoverage: null,
@@ -954,7 +1049,10 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
     } finally {
       await setupPage.close().catch(() => {});
     }
-    await installSyntheticRouting(context, result.network);
+    const transitionFixture = {
+      clockContext: { projectId: '260701', label: '260701 - Design' }
+    };
+    await installSyntheticRouting(context, result.network, transitionFixture);
 
     const existingPages = context.pages();
     const page = existingPages[0] || await context.newPage();
@@ -1178,6 +1276,22 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
       return { candidateIdentity, mismatches: mismatchEvidence, companionBundleParses: tracker.companionCount() };
     });
 
+    // The ownership-classification probes above intentionally create and tear
+    // down short-lived runtimes. Reset their synthetic authority record and
+    // worker before the canonical B1/B2 behavioral sequence so timing in those
+    // probes cannot manufacture remembered Timer history.
+    await bridge.removeStorage([AUTHORITY_STORAGE_KEY]);
+    const setupWorker = serviceWorkerTarget(await browserCdp.send('Target.getTargets'), extensionId);
+    if (setupWorker) {
+      const closed = await browserCdp.send('Target.closeTarget', { targetId: setupWorker.targetId });
+      assert(closed.success === true, 'Harness could not retire the synthetic setup worker', closed);
+      await waitFor(
+        async () => !serviceWorkerTarget(await browserCdp.send('Target.getTargets'), extensionId),
+        'synthetic setup worker retirement',
+        options.timeoutMs
+      );
+    }
+
     let activeRuntimeId = null;
     const primaryBootParseBaseline = tracker.companionCount();
     await runBrowserCase(result.cases, family, ['B1-LC-001', 'B1-LC-002', 'B1-LC-015'], 'BOOT', 'Concurrent boot creates one runtime and one root without false READY', async () => {
@@ -1209,6 +1323,44 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
         lifecycle: repeated.health
       };
     });
+
+    await runB2TransitionBrowserCase(
+      result.cases,
+      family,
+      ['B2-TRANSITION-001'],
+      'ACTION7-START',
+      'Exact action 7 evidence derives authoritative Timer state without claiming READY',
+      async () => {
+        let core = await waitFor(async () => {
+          const snapshot = await bridge.coreSnapshot();
+          return ['ACTIVE', 'PENDING'].includes(snapshot?.timer?.timerState) &&
+            snapshot.timer.currentContextId === 'job:260701' &&
+            snapshot.bridge?.verificationInFlight === false
+            ? snapshot
+            : null;
+        }, 'initial Bridge to Timer transition', options.timeoutMs);
+        const derivedState = core.timer.timerState;
+        if (derivedState === 'PENDING') {
+          await bridge.timerAction('TIMER_START_FRESH');
+          core = await waitFor(async () => {
+            const snapshot = await bridge.coreSnapshot();
+            return snapshot?.timer?.timerState === 'ACTIVE' && snapshot.timer.currentContextId === 'job:260701'
+              ? snapshot
+              : null;
+          }, 'explicit fresh start from remembered Context', options.timeoutMs);
+        }
+        const shell = await pageState(page);
+        assert(core.authorityOwner === true, 'Initial trusted transition core did not hold OWNER authority', core);
+        assert(core.readModelError === null, 'Initial Timer read model failed', core);
+        assert(Number.isSafeInteger(core.ledgerSegmentCount) && core.ledgerSegmentCount >= 0, 'Timer ledger diagnostics were unavailable', core);
+        assert(core.bridge.capability === 'FULL_NO_NATIVE_COMPLETION_HOOK', 'Packaged Bridge reported an unexpected capability', core.bridge);
+        assert(core.bridge.requestCount >= 1 && core.bridge.nativeMutationRequestCount === 0, 'Packaged Bridge transport was not read-only action 7', core.bridge);
+        assert(shell.health?.state === 'DEGRADED' && shell.health?.reason === EXPECTED_DEGRADED_REASON, 'B2.2 transition falsely promoted lifecycle readiness', shell);
+        assert(result.network.action7.length >= 1, 'Synthetic action 7 endpoint was not called', result.network);
+        assert(result.network.nativeMutationAttempts.length === 0, 'A native SquareCoil mutation was attempted', result.network.nativeMutationAttempts);
+        return { derivedState, core, lifecycle: shell.health, action7Requests: result.network.action7.length };
+      }
+    );
 
     await runB2KernelBrowserCase(
       result.cases,
@@ -1299,6 +1451,71 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
         assert(fixturePages.length === 1 && fixturePages[0] === page, 'Observer fixture page was not cleaned up', fixturePages.map(candidate => candidate.url()));
         assertHealthyB2KernelAuthority(afterCleanup, 'primary authority after observer cleanup', await pageState(page));
         return { ...evidence, afterCleanup, remainingFixturePages: fixturePages.length };
+      }
+    );
+
+    await runB2TransitionBrowserCase(
+      result.cases,
+      family,
+      ['B2-TRANSITION-002', 'B2-TRANSITION-003'],
+      'OWNER-OBSERVER-SWITCH',
+      'OWNER and OBSERVER synchronize one atomic Job A to Job B transition',
+      async () => {
+        const observerPage = await context.newPage();
+        let observerBridge = null;
+        try {
+          await observerPage.goto(`${FIXTURE_ORIGIN}${FIXTURE_PATH}`, { waitUntil: 'domcontentloaded', timeout: options.timeoutMs });
+          await waitFor(async () => (await pageState(observerPage)).documentToken, 'B2.2 observer document identity', options.timeoutMs);
+          observerBridge = new ContentBridge(context, observerPage, extensionId, options.timeoutMs, candidateIdentity);
+          await observerBridge.initialize();
+          const before = await waitFor(async () => {
+            const ownerCore = await bridge.coreSnapshot();
+            const observerCore = await observerBridge.coreSnapshot();
+            return ownerCore?.authorityOwner === true && observerCore?.authorityOwner === false &&
+              ownerCore.bridge?.initialized === true && observerCore.bridge?.initialized === true &&
+              ownerCore.revision === observerCore.revision && ownerCore.timer?.currentContextId === 'job:260701' &&
+              observerCore.timer?.currentContextId === 'job:260701'
+              ? { ownerCore, observerCore }
+              : null;
+          }, 'synchronized B2.2 OWNER and OBSERVER read models', options.timeoutMs);
+          assert(before.observerCore.bridge.requestCount === 0, 'OBSERVER issued a server verification request', before.observerCore.bridge);
+
+          await page.waitForTimeout(25);
+          transitionFixture.clockContext = { projectId: '260702', label: '260702 - Fabrication' };
+          await page.evaluate(contextValue => {
+            for (const selector of ['#clockin-remaining-time', '#clockin-debug']) {
+              const element = document.querySelector(selector);
+              if (!element) continue;
+              element.innerHTML = selector === '#clockin-remaining-time'
+                ? `<a href="/project.php?id=${contextValue.projectId}">${contextValue.label}</a>`
+                : '';
+            }
+          }, transitionFixture.clockContext);
+          await bridge.syncBridge();
+          const after = await waitFor(async () => {
+            const ownerCore = await bridge.coreSnapshot();
+            const observerCore = await observerBridge.coreSnapshot();
+            return ownerCore?.timer?.currentContextId === 'job:260702' &&
+              observerCore?.timer?.currentContextId === 'job:260702' &&
+              ownerCore.bridge?.initialized === true && observerCore.bridge?.initialized === true &&
+              ownerCore.revision === observerCore.revision &&
+              ownerCore.ledgerSegmentCount === 1 && observerCore.ledgerSegmentCount === 1
+              ? { ownerCore, observerCore }
+              : null;
+          }, 'atomic Job A to Job B propagation', options.timeoutMs);
+          assert(after.ownerCore.revision === before.ownerCore.revision + 1, 'Job switch did not commit as one authoritative revision', { before, after });
+          assert(after.ownerCore.timer.todayTotalMs > 0, 'Closed Job A interval was not reflected in today total', after.ownerCore.timer);
+          assert(after.ownerCore.timer.currentContextTotalMs >= 0, 'Job B total was unavailable', after.ownerCore.timer);
+          assert(after.observerCore.bridge.requestCount === 0, 'OBSERVER became a duplicate Bridge writer during the switch', after.observerCore.bridge);
+          assert(result.network.nativeMutationAttempts.length === 0, 'Job switch attempted a native SquareCoil mutation', result.network.nativeMutationAttempts);
+          return { before, after, action7Requests: result.network.action7.length };
+        } finally {
+          if (observerBridge) {
+            await observerBridge.authorityTeardown().catch(() => {});
+            await observerBridge.detach();
+          }
+          await observerPage.close().catch(() => {});
+        }
       }
     );
 
@@ -1401,7 +1618,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
       );
       const response = await bridge.send({ type: MESSAGES.REVALIDATE });
       const after = await waitFor(async () => serviceWorkerTarget(await browserCdp.send('Target.getTargets'), extensionId), 'service-worker restart', options.timeoutMs);
-      const authorityAfter = await waitFor(async () => {
+      let authorityAfter = await waitFor(async () => {
         const snapshot = await bridge.authoritySnapshot();
         return snapshot?.healthy === true &&
           ['OWNER', 'OBSERVER_CONNECTED'].includes(snapshot.disposition) &&
@@ -1419,18 +1636,27 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
       assert(response?.classification === 'DEGRADED_SAME_BUILD', 'Restarted worker returned an unexpected classification', response);
       assert(authorityAfter.workerInstanceId !== authorityBefore.workerInstanceId, 'Isolated authority retained the terminated worker identity', { authorityBefore, authorityAfter });
       assert(authorityBefore.disposition === 'OWNER' && authorityAfter.disposition === 'OWNER', 'Worker restart did not preserve OWNER disposition', { authorityBefore, authorityAfter });
-      assert(authorityAfter.revision === authorityBefore.revision, 'Worker restart changed the authoritative document revision', { authorityBefore, authorityAfter });
       assert(authorityAfter.coordinationEpoch === authorityBefore.coordinationEpoch, 'Worker restart changed the live ownership epoch', { authorityBefore, authorityAfter });
-      const persistedAfterResult = await bridge.getStorage([AUTHORITY_STORAGE_KEY]);
-      const persistedAfter = persistedAfterResult?.[AUTHORITY_STORAGE_KEY];
+      const synchronizedAfter = await waitFor(async () => {
+        const authority = await bridge.authoritySnapshot();
+        const persisted = (await bridge.getStorage([AUTHORITY_STORAGE_KEY]))?.[AUTHORITY_STORAGE_KEY];
+        return authority?.healthy === true && persisted?.document?.revision === authority.revision
+          ? { authority, persisted }
+          : null;
+      }, 'post-restart authority and persistence revision convergence', options.timeoutMs);
+      authorityAfter = synchronizedAfter.authority;
+      const persistedAfter = synchronizedAfter.persisted;
       assert(persistedAfter && typeof persistedAfter === 'object', 'Persisted authority envelope was unavailable after service-worker restart', { recordPresent: Boolean(persistedAfter) });
       assert(persistedAfter.document && typeof persistedAfter.document === 'object', 'Persisted authoritative document was unavailable after service-worker restart', { documentPresent: Boolean(persistedAfter?.document) });
       assert(persistedAfter.document.revision === authorityAfter.revision, 'Persisted and isolated authority revisions differed after restart', { authorityAfter, persistedAfterRevision: persistedAfter.document.revision });
       const persistedDocumentAfterSha256 = jsonSha256(persistedAfter.document);
-      assert(persistedDocumentAfterSha256 === persistedDocumentBeforeSha256, 'Worker restart changed the packaged persisted authoritative document', {
-        persistedDocumentBeforeSha256,
-        persistedDocumentAfterSha256
-      });
+      assert(authorityAfter.revision >= authorityBefore.revision, 'Worker restart regressed the authoritative document revision', { authorityBefore, authorityAfter });
+      if (authorityAfter.revision === authorityBefore.revision) {
+        assert(persistedDocumentAfterSha256 === persistedDocumentBeforeSha256, 'Stable-revision worker restart changed the persisted authoritative document', {
+          persistedDocumentBeforeSha256,
+          persistedDocumentAfterSha256
+        });
+      }
       assert(tracker.companionCount() === primaryBootParseBaseline + 1, 'Worker restart reinjected the companion bundle', tracker.snapshot());
       return {
         beforeTargetId: before.targetId,
@@ -1483,14 +1709,25 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
       return result;
     }
 
-    await runBrowserCase(result.cases, family, ['B1-LC-006'], 'CLEAN-TOGGLE', 'Clean disable and re-enable creates a fresh runtime generation', async () => {
+    await runB2TransitionLifecycleBrowserCase(result.cases, family, ['B2-TRANSITION-004'], ['B1-LC-006'], 'CLEAN-TOGGLE', 'Clean disable finalizes Timer once and re-enable creates a fresh runtime generation', async () => {
       assert(activeRuntimeId, 'Initial runtime was unavailable because the prerequisite case failed');
+      const coreBeforeDisable = await bridge.coreSnapshot();
+      assert(coreBeforeDisable?.timer && coreBeforeDisable.timer.timerState !== 'IDLE', 'Clean toggle had no Timer state to finalize', coreBeforeDisable);
       const disabledResponse = await bridge.setEnabled(false);
       const disabled = await waitFor(async () => {
         const state = await pageState(page);
         return !state.runtimeGlobalPresent && state.rootCount === 0 ? state : null;
       }, 'clean disable teardown', options.timeoutMs);
       assert(disabled.claimPresent === false && disabled.bootstrapPresent === false, 'Clean disable retained injection markers', disabled);
+      const persistedAfterDisable = (await bridge.getStorage([AUTHORITY_STORAGE_KEY]))?.[AUTHORITY_STORAGE_KEY]?.document;
+      assert(persistedAfterDisable?.timer && persistedAfterDisable.timer.active === null && persistedAfterDisable.timer.pending === null && persistedAfterDisable.timer.localPause === null, 'Clean disable did not finalize Timer state to IDLE', persistedAfterDisable?.timer);
+      const repeatedDisableResponse = await bridge.setEnabled(false);
+      const persistedAfterRepeatedDisable = (await bridge.getStorage([AUTHORITY_STORAGE_KEY]))?.[AUTHORITY_STORAGE_KEY]?.document;
+      assert(persistedAfterRepeatedDisable?.revision === persistedAfterDisable.revision, 'Repeated disable committed a second Timer transition', {
+        firstRevision: persistedAfterDisable?.revision,
+        repeatedRevision: persistedAfterRepeatedDisable?.revision
+      });
+      assert(result.network.nativeMutationAttempts.length === 0, 'Disable attempted a native SquareCoil mutation', result.network.nativeMutationAttempts);
       const enabledResponse = await bridge.setEnabled(true);
       const fresh = await waitFor(async () => {
         const state = await pageState(page);
@@ -1503,6 +1740,9 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
       activeRuntimeId = fresh.runtimeInstanceId;
       return {
         disabledResponse,
+        repeatedDisableResponse,
+        timerBeforeDisable: coreBeforeDisable.timer,
+        authoritativeRevisionAfterDisable: persistedAfterDisable.revision,
         enabledResponse,
         priorRuntimeInstanceId: priorRuntimeId,
         freshRuntimeInstanceId: activeRuntimeId,
@@ -1622,6 +1862,51 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
       };
     });
 
+    await runB2TransitionBrowserCase(
+      result.cases,
+      family,
+      ['B2-TRANSITION-005'],
+      'LEGACY-PREFLIGHT',
+      'Legacy presence blocks Bridge and Timer writes without exposing stored values',
+      async () => {
+        await bridge.setEnabled(false);
+        await waitFor(async () => {
+          const state = await pageState(page);
+          return !state.runtimeGlobalPresent && state.rootCount === 0 ? state : null;
+        }, 'legacy preflight setup disable', options.timeoutMs);
+        const legacyKey = 'ussign-squarecoil-job-timer-v1';
+        const sensitiveSentinel = 'A4-SENSITIVE-LEGACY-VALUE-MUST-NOT-LEAK';
+        const seeded = await bridge.setLegacyValue(legacyKey, sensitiveSentinel);
+        assert(seeded === sensitiveSentinel, 'Synthetic legacy marker was not seeded');
+        const beforeEnvelope = (await bridge.getStorage([AUTHORITY_STORAGE_KEY]))?.[AUTHORITY_STORAGE_KEY];
+        const action7Before = result.network.action7.length;
+        const enabledResponse = await bridge.setEnabled(true);
+        const blockedCore = await waitFor(async () => {
+          const snapshot = await bridge.coreSnapshot();
+          return snapshot?.initialized === true && snapshot.blocked === true ? snapshot : null;
+        }, 'legacy fail-closed trusted core', options.timeoutMs);
+        const afterEnvelope = (await bridge.getStorage([AUTHORITY_STORAGE_KEY]))?.[AUTHORITY_STORAGE_KEY];
+        assert(blockedCore.preflight?.reason === 'legacy-migration-required', 'Legacy preflight returned an unexpected block reason', blockedCore);
+        assert(blockedCore.preflight?.presentKeys?.length === 1 && blockedCore.preflight.presentKeys[0] === legacyKey, 'Legacy preflight did not report only the key identity', blockedCore.preflight);
+        assert(JSON.stringify(blockedCore).includes(sensitiveSentinel) === false, 'Legacy preflight leaked the stored value', blockedCore);
+        assert(afterEnvelope?.document?.revision === beforeEnvelope?.document?.revision, 'Legacy-blocked boot committed a Timer write', {
+          beforeRevision: beforeEnvelope?.document?.revision,
+          afterRevision: afterEnvelope?.document?.revision
+        });
+        assert(result.network.action7.length === action7Before, 'Legacy-blocked boot issued an action 7 request', { action7Before, action7After: result.network.action7.length });
+        assert(result.network.nativeMutationAttempts.length === 0, 'Legacy-blocked boot attempted a native SquareCoil mutation', result.network.nativeMutationAttempts);
+        await bridge.setEnabled(false);
+        const removed = await bridge.removeLegacyValue(legacyKey);
+        assert(removed === null, 'Synthetic legacy marker was not removed');
+        return {
+          enabledResponse,
+          blockedCore,
+          authoritativeRevision: afterEnvelope?.document?.revision,
+          action7RequestsBeforeAndAfter: [action7Before, result.network.action7.length]
+        };
+      }
+    );
+
     const finalState = await pageState(page);
     if (finalState.runtimeGlobalPresent) {
       await bridge.setEnabled(false).catch(() => {});
@@ -1632,6 +1917,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
     }
     await runCase(result.cases, `A4-B1-${family === 'chrome' ? 'CH' : 'ED'}-EVIDENCE-HEALTH`, 'Synthetic-only network and browser console remain clean', async () => {
       assert(result.network.blockedUnexpected.length === 0, 'Unexpected network requests were attempted', result.network.blockedUnexpected);
+      assert(result.network.nativeMutationAttempts.length === 0, 'Native SquareCoil mutation requests were attempted', result.network.nativeMutationAttempts);
       assert(result.console.errors.length === 0, 'Browser console emitted warnings or errors', result.console.errors);
       assert(result.console.pageErrors.length === 0, 'Fixture page emitted uncaught errors', result.console.pageErrors);
       return { network: result.network, console: result.console };
@@ -1655,7 +1941,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
     }
     const observedB2KernelFixtureIds = [...new Set(result.cases.flatMap(testCase => testCase.b2KernelFixtureIds || []))].sort();
     result.b2KernelFixtureCoverage = {
-      scope: 'B2.1_ISOLATED_AUTHORITY_KERNEL_ONLY',
+      scope: 'B2.2_TRUSTED_TRANSITION_CORE_PARTIAL',
       fullB2Acceptance: 'PENDING',
       required: [...REQUIRED_B2_1_A4_FIXTURE_IDS],
       observed: observedB2KernelFixtureIds,
@@ -1668,6 +1954,23 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
         b2Scope: 'ISOLATED_AUTHORITY_KERNEL_ONLY',
         status: 'FAIL',
         error: `Missing B2.1 fixture IDs: ${result.b2KernelFixtureCoverage.missing.join(', ')}`
+      });
+    }
+    const observedB2TransitionFixtureIds = [...new Set(result.cases.flatMap(testCase => testCase.b2TransitionFixtureIds || []))].sort();
+    result.b2TransitionFixtureCoverage = {
+      scope: 'B2.2_TRUSTED_TRANSITION_CORE_PARTIAL',
+      fullB2Acceptance: 'PENDING',
+      required: [...REQUIRED_B2_2_A4_FIXTURE_IDS],
+      observed: observedB2TransitionFixtureIds,
+      missing: REQUIRED_B2_2_A4_FIXTURE_IDS.filter(fixtureId => !observedB2TransitionFixtureIds.includes(fixtureId))
+    };
+    if (result.b2TransitionFixtureCoverage.missing.length) {
+      result.cases.push({
+        id: `A4-B2.2-${family === 'chrome' ? 'CH' : 'ED'}-FIXTURE-COVERAGE`,
+        name: 'Mandatory B2.2 trusted transition-core fixture coverage',
+        b2Scope: 'TRUSTED_TRANSITION_CORE_PARTIAL',
+        status: 'FAIL',
+        error: `Missing B2.2 fixture IDs: ${result.b2TransitionFixtureCoverage.missing.join(', ')}`
       });
     }
     const failedCases = result.cases.filter(testCase => testCase.status === 'FAIL');
