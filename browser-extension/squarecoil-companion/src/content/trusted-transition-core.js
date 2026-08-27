@@ -1,6 +1,7 @@
 'use strict';
 
-const { inspectLegacyPresence } = require('../data/legacy-preflight');
+const { inspectLegacyMigration, MIGRATION_DISPOSITIONS } = require('../data/legacy-preflight');
+const AUTHORITY_COMMANDS = Object.freeze({ MIGRATE_V07: 'MIGRATE_V07' });
 const { timerKind, deepClone, deepFreeze } = require('../data/model');
 const { TIMER_COMMANDS } = require('../timer/commands');
 const { createTimerReadModel } = require('../timer/read-model');
@@ -59,6 +60,7 @@ function createTrustedTransitionCore(options = {}) {
   let recoveryMode = null;
   let commandQueue = Promise.resolve();
   let prepareDisablePromise = null;
+  let migrationInFlight = false;
   let lastStatus = 'not-initialized';
   let lastError = null;
 
@@ -121,6 +123,8 @@ function createTrustedTransitionCore(options = {}) {
         checked: preflight.checked,
         blocked: preflight.blocked,
         reason: preflight.reason,
+        disposition: preflight.disposition,
+        activityChanged: preflight.activityChanged === true,
         presentKeys: [...preflight.presentKeys]
       } : null,
       bridge: bridge ? bridge.snapshot() : null,
@@ -213,36 +217,94 @@ function createTrustedTransitionCore(options = {}) {
     };
   }
 
+  async function resolveMigrationAndBridge() {
+    if (preflight && [
+      MIGRATION_DISPOSITIONS.SOURCE_CHANGED_AFTER_COMPLETION,
+      MIGRATION_DISPOSITIONS.UNAVAILABLE,
+      MIGRATION_DISPOSITIONS.FAILED
+    ].includes(preflight.disposition)) {
+      blocked = true;
+      publishStatus(preflight.reason);
+      return snapshot();
+    }
+    preflight = inspectLegacyMigration(legacyStorage, authorityDocument);
+    if (preflight.disposition === MIGRATION_DISPOSITIONS.REQUIRED && authorityOwner) {
+      const legacySources = preflight.sources;
+      migrationInFlight = true;
+      publishStatus('legacy-migration-in-progress');
+      try {
+        const envelope = commandEnvelope(AUTHORITY_COMMANDS.MIGRATE_V07, { legacySources });
+        if (typeof authorityClient.migrationCommand !== 'function') {
+          throw new Error('trusted-transition-migration-command-unavailable');
+        }
+        await authorityClient.migrationCommand(envelope);
+        await refreshDocument();
+        preflight = inspectLegacyMigration(legacyStorage, authorityDocument);
+        migrationInFlight = false;
+      } catch (error) {
+        migrationInFlight = false;
+        preflight = Object.freeze({ checked: false, blocked: true,
+          reason: 'legacy-preflight-failed', disposition: MIGRATION_DISPOSITIONS.FAILED,
+          presentKeys: preflight.presentKeys });
+        blocked = true;
+        publishStatus(preflight.reason, error);
+        return snapshot();
+      }
+    }
+    blocked = preflight.blocked;
+    if (blocked) {
+      publishStatus(preflight.reason);
+      return snapshot();
+    }
+    determineRecoveryMode();
+    if (!bridge) {
+      bridge = createBridge(bridgeOptions());
+      await bridge.ensure({ owner: authorityOwner });
+    } else {
+      await bridge.setOwner(authorityOwner);
+    }
+    publishStatus(authorityOwner ? 'trusted-core-owner-active' : 'trusted-core-observer-active');
+    return snapshot();
+  }
+
   async function ensure(connection = null) {
     if (disposed) throw new Error('trusted-transition-core-disposed');
     if (initialized) return snapshot();
     unsubscribe = authorityClient.subscribe(event => {
-      if (adopt(event)) publishStatus('authority-document-updated');
+      if (!adopt(event)) return;
+      if (!initialized || disposed) {
+        publishStatus('authority-document-updated');
+        return;
+      }
+      if (migrationInFlight || (!blocked && bridge)) {
+        publishStatus('authority-document-updated');
+        return;
+      }
+      serialize(resolveMigrationAndBridge).catch(error => {
+        blocked = true;
+        publishStatus('legacy-preflight-failed', error);
+      });
     });
     const connected = connection || await authorityClient.ensure();
     adopt(connected?.initialRead);
     await refreshDocument();
     const authority = authorityClient.snapshot();
     authorityOwner = authority.healthy === true && authority.disposition === 'OWNER';
-    preflight = inspectLegacyPresence(legacyStorage);
-    blocked = preflight.blocked;
     initialized = true;
-    if (blocked) {
-      publishStatus(preflight.reason);
-      return snapshot();
-    }
-    determineRecoveryMode();
-    bridge = createBridge(bridgeOptions());
-    await bridge.ensure({ owner: authorityOwner });
-    publishStatus(authorityOwner ? 'trusted-core-owner-active' : 'trusted-core-observer-active');
-    return snapshot();
+    return resolveMigrationAndBridge();
   }
 
   async function handleAuthoritySnapshot(authority) {
-    if (!initialized || disposed || blocked || !bridge) return snapshot();
+    if (!initialized || disposed) return snapshot();
     const nextOwner = authority?.healthy === true && authority.disposition === 'OWNER';
     const acquired = !authorityOwner && nextOwner;
     authorityOwner = nextOwner;
+    if (blocked || !bridge) {
+      return serialize(async () => {
+        await refreshDocument();
+        return resolveMigrationAndBridge();
+      });
+    }
     if (acquired) {
       await refreshDocument();
       determineRecoveryMode(true);

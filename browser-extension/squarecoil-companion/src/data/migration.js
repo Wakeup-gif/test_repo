@@ -134,6 +134,19 @@ function createV07SourceMarker(normalizedSources, completedAtMs) {
     sourceSchema: V07_MIGRATION_SOURCE_SCHEMA,
     sourceIdentity: presentKeys.sort().join('+'),
     sourceChecksum: checksum(payload),
+    authoritySourceChecksums: {
+      [LEGACY_SOURCE_KEYS.CURRENT]: checksum(normalizedSources.current.present
+        ? { present: true, value: normalizedSources.current.value }
+        : { present: false }),
+      [LEGACY_SOURCE_KEYS.ARCHIVE]: checksum(normalizedSources.archive.present
+        ? { present: true, value: normalizedSources.archive.value }
+        : { present: false })
+    },
+    activitySourceChecksum: checksum(normalizedSources.activity.present
+      ? { present: true, value: hasOwn(normalizedSources.activity, 'markerValue')
+        ? normalizedSources.activity.markerValue
+        : normalizedSources.activity.value }
+      : { present: false }),
     completionState: 'COMPLETE',
     completedAtMs
   };
@@ -954,6 +967,7 @@ module.exports = {
   V07_MIGRATION_MARKER_ID,
   V07_MIGRATION_VERSION,
   stableStringify,
+  checksum,
   createV07SourceMarker,
   normalizeLegacySources,
   migrateV07
