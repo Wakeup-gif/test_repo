@@ -12,14 +12,14 @@ If chat context is lost or implementation direction becomes unclear, start here 
 **Production baseline:** `main` at `9378da24f393b40066816133e7fa0f48063115f0` (`v0.7.1 Chrome Interaction Recovery`)  
 **Production main changed by prototype work:** No  
 **Framework status:** Reconciled after full legacy feature mine  
-**Logic status:** L0-L8 previously settled; targeted post-mine Logic delta now required  
+**Logic status:** L0-L8 settled + post-mine L5A tab/focus delta settled  
 **Implementation status:** B1 accepted; B2.1 accepted; B2.2 accepted; full B2 not yet settled  
 **Prototype UI:** nested workspace prototype + dedicated UI interaction gate present  
-**Latest accepted implementation/UI-gate checkpoint before documentation reconciliation:** `ba06297e689fa7a68574ea0c0fe6d12ee59e53bf`  
-**Next architecture action:** targeted Logic reconciliation from `docs/LOGIC-DELTA-HANDOFF.md`  
-**Next canonical build action after the Logic delta:** close remaining B2 gaps before treating B3 prototype work as canonical
+**Latest accepted implementation/UI-gate checkpoint before documentation/logic reconciliation:** `ba06297e689fa7a68574ea0c0fe6d12ee59e53bf`  
+**Logic delta authority:** `logic/L5A-TAB-PARITY-FOCUS-DELTA.md`  
+**Next canonical build action:** close remaining B2 gaps before treating B3 prototype work as canonical
 
-The current branch intentionally contains exploratory B3-facing UI work on top of the accepted B2.2 core. That prototype does not promote itself to production and does not mean full B2 or B3 are settled.
+The current branch intentionally contains exploratory B3-facing UI work on top of the accepted B2.2 core. The prototype does not promote itself to production and does not mean full B2 or B3 are settled.
 
 ---
 
@@ -34,41 +34,21 @@ The current branch intentionally contains exploratory B3-facing UI work on top o
 3. `docs/FEATURE-MINE-RECONCILIATION.md`
    - Current feature ledger after mining Timer v1.x, Companion v0.x, and historical Full UI/theme lineage.
    - Classifies features as core parity, core rebuild, optional presentation, or excluded sibling systems.
-   - Where old planning-branch/checkpoint metadata conflicts with this file, use this current reconciliation/checkpoint.
 
 4. `docs/LOGIC-DELTA-HANDOFF.md`
-   - Bounded post-mine Logic reconciliation scope.
-   - Do not restart Logic from L0 unless a real contradiction is discovered.
+   - Scope that produced the targeted post-mine Logic reconciliation.
 
-5. `docs/LOGIC-STAGE-PLAN.md`
-   - Original staged Logic architecture and implementation gate map.
-
-6. `logic/L0-INVARIANTS.md`
-   - Canonical vocabulary, compatibility baseline, non-negotiable invariants.
-
-7. `logic/L1-LIFECYCLE.md`
-   - Boot, READY, duplicate prevention, recovery, teardown, reload/update behavior.
-
-8. `logic/L2-STATE-TIME-MIGRATION.md`
-   - Timer State, Time Ledger, Workday rules, cross-tab ownership, recovery, migration model.
-
-9. `logic/L3-SQUARECOIL-BRIDGE.md`
-   - Read-only SquareCoil evidence normalization and native clock interpretation.
-
-10. `logic/L4-TIMER-BEHAVIOR.md`
-    - Core timer transitions: new/remembered jobs, Pending, Resume, Start Fresh, Local Pause, switches, uncertainty, Safety Holds.
-
-11. `logic/L5-TIME-VIEWS-WORKSPACE.md`
-    - Main timer, tabs/workspace, Recent, Time Overview, History, navigation, selected-vs-operational presentation.
-
+5. `logic/L0-INVARIANTS.md`
+6. `logic/L1-LIFECYCLE.md`
+7. `logic/L2-STATE-TIME-MIGRATION.md`
+8. `logic/L3-SQUARECOIL-BRIDGE.md`
+9. `logic/L4-TIMER-BEHAVIOR.md`
+10. `logic/L5-TIME-VIEWS-WORKSPACE.md`
+11. `logic/L5A-TAB-PARITY-FOCUS-DELTA.md`
+    - Canonical live-tab Today value, threshold behavior, real native focus-intent transitions, stale/dirty-route rules, and acceptance additions.
 12. `logic/L6-DATA-SAFETY-BACKUP.md`
-    - Archive, Clear Recent, Delete, Full Backup, Restore, History CSV, Time Report CSV.
-
 13. `logic/L7-SETTINGS-SUPPORT-THEMES.md`
-    - Settings router, Timer Appearance, Website Themes, Support/Feedback, diagnostics privacy, Developer Support.
-
 14. `logic/L8-ACCEPTANCE-HANDOFF.md`
-    - Failure priorities, fixtures/tests, Chrome/Edge gates, staged implementation handoff.
 
 15. `implementation/B1-ACCEPTANCE-EVIDENCE.md`
 16. `implementation/B2-KERNEL-EVIDENCE.md`
@@ -113,28 +93,39 @@ The current branch intentionally contains exploratory B3-facing UI work on top o
 - Timer Appearance remains Light/Dark/Auto.
 - Panel Finish remains Solid/Glass.
 - Core Website Theme remains Original/Refined Light/Sleek Dark.
-- Historical Cinematic Wallpaper is preserved as an optional post-core presentation capability, not a core dependency.
-- Historical Design Dashboard refresh is preserved as an optional page presentation profile, not Design Request business logic.
+- Historical Cinematic Wallpaper remains an optional post-core presentation capability.
+- Historical Design Dashboard refresh remains an optional page presentation profile, not Design Request business logic.
 - Sibling Design/Scope/File/Menu tools remain outside Companion scope.
 - Chrome/Edge use one shared behavior/source architecture with separate browser acceptance.
 - Static/package success never substitutes for installed-browser acceptance.
 
 ---
 
-## Newly mined parity that must not be lost
+## L5A post-mine logic now settled
 
-The post-mine reconciliation explicitly adds these established Timer UX details to the canonical feature ledger:
+The legacy parity delta is no longer open.
 
-- live authoritative elapsed summary in visible Job tabs;
-- threshold accent in visible tabs;
-- persistent drag reorder;
-- single-click selection;
-- double-click focus/expand behavior;
-- safe incoming focus on real SquareCoil Context changes;
-- collapse persistence across same-Context verification;
-- history/recent/archive continuity.
+Canonical decisions:
 
-Most of this was already present in L5. The required Logic delta is mainly to make live tab time + threshold presentation explicit and verify current-focus transition coverage.
+- visible Context tab time = **Context Today**, not lifetime Job Total;
+- tab Today comes from the canonical read model and never owns a separate clock;
+- ACTIVE tabs include valid current contribution;
+- PENDING anchors do not count before Resume/Start Fresh;
+- LOCAL_PAUSED/inactive tabs remain stable;
+- Safety Hold caps tab/Main/aggregate live contribution at the same boundary;
+- provisional tab values may reconcile downward without deleting finalized history;
+- threshold level uses unrounded Context Today and highest matching configured threshold;
+- threshold accent and operational status are separate semantics;
+- threshold meaning must not depend on color alone;
+- real confirmed A -> B and real none -> B entry may focus/select/show/expand incoming B after authoritative evaluation;
+- A -> none creates no arbitrary focus target;
+- boot/recovery discovery of an existing Context does not impersonate a new native entry;
+- same-Context verification/metadata does not steal focus or reopen manual collapse;
+- dirty Settings/L6 routes may defer the newest focus intent instead of discarding work;
+- newer explicit user selection beats an older unapplied focus intent;
+- newer real Context focus supersedes older deferred intent.
+
+See `logic/L5A-TAB-PARITY-FOCUS-DELTA.md` for the full interaction, failure, and A2/A3/A4 acceptance contract.
 
 ---
 
@@ -161,7 +152,8 @@ Known prototype limitations still include:
 
 - full `innerHTML` refresh strategy rather than retained-node rendering;
 - search focus is guarded, but scroll preservation is not solved;
-- direct non-null A -> B current-focus works, while null clock-out -> later B still needs deliberate contract/implementation handling;
+- null clock-out -> later Context behavior now has settled Logic in L5A but still needs implementation alignment/acceptance;
+- live tab Today + threshold parity is now settled Logic but not yet canonical B3 implementation;
 - destructive data tools remain intentionally locked;
 - full installed-browser A4 acceptance for the new UI has not been completed.
 
@@ -176,45 +168,39 @@ Do not call full B2 settled until the owning implementation/acceptance work clos
 - final READY/full B2 acceptance evidence;
 - full B2 settlement.
 
-The prototype UI does not waive these requirements.
+The prototype UI and settled L5A Logic do not waive these requirements.
 
 ---
 
 ## Next action
 
-### 1. Run the targeted Logic delta
+### Complete canonical B2
 
-Use:
+Close the remaining B2 core authority gaps under the existing L2-L4 contracts.
 
-`docs/LOGIC-DELTA-HANDOFF.md`
+### Then convert the prototype workspace into canonical B3
 
-Required focus:
+B3 must implement and accept the full L5 + L5A behavior, including:
 
-- L5 visible-tab elapsed parity;
-- L5 threshold accent parity;
-- current-focus transition coverage;
-- L8 acceptance additions.
-
-Optional visual packs do not block core Logic.
-
-### 2. Complete canonical B2
-
-After the delta is settled, close the remaining B2 core authority gaps.
-
-### 3. Convert prototype workspace work into canonical B3
-
-Only then treat the B3-facing prototype as a candidate for canonical Time Views / Workspace implementation and browser acceptance.
+- canonical live tab Today;
+- threshold accent/accessibility;
+- persistent reorder/select/hide neutrality;
+- real incoming Context focus behavior;
+- null -> Context re-entry behavior;
+- same-Context no-focus/no-expand behavior;
+- stale/deferred focus protection;
+- real installed-browser interaction acceptance.
 
 ---
 
 ## Staged path from here
 
 ```text
-R1  Targeted Logic delta
+R1  Targeted Logic delta — SETTLED
         ↓
 B2-C  Complete canonical B2
         ↓
-B3  Canonical Time Views / Workspace
+B3  Canonical Time Views / Workspace using L5 + L5A
         ↓
 B4  Data Safety / Backup / CSV
         ↓
@@ -249,10 +235,8 @@ Optional presentation must never block a core build that does not include it.
 
 ---
 
-## Framework readiness
+## Logic readiness
 
-**Framework ready for logic**
+**Ready** for implementation of the L5A delta under the existing staged dependencies.
 
-Reason: the post-mine feature ancestry is now classified and placed. Logic does not need to invent whether a feature belongs to core Timer/Workspace, presentation, optional visual profiles, or a separate sibling tool.
-
-The next Logic work is a bounded reconciliation pass, not a greenfield architecture exercise.
+There are no open behavior blockers in this delta. The next blockers are implementation/acceptance gaps in canonical B2, not missing framework or Logic definition.
