@@ -33,6 +33,12 @@ jobs:
           test -z "$(git status --porcelain --untracked-files=all)"
           npm --prefix browser-extension/squarecoil-companion run check:b2-transition
 
+      - name: Run Proto Squirel Coil UI interaction gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm --prefix browser-extension/squarecoil-companion run test:proto-ui
+
       - name: Validate generated JavaScript syntax
         shell: bash
         run: |
