@@ -71,6 +71,8 @@ B3 exact-candidate evidence is recorded in `implementation/B3-WORKSPACE-EVIDENCE
 
 Before any later-stage commit, run that stage's explicit gate plus every earlier aggregate regression and the installed-browser acceptance required by its owning audit.
 
+For B5-C, run `npm run check:b5c-theme` and installed Chrome/Edge acceptance for all four `B5C-THEME-*` fixtures before committing acceptance evidence.
+
 Also run:
 
 ```bash

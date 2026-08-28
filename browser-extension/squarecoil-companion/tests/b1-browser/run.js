@@ -12,6 +12,9 @@ const FIXTURE_ORIGIN = 'https://ussignandmill.squarecoil.net';
 const FIXTURE_PATH = '/__b1_fixture__/a4.html';
 const FRAME_PATH = '/__b1_fixture__/frame.html';
 const DASHBOARD_PATH = '/dashboard.php';
+const THEME_GENERIC_PATH = '/home.php';
+const LEADS_PATH = '/leads.php';
+const CALENDAR_PATH = '/calendar.php';
 const UNSUPPORTED_URL = 'data:text/html,<meta charset="utf-8"><title>A4 unsupported document</title><p>Synthetic unsupported document</p>';
 const ROOT_ID = 'ussign-job-timer';
 const RUNTIME_KEY = '__squareCoilCompanionRuntime';
@@ -80,6 +83,12 @@ const REQUIRED_B5B_A4_FIXTURE_IDS = Object.freeze([
   'B5B-DASH-001',
   'B5B-DASH-002',
   'B5B-SAFETY-001'
+]);
+const REQUIRED_B5C_A4_FIXTURE_IDS = Object.freeze([
+  'B5C-THEME-001',
+  'B5C-THEME-002',
+  'B5C-THEME-003',
+  'B5C-THEME-004'
 ]);
 const REQUIRED_B6_A4_FIXTURE_IDS = Object.freeze([
   'B6-CANDIDATE-001',
@@ -885,6 +894,19 @@ function dashboardFixtureHtml() {
   return '<!doctype html><html><head><meta charset="utf-8"><title>SquareCoil Design Dashboard Fixture</title><link rel="icon" href="data:,"></head><body><main><div id="content"><div class="mw1000 center-block demo-block mt30"><section id="widget-tasks"><div><h2>17</h2><h5>Tasks</h5></div></section><section id="widget-designs"><div><h2>8</h2><h5>Designs</h5></div></section><section id="widget-estimates"><div><h2>3</h2><h5>Estimates</h5></div></section><div id="page-content"><div class="panel heading-border panel-primary"><div class="panel-body bg-light"><select id="multiple_location_id"><option value="shop-2" selected>Shop 2</option></select><div id="db-designs"><div id="inProgress" class="design-list-container"><a class="clickableRowx" href="/project.php?id=260701">A</a><a class="clickableRowx" href="/project.php?id=260702">B</a></div><div id="nextJob" class="design-list-container"><button disabled>Native disabled</button></div><div id="onHold" class="design-list-container"><span class="text-warning">Native warning</span></div></div></div></div></div></div><div id="description-modal"><div class="modal-content"><button>Close</button></div></div><section class="timeclock-container"><button id="clockin" hidden>Clock in</button><button id="clockout">Clock out</button><span id="clockin-debug"></span><span id="clockin-remaining-time">' + clock + '</span><div class="clock-actions"></div></section></main></body></html>';
 }
 
+function probeThemeFixtureHtml(kind) {
+  const clock = clockContextHtml({ projectId: '260701', label: '260701 - Design' });
+  const menu = '<header class="navbar"><ul id="user-menu" class="dropdown-menu list-group dropdown-persist"><li class="list-group-item"><a href="#user">User</a></li><li class="dropdown-footer">User footer</li></ul><ul id="help-menu" class="dropdown-menu list-group dropdown-persist"><li class="list-group-item"><button type="button">Help</button></li><li class="dropdown-footer">Help footer</li></ul></header>';
+  const leads = kind === 'leads'
+    ? '<section id="leads-fixture" class="admin-form"><div class="panel"><input id="lead-filter" class="gui-input" value="Open leads"><select id="lead-owner" class="input-sm"><option selected>All owners</option></select></div></section>'
+    : '';
+  const calendar = kind === 'calendar'
+    ? '<section id="calendar-fixture" class="fc"><table><thead><tr><th class="fc-widget-header">Monday</th></tr></thead><tbody><tr><td id="calendar-day" class="fc-day fc-widget-content"><article id="calendar-event" class="fc-event" style="border-color:rgb(12, 180, 95)"><div class="fc-content"><span class="fc-title">Install</span><div class="cp"></div></div></article></td></tr></tbody></table></section>'
+    : '';
+  const nativeCss = '<style>.dropdown-persist,.dropdown-persist>li{color:rgb(21,31,41);background:rgb(250,250,250);border:1px solid rgb(190,195,200)}.dropdown-persist a,.dropdown-persist button{color:rgb(21,31,41)}.admin-form input,.admin-form select{color:rgb(21,31,41);background:rgb(255,255,255);border:1px solid rgb(180,185,190);border-radius:0}.fc .fc-day,.fc .fc-widget-content,.fc .fc-widget-header{color:rgb(21,31,41);background-color:rgb(255,255,255);border-color:rgb(190,195,200)}.fc .fc-event{color:rgb(21,31,41);background:rgb(250,250,250);border-width:1px;border-style:solid}.fc .fc-event .cp{height:4px;background:rgb(230,230,230)}</style>';
+  return '<!doctype html><html><head><meta charset="utf-8"><title>SquareCoil B5-C Theme Fixture</title><link rel="icon" href="data:,">' + nativeCss + '</head><body>' + menu + '<main>' + leads + calendar + '<section class="timeclock-container"><button id="clockin" hidden>Clock in</button><button id="clockout">Clock out</button><span id="clockin-debug"></span><span id="clockin-remaining-time">' + clock + '</span><div class="clock-actions"></div></section></main></body></html>';
+}
+
 async function installSyntheticRouting(context, networkEvidence, transitionFixture) {
   await context.route('**/*', async route => {
     const request = route.request();
@@ -901,6 +923,11 @@ async function installSyntheticRouting(context, networkEvidence, transitionFixtu
     if (url.origin === FIXTURE_ORIGIN && url.pathname === DASHBOARD_PATH) {
       networkEvidence.fulfilled.push(url.href);
       return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: dashboardFixtureHtml() });
+    }
+    if (url.origin === FIXTURE_ORIGIN && [THEME_GENERIC_PATH, LEADS_PATH, CALENDAR_PATH].includes(url.pathname)) {
+      networkEvidence.fulfilled.push(url.href);
+      const kind = url.pathname === LEADS_PATH ? 'leads' : url.pathname === CALENDAR_PATH ? 'calendar' : 'generic';
+      return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: probeThemeFixtureHtml(kind) });
     }
     if (url.origin === FIXTURE_ORIGIN && url.pathname === '/ajax_time_clock.php') {
       const body = request.postData() || '';
@@ -1063,6 +1090,18 @@ function runB5OptionalBrowserCase(cases, family, fixtureIds, slug, name, task) {
   });
 }
 
+function runB5CThemeBrowserCase(cases, family, fixtureIds, slug, name, task) {
+  for (const fixtureId of fixtureIds) {
+    if (!REQUIRED_B5C_A4_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown B5-C A4 fixture ID: ${fixtureId}`);
+  }
+  const browserCode = family === 'chrome' ? 'CH' : 'ED';
+  const fixtureCode = fixtureIds.map(value => value.replace('B5C-', '')).join('-');
+  return runCase(cases, `A4-B5-C-${browserCode}-${fixtureCode}-${slug}`, name, task, {
+    b5cThemeFixtureIds: fixtureIds,
+    b5cThemeScope: 'PROBE_BACKED_ROUTE_BOUNDED_THEME_ADAPTERS'
+  });
+}
+
 function runB6CandidateBrowserCase(cases, family, fixtureIds, slug, name, task, extraMetadata = {}) {
   for (const fixtureId of fixtureIds) {
     if (!REQUIRED_B6_A4_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown B6 A4 fixture ID: ${fixtureId}`);
@@ -1161,6 +1200,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
     stableFixtureCoverage: null,
     b2KernelFixtureCoverage: null,
     b3WorkspaceFixtureCoverage: null,
+    b5cThemeFixtureCoverage: null,
     b6CandidateFixtureCoverage: null,
     cases: [],
     durationMs: null,
@@ -2336,6 +2376,139 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
       }
     );
 
+    await runB5CThemeBrowserCase(
+      result.cases,
+      family,
+      ['B5C-THEME-001', 'B5C-THEME-002', 'B5C-THEME-003', 'B5C-THEME-004'],
+      'PROBE-THEME-ADAPTERS',
+      'B5-C applies only the probe-backed dropdown Leads and Install Calendar adapters and restores native presentation exactly',
+      async () => {
+        const before = await bridge.coreSnapshot();
+        await bridge.preferenceAction({ websiteTheme: 'SLEEK_DARK' }, before.preferences.preferenceRevision);
+        await waitFor(async () => {
+          const snapshot = await bridge.coreSnapshot();
+          return snapshot?.preferences?.websiteTheme === 'SLEEK_DARK' ? snapshot : null;
+        }, 'B5-C Sleek Dark preference settlement', options.timeoutMs);
+
+        const pages = [];
+        const bridges = [];
+        try {
+          for (const relative of [THEME_GENERIC_PATH, LEADS_PATH, CALENDAR_PATH]) {
+            const themedPage = await context.newPage();
+            pages.push(themedPage);
+            themedPage.on('console', message => {
+              if (message.type() === 'error' || message.type() === 'warning') result.console.errors.push({ type: message.type(), text: message.text() });
+            });
+            themedPage.on('pageerror', error => result.console.pageErrors.push(String(error?.message || error)));
+            await themedPage.goto(`${FIXTURE_ORIGIN}${relative}`, { waitUntil: 'domcontentloaded', timeout: options.timeoutMs });
+            await waitFor(async () => (await pageState(themedPage)).documentToken, `B5-C ${relative} document identity`, options.timeoutMs);
+            const themedBridge = new ContentBridge(context, themedPage, extensionId, options.timeoutMs, candidateIdentity);
+            await themedBridge.initialize();
+            bridges.push(themedBridge);
+          }
+
+          const [genericPage, leadsPage, calendarPage] = pages;
+          const generic = await waitFor(async () => genericPage.evaluate(() => {
+            const user = getComputedStyle(document.getElementById('user-menu'));
+            const help = getComputedStyle(document.getElementById('help-menu'));
+            const state = {
+              theme: document.documentElement.getAttribute('data-squarecoil-companion-site-theme'),
+              route: document.documentElement.getAttribute('data-squarecoil-companion-site-route'),
+              layers: document.querySelectorAll('#squarecoil-companion-site-theme').length,
+              userBackground: user.backgroundColor,
+              userColor: user.color,
+              helpBackground: help.backgroundColor,
+              helpColor: help.color
+            };
+            return state.theme === 'SLEEK_DARK' && state.route === 'GENERIC' && state.layers === 1 ? state : null;
+          }), 'B5-C generic dropdown adapter', options.timeoutMs);
+          assert(generic.userBackground === 'rgb(7, 16, 26)' && generic.helpBackground === 'rgb(7, 16, 26)' &&
+            generic.userColor === 'rgb(203, 215, 226)' && generic.helpColor === 'rgb(203, 215, 226)',
+          'B5-C did not repair both persistent top-right dropdown surfaces', generic);
+
+          const leads = await waitFor(async () => leadsPage.evaluate(() => {
+            const input = getComputedStyle(document.getElementById('lead-filter'));
+            const select = getComputedStyle(document.getElementById('lead-owner'));
+            const state = {
+              theme: document.documentElement.getAttribute('data-squarecoil-companion-site-theme'),
+              route: document.documentElement.getAttribute('data-squarecoil-companion-site-route'),
+              layers: document.querySelectorAll('#squarecoil-companion-site-theme').length,
+              input: { color: input.color, background: input.backgroundColor, border: input.borderColor, radius: input.borderRadius },
+              select: { color: select.color, background: select.backgroundColor, border: select.borderColor, radius: select.borderRadius }
+            };
+            return state.theme === 'SLEEK_DARK' && state.route === 'LEADS' && state.layers === 1 ? state : null;
+          }), 'B5-C Leads adapter', options.timeoutMs);
+          for (const control of [leads.input, leads.select]) {
+            assert(control.color === 'rgb(241, 245, 248)' && control.background === 'rgb(11, 20, 29)' &&
+              control.border === 'rgb(86, 97, 108)' && control.radius === '8px',
+            'B5-C Leads filter control did not receive the bounded adapter', { leads, control });
+          }
+
+          const calendar = await waitFor(async () => calendarPage.evaluate(() => {
+            const day = getComputedStyle(document.getElementById('calendar-day'));
+            const event = getComputedStyle(document.getElementById('calendar-event'));
+            const progress = getComputedStyle(document.querySelector('#calendar-event .cp'));
+            const state = {
+              theme: document.documentElement.getAttribute('data-squarecoil-companion-site-theme'),
+              route: document.documentElement.getAttribute('data-squarecoil-companion-site-route'),
+              layers: document.querySelectorAll('#squarecoil-companion-site-theme').length,
+              day: { color: day.color, background: day.backgroundColor, border: day.borderColor },
+              event: { color: event.color, background: event.backgroundColor, borderColor: event.borderLeftColor, borderWidth: event.borderLeftWidth, radius: event.borderRadius },
+              progress: { height: progress.height, background: progress.backgroundColor, radius: progress.borderRadius }
+            };
+            return state.theme === 'SLEEK_DARK' && state.route === 'INSTALL_CALENDAR' && state.layers === 1 ? state : null;
+          }), 'B5-C Install Calendar adapter', options.timeoutMs);
+          assert(calendar.day.background === 'rgba(7, 16, 24, 0.92)' && calendar.day.border === 'rgb(57, 67, 77)',
+            'B5-C Install Calendar day surface was not repaired', calendar);
+          assert(calendar.event.background === 'rgb(17, 28, 38)' && calendar.event.borderColor === 'rgb(12, 180, 95)' &&
+            calendar.event.borderWidth === '2px' && calendar.event.radius === '7px',
+          'B5-C Install Calendar event styling replaced native semantic border color or missed its adapter', calendar);
+          assert(calendar.progress.height === '6px' && calendar.progress.radius === '999px',
+            'B5-C Install Calendar progress strip was not repaired', calendar);
+
+          const current = await bridge.coreSnapshot();
+          await bridge.preferenceAction({ websiteTheme: 'ORIGINAL' }, current.preferences.preferenceRevision);
+          const restored = [];
+          for (const themedPage of pages) {
+            restored.push(await waitFor(async () => themedPage.evaluate(() => {
+              const state = {
+                theme: document.documentElement.getAttribute('data-squarecoil-companion-site-theme'),
+                route: document.documentElement.getAttribute('data-squarecoil-companion-site-route'),
+                layers: document.querySelectorAll('#squarecoil-companion-site-theme').length,
+                menuBackground: getComputedStyle(document.getElementById('user-menu')).backgroundColor
+              };
+              return state.theme === null && state.route === null && state.layers === 0 ? state : null;
+            }), 'B5-C Original restoration', options.timeoutMs));
+          }
+          assert(restored.every(state => state.menuBackground === 'rgb(250, 250, 250)'),
+            'B5-C Original did not restore native dropdown presentation', restored);
+          const calendarNativeBorder = await calendarPage.evaluate(() => getComputedStyle(document.getElementById('calendar-event')).borderLeftColor);
+          assert(calendarNativeBorder === 'rgb(12, 180, 95)', 'B5-C Original changed the native calendar event border color', calendarNativeBorder);
+          const after = await bridge.coreSnapshot();
+          assert(after.ledgerSegmentCount === before.ledgerSegmentCount && after.timer.timerState === before.timer.timerState &&
+            after.timer.currentContextId === before.timer.currentContextId,
+          'B5-C theme adapters changed Timer or Ledger authority', { before, after });
+          assert(result.network.nativeMutationAttempts.length === 0, 'B5-C theme adapters attempted a native SquareCoil mutation', result.network.nativeMutationAttempts);
+          return { generic, leads, calendar, restored, calendarNativeBorder, nativeMutationAttempts: result.network.nativeMutationAttempts.length };
+        } finally {
+          for (const themedBridge of bridges.reverse()) {
+            await themedBridge.authorityTeardown().catch(() => {});
+            await themedBridge.detach();
+          }
+          for (const themedPage of pages.reverse()) await themedPage.close().catch(() => {});
+          await waitFor(async () => {
+            const snapshot = await bridge.authoritySnapshot();
+            return snapshot?.healthy === true && snapshot.disposition === 'OWNER' ? snapshot : null;
+          }, 'B5-C primary OWNER after themed-page cleanup', options.timeoutMs);
+          await bridge.syncBridge().catch(() => {});
+          await waitFor(async () => {
+            const health = await bridge.send({ type: MESSAGES.HEALTH });
+            return health?.ready === true && health?.health?.state === 'READY' ? health : null;
+          }, 'B5-C post-cleanup READY settlement', options.timeoutMs);
+        }
+      }
+    );
+
     await runBrowserCase(result.cases, family, ['B1-LC-003', 'B1-LC-014'], 'RECOVERY', 'Dead interaction and removed root recover in place', async () => {
       assert(activeRuntimeId, 'Initial runtime was unavailable because the prerequisite case failed');
       const dead = await page.evaluate(({ rootId, probeEvent }) => {
@@ -2876,6 +3049,22 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
         b5OptionalScope: 'OPTIONAL_PRESENTATION_PACKS',
         status: 'FAIL',
         error: `Missing B5-B optional fixture IDs: ${result.b5OptionalFixtureCoverage.missing.join(', ')}`
+      });
+    }
+    const observedB5CThemeFixtureIds = [...new Set(result.cases.flatMap(testCase => testCase.b5cThemeFixtureIds || []))].sort();
+    result.b5cThemeFixtureCoverage = {
+      scope: 'B5_C_PROBE_BACKED_ROUTE_BOUNDED_THEME_ADAPTERS_A4',
+      required: [...REQUIRED_B5C_A4_FIXTURE_IDS],
+      observed: observedB5CThemeFixtureIds,
+      missing: REQUIRED_B5C_A4_FIXTURE_IDS.filter(fixtureId => !observedB5CThemeFixtureIds.includes(fixtureId))
+    };
+    if (result.b5cThemeFixtureCoverage.missing.length) {
+      result.cases.push({
+        id: `A4-B5-C-${family === 'chrome' ? 'CH' : 'ED'}-FIXTURE-COVERAGE`,
+        name: 'Mandatory B5-C probe-backed theme fixture coverage',
+        b5cThemeScope: 'PROBE_BACKED_ROUTE_BOUNDED_THEME_ADAPTERS',
+        status: 'FAIL',
+        error: `Missing B5-C theme fixture IDs: ${result.b5cThemeFixtureCoverage.missing.join(', ')}`
       });
     }
     const observedB6CandidateFixtureIds = [...new Set(result.cases.flatMap(testCase => testCase.b6CandidateFixtureIds || []))].sort();
