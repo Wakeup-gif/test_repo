@@ -4,7 +4,7 @@ This file scopes only `browser-extension/squarecoil-companion/`.
 
 ## Current task
 
-B2-C, B3, B4, B5-A, B5-B, B5-C, and B6 are accepted on `codex/squarecoil-b2c-migration`. The exact post-B5-C B6 candidate source is `aeac7fe52a2e723106340bc6d283d2eb49521573`.
+B2-C, B3, B4, B5-A, B5-B, B5-C, B5-D, and B6 are accepted on `codex/squarecoil-b2c-migration`. The exact B5-D implementation source is `4686ab0c92ce7e4b91a92bc64b479a2bd0ea01c0`.
 
 Do not merge or promote to `main`, publish a release/store build, or add a new live SquareCoil mutation without separate exact approval.
 
@@ -71,6 +71,8 @@ Before any later-stage commit, run that stage's explicit gate plus every earlier
 
 For B5-C, run `npm run check:b5c-theme` and installed Chrome/Edge acceptance for all four `B5C-THEME-*` fixtures before committing acceptance evidence.
 
+For B5-D, run `npm run check:b5d-theme` and installed Chrome/Edge acceptance for all five `B5D-*` fixtures before committing acceptance evidence.
+
 Also run:
 
 ```bash
@@ -113,9 +115,18 @@ Do not finish with unrelated changes.
 
 ## Accepted B5-C gate
 
-- Only the probe-backed persistent dropdown, exact `/leads.php`, and exact `/calendar.php` CSS adapters were added; B5-D remains deferred.
+- Only the probe-backed persistent dropdown, exact `/leads.php`, and exact `/calendar.php` CSS adapters were added in B5-C; broader theme parity remained separately gated to B5-D.
 - Original, forced colors, and teardown remove both theme and route ownership; native FullCalendar event border colors remain intact.
 - Exact source `aeac7fe52a2e723106340bc6d283d2eb49521573` passed all four `B5C-THEME-*` fixtures in installed Chrome and Edge with no native mutation attempts.
+
+## Accepted B5-D gate
+
+- Fresh zero-history Home exposes Recent Jobs, Time Overview, History, and Settings without a SquareCoil clock-in.
+- Vendor adapters remain presentation-only, exact-route-bounded, and removable; near-miss routes fail closed to `GENERIC`.
+- CKEditor chrome and same-origin editor documents are readable in Sleek Dark, while inaccessible documents receive no false ownership marker.
+- Narrow viewport, reduced motion, forced colors, print, Original, disable, and teardown retain accessible native fallback and exact cleanup.
+- Exact implementation source `4686ab0c92ce7e4b91a92bc64b479a2bd0ea01c0` passed 487 aggregate tests, 13 prototype tests, package validation, and all five `B5D-*` fixtures in installed Chrome and Edge with no native mutation attempts.
+- See `implementation/B5D-THEME-UI-EVIDENCE.md` for exact package hashes and proof boundaries.
 
 ## Accepted B6 gate
 
@@ -126,4 +137,4 @@ Do not finish with unrelated changes.
 
 ## Stage boundary
 
-B6 is complete. No B5-D or later implementation, production promotion, publication/store submission, merge to `main`, rollout, or new live mutation is authorized. Preserve the accepted branch and wait for a separate exact instruction.
+B6 and the separately authorized B5-D delta are complete. No later implementation, production promotion, publication/store submission, merge to `main`, rollout, or new live mutation is authorized. Preserve the accepted branch and wait for a separate exact instruction.
