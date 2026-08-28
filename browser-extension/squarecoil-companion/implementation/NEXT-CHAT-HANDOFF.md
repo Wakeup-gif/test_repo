@@ -7,8 +7,8 @@ Branch: `codex/squarecoil-b2c-migration`
 ## Current gate
 
 - B1 through B2-C: accepted and preserved.
-- B3 Canonical Time Views / Workspace: implemented; final clean exact-package acceptance pending.
-- B4: explicitly authorized after B3 passes; not started in this candidate.
+- B3 Canonical Time Views / Workspace: accepted at exact source commit `e3b369e691df317462bf6ef53cd981f682cca1d2`.
+- B4: explicitly authorized and current.
 - B5-A, B5-B, B6: authorized sequentially after the preceding gates pass.
 
 No merge/promotion to `main`, release/store publication, or new live SquareCoil mutation is authorized.
@@ -19,23 +19,13 @@ The implementation now provides one canonical revisioned read surface for compac
 
 See `implementation/B3-WORKSPACE-EVIDENCE.md` and `docs/FEATURE-LEDGER.md`.
 
-## Required B3 closeout
+## Accepted B3 evidence
 
-1. Run `npm run test:b3:unit`.
-2. Run `npm run test:b3:integration`.
-3. Run `npm run test:proto-ui`.
-4. Run `npm run check:b3-workspace`.
-5. Commit the clean candidate.
-6. Build one exact package with `sourceDirty: false` and the candidate commit SHA.
-7. Run the same unchanged package/ZIP independently in installed Chrome and Edge.
-8. Push, verify remote equality, and verify CI.
-9. Record the immutable candidate/ZIP/browser evidence and mark B3 accepted.
-
-Dirty development Chrome and Edge rehearsals already pass against the same bytes, but are not acceptance evidence.
+The aggregate 368-test gate and the separate 13-test inherited UI compatibility gate passed. One clean package/ZIP passed installed Chrome 151 and Edge 151 with unchanged bytes, exact source identity, no unexpected network/console errors, and no native mutation attempts. GitHub Actions run `33149161832` succeeded. See `implementation/B3-WORKSPACE-EVIDENCE.md` for hashes and fixture mapping.
 
 ## Next authorized gate
 
-After B3 passes, read the complete B4 source set required by `AGENTS.md`, especially L6, the B4 readiness audit, relevant L2 persistence/migration rules, and L8 B4 acceptance. Implement only settled data-safety behavior. Imported/restored data must never fabricate Active, Pending, or Local Pause state; destructive actions require explicit, reviewable commands.
+Read the complete B4 source set required by `AGENTS.md`, especially L6, the B4 readiness audit, relevant L2 persistence/migration rules, and L8 B4 acceptance. Implement only settled data-safety behavior. Imported/restored data must never fabricate Active, Pending, or Local Pause state; destructive actions require explicit, reviewable commands.
 
 ## Safety boundary
 

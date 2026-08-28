@@ -1,6 +1,6 @@
 # B3 Canonical Time Views / Workspace Evidence
 
-Status: **candidate — clean exact-package acceptance pending**
+Status: **accepted**
 Branch: `codex/squarecoil-b2c-migration`
 Owning contracts: L2, L4, L5, L5A, L8, and `logic/B3-WORKSPACE-READINESS-AUDIT.md`
 
@@ -33,9 +33,24 @@ The final dirty-development rehearsal passed independently in installed branded 
 - no unexpected network requests, console/page errors, or native SquareCoil mutation attempts;
 - result is explicitly `NON_ACCEPTANCE` because `sourceDirty` was true.
 
-## Exact candidate gate
+## Exact candidate result
 
-Acceptance requires a clean source commit, `sourceDirty: false`, package and ZIP inventory equality before/after both browser runs, exact `sourceSha`, installed Chrome PASS, installed Edge PASS, remote push, and successful CI. Record those immutable values in the final gate report; do not relabel the dirty rehearsal as acceptance.
+- source commit: `e3b369e691df317462bf6ef53cd981f682cca1d2`;
+- `sourceDirty: false`;
+- candidate fingerprint: `d556a98b96b9c688b8def0f1d983c10618d59bbeb1a1728052b5b503eab54bec`;
+- ZIP SHA-256 before/after: `47b7a607affc2c4df7455b4bd0f4d41395e8c3142cbdad409ab833535a801f10`;
+- extracted/ZIP inventory digest: `7ff06af728263a0007fbc850dea31573bd6f8afe8c3a16127f542df37ee4cb6b`;
+- installed Chrome `151.0.7922.174`: PASS;
+- installed Edge `151.0.4129.107`: PASS;
+- all required B1/B2/B3 A4 fixture IDs observed;
+- package and ZIP unchanged across both browsers;
+- unexpected network requests: none;
+- console/page errors: none;
+- native SquareCoil mutation attempts: none;
+- remote branch matched the source commit;
+- GitHub Actions run `33149161832`: success.
+
+The aggregate automated gate passed 368 tests: 90 B1 unit, 167 B2 unit, 29 B3 unit, 38 B1 integration, 42 B2 integration, and 2 B3 integration. The separate 13-test inherited prototype compatibility gate also passed.
 
 ## Proof boundary
 

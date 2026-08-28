@@ -544,7 +544,7 @@ These are implementation/readiness facts, not reasons to reopen settled core arc
 
 **2026-08-27 B2-C completion addendum:** the B2 caveats above describe the checkpoint that entered this reconciliation. The active `codex/squarecoil-b2c-migration` branch has since implemented and accepted migration invocation, passive native action 2/3/4 observation, current-OWNER routing, verification fallback, and the final READY settlement gate.
 
-**2026-08-28 B3 implementation addendum:** the canonical workspace now implements the L5/L5A tab, focus, selected/current, Recent, Overview, daily/context detail, and finalized History contract. Exact clean-package acceptance remains the final gate. Optional presentation and destructive data features remain outside B3.
+**2026-08-28 B3 acceptance addendum:** the canonical workspace implements the L5/L5A tab, focus, selected/current, Recent, Overview, daily/context detail, and finalized History contract. Exact candidate `e3b369e691df317462bf6ef53cd981f682cca1d2` passed clean-package, installed Chrome/Edge, and CI acceptance. Optional presentation and destructive data features remain outside B3.
 
 ---
 

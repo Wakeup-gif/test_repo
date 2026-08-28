@@ -1,7 +1,7 @@
 # SquareCoil Companion Rebuild
 ## B3 Workspace Behavior-Readiness Audit
 
-**Status:** Settled — B3 behavior implemented; final exact-candidate acceptance pending
+**Status:** Accepted — exact candidate passed automated, Chrome, Edge, and CI gates
 **Scope:** compare the active prototype Workspace/read model against settled L5 + L5A behavior  
 **Active branch:** `proto/squirel-coil-plugin`  
 **Depends on:** L2, L4, L5, L5A, L8, and B2-C completion logic  
@@ -696,7 +696,7 @@ Canonical B3 acceptance is blocked by downstream implementation and the planned 
 
 No core Workspace behavior still has to be guessed.
 
-The implementation now closes the gaps catalogued above using one canonical revisioned read model and workspace owner. Final B3 acceptance still requires the exact clean package, installed Chrome/Edge results, remote branch push, and CI evidence. Logic should reopen only if that acceptance exposes a genuine contradiction or a new product decision.
+The implementation closes the gaps catalogued above using one canonical revisioned read model and workspace owner. Exact clean-package, installed Chrome/Edge, remote branch, and CI evidence passed at `e3b369e691df317462bf6ef53cd981f682cca1d2`. Logic should reopen only if later regression evidence exposes a genuine contradiction or a new product decision.
 
 ---
 

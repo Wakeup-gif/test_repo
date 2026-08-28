@@ -18,7 +18,7 @@ If chat context is lost or implementation direction becomes unclear, start here 
 
 **Logic status:** L0-L8 settled + post-mine L5A tab/focus delta settled
 
-**Implementation status:** B1 through B2-C accepted; B3 canonical workspace implemented and in final exact-candidate acceptance
+**Implementation status:** B1 through B3 accepted; B4 Data Safety / Backup / CSV is current
 
 **Workspace UI:** canonical B3 Main/Recent/Overview/By Day/By Context/Context Detail/History implementation present
 
@@ -26,7 +26,7 @@ If chat context is lost or implementation direction becomes unclear, start here 
 
 **Logic delta authority:** `logic/L5A-TAB-PARITY-FOCUS-DELTA.md`
 
-**Next canonical build action:** accept and push B3, then proceed directly to the authorized B4 data-safety gate
+**Next canonical build action:** implement and accept B4 against L6 and the B4 readiness audit
 
 The user explicitly authorized sequential B3 through B6 work on this existing branch. That authorization does not promote the branch to production, authorize a release/store upload, or authorize new live SquareCoil mutations.
 
@@ -162,7 +162,7 @@ Current boundary notes:
 - periodic refresh preserves the last trusted snapshot, scroll position, focused search input, and active presentation interactions;
 - native A -> B and none -> B focus uses a durable revision-bound transition identity, while boot and same-Context verification do not steal focus;
 - destructive data tools remain intentionally locked pending B4;
-- B3 is not accepted until the clean exact-package Chrome/Edge result is recorded.
+- exact B3 candidate `e3b369e691df317462bf6ef53cd981f682cca1d2` passed installed Chrome/Edge and CI.
 
 ---
 
@@ -182,7 +182,7 @@ Settlement remains acceptance-gated: all required automated checks, clean exact-
 
 ## Next action
 
-Complete B3 exact-candidate acceptance. If the aggregate gate, package binding, installed Chrome/Edge suite, push, and CI pass, record B3 as accepted and begin B4 against L6 and `logic/B4-DATA-READINESS-AUDIT.md`.
+Implement B4 against L6 and `logic/B4-DATA-READINESS-AUDIT.md`, preserving every accepted B1-B3 gate.
 
 B4 may add only the settled archive/delete/wipe/backup/restore/CSV behavior. It must not weaken B2 authority or let imported content fabricate a live Timer state.
 
@@ -232,6 +232,6 @@ Optional presentation must never block a core build that does not include it.
 
 ## Logic readiness
 
-**Ready** for B3 exact-candidate acceptance and, after it passes, the already authorized B4 implementation gate.
+**Ready** for the authorized B4 implementation gate.
 
-There are no open framework or Logic blockers for B3. Promotion remains a separate decision.
+There are no open framework or Logic blockers for B4 entry. Promotion remains a separate decision.

@@ -4,7 +4,7 @@ This file scopes only `browser-extension/squarecoil-companion/`.
 
 ## Current task
 
-B2-C is accepted on `codex/squarecoil-b2c-migration`. B3 Canonical Time Views / Workspace is the current acceptance candidate. The user has explicitly authorized sequential continuation through B4, B5-A, B5-B, and B6 after each preceding gate passes.
+B2-C and B3 are accepted on `codex/squarecoil-b2c-migration`. B4 Data Safety / Backup / CSV is the current authorized task. The user has explicitly authorized sequential continuation through B5-A, B5-B, and B6 after each preceding gate passes.
 
 Do not merge or promote to `main`, publish a release/store build, or add a new live SquareCoil mutation without separate exact approval.
 
@@ -50,7 +50,7 @@ Work from this directory for npm scripts. Node.js 22 is the CI baseline. The pro
 
 Do not edit `dist/` directly. `scripts/build.js` generates it from `src/`; `dist/` is intentionally untracked.
 
-## Required B3 checks
+## Required regression checks
 
 Run all of these after B3 code changes:
 
@@ -63,7 +63,7 @@ npm run check:b3-workspace
 
 All accepted B1/B2 checks in the aggregate gate must remain green. B3 fixtures use stable unique `UT-B3-*` or `IT-B3-*` IDs.
 
-For final B3 acceptance, build one clean exact package and run `tests/b1-browser/run.js` independently in installed branded Chrome and Edge. Both must pass against unchanged package/ZIP bytes and the exact candidate source SHA. Dirty development runs are diagnostic only.
+B3 exact-candidate evidence is recorded in `implementation/B3-WORKSPACE-EVIDENCE.md` and must remain green.
 
 Before any later-stage commit, run that stage's explicit gate plus every earlier aggregate regression and the installed-browser acceptance required by its owning audit.
 
@@ -76,7 +76,7 @@ git status --short
 
 Do not finish with unrelated changes.
 
-## B3 acceptance gate
+## Accepted B3 gate
 
 - One canonical revision feeds Main, tabs, Recent, Overview, By Day, By Context, Context Detail, and finalized History.
 - Tab time is Context Today; thresholds compare exact unrounded Today and are not the operational-status signal.
@@ -91,4 +91,4 @@ Do not finish with unrelated changes.
 
 ## Stage boundary
 
-After B3 is accepted, update the evidence/current-state documents, commit and push the coherent gate, then continue to B4. Do not begin B5 until B4 passes; do not begin B6 until B5-A/B5-B pass. Promotion, publication, and new live mutations remain out of scope.
+Implement only the settled B4 behavior, update its evidence/current-state documents, commit and push the coherent gate, and require its exact acceptance before continuing to B5-A. Do not begin B6 until B5-A/B5-B pass. Promotion, publication, and new live mutations remain out of scope.

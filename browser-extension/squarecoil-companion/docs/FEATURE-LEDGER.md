@@ -11,7 +11,7 @@ This is the execution ledger. Planning history remains in `docs/FEATURE-MINE-REC
 | OWNER/OBSERVER authority and fenced Timer/Ledger | B2.1 | authority kernel/store/protocol | Core/on | storage | sole authoritative local writer | Accepted; inherited B2 kernel gates green |
 | Read-only Bridge and native action observation | B2.2/B2-C | Bridge service/engine, webRequest observer | Core/on | SquareCoil host, webRequest | observation/read-only transport; OWNER routes verified Timer command | Accepted; no direct native mutation path |
 | Migration and final READY settlement | B2-C | migration + settlement evidence | Core/on | storage | fenced migration write; fail-closed health read | Accepted; blocked/incomplete states remain non-READY |
-| Canonical workspace and time views | B3 | `src/timer/read-model.js`, `src/ui/*`, B3 evidence | Core/on | storage | read/navigation plus presentation preferences | Candidate; exact clean Chrome/Edge acceptance pending |
+| Canonical workspace and time views | B3 | `src/timer/read-model.js`, `src/ui/*`, B3 evidence | Core/on | storage | read/navigation plus presentation preferences | Accepted at `e3b369e`; 31 stable B3 fixtures, Chrome/Edge PASS, CI success |
 | Archive/Delete/Wipe | B4 | L6/B4 readiness | Core/on when implemented | storage, downloads only where justified | explicit destructive local data commands | Not started; locked in B3 UI |
 | Full Backup JSON and restore | B4 | L6/B4 readiness | Core/on when implemented | storage/downloads/file picker as justified | explicit export/import; never restores live state | Not started |
 | History CSV and Time Report CSV | B4 | L6/B4 readiness | Core/on when implemented | downloads only where justified | export/read-only | Not started |
