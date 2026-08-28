@@ -12,8 +12,10 @@ const {
   AUTHORITY_CONTROL_MESSAGES,
   KERNEL_ONLY_DISPOSITION,
   isAuthorityMessageType,
+  isB2SettlementAcknowledgment,
   validateAuthorityRequest
 } = require('./authority-protocol');
+const { evaluateB2ReadySettlement } = require('../core/b2-ready-settlement');
 const { createAuthorityRouter } = require('./authority-router');
 const { createDefaultAuthorityKernel } = require('./authority-kernel');
 const { createNativeCompletionObserver } = require('./native-completion-observer');
@@ -70,6 +72,27 @@ async function prepareIsolatedAuthorityTeardown(request, runtimeInstanceId) {
       disconnected: false,
       reason: String(error?.message || error || 'authority-content-teardown-failed')
     };
+  }
+}
+
+async function readB2Settlement(request, runtimeInstanceId) {
+  if (!chrome.tabs || typeof chrome.tabs.sendMessage !== 'function') {
+    return { ok: false, reason: 'settlement-content-control-unavailable' };
+  }
+  const message = {
+    type: AUTHORITY_CONTROL_MESSAGES.GET_B2_SETTLEMENT,
+    protocolVersion: AUTHORITY_PROTOCOL_VERSION,
+    documentToken: request.documentToken,
+    runtimeInstanceId
+  };
+  const options = request.expectedDocumentId ? { documentId: request.expectedDocumentId } : { frameId: 0 };
+  try {
+    const response = await chrome.tabs.sendMessage(request.tabId, message, options);
+    return isB2SettlementAcknowledgment(response, message)
+      ? { ok: true, authority: response.authority, core: response.core }
+      : { ok: false, reason: response?.reason || 'settlement-acknowledgment-invalid' };
+  } catch (error) {
+    return { ok: false, reason: String(error?.message || error || 'settlement-health-unavailable') };
   }
 }
 
@@ -630,6 +653,50 @@ function responseForProbe(classification, probe, extra = {}) {
   };
 }
 
+async function settleB2Response(request, probe, response) {
+  const shellHealth = response?.health;
+  if (
+    response?.classification !== PROBE_RESULTS.DEGRADED_SAME_BUILD ||
+    shellHealth?.reason !== EXPECTED_B1_DEGRADED_REASON ||
+    !shellHealthyExceptCoordination(shellHealth)
+  ) return response;
+
+  const runtimeInstanceId = shellHealth.runtimeInstanceId || probe.runtimeInstanceId;
+  const evidence = await readB2Settlement(request, runtimeInstanceId);
+  if (!evidence.ok) {
+    return {
+      ...response,
+      expectedB1Degraded: false,
+      reason: evidence.reason,
+      health: { ...shellHealth, reason: evidence.reason }
+    };
+  }
+  const settlement = evaluateB2ReadySettlement(shellHealth, evidence.authority, evidence.core);
+  const health = {
+    ...shellHealth,
+    state: settlement.ready ? 'READY' : 'DEGRADED',
+    reason: settlement.reason,
+    readiness: {
+      ...shellHealth.readiness,
+      coordinationPositive: settlement.ready,
+      coordinationDisposition: evidence.authority.disposition
+    },
+    authority: evidence.authority,
+    trustedCore: evidence.core,
+    bridge: evidence.core.bridge || shellHealth.bridge
+  };
+  return {
+    ...response,
+    ok: settlement.ready,
+    ready: settlement.ready,
+    classification: settlement.ready ? PROBE_RESULTS.HEALTHY_SAME_BUILD : PROBE_RESULTS.DEGRADED_SAME_BUILD,
+    reason: settlement.reason,
+    health,
+    expectedB1Degraded: false,
+    b2Settlement: settlement
+  };
+}
+
 function shellHealthyExceptCoordination(health) {
   const readiness = health?.readiness;
   const required = [
@@ -919,7 +986,9 @@ async function getHealthUnsafe(request) {
   const probe = await collectPageProbe(request);
   const guard = guardProbe(request, probe);
   if (guard) return { ...guard, health: probe.runtimeSnapshot || null, reloadRequired: guard.reason !== 'unsupported-document' };
-  return responseForProbe(classifyPageProbe(probe), probe);
+  request = { ...request, documentToken: probe.documentToken, expectedDocumentId: request.expectedDocumentId || probe.browserDocumentId };
+  const response = responseForProbe(classifyPageProbe(probe), probe);
+  return settleB2Response(request, probe, response);
 }
 
 async function setPageEnabledUnsafe(request, enabled) {

@@ -1329,7 +1329,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
       family,
       ['B2-TRANSITION-001'],
       'ACTION7-START',
-      'Exact action 7 evidence derives authoritative Timer state without claiming READY',
+      'Exact action 7 evidence derives authoritative Timer state and settles effective READY',
       async () => {
         let core = await waitFor(async () => {
           const snapshot = await bridge.coreSnapshot();
@@ -1350,15 +1350,20 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
           }, 'explicit fresh start from remembered Context', options.timeoutMs);
         }
         const shell = await pageState(page);
+        const settledHealth = await bridge.send({ type: MESSAGES.HEALTH });
         assert(core.authorityOwner === true, 'Initial trusted transition core did not hold OWNER authority', core);
         assert(core.readModelError === null, 'Initial Timer read model failed', core);
         assert(Number.isSafeInteger(core.ledgerSegmentCount) && core.ledgerSegmentCount >= 0, 'Timer ledger diagnostics were unavailable', core);
-        assert(core.bridge.capability === 'FULL_NO_NATIVE_COMPLETION_HOOK', 'Packaged Bridge reported an unexpected capability', core.bridge);
+        assert(core.bridge.capability === 'FULL', 'Packaged Bridge reported an unexpected capability', core.bridge);
         assert(core.bridge.requestCount >= 1 && core.bridge.nativeMutationRequestCount === 0, 'Packaged Bridge transport was not read-only action 7', core.bridge);
-        assert(shell.health?.state === 'DEGRADED' && shell.health?.reason === EXPECTED_DEGRADED_REASON, 'B2.2 transition falsely promoted lifecycle readiness', shell);
+        assert(shell.health?.state === 'DEGRADED' && shell.health?.reason === EXPECTED_DEGRADED_REASON, 'MAIN shell no longer preserved its isolated-authority boundary', shell);
+        assert(settledHealth?.ready === true && settledHealth?.health?.state === 'READY', 'Settled B2 health did not report READY', settledHealth);
+        assert(settledHealth?.b2Settlement?.authorityDisposition === 'OWNER', 'Settled B2 health did not preserve positive OWNER evidence', settledHealth);
+        assert(['NOT_REQUIRED', 'COMPLETE_MATCH'].includes(settledHealth?.b2Settlement?.migrationDisposition), 'Settled B2 health accepted unresolved migration', settledHealth);
+        assert(settledHealth?.b2Settlement?.bridgeCapability === 'FULL', 'Settled B2 health did not report the actual Bridge capability', settledHealth);
         assert(result.network.action7.length >= 1, 'Synthetic action 7 endpoint was not called', result.network);
         assert(result.network.nativeMutationAttempts.length === 0, 'A native SquareCoil mutation was attempted', result.network.nativeMutationAttempts);
-        return { derivedState, core, lifecycle: shell.health, action7Requests: result.network.action7.length };
+        return { derivedState, core, lifecycle: shell.health, settledHealth, action7Requests: result.network.action7.length };
       }
     );
 
@@ -1867,7 +1872,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
       family,
       ['B2-TRANSITION-005'],
       'LEGACY-PREFLIGHT',
-      'Legacy presence blocks Bridge and Timer writes without exposing stored values',
+      'Malformed legacy migration fails closed without exposing stored values',
       async () => {
         await bridge.setEnabled(false);
         await waitFor(async () => {
@@ -1886,7 +1891,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
           return snapshot?.initialized === true && snapshot.blocked === true ? snapshot : null;
         }, 'legacy fail-closed trusted core', options.timeoutMs);
         const afterEnvelope = (await bridge.getStorage([AUTHORITY_STORAGE_KEY]))?.[AUTHORITY_STORAGE_KEY];
-        assert(blockedCore.preflight?.reason === 'legacy-migration-required', 'Legacy preflight returned an unexpected block reason', blockedCore);
+        assert(blockedCore.preflight?.reason === 'legacy-preflight-failed' && blockedCore.preflight?.disposition === 'FAILED', 'Legacy preflight returned an unexpected block reason', blockedCore);
         assert(blockedCore.preflight?.presentKeys?.length === 1 && blockedCore.preflight.presentKeys[0] === legacyKey, 'Legacy preflight did not report only the key identity', blockedCore.preflight);
         assert(JSON.stringify(blockedCore).includes(sensitiveSentinel) === false, 'Legacy preflight leaked the stored value', blockedCore);
         assert(afterEnvelope?.document?.revision === beforeEnvelope?.document?.revision, 'Legacy-blocked boot committed a Timer write', {

@@ -9,7 +9,8 @@ const { BUILD_ID, CANDIDATE_FINGERPRINT } = require('../core/build-identity');
 const {
   AUTHORITY_PROTOCOL_VERSION,
   AUTHORITY_CONTROL_MESSAGES,
-  KERNEL_ONLY_DISPOSITION
+  KERNEL_ONLY_DISPOSITION,
+  createB2SettlementAcknowledgment
 } = require('../extension/authority-protocol');
 const { createAuthorityClient } = require('../extension/authority-client');
 const { createTrustedTransitionCore } = require('./trusted-transition-core');
@@ -91,6 +92,46 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
       bridge: null,
       timer: null,
       readModelError: null
+    };
+  }
+
+  function settlementAuthoritySnapshot() {
+    const current = authoritySnapshot();
+    return {
+      enabled: current.enabled === true,
+      healthy: current.healthy === true,
+      disposition: current.disposition || 'UNAVAILABLE'
+    };
+  }
+
+  function settlementCoreSnapshot() {
+    const current = coreSnapshot();
+    return {
+      initialized: current.initialized === true,
+      disposed: current.disposed === true,
+      blocked: current.blocked === true,
+      status: current.status || 'unavailable',
+      preflight: current.preflight ? {
+        checked: current.preflight.checked === true,
+        blocked: current.preflight.blocked === true,
+        reason: current.preflight.reason || null,
+        disposition: current.preflight.disposition || 'UNAVAILABLE',
+        activityChanged: current.preflight.activityChanged === true,
+        presentKeys: Array.isArray(current.preflight.presentKeys) ? [...current.preflight.presentKeys] : []
+      } : null,
+      bridge: current.bridge ? {
+        initialized: current.bridge.initialized === true,
+        active: current.bridge.active === true,
+        owner: current.bridge.owner === true,
+        disposed: current.bridge.disposed === true,
+        capability: current.bridge.capability || 'UNAVAILABLE',
+        listenersAttached: current.bridge.listenersAttached === true,
+        requestCount: current.bridge.requestCount,
+        nativeMutationRequestCount: current.bridge.nativeMutationRequestCount,
+        lastReason: current.bridge.lastReason || null,
+        lastError: current.bridge.lastError || null
+      } : null,
+      readModelError: current.readModelError || null
     };
   }
 
@@ -343,7 +384,7 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
   }
 
   function onAuthorityControl(message, _sender, sendResponse) {
-    if (message?.type !== AUTHORITY_CONTROL_MESSAGES.PREPARE_DISABLE) return undefined;
+    if (![AUTHORITY_CONTROL_MESSAGES.PREPARE_DISABLE, AUTHORITY_CONTROL_MESSAGES.GET_B2_SETTLEMENT].includes(message?.type)) return undefined;
     const documentToken = ensureDocumentToken();
     if (
       message.protocolVersion !== AUTHORITY_PROTOCOL_VERSION ||
@@ -358,6 +399,10 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
         documentToken,
         runtimeInstanceId: authorityRuntimeInstanceId
       });
+      return false;
+    }
+    if (message.type === AUTHORITY_CONTROL_MESSAGES.GET_B2_SETTLEMENT) {
+      sendResponse(createB2SettlementAcknowledgment(message, settlementAuthoritySnapshot(), settlementCoreSnapshot()));
       return false;
     }
     prepareDisableAndTeardownAuthority().then(response => sendResponse({

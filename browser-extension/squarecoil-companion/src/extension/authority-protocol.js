@@ -16,10 +16,12 @@ const AUTHORITY_MESSAGES = Object.freeze({
 });
 
 const AUTHORITY_CONTROL_MESSAGES = Object.freeze({
-  PREPARE_DISABLE: `${AUTHORITY_MESSAGE_PREFIX}PREPARE_DISABLE`
+  PREPARE_DISABLE: `${AUTHORITY_MESSAGE_PREFIX}PREPARE_DISABLE`,
+  GET_B2_SETTLEMENT: `${AUTHORITY_MESSAGE_PREFIX}GET_B2_SETTLEMENT`
 });
 
 const AUTHORITY_UPDATE_ACK = `${AUTHORITY_MESSAGE_PREFIX}UPDATE_ACK`;
+const B2_SETTLEMENT_ACK = `${AUTHORITY_MESSAGE_PREFIX}B2_SETTLEMENT_ACK`;
 
 const REQUEST_TYPES = new Set([
   AUTHORITY_MESSAGES.CONNECT,
@@ -70,6 +72,33 @@ function isAuthorityUpdateAcknowledgment(value, message) {
     expectedKeys.every(key => value[key] === expected[key]);
 }
 
+function createB2SettlementAcknowledgment(message, authority, core) {
+  return Object.freeze({
+    ok: true,
+    type: B2_SETTLEMENT_ACK,
+    protocolVersion: AUTHORITY_PROTOCOL_VERSION,
+    documentToken: message.documentToken,
+    runtimeInstanceId: message.runtimeInstanceId,
+    authority,
+    core
+  });
+}
+
+function isB2SettlementAcknowledgment(value, message) {
+  if (!isPlainObject(value) || !isPlainObject(message)) return false;
+  const keys = Object.keys(value).sort();
+  const expectedKeys = ['authority', 'core', 'documentToken', 'ok', 'protocolVersion', 'runtimeInstanceId', 'type'].sort();
+  return keys.length === expectedKeys.length &&
+    keys.every((key, index) => key === expectedKeys[index]) &&
+    value.ok === true &&
+    value.type === B2_SETTLEMENT_ACK &&
+    value.protocolVersion === AUTHORITY_PROTOCOL_VERSION &&
+    value.documentToken === message.documentToken &&
+    value.runtimeInstanceId === message.runtimeInstanceId &&
+    isPlainObject(value.authority) &&
+    isPlainObject(value.core);
+}
+
 function validateAuthorityRequest(message) {
   if (!isPlainObject(message)) return { ok: false, reason: 'authority-request-invalid' };
   if (message.protocolVersion !== AUTHORITY_PROTOCOL_VERSION) {
@@ -116,11 +145,14 @@ module.exports = {
   AUTHORITY_MESSAGES,
   AUTHORITY_CONTROL_MESSAGES,
   AUTHORITY_UPDATE_ACK,
+  B2_SETTLEMENT_ACK,
   KERNEL_ONLY_DISPOSITION,
   isConcreteId,
   isPlainObject,
   isAuthorityMessageType,
   createAuthorityUpdateAcknowledgment,
   isAuthorityUpdateAcknowledgment,
+  createB2SettlementAcknowledgment,
+  isB2SettlementAcknowledgment,
   validateAuthorityRequest
 };
