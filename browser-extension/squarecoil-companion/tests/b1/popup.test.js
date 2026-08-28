@@ -339,7 +339,7 @@ test('popup gives actionable reload guidance for terminal recovery exhaustion', 
   assert.equal(document.body.dataset.health, 'attention');
   assert.equal(nodes.get('classification').textContent, 'FAILED_SAME_BUILD');
   assert.equal(nodes.get('lifecycle').textContent, 'FAILED');
-  assert.equal(nodes.get('reason').textContent, 'recovery-exhausted — Reload the SquareCoil tab.');
+  assert.equal(nodes.get('reason').textContent, 'recovery-exhausted');
   assert.equal(nodes.get('retryCleanup').hidden, true);
 });
 
@@ -516,10 +516,66 @@ test('UT-B2-READY-019 popup settlement retry policy is exactly bounded to three 
   assert.match(source, /SETTLEMENT_RETRY_DELAYS_MS\s*=\s*Object\.freeze\(\[50, 150, 450\]\)/);
 });
 
-test('UT-B2-READY-022 popup static copy preserves the final fail-closed B2 settlement gate in B6', () => {
+test('UT-B2-READY-022 popup static copy preserves the final fail-closed gate behind friendly status copy', () => {
   const html = fs.readFileSync(path.resolve(__dirname, '../../popup/popup.html'), 'utf8');
-  assert.match(html, /B6 · Release candidate/);
-  assert.match(html, /READY requires lifecycle, fenced authority, migration, trusted core, and Bridge settlement\./);
-  assert.match(html, /never bypasses those checks, restores live timer state, or modifies SquareCoil official data/);
-  assert.doesNotMatch(html, /B1 intentionally stays degraded/);
+  assert.match(html, /Companion workspace/);
+  assert.match(html, /Ready appears only after every required safety check passes\./);
+  assert.match(html, /Technical details/);
+  assert.doesNotMatch(html, /B6 · Release candidate|OWNER|fenced authority|trusted core|Bridge settlement/);
+});
+
+test('UT-B5-POPUP-001 exact healthy status and read-only page summary render in the friendly popup', async () => {
+  const listeners = new Map();
+  const nodes = new Map();
+  for (const id of ['classification', 'lifecycle', 'reason', 'runtimeId', 'retryCleanup', 'startFresh', 'enabled', 'refresh',
+    'version', 'stage', 'friendlyStatus', 'friendlyMessage', 'statusIcon', 'summaryCard', 'emptySummary', 'emptySummaryText',
+    'summaryLabel', 'summaryToday', 'summarySession', 'summaryState', 'copyDiagnostics', 'copyResult']) {
+    nodes.set(id, { id, textContent: '', hidden: false, checked: true,
+      addEventListener(type, listener) { this[`on${type}`] = listener; } });
+  }
+  const document = { body: { dataset: {} }, getElementById: id => nodes.get(id) || null,
+    addEventListener: (type, listener) => listeners.set(type, listener) };
+  const chrome = {
+    tabs: {
+      query: async () => [{ id: 17 }],
+      sendMessage: async (tabId, message) => {
+        assert.equal(tabId, 17); assert.equal(message.type, 'SC_COMPANION_GET_POPUP_SUMMARY');
+        return { ok: true, status: 'WORKING', current: { label: 'Production (General)', todayMs: 7000, sessionMs: 4000 } };
+      }
+    },
+    storage: { local: { get: async () => ({ timerEnabled: true }), set: async () => {} } },
+    runtime: { getManifest: () => ({ version: '0.7.1' }), sendMessage: async () => ({
+      ok: true, ready: true, classification: 'HEALTHY_SAME_BUILD', health: { state: 'READY', mode: 'ENABLED', reason: 'ready' }
+    }) }
+  };
+  const source = fs.readFileSync(path.resolve(__dirname, '../../src/popup/popup.js'), 'utf8');
+  vm.runInNewContext(source, { chrome, document, console }, { filename: 'src/popup/popup.js' });
+  await listeners.get('DOMContentLoaded')();
+  assert.equal(nodes.get('friendlyStatus').textContent, 'Ready');
+  assert.equal(nodes.get('summaryLabel').textContent, 'Production (General)');
+  assert.equal(nodes.get('summaryToday').textContent, '00:00:07');
+  assert.equal(nodes.get('summarySession').textContent, '00:00:04');
+  assert.equal(nodes.get('summaryCard').hidden, false);
+  assert.equal(nodes.get('emptySummary').hidden, true);
+});
+
+test('UT-B5-POPUP-002 raw READY without the exact healthy gate remains Limited', async () => {
+  const listeners = new Map(); const nodes = new Map();
+  for (const id of ['classification', 'lifecycle', 'reason', 'runtimeId', 'retryCleanup', 'startFresh', 'enabled', 'refresh',
+    'version', 'stage', 'friendlyStatus', 'friendlyMessage', 'statusIcon']) {
+    nodes.set(id, { id, textContent: '', hidden: false, checked: true,
+      addEventListener(type, listener) { this[`on${type}`] = listener; } });
+  }
+  const document = { body: { dataset: {} }, getElementById: id => nodes.get(id) || null,
+    addEventListener: (type, listener) => listeners.set(type, listener) };
+  const chrome = { tabs: { query: async () => [{ id: 9 }] },
+    storage: { local: { get: async () => ({ timerEnabled: true }), set: async () => {} } },
+    runtime: { getManifest: () => ({ version: '0.7.1' }), sendMessage: async () => ({
+      ok: false, ready: false, classification: 'DEGRADED_SAME_BUILD', health: { state: 'READY', mode: 'ENABLED', reason: 'final-gate-blocked' }
+    }) } };
+  const source = fs.readFileSync(path.resolve(__dirname, '../../src/popup/popup.js'), 'utf8');
+  vm.runInNewContext(source, { chrome, document, console }, { filename: 'src/popup/popup.js' });
+  await listeners.get('DOMContentLoaded')();
+  assert.equal(nodes.get('friendlyStatus').textContent, 'Limited');
+  assert.equal(document.body.dataset.health, 'attention');
 });

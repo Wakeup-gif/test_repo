@@ -183,3 +183,9 @@ test('UT-B5-PREF-011 optional presentation choices commit together without Timer
   assert.deepEqual(document.ledger, before.ledger);
   assert.equal(validateDocument(document), true);
 });
+
+test('UT-B5-PREF-013 Light Glass is durable while the Dark Glass name preserves the accepted Sleek Dark identity', () => {
+  assert.equal(validatePreferencePatch({ websiteTheme: 'LIGHT_GLASS' }).websiteTheme, 'LIGHT_GLASS');
+  assert.equal(normalizePreferenceSnapshot({ websiteTheme: 'DARK_GLASS' }).websiteTheme, 'SLEEK_DARK');
+  assert.equal(normalizePreferenceSnapshot({ websiteTheme: 'LIGHT_GLASS' }).websiteTheme, 'LIGHT_GLASS');
+});

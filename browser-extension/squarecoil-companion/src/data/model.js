@@ -457,7 +457,7 @@ function validateDataSafety(dataSafety, contexts) {
     }
     if (!['LIGHT', 'DARK', 'AUTO'].includes(preferences.timerAppearance) ||
         !['SOLID', 'GLASS'].includes(preferences.panelFinish) ||
-        !['ORIGINAL', 'REFINED_LIGHT', 'SLEEK_DARK'].includes(preferences.websiteTheme)) {
+        !['ORIGINAL', 'LIGHT_GLASS', 'REFINED_LIGHT', 'SLEEK_DARK'].includes(preferences.websiteTheme)) {
       throw new Error('preferences-appearance-invalid');
     }
     if (preferences.preferencesSchemaVersion >= 2 &&

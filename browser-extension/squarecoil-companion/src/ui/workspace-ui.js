@@ -35,11 +35,11 @@ const WORKSPACE_STORAGE_KEYS = new Set(['protoUiHiddenTabs', 'b3WorkspaceOrder',
 const VIEW_IDS = new Set([
   'main', 'recent', 'overview', 'by-day', 'by-context', 'history', 'context-detail',
   'settings', 'timer-appearance', 'website-theme', 'timer-limits', 'submit-ticket',
-  'presentation-packs', 'send-feedback', 'developer-support', 'data-tools'
+  'presentation-packs', 'send-feedback', 'developer-support', 'data-tools', 'advanced-diagnostics'
 ]);
 const SETTINGS_VIEW_IDS = new Set([
   'settings', 'timer-appearance', 'website-theme', 'timer-limits', 'submit-ticket',
-  'presentation-packs', 'send-feedback', 'developer-support', 'data-tools'
+  'presentation-packs', 'send-feedback', 'developer-support', 'data-tools', 'advanced-diagnostics'
 ]);
 const TIMER_ACTIONS = Object.freeze({
   pause: TIMER_COMMANDS.LOCAL_PAUSE,
@@ -97,6 +97,14 @@ function statusTone(status) {
   return 'muted';
 }
 
+function friendlyCompanionStatus(core, timer) {
+  if (core?.blocked) return Object.freeze({ label: 'Needs attention', tone: 'danger', message: 'Open Settings for recovery options.' });
+  if (timer?.running) return Object.freeze({ label: 'Working', tone: 'positive', message: 'Watching your current SquareCoil activity.' });
+  if (core?.initialized && timer) return Object.freeze({ label: 'Ready', tone: 'positive', message: 'Companion is ready when you are.' });
+  if (String(core?.status || '').includes('recover')) return Object.freeze({ label: 'Working', tone: 'warning', message: 'Reconnecting to this SquareCoil page.' });
+  return Object.freeze({ label: 'Setup required', tone: 'warning', message: 'Open a supported SquareCoil page to finish setup.' });
+}
+
 function safeProjectId(value) {
   const id = String(value || '').trim();
   return /^[1-9]\d*$/.test(id) ? id : null;
@@ -122,6 +130,9 @@ function createWorkspaceUi(options = {}) {
   const storageChanges = options.storageChanges || null;
   const getCoreHandle = options.getCoreHandle;
   const packageVersion = String(options.packageVersion || '0.7.1');
+  const buildId = String(options.buildId || 'unknown');
+  const buildStage = String(options.buildStage || 'unknown');
+  const candidateFingerprint = String(options.candidateFingerprint || 'unknown');
   const userAgent = String(options.userAgent || window?.navigator?.userAgent || '');
   if (!document || !window || !storage || typeof getCoreHandle !== 'function') throw new Error('workspace-ui-options-required');
 
@@ -146,6 +157,7 @@ function createWorkspaceUi(options = {}) {
   let workspaceRevision = 0;
   let busyAction = null;
   let errorMessage = null;
+  let lastTechnicalError = null;
   let preferencesLoaded = false;
   let lastGoodCore = null;
   let snapshotStale = false;
@@ -172,6 +184,11 @@ function createWorkspaceUi(options = {}) {
 
   function coreHandle() { return getCoreHandle() || null; }
 
+  function recordTechnicalError(error, friendlyMessage) {
+    lastTechnicalError = String(error?.message || error || 'unknown-error');
+    errorMessage = friendlyMessage;
+  }
+
   function deviceTimeZone() {
     try { return Intl.DateTimeFormat().resolvedOptions().timeZone || null; }
     catch (_) { return null; }
@@ -187,10 +204,10 @@ function createWorkspaceUi(options = {}) {
       const candidate = handle.coreSnapshot({ selectedContextId, historyLimit, deviceTimeZone: deviceTimeZone() });
       const currentRevision = lastGoodCore?.timer?.revision;
       const nextRevision = candidate?.timer?.revision;
-      if (!candidate?.timer) throw new Error(candidate?.readModelError || 'trusted-read-model-unavailable');
+      if (!candidate?.timer) throw new Error(candidate?.readModelError || 'Companion data is not available yet.');
       if (Number.isSafeInteger(currentRevision) && (!Number.isSafeInteger(nextRevision) || nextRevision < currentRevision)) {
         snapshotStale = true;
-        errorMessage = 'A stale workspace revision was rejected; showing the last trusted values.';
+        errorMessage = 'An older update was ignored; showing the latest saved values.';
         return lastGoodCore;
       }
       lastGoodCore = candidate;
@@ -379,15 +396,15 @@ function createWorkspaceUi(options = {}) {
 
   function styleBlock() {
     return `<style data-sc-proto-style>
-#${ROOT_ID}.sc-proto-root{all:initial;position:fixed!important;right:20px!important;bottom:20px!important;z-index:2147483640!important;width:410px!important;max-width:calc(100vw - 32px)!important;color-scheme:light;--sc-bg:#f4f6f8;--sc-panel:#fff;--sc-panel-2:#eef2f5;--sc-text:#18212b;--sc-muted:#65707c;--sc-border:#d8dee5;--sc-accent:#315c7a;--sc-accent-soft:#e7f0f6;--sc-positive:#26734d;--sc-positive-soft:#e5f4ec;--sc-warning:#8b5a12;--sc-warning-soft:#fff1d7;--sc-danger:#a13a3a;--sc-danger-soft:#fae6e6;--sc-shadow:0 18px 48px rgba(20,32,44,.22),0 3px 12px rgba(20,32,44,.12);font:400 13px/1.4 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important}
-#${ROOT_ID}.sc-proto-root[data-proto-theme="dark"]{color-scheme:dark;--sc-bg:#11161c;--sc-panel:#191f26;--sc-panel-2:#222a33;--sc-text:#e7edf3;--sc-muted:#9aa6b2;--sc-border:#343e49;--sc-accent:#8cb9d6;--sc-accent-soft:#203543;--sc-positive:#75c69d;--sc-positive-soft:#173628;--sc-warning:#edbe6f;--sc-warning-soft:#3b2f1b;--sc-danger:#ef9a9a;--sc-danger-soft:#442323;--sc-shadow:0 18px 52px rgba(0,0,0,.46),0 3px 14px rgba(0,0,0,.32)}
-#${ROOT_ID}.sc-proto-root *{box-sizing:border-box!important;font:inherit}#${ROOT_ID} .sc-proto-shell{overflow:hidden;border:1px solid var(--sc-border);border-radius:14px;background:var(--sc-bg);color:var(--sc-text);box-shadow:var(--sc-shadow)}#${ROOT_ID}[data-proto-surface="glass"] .sc-proto-shell{background:color-mix(in srgb,var(--sc-bg) 82%,transparent);backdrop-filter:blur(18px) saturate(125%)}
-#${ROOT_ID} .sc-proto-topbar{display:flex;align-items:center;gap:10px;min-height:44px;padding:9px 10px 8px 12px;background:var(--sc-panel);border-bottom:1px solid var(--sc-border)}#${ROOT_ID} .sc-proto-brand{min-width:0;flex:1}#${ROOT_ID} .sc-proto-brand strong{display:block;font-weight:650;font-size:13px}#${ROOT_ID} .sc-proto-brand small,#${ROOT_ID} .sc-proto-lifecycle{color:var(--sc-muted);font-size:10px}#${ROOT_ID} button,#${ROOT_ID} input{color:inherit}#${ROOT_ID} button{border:1px solid var(--sc-border);background:var(--sc-panel);border-radius:8px;padding:6px 9px;cursor:pointer}#${ROOT_ID} button:hover{background:var(--sc-panel-2)}#${ROOT_ID} button:focus-visible,#${ROOT_ID} input:focus-visible{outline:2px solid var(--sc-accent);outline-offset:2px}#${ROOT_ID} button[disabled]{opacity:.5;cursor:not-allowed}#${ROOT_ID} .sc-icon-btn{width:30px;height:30px;padding:0;display:grid;place-items:center}
+#${ROOT_ID}.sc-proto-root{all:initial;box-sizing:border-box!important;position:fixed!important;right:20px!important;bottom:20px!important;z-index:2147483640!important;width:400px!important;max-width:calc(100vw - 24px)!important;padding:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;color-scheme:light;--sc-bg:#f5f8fb;--sc-panel:#fff;--sc-panel-2:#edf3f7;--sc-text:#17212c;--sc-muted:#65717d;--sc-border:#d2dbe4;--sc-accent:#347fbd;--sc-accent-soft:#e5f1fa;--sc-positive:#26734d;--sc-positive-soft:#e4f3eb;--sc-warning:#8b5a12;--sc-warning-soft:#fff1d7;--sc-danger:#a13a3a;--sc-danger-soft:#fae6e6;--sc-shadow:0 22px 60px rgba(17,30,42,.24),0 3px 14px rgba(17,30,42,.12);font:400 13px/1.4 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important}
+#${ROOT_ID}.sc-proto-root[data-proto-theme="dark"]{color-scheme:dark;--sc-bg:#0e151c;--sc-panel:#151e27;--sc-panel-2:#1c2934;--sc-text:#eef5fb;--sc-muted:#9aa9b6;--sc-border:rgba(192,221,244,.14);--sc-accent:#61aef7;--sc-accent-soft:#17344b;--sc-positive:#7bcfa3;--sc-positive-soft:#163729;--sc-warning:#edbe6f;--sc-warning-soft:#3b2f1b;--sc-danger:#f09d9d;--sc-danger-soft:#442323;--sc-shadow:0 24px 64px rgba(0,0,0,.52),0 3px 14px rgba(0,0,0,.34)}
+#${ROOT_ID}.sc-proto-root *{box-sizing:border-box!important;font:inherit}#${ROOT_ID} .sc-proto-shell{overflow:hidden;border:1px solid var(--sc-border);border-radius:15px;background:var(--sc-bg);color:var(--sc-text);box-shadow:var(--sc-shadow)}#${ROOT_ID}[data-proto-surface="glass"] .sc-proto-shell{background:color-mix(in srgb,var(--sc-bg) 84%,transparent);-webkit-backdrop-filter:blur(18px) saturate(120%);backdrop-filter:blur(18px) saturate(120%)}
+#${ROOT_ID} .sc-proto-topbar{display:flex;align-items:center;gap:9px;min-height:52px;padding:9px 10px;background:color-mix(in srgb,var(--sc-panel) 92%,transparent);border-bottom:1px solid var(--sc-border)}#${ROOT_ID} .sc-brand-mark{display:grid;place-items:center;width:32px;height:32px;flex:0 0 32px;border-radius:9px;background:var(--sc-accent);color:#fff;font-size:11px;font-weight:800;letter-spacing:.03em;box-shadow:0 4px 14px color-mix(in srgb,var(--sc-accent) 28%,transparent)}#${ROOT_ID} .sc-proto-brand{min-width:0;flex:1}#${ROOT_ID} .sc-proto-brand strong{display:block;font-weight:720;font-size:13px;letter-spacing:-.01em}#${ROOT_ID} .sc-proto-brand small{display:block;color:var(--sc-muted);font-size:9.5px}#${ROOT_ID} .sc-proto-status{display:inline-flex;align-items:center;gap:5px;color:var(--sc-muted);font-size:10px;white-space:nowrap}#${ROOT_ID} .sc-proto-status::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}#${ROOT_ID} .sc-proto-status[data-tone="positive"]{color:var(--sc-positive)}#${ROOT_ID} .sc-proto-status[data-tone="warning"]{color:var(--sc-warning)}#${ROOT_ID} .sc-proto-status[data-tone="danger"]{color:var(--sc-danger)}#${ROOT_ID} button,#${ROOT_ID} input{color:inherit}#${ROOT_ID} button{border:1px solid var(--sc-border);background:var(--sc-panel);border-radius:8px;padding:6px 9px;cursor:pointer;transition:background-color .14s ease,border-color .14s ease,transform .14s ease}#${ROOT_ID} button:hover{background:var(--sc-panel-2);border-color:color-mix(in srgb,var(--sc-accent) 38%,var(--sc-border))}#${ROOT_ID} button:active{transform:translateY(1px)}#${ROOT_ID} button:focus-visible,#${ROOT_ID} input:focus-visible,#${ROOT_ID} select:focus-visible,#${ROOT_ID} textarea:focus-visible,#${ROOT_ID} summary:focus-visible{outline:2px solid var(--sc-accent);outline-offset:2px}#${ROOT_ID} button[disabled]{opacity:.5;cursor:not-allowed}#${ROOT_ID} .sc-icon-btn{width:30px;height:30px;padding:0;display:grid;place-items:center}
 #${ROOT_ID} .sc-tabs{display:flex;gap:4px;align-items:stretch;padding:8px 8px 0;overflow-x:auto;background:var(--sc-panel-2);border-bottom:1px solid var(--sc-border)}#${ROOT_ID} .sc-tab{min-width:68px;max-width:108px;min-height:42px;display:grid;grid-template-columns:8px minmax(0,1fr) auto;grid-template-rows:auto auto;gap:0 5px;padding:4px 6px;border-radius:8px 8px 0 0;border-bottom:0;background:transparent;color:var(--sc-muted)}#${ROOT_ID} .sc-tab[data-selected="true"]{background:var(--sc-bg);color:var(--sc-text);position:relative;top:1px}#${ROOT_ID} .sc-tab-label,#${ROOT_ID} .sc-tab-time{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}#${ROOT_ID} .sc-tab-label{font-size:10.5px;font-weight:650}#${ROOT_ID} .sc-tab-time{font-size:9px}#${ROOT_ID} .sc-tab-x{border:0;background:transparent;padding:0;width:14px;height:14px;font-size:12px}#${ROOT_ID} .sc-dot{width:6px;height:6px;border-radius:50%;align-self:center;background:var(--sc-muted)}#${ROOT_ID} .sc-dot[data-tone="positive"]{background:var(--sc-positive)}#${ROOT_ID} .sc-dot[data-tone="warning"]{background:var(--sc-warning)}#${ROOT_ID} .sc-dot[data-tone="danger"]{background:var(--sc-danger)}#${ROOT_ID} .sc-tab[data-threshold="YELLOW"]{box-shadow:inset 0 3px #d9a51f}#${ROOT_ID} .sc-tab[data-threshold="ORANGE"]{box-shadow:inset 0 3px #d97820}#${ROOT_ID} .sc-tab[data-threshold="RED"]{box-shadow:inset 0 3px var(--sc-danger)}
-#${ROOT_ID} .sc-content{max-height:540px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}#${ROOT_ID} .sc-view{padding:12px}#${ROOT_ID} .sc-current-strip{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;margin-bottom:9px;border:1px solid var(--sc-border);background:var(--sc-panel);border-radius:9px}#${ROOT_ID} .sc-eyebrow{color:var(--sc-muted);font-size:10px;text-transform:uppercase;letter-spacing:.06em}#${ROOT_ID} .sc-title{margin-top:2px;font-size:15px;font-weight:680;overflow-wrap:anywhere}#${ROOT_ID} .sc-status{display:inline-flex;align-items:center;gap:6px;margin-top:6px;border-radius:999px;padding:3px 7px;font-size:10.5px;font-weight:650;background:var(--sc-panel-2);color:var(--sc-muted)}#${ROOT_ID} .sc-status[data-tone="positive"]{background:var(--sc-positive-soft);color:var(--sc-positive)}#${ROOT_ID} .sc-status[data-tone="warning"]{background:var(--sc-warning-soft);color:var(--sc-warning)}#${ROOT_ID} .sc-status[data-tone="danger"]{background:var(--sc-danger-soft);color:var(--sc-danger)}
+#${ROOT_ID} .sc-content{max-height:560px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}#${ROOT_ID} .sc-view{padding:12px}#${ROOT_ID} .sc-current-strip{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;margin-bottom:9px;border:1px solid var(--sc-border);background:var(--sc-panel);border-radius:10px}#${ROOT_ID} .sc-eyebrow{color:var(--sc-muted);font-size:9.5px;text-transform:uppercase;letter-spacing:.075em;font-weight:650}#${ROOT_ID} .sc-title{margin-top:2px;font-size:15px;font-weight:700;overflow-wrap:anywhere}#${ROOT_ID} .sc-status{display:inline-flex;align-items:center;gap:6px;margin-top:6px;border-radius:999px;padding:3px 7px;font-size:10.5px;font-weight:650;background:var(--sc-panel-2);color:var(--sc-muted)}#${ROOT_ID} .sc-status[data-tone="positive"]{background:var(--sc-positive-soft);color:var(--sc-positive)}#${ROOT_ID} .sc-status[data-tone="warning"]{background:var(--sc-warning-soft);color:var(--sc-warning)}#${ROOT_ID} .sc-status[data-tone="danger"]{background:var(--sc-danger-soft);color:var(--sc-danger)}
 #${ROOT_ID} .sc-timer-card{padding:13px;border:1px solid var(--sc-border);border-radius:11px;background:var(--sc-panel)}#${ROOT_ID} .sc-metrics,#${ROOT_ID} .sc-summary-grid{display:grid;grid-template-columns:1.25fr 1fr;gap:9px;margin-top:12px}#${ROOT_ID} .sc-metric,#${ROOT_ID} .sc-summary{padding:10px;border:1px solid var(--sc-border);border-radius:9px;background:var(--sc-panel-2)}#${ROOT_ID} .sc-metric strong,#${ROOT_ID} .sc-summary strong{display:block;margin-top:2px;font-size:18px;font-weight:700}#${ROOT_ID} .sc-session{margin-top:10px;color:var(--sc-muted);font-size:11px;display:flex;justify-content:space-between}#${ROOT_ID} .sc-actions,#${ROOT_ID} .sc-row-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}#${ROOT_ID} .sc-actions .sc-primary{background:var(--sc-accent);border-color:var(--sc-accent);color:var(--sc-bg);font-weight:650}#${ROOT_ID} .sc-nav-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}#${ROOT_ID} .sc-nav-grid button{text-align:left;min-height:44px}#${ROOT_ID} .sc-nav-grid strong{display:block;font-size:11.5px;font-weight:650}#${ROOT_ID} .sc-nav-grid small{display:block;color:var(--sc-muted);font-size:9.5px;margin-top:2px}#${ROOT_ID} .sc-search{display:flex;gap:7px;margin-top:10px}#${ROOT_ID} .sc-search input{min-width:0;flex:1;border:1px solid var(--sc-border);border-radius:8px;background:var(--sc-panel);padding:7px 9px}
-#${ROOT_ID} .sc-view-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}#${ROOT_ID} .sc-view-head strong{flex:1;font-size:14px;font-weight:680}#${ROOT_ID} .sc-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--sc-border)}#${ROOT_ID} .sc-row-title{font-weight:620;font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#${ROOT_ID} .sc-row-meta{color:var(--sc-muted);font-size:10px;margin-top:2px}#${ROOT_ID} .sc-row-actions{margin-top:0;justify-content:flex-end}#${ROOT_ID} .sc-row-actions button{padding:4px 7px;font-size:10px}#${ROOT_ID} .sc-choice{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:7px}#${ROOT_ID} .sc-choice button[data-active="true"]{border-color:var(--sc-accent);background:var(--sc-accent-soft);color:var(--sc-accent);font-weight:650}#${ROOT_ID} .sc-note,#${ROOT_ID} .sc-stale{margin-top:9px;padding:8px 9px;border-radius:8px;background:var(--sc-panel-2);color:var(--sc-muted);font-size:10px}#${ROOT_ID} .sc-stale{background:var(--sc-warning-soft);color:var(--sc-warning)}#${ROOT_ID} .sc-error{margin:0 12px 10px;padding:8px 9px;border-radius:8px;background:var(--sc-danger-soft);color:var(--sc-danger);font-size:10px}#${ROOT_ID} .sc-empty{padding:18px 8px;text-align:center;color:var(--sc-muted);font-size:11px}#${ROOT_ID} .sc-foot{padding:7px 10px;border-top:1px solid var(--sc-border);background:var(--sc-panel);color:var(--sc-muted);font-size:9.5px}#${ROOT_ID}[data-proto-collapsed="true"]{width:292px!important}#${ROOT_ID}[data-proto-collapsed="true"] .sc-tabs,#${ROOT_ID}[data-proto-collapsed="true"] .sc-content,#${ROOT_ID}[data-proto-collapsed="true"] .sc-foot{display:none}@media(max-width:460px){#${ROOT_ID}.sc-proto-root{right:8px!important;bottom:8px!important;width:calc(100vw - 16px)!important}}
-#${ROOT_ID} .sc-section-label{margin-top:14px}#${ROOT_ID} .sc-choice-three{grid-template-columns:repeat(3,1fr)}#${ROOT_ID} label{display:block;margin-top:9px;color:var(--sc-muted);font-size:10px}#${ROOT_ID} label input,#${ROOT_ID} label select,#${ROOT_ID} label textarea{display:block;width:100%;margin-top:4px;padding:7px 8px;border:1px solid var(--sc-border);border-radius:8px;background:var(--sc-panel);color:var(--sc-text)}#${ROOT_ID} label textarea{resize:vertical;min-height:86px}#${ROOT_ID} .sc-field-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}#${ROOT_ID} .sc-check{display:flex;align-items:center;gap:7px}#${ROOT_ID} .sc-check input{display:inline-block;width:auto;margin:0}#${ROOT_ID} .sc-diagnostics{max-height:170px;overflow:auto;white-space:pre-wrap;word-break:break-word;margin:9px 0 0;padding:8px;border:1px solid var(--sc-border);border-radius:8px;background:var(--sc-panel-2);color:var(--sc-text);font:10px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace!important}@media(forced-colors:active){#${ROOT_ID}.sc-proto-root{forced-color-adjust:auto}#${ROOT_ID} .sc-proto-shell,#${ROOT_ID} button,#${ROOT_ID} input,#${ROOT_ID} select,#${ROOT_ID} textarea{border:1px solid ButtonText;box-shadow:none;background:Canvas;color:CanvasText}#${ROOT_ID}[data-proto-surface="glass"] .sc-proto-shell{backdrop-filter:none}}
+#${ROOT_ID} .sc-view-head{display:flex;align-items:center;gap:8px;margin-bottom:12px}#${ROOT_ID} .sc-view-head strong{flex:1;font-size:14px;font-weight:700}#${ROOT_ID} .sc-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--sc-border)}#${ROOT_ID} .sc-row-title{font-weight:640;font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#${ROOT_ID} .sc-row-meta{color:var(--sc-muted);font-size:10px;margin-top:2px}#${ROOT_ID} .sc-row-actions{margin-top:0;justify-content:flex-end}#${ROOT_ID} .sc-row-actions button{padding:4px 7px;font-size:10px}#${ROOT_ID} .sc-choice{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:7px}#${ROOT_ID} .sc-choice button[data-active="true"]{border-color:var(--sc-accent);background:var(--sc-accent-soft);color:var(--sc-accent);font-weight:650}#${ROOT_ID} .sc-note,#${ROOT_ID} .sc-stale{margin-top:9px;padding:8px 9px;border-radius:8px;background:var(--sc-panel-2);color:var(--sc-muted);font-size:10px}#${ROOT_ID} .sc-stale{background:var(--sc-warning-soft);color:var(--sc-warning)}#${ROOT_ID} .sc-error{margin:0 12px 10px;padding:8px 9px;border-radius:8px;background:var(--sc-danger-soft);color:var(--sc-danger);font-size:10px}#${ROOT_ID} .sc-empty{padding:20px 10px;text-align:center;color:var(--sc-muted);font-size:11px}#${ROOT_ID} .sc-empty strong{display:block;margin-bottom:4px;color:var(--sc-text);font-size:12px}#${ROOT_ID} .sc-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-top:1px solid var(--sc-border);background:var(--sc-panel);color:var(--sc-muted);font-size:9.5px}#${ROOT_ID} .sc-foot button{border:0;background:transparent;padding:3px;color:var(--sc-muted);font-size:9.5px}#${ROOT_ID}[data-proto-collapsed="true"]{width:292px!important}#${ROOT_ID}[data-proto-collapsed="true"] .sc-tabs,#${ROOT_ID}[data-proto-collapsed="true"] .sc-content,#${ROOT_ID}[data-proto-collapsed="true"] .sc-foot{display:none}@media(max-width:460px){#${ROOT_ID}.sc-proto-root{right:8px!important;bottom:8px!important;width:calc(100vw - 16px)!important}}
+#${ROOT_ID} .sc-section-label{margin-top:16px}#${ROOT_ID} .sc-choice-three{grid-template-columns:repeat(3,1fr)}#${ROOT_ID} label{display:block;margin-top:9px;color:var(--sc-muted);font-size:10px}#${ROOT_ID} label input,#${ROOT_ID} label select,#${ROOT_ID} label textarea{display:block;width:100%;margin-top:4px;padding:7px 8px;border:1px solid var(--sc-border);border-radius:8px;background:var(--sc-panel);color:var(--sc-text)}#${ROOT_ID} label textarea{resize:vertical;min-height:86px}#${ROOT_ID} .sc-field-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}#${ROOT_ID} .sc-check{display:flex;align-items:center;gap:7px}#${ROOT_ID} .sc-check input{display:inline-block;width:auto;margin:0}#${ROOT_ID} .sc-unavailable{min-height:48px;padding:8px 9px;border:1px dashed var(--sc-border);border-radius:9px;background:color-mix(in srgb,var(--sc-panel-2) 60%,transparent);opacity:.78}#${ROOT_ID} .sc-unavailable strong,#${ROOT_ID} .sc-unavailable small{display:block}#${ROOT_ID} .sc-unavailable strong{font-size:11.5px}#${ROOT_ID} .sc-unavailable small{margin-top:2px;color:var(--sc-muted);font-size:9.5px}#${ROOT_ID} .sc-theme-list{display:grid;gap:7px}#${ROOT_ID} .sc-theme-choice{display:grid;grid-template-columns:44px minmax(0,1fr) 18px;align-items:center;gap:10px;width:100%;padding:8px;text-align:left}#${ROOT_ID} .sc-theme-choice>span:nth-child(2)>strong,#${ROOT_ID} .sc-theme-choice>span:nth-child(2)>small{display:block}#${ROOT_ID} .sc-theme-choice small{margin-top:2px;color:var(--sc-muted);font-size:9.5px}#${ROOT_ID} .sc-theme-choice[data-active="true"]{border-color:var(--sc-accent);box-shadow:inset 0 0 0 1px var(--sc-accent)}#${ROOT_ID} .sc-theme-swatch{display:grid;place-items:center;height:36px;border:1px solid var(--sc-border);border-radius:7px;font-weight:750}#${ROOT_ID} .sc-theme-swatch[data-theme-swatch="SLEEK_DARK"]{color:#eef5fb;background:#0c1721}#${ROOT_ID} .sc-theme-swatch[data-theme-swatch="LIGHT_GLASS"]{color:#243441;background:rgba(248,251,254,.78)}#${ROOT_ID} .sc-theme-swatch[data-theme-swatch="REFINED_LIGHT"]{color:#17212c;background:#fff}#${ROOT_ID} .sc-radio{width:14px;height:14px;border:2px solid var(--sc-border);border-radius:50%}#${ROOT_ID} .sc-theme-choice[data-active="true"] .sc-radio{border:4px solid var(--sc-accent)}#${ROOT_ID} .sc-health-summary{display:flex;align-items:center;gap:10px;padding:11px;border:1px solid var(--sc-border);border-radius:10px;background:var(--sc-panel)}#${ROOT_ID} .sc-health-icon{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--sc-positive-soft);color:var(--sc-positive);font-weight:800}#${ROOT_ID} .sc-health-summary[data-tone="warning"] .sc-health-icon{background:var(--sc-warning-soft);color:var(--sc-warning)}#${ROOT_ID} .sc-health-summary[data-tone="danger"] .sc-health-icon{background:var(--sc-danger-soft);color:var(--sc-danger)}#${ROOT_ID} .sc-health-summary strong,#${ROOT_ID} .sc-health-summary small{display:block}#${ROOT_ID} .sc-health-summary small{margin-top:2px;color:var(--sc-muted);font-size:10px}#${ROOT_ID} .sc-technical{margin-top:10px;padding:9px;border:1px solid var(--sc-border);border-radius:9px;background:var(--sc-panel)}#${ROOT_ID} .sc-technical summary{cursor:pointer;font-weight:650}#${ROOT_ID} .sc-technical p{margin:8px 0 0;color:var(--sc-muted);font-size:10px}#${ROOT_ID} .sc-diagnostics{max-height:190px;overflow:auto;white-space:pre-wrap;word-break:break-word;margin:9px 0 0;padding:8px;border:1px solid var(--sc-border);border-radius:8px;background:var(--sc-panel-2);color:var(--sc-text);font:10px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace!important}@media(prefers-reduced-motion:reduce){#${ROOT_ID} button{transition:none}}@media(forced-colors:active){#${ROOT_ID}.sc-proto-root{forced-color-adjust:auto}#${ROOT_ID} .sc-proto-shell,#${ROOT_ID} button,#${ROOT_ID} input,#${ROOT_ID} select,#${ROOT_ID} textarea{border:1px solid ButtonText;box-shadow:none;background:Canvas;color:CanvasText}#${ROOT_ID}[data-proto-surface="glass"] .sc-proto-shell{-webkit-backdrop-filter:none;backdrop-filter:none}}
 </style>`;
   }
 
@@ -421,19 +438,19 @@ function createWorkspaceUi(options = {}) {
   function searchMarkup() { return `<form class="sc-search" data-sc-search-form><input name="projectId" inputmode="search" autocomplete="off" placeholder="Find known context or open job #"><button type="submit">Find</button></form>`; }
 
   function mainNavigationMarkup() {
-    return '<div class="sc-nav-grid"><button data-action="view" data-view="recent"><strong>Recent Jobs</strong><small>Visibility, recency, status</small></button><button data-action="view" data-view="overview"><strong>Time Overview</strong><small>Today, week, day, context</small></button><button data-action="view" data-view="history"><strong>History</strong><small>Finalized logical sessions</small></button><button data-action="view" data-view="settings"><strong>Settings</strong><small>Appearance, limits &amp; support</small></button></div>';
+    return '<div class="sc-nav-grid"><button data-action="view" data-view="recent"><strong>Recent jobs</strong><small>Visibility, recency, status</small></button><button data-action="view" data-view="overview"><strong>Time overview</strong><small>Today, week, day, context</small></button><button data-action="view" data-view="history"><strong>History</strong><small>Completed Companion sessions</small></button><button data-action="view" data-view="settings"><strong>Settings</strong><small>Appearance, tracking and privacy</small></button></div>';
   }
 
   function currentStrip(timer, operational, selected) {
     if (!operational) return '';
     const different = operational.contextId !== selected?.contextId;
-    return `<div class="sc-current-strip"><div><div class="sc-eyebrow">Actually running / observed</div><div class="sc-row-title">${escapeHtml(operational.label)}</div><div class="sc-row-meta">Today ${formatDuration(operational.todayMs, { compact: true })}${marker(operational)} · ${escapeHtml(statusLabel(operational.status))}</div></div>${different ? `<button data-action="select" data-context="${escapeHtml(operational.contextId)}">View</button>` : ''}</div>`;
+    return `<div class="sc-current-strip"><div><div class="sc-eyebrow">Working now</div><div class="sc-row-title">${escapeHtml(operational.label)}</div><div class="sc-row-meta">Today ${formatDuration(operational.todayMs, { compact: true })}${marker(operational)} · ${escapeHtml(statusLabel(operational.status))}</div></div>${different ? `<button data-action="select" data-context="${escapeHtml(operational.contextId)}">View</button>` : ''}</div>`;
   }
 
   function mainView(timer) {
     const selected = selectedRow(timer);
     const operational = currentRow(timer);
-    if (!selected) return `<div class="sc-view"><div class="sc-empty"><strong>No Companion job history yet.</strong><br>Clock in or open a SquareCoil job to begin tracking. Settings and local data tools are available now.</div>${mainNavigationMarkup()}${searchMarkup()}</div>`;
+    if (!selected) return `<div class="sc-view"><div class="sc-empty"><strong>No recent jobs yet.</strong><br>Open a SquareCoil job to begin. Settings, history and local data tools are available now.</div>${mainNavigationMarkup()}${searchMarkup()}</div>`;
     const selectedOperational = selected.contextId === timer.currentContextId;
     const status = selected.status || 'NOT_RUNNING';
     const activeSession = selectedOperational && status.startsWith('RUNNING') && timer.running;
@@ -443,10 +460,10 @@ function createWorkspaceUi(options = {}) {
     if (selectedOperational && timer.availableActions?.localResume) actions.push('<button class="sc-primary" data-action="timer" data-timer-action="localResume">Resume locally</button>');
     const open = openButton(selected); if (open) actions.push(open);
     actions.push(`<button data-action="context-detail" data-context="${escapeHtml(selected.contextId)}">Context detail</button>`);
-    const pending = selectedOperational && timer.pending ? `<div class="sc-note">Awaiting choice. Resume can begin from ${escapeHtml(formatClockTime(timer.pending.safeStartAnchorMs))}; this safe anchor is not counted until a choice commits.</div>` : '';
-    const hold = selected.isSafetyHeld ? '<div class="sc-note">Companion stopped extending the local value at the shared verification boundary. This does not claim that the native SquareCoil clock was paused.</div>' : '';
+    const pending = selectedOperational && timer.pending ? `<div class="sc-note">Choose Resume or Start fresh. Time is not added until you choose.</div>` : '';
+    const hold = selected.isSafetyHeld ? '<div class="sc-note">Time is paused here while Companion verifies the page. Your SquareCoil clock was not changed.</div>' : '';
     const native = timer.nativeDisposition && timer.nativeDisposition !== 'TRACKABLE_CONTEXT'
-      ? `<div class="sc-note">Native disposition: ${escapeHtml(timer.nativeDisposition.toLowerCase().replace(/_/g, ' '))}. This is separate from the selected Context status.</div>` : '';
+      ? '<div class="sc-note">This page is visible, but it is not currently eligible for local time tracking.</div>' : '';
     return `<div class="sc-view">${currentStrip(timer, operational, selected)}<section class="sc-timer-card"><div class="sc-eyebrow">${selected.kind === 'job' ? `Job ${escapeHtml(selected.projectId)}` : 'General context'}</div><div class="sc-title">${escapeHtml(selected.label)}</div><div class="sc-status" data-tone="${statusTone(status)}"><span class="sc-dot" data-tone="${statusTone(status)}"></span>${escapeHtml(statusLabel(status))}</div><div class="sc-metrics"><div class="sc-metric"><span class="sc-eyebrow">Today</span><strong>${formatDuration(selected.todayMs)}${selected.isProvisional ? '*' : ''}</strong></div><div class="sc-metric"><span class="sc-eyebrow">${selected.kind === 'job' ? 'Job total' : 'Context total'}</span><strong>${formatDuration(selected.totalMs)}${selected.isProvisional ? '*' : ''}</strong></div></div>${activeSession ? `<div class="sc-session"><span>Current session${timer.running.provisional ? ' · provisional' : ''}</span><strong>${formatDuration(timer.running.elapsedMs)}</strong></div>` : ''}${pending}${hold}${native}<div class="sc-actions">${busyAction ? '<button disabled>Working…</button>' : actions.join('')}</div></section>${mainNavigationMarkup()}${searchMarkup()}</div>`;
   }
 
@@ -477,7 +494,7 @@ function createWorkspaceUi(options = {}) {
 
   function historyView(timer) {
     const rows = timer.historyRows || [];
-    return `<div class="sc-view">${viewHeader('History')}${rows.length ? rows.map(row => `<div class="sc-row"><div><div class="sc-row-title">${escapeHtml(row.label)}</div><div class="sc-row-meta">${escapeHtml(row.localDates?.join(' → ') || row.localDate)} · ${escapeHtml(formatClockTime(row.startAtMs))} to ${escapeHtml(formatClockTime(row.endAtMs))}${row.endReason ? ` · ${escapeHtml(row.endReason)}` : ''}</div><div class="sc-row-meta">Session ${escapeHtml(row.sessionId)} · cycle ${escapeHtml(row.cycleId)} · ${row.segmentIds?.length || 1} ledger segment${(row.segmentIds?.length || 1) === 1 ? '' : 's'}</div></div><strong>${formatDuration(row.durationMs, { compact: true })}</strong></div>`).join('') : '<div class="sc-empty">No completed Companion sessions yet.</div>'}${timer.historyHasMore ? `<div class="sc-actions"><button data-action="load-history">Load more (${timer.historyRows.length} of ${timer.historyTotal})</button></div>` : ''}<div class="sc-note">History contains finalized Companion work only. Live sessions remain in the current-session area.</div></div>`;
+    return `<div class="sc-view">${viewHeader('History')}${rows.length ? rows.map(row => `<div class="sc-row" data-history-session="${escapeHtml(row.sessionId || '')}"><div><div class="sc-row-title">${escapeHtml(row.label)}</div><div class="sc-row-meta">${escapeHtml(row.localDates?.join(' → ') || row.localDate)} · ${escapeHtml(formatClockTime(row.startAtMs))} to ${escapeHtml(formatClockTime(row.endAtMs))}</div></div><strong>${formatDuration(row.durationMs, { compact: true })}</strong></div>`).join('') : '<div class="sc-empty">No completed Companion sessions yet.</div>'}${timer.historyHasMore ? `<div class="sc-actions"><button data-action="load-history">Load more (${timer.historyRows.length} of ${timer.historyTotal})</button></div>` : ''}<div class="sc-note">Current work stays on the Home screen until the session is complete.</div></div>`;
   }
 
   function contextDetailView(timer) {
@@ -490,8 +507,28 @@ function createWorkspaceUi(options = {}) {
     return `<button data-action="settings-route" data-view="${escapeHtml(viewName)}"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(detail)}</small></button>`;
   }
 
+  function websiteThemeLabel(value) {
+    return ({
+      ORIGINAL: 'Native / Off',
+      SLEEK_DARK: 'Dark Glass v2.3.4',
+      LIGHT_GLASS: 'Light Glass v1.0.0',
+      REFINED_LIGHT: 'Refined Light v1.0.1'
+    })[value] || 'Native / Off';
+  }
+
+  function optionalStateLabel(feature) {
+    const state = String(feature?.state || 'DISABLED');
+    if (state === 'APPLIED') return 'On';
+    if (state === 'PARTIAL_SAFE') return 'Limited on this page';
+    if (state === 'DEGRADED_FALLBACK') return 'Using saved wallpaper';
+    if (state === 'SUSPENDED_ACCESSIBILITY') return 'Off for accessibility';
+    if (state === 'SUSPENDED_THEME') return 'Choose a Glass theme first';
+    if (state === 'INACTIVE_PAGE') return 'Ready on supported pages';
+    return 'Off';
+  }
+
   function settingsView() {
-    return `<div class="sc-view">${viewHeader('Settings')}<div class="sc-eyebrow">Timer</div><div class="sc-nav-grid">${settingsNav('timer-appearance', 'Appearance & Finish', `${theme} · ${surface}`)}${settingsNav('timer-limits', 'Timer Limits', `${limitDraft?.yellowMinutes ?? 60} / ${limitDraft?.orangeMinutes ?? 120} / ${limitDraft?.redMinutes ?? 240} min`)}</div><div class="sc-eyebrow sc-section-label">Library</div><div class="sc-nav-grid">${settingsNav('recent', 'Recent Jobs', 'Visibility and archive actions')}${settingsNav('overview', 'Time Overview', 'Today, week, day, context')}${settingsNav('history', 'History', 'Finalized Companion sessions')}${settingsNav('data-tools', 'Archives & Backup', 'Data tools: backup, restore, CSV, cleanup')}</div><div class="sc-eyebrow sc-section-label">SquareCoil</div><div class="sc-nav-grid">${settingsNav('website-theme', 'Website Theme', websiteTheme.replace(/_/g, ' '))}${settingsNav('presentation-packs', 'Optional Presentation', `${cinematicBackground} · dashboard ${dashboardProfile}`)}</div><div class="sc-eyebrow sc-section-label">Support</div><div class="sc-nav-grid">${settingsNav('submit-ticket', 'Submit a Ticket', `Email ${SUPPORT_EMAIL}`)}${settingsNav('send-feedback', 'Send Feedback', 'Suggestion, UI / UX, feature idea')}</div><div class="sc-eyebrow sc-section-label">About</div><div class="sc-nav-grid">${settingsNav('developer-support', 'Support the Developer', 'Free app · optional tips')}</div></div>`;
+    return `<div class="sc-view">${viewHeader('Settings')}<div class="sc-eyebrow">Appearance</div><div class="sc-nav-grid">${settingsNav('timer-appearance', 'Companion appearance', `${theme === 'AUTO' ? 'System' : theme === 'DARK' ? 'Dark' : 'Light'} · ${surface === 'GLASS' ? 'Glass' : 'Solid'}`)}${settingsNav('website-theme', 'SquareCoil theme', websiteThemeLabel(websiteTheme))}</div><div class="sc-eyebrow sc-section-label">Time tracking</div><div class="sc-nav-grid">${settingsNav('timer-limits', 'Time color limits', `${limitDraft?.yellowMinutes ?? 60} / ${limitDraft?.orangeMinutes ?? 120} / ${limitDraft?.redMinutes ?? 240} min`)}${settingsNav('overview', 'Time overview', 'Today, week, day and job')}${settingsNav('history', 'History', 'Completed Companion sessions')}</div><div class="sc-eyebrow sc-section-label">Jobs and watching</div><div class="sc-nav-grid">${settingsNav('recent', 'Recent jobs', 'Visibility and archive actions')}<div class="sc-unavailable" aria-disabled="true"><strong>Watched-job changes</strong><small>Not available yet · needs a verified read-only source</small></div></div><div class="sc-eyebrow sc-section-label">Notifications</div><div class="sc-unavailable" aria-disabled="true"><strong>SquareCoil alerts</strong><small>Not available yet · no proven notification source</small></div><div class="sc-eyebrow sc-section-label">Dashboard</div><div class="sc-nav-grid">${settingsNav('presentation-packs', 'Wallpaper and dashboard', `${cinematicBackground === 'CINEMATIC' ? 'Wallpaper on' : 'Wallpaper off'} · dashboard ${dashboardProfile === 'ON' ? 'on' : 'off'}`)}</div><div class="sc-eyebrow sc-section-label">Privacy and permissions</div><div class="sc-nav-grid">${settingsNav('data-tools', 'Local data and backups', 'Export, restore and cleanup')}</div><div class="sc-eyebrow sc-section-label">Advanced diagnostics</div><div class="sc-nav-grid">${settingsNav('advanced-diagnostics', 'Technical details', 'Status and privacy-safe diagnostics')}${settingsNav('submit-ticket', 'Submit a ticket', `Email ${SUPPORT_EMAIL}`)}${settingsNav('send-feedback', 'Send feedback', 'Suggestion, UI / UX or feature idea')}${settingsNav('developer-support', 'Support the developer', 'Free app · optional tips')}</div></div>`;
   }
 
   function choiceMarkup(action, values, current) {
@@ -503,28 +540,31 @@ function createWorkspaceUi(options = {}) {
     const effectiveFinish = presentation?.panelFinishEffective || surface;
     const finishNote = surface === 'GLASS' && effectiveFinish === 'SOLID_FALLBACK'
       ? '<div class="sc-note">Glass is selected, but this browser or accessibility mode currently uses a readable Solid fallback.</div>' : '';
-    return `<div class="sc-view">${viewHeader('Appearance & Finish', 'settings')}<div class="sc-eyebrow">Timer Appearance</div>${choiceMarkup('preference', [['LIGHT', 'Light'], ['DARK', 'Dark'], ['AUTO', 'Auto']], theme)}<div class="sc-note">Preference ${escapeHtml(theme)} · effective ${escapeHtml(effectiveTheme)}. Auto follows the system color scheme without changing the saved preference.</div><div class="sc-eyebrow sc-section-label">Panel Finish</div>${choiceMarkup('preference-finish', [['SOLID', 'Solid'], ['GLASS', 'Glass']], surface)}${finishNote}</div>`;
+    return `<div class="sc-view">${viewHeader('Companion appearance', 'settings')}<div class="sc-eyebrow">Color</div>${choiceMarkup('preference', [['LIGHT', 'Light'], ['DARK', 'Dark'], ['AUTO', 'System']], theme)}<div class="sc-note">System follows your browser or operating-system appearance.</div><div class="sc-eyebrow sc-section-label">Panel finish</div>${choiceMarkup('preference-finish', [['SOLID', 'Solid'], ['GLASS', 'Glass']], surface)}${finishNote}</div>`;
   }
 
   function websiteThemeView() {
-    const effective = presentation?.websiteThemeEffective || websiteTheme;
-    const logo = presentation?.logoStatus || 'native-logo';
-    return `<div class="sc-view">${viewHeader('SquareCoil Website Theme', 'settings')}${choiceMarkup('preference-site', [['ORIGINAL', 'Original'], ['REFINED_LIGHT', 'Refined Light'], ['SLEEK_DARK', 'Sleek Dark']], websiteTheme)}<div class="sc-note">Preference ${escapeHtml(websiteTheme.replace(/_/g, ' '))} · effective ${escapeHtml(effective.replace(/_/g, ' '))}. Styling is presentation-only and never changes native controls or clock actions.</div>${websiteTheme === 'SLEEK_DARK' && !String(logo).startsWith('configured') ? '<div class="sc-note">The approved dark logo is unavailable, so the native logo remains visible.</div>' : ''}</div>`;
+    return `<div class="sc-view">${viewHeader('SquareCoil theme', 'settings')}<div class="sc-theme-list">${[
+      ['ORIGINAL', 'Native / Off', 'Use SquareCoil as provided.'],
+      ['SLEEK_DARK', 'Dark Glass', 'v2.3.4 · transparent, low-light workspace'],
+      ['LIGHT_GLASS', 'Light Glass', 'v1.0.0 · pale translucent workspace'],
+      ['REFINED_LIGHT', 'Refined Light', 'v1.0.1 · bright, high-clarity workspace']
+    ].map(([value, label, detail]) => `<button class="sc-theme-choice" data-action="preference-site" data-value="${value}" data-active="${websiteTheme === value}"><span class="sc-theme-swatch" data-theme-swatch="${value}">SC</span><span><strong>${label}</strong><small>${detail}</small></span><span class="sc-radio" aria-hidden="true"></span></button>`).join('')}</div><div class="sc-note">Themes change appearance only. SquareCoil buttons, values and clock actions remain untouched.</div></div>`;
   }
 
   function presentationPacksView() {
     const optional = presentation?.optional || {};
     const cinematic = optional.cinematic || {};
     const dashboard = optional.dashboard || {};
-    const eligibilityNote = websiteTheme !== 'SLEEK_DARK'
-      ? '<div class="sc-note">These first-release packs are dark-system treatments. Their saved choices stay suspended until Sleek Dark is effective.</div>' : '';
-    return `<div class="sc-view">${viewHeader('Optional Presentation', 'settings')}<div class="sc-eyebrow">Fresh Bing Cinematic Background</div>${choiceMarkup('preference-cinematic', [['NONE', 'Off'], ['CINEMATIC', 'On']], cinematicBackground)}<div class="sc-note">Saved ${escapeHtml(cinematicBackground)} · effective ${escapeHtml(cinematic.state || 'DISABLED')}. Enabling asks for optional access to www.bing.com. Requests contain only fixed image-feed parameters—never job, timer, page, or user content.</div><div class="sc-eyebrow sc-section-label">Design Dashboard profile</div>${choiceMarkup('preference-dashboard', [['OFF', 'Off'], ['ON', 'On']], dashboardProfile)}<div class="sc-note">Saved ${escapeHtml(dashboardProfile)} · effective ${escapeHtml(dashboard.state || 'INACTIVE_PAGE')}. It can apply only to the exact /dashboard.php?show=2 page and changes presentation only.</div>${eligibilityNote}<div class="sc-actions"><button data-action="restore-native">Restore Native SquareCoil</button></div><div class="sc-note">Restore Native selects Original, disables both optional packs, removes Companion-owned presentation, and leaves every native control and business value untouched.</div></div>`;
+    const eligibilityNote = !['SLEEK_DARK', 'LIGHT_GLASS'].includes(websiteTheme)
+      ? '<div class="sc-note">Choose Dark Glass or Light Glass to use the optional wallpaper.</div>' : '';
+    return `<div class="sc-view">${viewHeader('Wallpaper and dashboard', 'settings')}<div class="sc-eyebrow">Cinematic wallpaper</div>${choiceMarkup('preference-cinematic', [['NONE', 'Off'], ['CINEMATIC', 'On']], cinematicBackground)}<div class="sc-note">${escapeHtml(optionalStateLabel(cinematic))}. Turning it on asks for optional access to Bing's image feed. Job, timer, page and user content are never sent.</div><div class="sc-eyebrow sc-section-label">Design dashboard</div>${choiceMarkup('preference-dashboard', [['OFF', 'Off'], ['ON', 'On']], dashboardProfile)}<div class="sc-note">${escapeHtml(optionalStateLabel(dashboard))}. This profile is limited to the Design dashboard and only changes presentation.</div>${eligibilityNote}<div class="sc-actions"><button data-action="restore-native">Restore Native / Off</button></div><div class="sc-note">Restoring Native / Off removes Companion-owned website styling and optional presentation without changing SquareCoil data.</div></div>`;
   }
 
   function timerLimitsView() {
     const draft = limitDraft || { ...DEFAULT_PREFERENCES, baseRevision: preferenceRevision, dirty: false };
     const stale = draft.dirty && draft.baseRevision !== preferenceRevision;
-    return `<div class="sc-view">${viewHeader('Timer Limits', 'settings')}<form data-sc-limits-form><div class="sc-field-grid"><label>Yellow minutes<input type="number" min="1" step="1" name="yellowMinutes" value="${escapeHtml(draft.yellowMinutes)}"></label><label>Orange minutes<input type="number" min="1" step="1" name="orangeMinutes" value="${escapeHtml(draft.orangeMinutes)}"></label><label>Red minutes<input type="number" min="1" step="1" name="redMinutes" value="${escapeHtml(draft.redMinutes)}"></label></div>${stale ? '<div class="sc-note">A newer preference revision was committed in another tab. Reopen this form before saving so it cannot overwrite that change.</div>' : ''}<div class="sc-actions"><button class="sc-primary" type="submit" ${stale ? 'disabled' : ''}>Save Limits</button><button type="button" data-action="reset-limits">Reset to 60 / 120 / 240</button></div></form><div class="sc-note">Limits use exact unrounded Context Today values. They change tab accents only, never operational status or recorded time.</div></div>`;
+    return `<div class="sc-view">${viewHeader('Time color limits', 'settings')}<form data-sc-limits-form><div class="sc-field-grid"><label>Yellow minutes<input type="number" min="1" step="1" name="yellowMinutes" value="${escapeHtml(draft.yellowMinutes)}"></label><label>Orange minutes<input type="number" min="1" step="1" name="orangeMinutes" value="${escapeHtml(draft.orangeMinutes)}"></label><label>Red minutes<input type="number" min="1" step="1" name="redMinutes" value="${escapeHtml(draft.redMinutes)}"></label></div>${stale ? '<div class="sc-note">Settings changed in another tab. Reopen this form before saving.</div>' : ''}<div class="sc-actions"><button class="sc-primary" type="submit" ${stale ? 'disabled' : ''}>Save limits</button><button type="button" data-action="reset-limits">Reset to 60 / 120 / 240</button></div></form><div class="sc-note">These limits change tab colors only. They never change recorded time.</div></div>`;
   }
 
   function supportView(kind) {
@@ -542,6 +582,12 @@ function createWorkspaceUi(options = {}) {
     return `<div class="sc-view">${viewHeader('Support the Developer', 'settings')}<div class="sc-title">Free app. Free updates. Optional tips.</div><div class="sc-note">The tiny development gremlins appreciate caffeine, but every Companion feature remains available whether or not you tip.</div><div class="sc-empty">No approved Buy Me a Coffee URL, Cash App name, or packaged QR is configured. Nothing has been fabricated or opened.</div></div>`;
   }
 
+  function advancedDiagnosticsView(core) {
+    const status = friendlyCompanionStatus(core, core?.timer);
+    const diagnostics = frozenDiagnostics();
+    return `<div class="sc-view">${viewHeader('Advanced diagnostics', 'settings')}<section class="sc-health-summary" data-tone="${status.tone}"><span class="sc-health-icon" aria-hidden="true">${status.tone === 'positive' ? '✓' : '!'}</span><div><strong>${escapeHtml(status.label)}</strong><small>${escapeHtml(status.message)}</small></div></section><details class="sc-technical"><summary>Technical details</summary><p>Privacy-safe status only. Job names, customer data, page content and account tokens are excluded.</p><pre class="sc-diagnostics" data-sc-advanced-diagnostics>${escapeHtml(diagnostics.text)}</pre></details>${supportMessage ? `<div class="sc-note">${escapeHtml(supportMessage)}</div>` : ''}${supportManualCopy ? `<pre class="sc-diagnostics" data-sc-manual-copy>${escapeHtml(supportManualCopy)}</pre>` : ''}<div class="sc-actions"><button class="sc-primary" data-action="copy-advanced-diagnostics">Copy diagnostics</button><button data-action="sync">Refresh status</button></div></div>`;
+  }
+
   function conflictMarkup() {
     if (!pendingImport?.plan?.conflicts?.length) return '';
     return `<div class="sc-note"><strong>Import needs review.</strong> Nothing has been written.</div>${pendingImport.plan.conflicts.map(conflict => `<div class="sc-row"><div><div class="sc-row-title">${escapeHtml(conflict.code)}</div><div class="sc-row-meta">${escapeHtml(conflict.contextId || '')}${conflict.incomingSegmentId ? ` · incoming ${escapeHtml(conflict.incomingSegmentId)}` : ''}</div></div>${conflict.resolvable ? `<div class="sc-row-actions"><button data-action="resolve-conflict" data-conflict="${escapeHtml(conflict.id)}" data-resolution="KEEP_CURRENT">Keep Current</button><button data-action="resolve-conflict" data-conflict="${escapeHtml(conflict.id)}" data-resolution="USE_INCOMING">Use Incoming</button></div>` : '<span class="sc-status" data-tone="danger">Must fix file</span>'}</div>`).join('')}`;
@@ -555,7 +601,7 @@ function createWorkspaceUi(options = {}) {
   }
 
   function bodyMarkup(timer, core) {
-    if (!timer) return '<div class="sc-view"><div class="sc-empty">Connecting to the trusted Companion core…</div></div>';
+    if (!timer) return '<div class="sc-view"><div class="sc-empty">Connecting to this SquareCoil page…</div></div>';
     if (view === 'recent') return recentView(timer);
     if (view === 'overview') return overviewView(timer);
     if (view === 'by-day') return byDayView(timer);
@@ -571,13 +617,14 @@ function createWorkspaceUi(options = {}) {
     if (view === 'send-feedback') return supportView('feedback');
     if (view === 'developer-support') return developerSupportView();
     if (view === 'data-tools') return dataToolsView(core);
+    if (view === 'advanced-diagnostics') return advancedDiagnosticsView(core);
     return mainView(timer);
   }
 
   function render({ allowInteractionDeferral = false } = {}) {
     if (disposed) return;
     const target = mountRoot(); if (!target) return;
-    if (allowInteractionDeferral && (collapsed || draggedContextId || pendingFileMode || target.querySelector?.('button:hover, input:hover, input:focus, textarea:focus, select:focus, button:focus-visible'))) return;
+    if (allowInteractionDeferral && (collapsed || draggedContextId || pendingFileMode || target.querySelector?.('input:focus, textarea:focus, select:focus, summary:focus, button:focus-visible'))) return;
     const previousScroll = target.querySelector?.('.sc-content')?.scrollTop || 0;
     const core = readCoreSnapshot();
     const timer = core?.timer || null;
@@ -586,9 +633,9 @@ function createWorkspaceUi(options = {}) {
     target.dataset.protoSurface = String(presentation?.panelFinishEffective || surface).startsWith('GLASS') ? 'glass' : 'solid';
     target.dataset.protoCollapsed = collapsed ? 'true' : 'false';
     target.dataset.workspaceState = snapshotStale ? 'stale' : timer ? 'loaded' : 'loading';
-    const status = core?.blocked ? 'Blocked by legacy data' : core?.status ? String(core.status).replace(/-/g, ' ') : 'Connecting';
+    const friendlyStatus = friendlyCompanionStatus(core, timer);
     const basis = timer?.timeBasis?.disclosed ? timer.timeBasis.label : timer?.workdayZone || 'waiting for time basis';
-    target.innerHTML = `${styleBlock()}<div class="sc-proto-shell"><div class="sc-proto-topbar"><div class="sc-proto-brand"><strong>SquareCoil Companion</strong><small>B6 release candidate</small></div><span class="sc-proto-lifecycle" data-sc-status>${escapeHtml(status)}</span><button class="sc-icon-btn" data-action="sync" aria-label="Sync">↻</button><button class="sc-icon-btn" data-action="collapse" aria-label="${collapsed ? 'Expand' : 'Collapse'}">${collapsed ? '▣' : '–'}</button></div>${timer ? tabMarkup(timer) : ''}<div class="sc-content">${snapshotStale ? '<div class="sc-stale">Showing the last trusted revision while the workspace revalidates.</div>' : ''}${bodyMarkup(timer, core)}</div>${errorMessage ? `<div class="sc-error">${escapeHtml(errorMessage)}</div>` : ''}<div class="sc-foot">Revision ${timer?.revision ?? '—'} · preference ${preferenceRevision} · ${escapeHtml(basis)}</div></div>`;
+    target.innerHTML = `${styleBlock()}<div class="sc-proto-shell"><div class="sc-proto-topbar"><div class="sc-brand-mark" aria-hidden="true">SC</div><div class="sc-proto-brand"><strong>SquareCoil</strong><small>Companion</small></div><span class="sc-proto-status" data-tone="${friendlyStatus.tone}" data-sc-status>${escapeHtml(friendlyStatus.label)}</span><button class="sc-icon-btn" data-action="sync" aria-label="Refresh">↻</button><button class="sc-icon-btn" data-action="collapse" aria-label="${collapsed ? 'Expand' : 'Collapse'}">${collapsed ? '▣' : '–'}</button></div>${timer ? tabMarkup(timer) : ''}<div class="sc-content">${snapshotStale ? '<div class="sc-stale">Showing the last saved view while Companion reconnects.</div>' : ''}${bodyMarkup(timer, core)}</div>${errorMessage ? `<div class="sc-error">${escapeHtml(errorMessage)}</div>` : ''}<div class="sc-foot"><span>${escapeHtml(basis)}</span><button data-action="open-diagnostics">Technical details</button></div></div>`;
     const content = target.querySelector?.('.sc-content'); if (content) content.scrollTop = previousScroll;
     if (focusTarget) {
       const selector = focusTarget;
@@ -601,10 +648,10 @@ function createWorkspaceUi(options = {}) {
     const type = TIMER_ACTIONS[key]; if (!type) return;
     if (event?.isTrusted !== true) { errorMessage = 'Timer actions require a real user click.'; render(); return; }
     const handle = coreHandle();
-    if (!handle || typeof handle.timerAction !== 'function') { errorMessage = 'Trusted timer core is not available yet.'; render(); return; }
+    if (!handle || typeof handle.timerAction !== 'function') { errorMessage = 'Time controls are not available yet.'; render(); return; }
     busyAction = key; errorMessage = null; render();
     try { await handle.timerAction(type); if (typeof handle.syncBridge === 'function') await handle.syncBridge(); }
-    catch (error) { errorMessage = String(error?.message || error); }
+    catch (error) { recordTechnicalError(error, 'That time action could not be completed. Refresh status and try again.'); }
     finally { busyAction = null; render(); }
   }
 
@@ -631,7 +678,7 @@ function createWorkspaceUi(options = {}) {
 
   function downloadArtifact(kind) {
     const handle = coreHandle();
-    if (!handle || typeof handle.dataExport !== 'function') throw new Error('Trusted data export is not available yet.');
+    if (!handle || typeof handle.dataExport !== 'function') throw new Error('Data export is not available yet.');
     const exportedAtMs = Date.now();
     const result = handle.dataExport(kind, {
       ...workspaceData(),
@@ -653,7 +700,7 @@ function createWorkspaceUi(options = {}) {
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
-    dataMessage = `${isBackup ? 'Full Backup' : kind === 'HISTORY_CSV' ? 'History CSV' : 'Time Report CSV'} prepared from revision ${result.snapshotRevision ?? lastGoodCore?.timer?.revision ?? '—'}.`;
+    dataMessage = `${isBackup ? 'Full Backup' : kind === 'HISTORY_CSV' ? 'History CSV' : 'Time Report CSV'} is ready.`;
     return result;
   }
 
@@ -672,7 +719,7 @@ function createWorkspaceUi(options = {}) {
       return false;
     }
     const handle = coreHandle();
-    if (!handle || typeof handle.commitDataAction !== 'function') throw new Error('Trusted data mutation is not available yet.');
+    if (!handle || typeof handle.commitDataAction !== 'function') throw new Error('This data action is not available yet.');
     const confirmations = [...plan.requiredConfirmations];
     let preBackupDisposition;
     const globalDestructive = confirmations.some(token => ['DELETE_ALL_ARCHIVED', 'WIPE_ALL_TIME_HISTORY', 'RESTORE_REPLACE'].includes(token));
@@ -689,13 +736,13 @@ function createWorkspaceUi(options = {}) {
     if ((confirmations.length || values.confirm === true) && !window.confirm(description || 'Commit this Companion data operation?')) return false;
     await handle.commitDataAction(plan.planId, { confirmationTokens: confirmations, preBackupDisposition });
     pendingImport = null;
-    dataMessage = `Completed ${plan.operation.replace(/^DATA_/, '').replace(/_/g, ' ').toLowerCase()} at one authoritative revision.`;
+    dataMessage = `Completed ${plan.operation.replace(/^DATA_/, '').replace(/_/g, ' ').toLowerCase()}.`;
     return true;
   }
 
   async function runDataAction(type, values = {}) {
     const handle = coreHandle();
-    if (!handle || typeof handle.stageDataAction !== 'function') throw new Error('Trusted data staging is not available yet.');
+    if (!handle || typeof handle.stageDataAction !== 'function') throw new Error('This data tool is not available yet.');
     const request = { ...workspaceData(), ...values };
     if ([DATA_COMMANDS.ARCHIVE_CONTEXT, DATA_COMMANDS.ARCHIVE_ELIGIBLE].includes(type)) request.atMs = Date.now();
     const plan = await handle.stageDataAction(type, request);
@@ -707,7 +754,7 @@ function createWorkspaceUi(options = {}) {
 
   async function stageImport(type, values) {
     const handle = coreHandle();
-    if (!handle || typeof handle.stageDataAction !== 'function') throw new Error('Trusted data staging is not available yet.');
+    if (!handle || typeof handle.stageDataAction !== 'function') throw new Error('This data tool is not available yet.');
     const request = { ...workspaceData(), ...values };
     const plan = await handle.stageDataAction(type, request);
     pendingImport = { type, values: request, plan, resolutions: { ...(request.resolutions || {}) } };
@@ -729,13 +776,19 @@ function createWorkspaceUi(options = {}) {
     dataMessage = null;
     render();
     try { await task(); }
-    catch (error) { errorMessage = String(error?.message || error); }
+    catch (error) {
+      const reason = String(error?.message || error || '');
+      const friendly = /Bing access was not granted|permission/i.test(reason)
+        ? 'Wallpaper permission was not granted. The wallpaper remains off.'
+        : 'That change could not be completed. No SquareCoil data was changed. Open Technical details for more information.';
+      recordTechnicalError(error, friendly);
+    }
     finally { busyAction = null; render(); }
   }
 
   async function commitPreferencePatch(patch, expectedRevision = preferenceRevision) {
     const handle = coreHandle();
-    if (!handle || typeof handle.preferenceAction !== 'function') throw new Error('Trusted Preferences service is not available yet.');
+    if (!handle || typeof handle.preferenceAction !== 'function') throw new Error('Settings are not available yet.');
     await handle.preferenceAction(patch, expectedRevision);
   }
 
@@ -796,11 +849,23 @@ function createWorkspaceUi(options = {}) {
     return createDiagnosticSnapshot({
       packageName: 'SquareCoil Companion',
       packageVersion,
+      buildId,
+      buildStage,
+      candidateFingerprint,
       userAgent,
       url: window.location?.href,
       lifecycle: core.status || 'unavailable',
+      runtimeInstanceId: document.getElementById(ROOT_ID)?.dataset?.runtimeInstanceId,
+      workerInstanceId: core.authorityTenure?.workerInstanceId,
+      coordinationEpoch: core.authorityTenure?.coordinationEpoch,
+      settlementStatus: core.initialized && !core.blocked && core.timer ? 'ready' : core.blocked ? 'blocked' : 'not-ready',
+      migrationDisposition: core.preflight?.disposition,
+      migrationReason: core.preflight?.reason,
       bridgeCapability: core.bridge?.capability || 'UNAVAILABLE',
       bridgeStatus: core.bridge?.active ? 'active' : core.bridge?.initialized ? 'inactive' : 'unavailable',
+      bridgeGeneration: core.bridge?.bridgeGeneration,
+      bridgeReason: core.bridge?.lastError || core.bridge?.lastReason,
+      lastTechnicalError: lastTechnicalError || core.lastError || core.readModelError || core.dataReadModelError,
       coreReadiness: core.initialized && !core.blocked && core.timer ? 'ready' : core.blocked ? 'blocked' : 'not-ready',
       preferences: core.preferences || DEFAULT_PREFERENCES,
       presentation: core.presentation || presentation || {},
@@ -844,6 +909,7 @@ function createWorkspaceUi(options = {}) {
       return;
     }
     if (action === 'settings-route') { navigateSettings(button.dataset.view); return; }
+    if (action === 'open-diagnostics') { navigateSettings('advanced-diagnostics'); return; }
     if (action === 'settings-back') { navigateSettings(button.dataset.view || 'settings'); return; }
     if (action === 'settings-close') { navigateSettings('main', { close: true }); return; }
     if (action === 'select') { selectContext(button.dataset.context); render(); return; }
@@ -867,9 +933,9 @@ function createWorkspaceUi(options = {}) {
       withBusy('cinematic-preference', async () => {
         const handle = coreHandle();
         if (value === 'CINEMATIC') {
-          if (!handle || typeof handle.requestCinematicAccess !== 'function') throw new Error('Optional wallpaper permission service is unavailable.');
+          if (!handle || typeof handle.requestCinematicAccess !== 'function') throw new Error('cinematic-permission-service-unavailable');
           const permission = await handle.requestCinematicAccess();
-          if (permission?.granted !== true) throw new Error('Fresh Bing access was not granted; Cinematic remains off.');
+          if (permission?.granted !== true) throw new Error('cinematic-permission-not-granted');
         }
         await commitPreferencePatch({ cinematicBackground: value });
         if (value === 'NONE' && typeof handle?.removeCinematicAccess === 'function') await handle.removeCinematicAccess();
@@ -905,6 +971,11 @@ function createWorkspaceUi(options = {}) {
     if (action === 'copy-diagnostics' && event.isTrusted === true) {
       const draft = supportDrafts[button.dataset.supportKind];
       if (draft?.diagnostics?.text) withBusy('copy', () => copyText(draft.diagnostics.text, 'The visible diagnostics snapshot was copied.'));
+      return;
+    }
+    if (action === 'copy-advanced-diagnostics' && event.isTrusted === true) {
+      const diagnostics = frozenDiagnostics();
+      withBusy('copy', () => copyText(diagnostics.text, 'Technical details copied.'));
       return;
     }
     if (action === 'copy-message' && event.isTrusted === true) {
@@ -943,7 +1014,7 @@ function createWorkspaceUi(options = {}) {
       });
       return;
     }
-    if (action === 'sync' && event.isTrusted === true) { const handle = coreHandle(); if (handle && typeof handle.syncBridge === 'function') handle.syncBridge().then(render, error => { errorMessage = String(error?.message || error); render(); }); }
+    if (action === 'sync' && event.isTrusted === true) { const handle = coreHandle(); if (handle && typeof handle.syncBridge === 'function') handle.syncBridge().then(render, error => { recordTechnicalError(error, 'Companion could not refresh. Reload the SquareCoil tab and try again.'); render(); }); }
   }
 
   function onChange(event) {
@@ -1038,7 +1109,7 @@ function createWorkspaceUi(options = {}) {
         return;
       }
       if (limitDraft.baseRevision !== preferenceRevision) {
-        errorMessage = 'A newer preference revision exists. Reopen Timer Limits before saving.';
+        errorMessage = 'Settings changed in another tab. Reopen Time color limits before saving.';
         render();
         return;
       }

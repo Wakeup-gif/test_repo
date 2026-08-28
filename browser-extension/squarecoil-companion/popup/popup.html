@@ -8,35 +8,69 @@
 </head>
 <body>
   <main>
-    <header>
-      <div>
-        <h1>SquareCoil Companion</h1>
-        <p id="stage">B6 · Release candidate</p>
+    <header class="topbar">
+      <span class="brand-mark" aria-hidden="true">SC</span>
+      <div class="brand-copy">
+        <h1>SquareCoil</h1>
+        <p id="stage">Companion workspace</p>
       </div>
       <span id="version">v0.7.1</span>
+      <button id="refresh" class="icon-button" type="button" aria-label="Refresh status">↻</button>
     </header>
+
+    <section class="status-card" aria-live="polite">
+      <span id="statusIcon" class="status-icon" aria-hidden="true">↻</span>
+      <div>
+        <strong id="friendlyStatus">Working</strong>
+        <p id="friendlyMessage">Companion is connecting to this page.</p>
+      </div>
+    </section>
 
     <section class="control-row">
       <div>
         <strong>Companion enabled</strong>
-        <small>Controls the rebuilt page runtime only.</small>
+        <small>Keep the page workspace and local tracking available.</small>
       </div>
       <label class="switch">
         <input id="enabled" type="checkbox" checked>
         <span aria-hidden="true"></span>
+        <span class="sr-only">Enable SquareCoil Companion</span>
       </label>
     </section>
 
-    <section class="health" aria-live="polite">
-      <div><span>Probe</span><b id="classification">Checking…</b></div>
-      <div><span>Lifecycle</span><b id="lifecycle">Checking…</b></div>
-      <div><span>Reason</span><b id="reason">—</b></div>
-      <div><span>Runtime</span><code id="runtimeId">—</code></div>
-      <p>READY requires lifecycle, fenced authority, migration, trusted core, and Bridge settlement. Candidate status never bypasses those checks, restores live timer state, or modifies SquareCoil official data.</p>
-      <button id="refresh" type="button">Refresh health</button>
-      <button id="retryCleanup" type="button" hidden>Retry cleanup only</button>
-      <button id="startFresh" type="button" hidden>Start fresh runtime</button>
+    <section id="summaryCard" class="work-card" hidden>
+      <div class="work-heading">
+        <span class="eyebrow">Current work</span>
+        <span id="summaryState" class="work-state">Working</span>
+      </div>
+      <strong id="summaryLabel">Production (General)</strong>
+      <div class="metrics">
+        <div><span>Today</span><b id="summaryToday">00:00:00</b></div>
+        <div><span>Current session</span><b id="summarySession">00:00:00</b></div>
+      </div>
     </section>
+
+    <section id="emptySummary" class="empty-card">
+      <strong>Companion is available before you clock in.</strong>
+      <p id="emptySummaryText">Open a SquareCoil page to see current work. Settings remain available without clocking in.</p>
+    </section>
+
+    <p class="availability-note">Use the Companion panel on the SquareCoil page for Appearance, Time tracking, Jobs, Dashboard, Privacy, and Settings.</p>
+
+    <details class="technical-card">
+      <summary>Technical details</summary>
+      <p>Ready appears only after every required safety check passes.</p>
+      <dl>
+        <div><dt>Probe</dt><dd id="classification">Checking…</dd></div>
+        <div><dt>Lifecycle</dt><dd id="lifecycle">Checking…</dd></div>
+        <div><dt>Reason</dt><dd id="reason">—</dd></div>
+        <div><dt>Runtime</dt><dd><code id="runtimeId">—</code></dd></div>
+      </dl>
+      <button id="copyDiagnostics" type="button">Copy diagnostics</button>
+      <span id="copyResult" class="copy-result" aria-live="polite"></span>
+      <button id="retryCleanup" type="button" hidden>Retry cleanup</button>
+      <button id="startFresh" type="button" hidden>Start fresh</button>
+    </details>
   </main>
   <script src="../dist/popup.js"></script>
 </body>

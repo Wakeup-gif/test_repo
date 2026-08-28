@@ -119,7 +119,7 @@ test('UT-B3-UI-002 a real authoritative A to B intent selects, reveals, opens Ma
   h.ui.render();
   assert.equal(h.root.dataset.protoCollapsed, 'false');
   assert.match(h.root.innerHTML, /Job 202/);
-  assert.doesNotMatch(h.root.innerHTML, /Data tools/);
+  assert.doesNotMatch(h.root.innerHTML, /Local data and backups/);
   const writesAfterFirst = h.writes.length;
   h.ui.render();
   assert.equal(h.writes.length, writesAfterFirst);
@@ -148,7 +148,7 @@ test('UT-B3-UI-004 dirty route defers native focus and a newer explicit user sel
   h.timer.currentContextId = 'job:202';
   h.timer.focusIntent = { intentId: 'focus:b', contextId: 'job:202', priorContextId: 'job:101', transitionType: 'CONTEXT_CHANGED', sourceStateRevision: 2 };
   h.ui.render();
-  assert.match(h.root.innerHTML, /Data tools/);
+  assert.match(h.root.innerHTML, /Local data and backups/);
   h.click({ action: 'select', context: 'job:303' });
   h.ui.setRouteProtection({ dirty: false });
   assert.match(h.root.innerHTML, /Job 303/);
@@ -160,13 +160,12 @@ test('UT-B3-UI-005 transient failure and an older revision retain the last trust
   assert.match(h.root.innerHTML, /Job 101/);
   h.setThrowRead(true);
   h.ui.render();
-  assert.match(h.root.innerHTML, /Showing the last trusted revision/);
+  assert.match(h.root.innerHTML, /Showing the last saved view while Companion reconnects/);
   assert.match(h.root.innerHTML, /Job 101/);
   h.setThrowRead(false);
   h.timer.revision = 0;
   h.ui.render();
-  assert.match(h.root.innerHTML, /stale workspace revision was rejected/);
-  assert.match(h.root.innerHTML, /Revision 1/);
+  assert.match(h.root.innerHTML, /An older update was ignored/);
   h.ui.teardown();
 });
 
@@ -176,7 +175,7 @@ test('UT-B3-UI-006 History loads beyond the initial bounded page without using t
   assert.match(h.root.innerHTML, /Load more \(100 of 150\)/);
   h.click({ action: 'load-history' });
   assert.doesNotMatch(h.root.innerHTML, /Load more/);
-  assert.match(h.root.innerHTML, /session-149/);
+  assert.match(h.root.innerHTML, /data-history-session="session-149"/);
   h.ui.teardown();
 });
 

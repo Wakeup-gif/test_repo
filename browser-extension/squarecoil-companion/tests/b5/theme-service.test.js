@@ -292,3 +292,30 @@ test('UT-B5-THEME-017 B5-D inaccessible CKEditor documents fail closed without a
   h.service.teardown();
   assert.equal(frame.getAttribute(EDITOR_FRAME_ATTRIBUTE), null);
 });
+
+test('UT-B5-THEME-018 Light Glass owns one pale translucent layer and a same-origin light editor document', () => {
+  const editor = editorFrame();
+  const h = harness({ pathname: '/project_designs.php', editorFrames: [editor.frame] });
+  const snapshot = h.service.apply(preferences({ websiteTheme: 'LIGHT_GLASS' }));
+  assert.equal(snapshot.websiteThemeEffective, 'LIGHT_GLASS');
+  assert.equal(h.root.getAttribute(ROOT_THEME_ATTRIBUTE), 'LIGHT_GLASS');
+  assert.equal(h.document.querySelectorAll(`#${STYLE_ID}`).length, 1);
+  const css = h.document.querySelectorAll(`#${STYLE_ID}`)[0].textContent;
+  for (const marker of ['--sc-site-shell:rgba(248,251,254,.82)', '.navbar-brand::before', '#pmlt>div:has(>#duplicate)', '.fc .fc-event', 'backdrop-filter:none!important']) {
+    assert.match(css, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  }
+  assert.equal(editor.frame.getAttribute(EDITOR_FRAME_ATTRIBUTE), 'light-glass');
+  assert.match(editor.head.children.find(child => child.id === EDITOR_STYLE_ID).textContent, /background:#f8fafc/);
+  h.service.teardown();
+});
+
+test('UT-B5-THEME-019 Dark Glass keeps semantic colors SC lockup and single-row project actions without remote assets', () => {
+  const h = harness({ pathname: '/project_milestones.php' });
+  h.service.apply(preferences({ websiteTheme: 'SLEEK_DARK' }));
+  const css = h.document.querySelectorAll(`#${STYLE_ID}`)[0].textContent;
+  for (const marker of ['--sc-site-shell:rgba(7,15,23,.62)', 'content:"SC"', '#pmlt>div:has(>#duplicate)', '.alert-danger', '.alert-warning', '.alert-success']) {
+    assert.match(css, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  }
+  assert.doesNotMatch(css, /https?:\/\/|@import|fonts\.googleapis/);
+  h.service.teardown();
+});

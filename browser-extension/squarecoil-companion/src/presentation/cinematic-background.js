@@ -135,7 +135,9 @@ function createCinematicBackground(options = {}) {
 
   function eligible() {
     if (preferences.cinematicBackground !== 'CINEMATIC') return { state: 'DISABLED', reason: 'preference-none' };
-    if (basePresentation.websiteThemeEffective !== 'SLEEK_DARK') return { state: 'SUSPENDED_THEME', reason: 'sleek-dark-required' };
+    if (!['SLEEK_DARK', 'LIGHT_GLASS'].includes(basePresentation.websiteThemeEffective)) {
+      return { state: 'SUSPENDED_THEME', reason: 'glass-theme-required' };
+    }
     if (basePresentation.forcedColors === true || basePresentation.reducedTransparency === true ||
         forcedMedia?.matches === true || transparencyMedia?.matches === true) {
       return { state: 'SUSPENDED_ACCESSIBILITY', reason: 'accessibility-override' };

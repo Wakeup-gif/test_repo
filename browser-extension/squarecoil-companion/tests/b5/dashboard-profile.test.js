@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  DASHBOARD_STYLE_ID, DASHBOARD_ATTRIBUTE, AUDITED_SELECTORS, DASHBOARD_CSS,
+  DASHBOARD_STYLE_ID, DASHBOARD_ATTRIBUTE, DASHBOARD_SUMMARY_ID, AUDITED_SELECTORS, DASHBOARD_CSS,
   exactDashboardRoute, createDashboardProfile
 } = require('../../src/presentation/dashboard-profile');
 
@@ -20,18 +20,32 @@ class Element {
 }
 
 function harness({ pathname = '/dashboard.php', search = '?show=2', missing = [] } = {}) {
-  const root = new Element('html'); const head = new Element('head'); root.appendChild(head);
+  const root = new Element('html'); const head = new Element('head'); const body = new Element('body');
+  const content = new Element('main'); content.id = 'content'; root.appendChild(head); root.appendChild(body); body.appendChild(content);
   const elements = new Map();
+  elements.set('#content', content);
   for (const selector of AUDITED_SELECTORS) if (!missing.includes(selector)) elements.set(selector, new Element('div'));
+  function findById(node, id) {
+    if (node.id === id) return node;
+    for (const child of node.children || []) { const found = findById(child, id); if (found) return found; }
+    return null;
+  }
   const document = {
-    documentElement: root, head,
+    documentElement: root, head, body,
     createElement(tag) { return new Element(tag); },
+    getElementById(id) { return findById(root, id); },
     querySelector(selector) { return elements.get(selector) || null; },
-    querySelectorAll(selector) { return selector === `#${DASHBOARD_STYLE_ID}` ? head.children.filter(child => child.id === DASHBOARD_STYLE_ID) : []; }
+    querySelectorAll(selector) {
+      if (selector === `#${DASHBOARD_STYLE_ID}`) return head.children.filter(child => child.id === DASHBOARD_STYLE_ID);
+      if (selector === `#${DASHBOARD_SUMMARY_ID}`) {
+        const found = findById(root, DASHBOARD_SUMMARY_ID); return found ? [found] : [];
+      }
+      return [];
+    }
   };
   const window = { location: { pathname, search } };
   const service = createDashboardProfile({ document, window });
-  return { service, document, window, root, head, elements };
+  return { service, document, window, root, head, body, content, elements };
 }
 
 function prefs(values = {}) {
@@ -131,4 +145,23 @@ test('UT-B5-DASH-015 sibling Design tools remain behaviorally independent', () =
   const h = harness(); const sibling = { featureId: 'design-job-tools', enabled: true, handler: () => 42 };
   const handler = sibling.handler; h.service.apply(prefs(), sleek);
   assert.equal(sibling.enabled, true); assert.equal(sibling.handler, handler); assert.equal(sibling.handler(), 42);
+});
+
+test('UT-B5-DASH-016 optional dashboard summary is owned read-only bounded and updates without stacking', () => {
+  const h = harness();
+  const first = { currentLabel: 'Production (General)', todayMs: 7000, weekMs: 12000, sessionMs: 4000,
+    recent: [{ label: 'Production (General)' }, { label: 'Job 42' }] };
+  h.service.apply(prefs(), sleek, first);
+  const host = h.document.getElementById(DASHBOARD_SUMMARY_ID);
+  assert.ok(host);
+  const text = node => [node.textContent || '', ...(node.children || []).map(text)].join(' ');
+  assert.match(text(host), /SquareCoil Companion/);
+  assert.match(text(host), /Production \(General\)/);
+  assert.match(text(host), /00:00:07/);
+  h.service.apply(prefs(), sleek, { ...first, todayMs: 9000 });
+  assert.equal(h.document.querySelectorAll(`#${DASHBOARD_SUMMARY_ID}`).length, 1);
+  assert.equal(h.document.getElementById(DASHBOARD_SUMMARY_ID), host);
+  assert.match(text(host), /00:00:09/);
+  h.service.teardown();
+  assert.equal(h.document.getElementById(DASHBOARD_SUMMARY_ID), null);
 });

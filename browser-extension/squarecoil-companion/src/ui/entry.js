@@ -1,6 +1,6 @@
 'use strict';
 
-const { CANDIDATE_FINGERPRINT } = require('../core/build-identity');
+const { BUILD_ID, BUILD_STAGE, CANDIDATE_FINGERPRINT } = require('../core/build-identity');
 const { ROOT_ID, createWorkspaceUi } = require('./workspace-ui');
 
 const SEARCH_INPUT_SELECTOR = `#${ROOT_ID} [data-sc-search-form] input[name="projectId"]`;
@@ -70,6 +70,9 @@ function createSearchFocusGuard() {
     storage: chrome.storage.local,
     storageChanges: chrome.storage.onChanged,
     packageVersion: chrome.runtime.getManifest().version,
+    buildId: BUILD_ID,
+    buildStage: BUILD_STAGE,
+    candidateFingerprint: CANDIDATE_FINGERPRINT,
     userAgent: window.navigator?.userAgent || '',
     getCoreHandle: () => globalThis.__squareCoilCompanionAuthorityHealth || null
   });

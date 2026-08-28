@@ -27,6 +27,7 @@ const B5B_PERMISSION_MESSAGE = 'SC_COMPANION_B5B_REQUEST_PERMISSION';
 const B5B_REMOVE_PERMISSION_MESSAGE = 'SC_COMPANION_B5B_REMOVE_PERMISSION';
 const B5B_WALLPAPER_MESSAGE = 'SC_COMPANION_B5B_GET_WALLPAPER';
 const B5B_ACK_MESSAGE = 'SC_COMPANION_B5B_ACK';
+const POPUP_SUMMARY_MESSAGE = 'SC_COMPANION_GET_POPUP_SUMMARY';
 const TRANSPORT_RETRY_DELAYS_MS = Object.freeze([250, 1000, 3000]);
 const B2_SETTLEMENT_REFRESH_RESPONSE_BUDGET_MS = 15_000;
 const PACKAGE_VERSION = String(chrome.runtime.getManifest().version || '0.0.0');
@@ -133,12 +134,27 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
     });
     if (!dashboardProfile) dashboardProfile = createDashboardProfile({ document, window });
     return Object.freeze({
-      apply(preferences, basePresentation) {
+      apply(preferences, basePresentation, summary) {
         return Object.freeze({
           cinematic: cinematicService.apply(preferences, basePresentation),
-          dashboard: dashboardProfile.apply(preferences, basePresentation)
+          dashboard: dashboardProfile.apply(preferences, basePresentation, summary)
         });
       }
+    });
+  }
+
+  function dashboardSummary(current) {
+    const timer = current?.timer || null;
+    if (!timer) return Object.freeze({ currentLabel: null, todayMs: 0, weekMs: 0, sessionMs: 0, recent: [] });
+    const rows = Array.isArray(timer.contextRows) ? timer.contextRows : [];
+    const active = rows.find(row => row.contextId === timer.currentContextId) || null;
+    return Object.freeze({
+      currentLabel: active?.label ? String(active.label).slice(0, 160) : null,
+      todayMs: Number(timer.todayTotalMs) || 0,
+      weekMs: Number(timer.weekTotalMs) || 0,
+      sessionMs: Number(timer.running?.elapsedMs) || 0,
+      recent: Object.freeze(rows.slice().sort((left, right) => Number(right.lastSeenAtMs || 0) - Number(left.lastSeenAtMs || 0))
+        .slice(0, 3).map(row => Object.freeze({ label: String(row.label || '').slice(0, 160) })))
     });
   }
 
@@ -147,7 +163,7 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
     let presentation = null;
     try {
       const base = ensureThemeService().apply(current.preferences);
-      presentation = { ...base, optional: ensureOptionalPresentation().apply(current.preferences, base) };
+      presentation = { ...base, optional: ensureOptionalPresentation().apply(current.preferences, base, dashboardSummary(current)) };
     }
     catch (_) { presentation = null; }
     return { ...current, presentation };
@@ -637,7 +653,49 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
     return teardownAuthority();
   }
 
-  function onAuthorityControl(message, _sender, sendResponse) {
+  function boundedDuration(value) {
+    const duration = Number(value);
+    return Number.isSafeInteger(duration) && duration >= 0 ? duration : 0;
+  }
+
+  function popupSummary() {
+    const current = trustedCore ? trustedCore.snapshot({ historyLimit: 3 }) : null;
+    const timer = current?.timer || null;
+    if (!timer) return Object.freeze({ ok: false, status: 'SETUP_REQUIRED', current: null, recent: [] });
+    const rows = Array.isArray(timer.contextRows) ? timer.contextRows : [];
+    const active = rows.find(row => row.contextId === timer.currentContextId) || null;
+    const recent = rows.filter(row => row && typeof row.label === 'string').slice().sort((left, right) =>
+      Number(right.lastSeenAtMs || 0) - Number(left.lastSeenAtMs || 0)).slice(0, 3).map(row => Object.freeze({
+        label: String(row.label).slice(0, 160),
+        status: String(row.status || 'NOT_RUNNING').slice(0, 48),
+        todayMs: boundedDuration(row.todayMs),
+        totalMs: boundedDuration(row.totalMs)
+      }));
+    return Object.freeze({
+      ok: true,
+      status: active && timer.running ? 'WORKING' : 'READY',
+      current: active ? Object.freeze({
+        label: String(active.label || 'Current work').slice(0, 160),
+        status: String(active.status || 'NOT_RUNNING').slice(0, 48),
+        todayMs: boundedDuration(active.todayMs),
+        totalMs: boundedDuration(active.totalMs),
+        sessionMs: boundedDuration(timer.running?.elapsedMs)
+      }) : null,
+      todayMs: boundedDuration(timer.todayTotalMs),
+      weekMs: boundedDuration(timer.weekTotalMs),
+      recent: Object.freeze(recent)
+    });
+  }
+
+  function onAuthorityControl(message, sender, sendResponse) {
+    if (message?.type === POPUP_SUMMARY_MESSAGE) {
+      if (sender?.id && sender.id !== chrome.runtime.id) {
+        sendResponse({ ok: false, status: 'UNAVAILABLE', reason: 'extension-sender-required' });
+        return false;
+      }
+      sendResponse(popupSummary());
+      return false;
+    }
     if (![AUTHORITY_CONTROL_MESSAGES.PREPARE_DISABLE, AUTHORITY_CONTROL_MESSAGES.GET_B2_SETTLEMENT].includes(message?.type)) return undefined;
     const documentToken = ensureDocumentToken();
     if (

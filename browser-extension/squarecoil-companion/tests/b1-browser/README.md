@@ -1,6 +1,6 @@
 # B1-B6 installed-browser acceptance harness
 
-This harness loads one exact unpacked package into installed, branded Google Chrome and Microsoft Edge. For each browser it runs a fresh `PROFILE-CLEAN` and a separate `PROFILE-UPGRADE-V07` against the same immutable package and ZIP. It retains every accepted B1 through B6 gate and adds the B5-D presentation/UI delta. It serves only synthetic fixture HTML in memory. No request reaches SquareCoil or customer data.
+This harness loads one exact unpacked package into installed, branded Google Chrome and Microsoft Edge. For each browser it runs a fresh `PROFILE-CLEAN` and a separate `PROFILE-UPGRADE-V07` against the same immutable package and ZIP. It retains every accepted B1 through B6 gate and adds the current presentation/UI integration. It serves only synthetic fixture HTML in memory. No request reaches SquareCoil or customer data.
 
 ## Required package
 
@@ -92,14 +92,15 @@ Every message the harness sends directly from the content-script execution world
 - malformed restore inputs and active-state Replace fail closed without mutation;
 - Archive and Restore preserve Context totals while passing through the fenced authoritative writer;
 - an exact backup merge dedupes existing history and cannot double-count ledger time.
-- Settings Home exposes the settled Appearance, Limits, Library, SquareCoil theme, Support, and About destinations;
-- Auto/Glass preferences report their real effective presentation, and website themes own at most one removable style layer;
+- Settings Home remains available with zero history and exposes Appearance, Time tracking, Jobs and watching, Notifications, Dashboard, Privacy and permissions, and Advanced diagnostics;
+- Native/Off, Dark Glass, Light Glass, and Refined Light settle independently, report their real effective presentation, and own at most one removable style layer;
+- Light Glass and Refined Light apply bounded same-origin CKEditor document treatment; Dark Glass retains the accepted vendor, overlay, calendar, and responsive adapters;
 - one revisioned Preferences service synchronizes owner/observer tabs and rejects a stale Timer Limits form before allowing one coherent replacement batch;
 - Support diagnostics are opt-in and frozen, expose only coarse allowlisted state, and delivery remains an explicit user action;
 - dirty Settings drafts require confirmation, missing Developer Support configuration stays unavailable, and no settings action mutates Timer/Ledger or native SquareCoil state.
 - optional presentation is off by default and makes no Bing request without the optional host permission;
 - Cinematic owns one bounded host/style, settles safely to cache/fallback/base presentation, and Restore Native removes its resources;
-- the Design Dashboard profile applies only to exact `/dashboard.php?show=2`, preserves native KPI text, row order/targets, selects, disabled controls, and warnings, and does not leak to another dashboard mode;
+- the Design Dashboard profile applies only to exact `/dashboard.php?show=2`, preserves native KPI text, row order/targets, selects, disabled controls, and warnings, adds one non-interactive read-only Companion summary, and does not leak to another dashboard mode;
 - optional presentation changes no Timer/Ledger/native-clock authority and attempts no native SquareCoil mutation.
 - a fresh clean profile contains no inherited authority document or runtime before the B6 candidate begins its inherited gates;
 - a separate valid v0.7 upgrade profile migrates two dated sessions plus the undated accumulated remainder exactly once, retains the legacy source byte-for-byte, imports compatible preferences with optional presentation still off, never revives legacy live state, and reaches READY only after the full settled B2 gate;

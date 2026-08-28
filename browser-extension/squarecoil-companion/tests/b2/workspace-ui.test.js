@@ -228,7 +228,7 @@ test('UT-B2-PROTOUI-004 nested menu routes enter Recent, Overview, History, and 
 test('UT-B2-PROTOUI-005 selecting inactive history is inspection-only and never exposes operational Pause against that selection', async () => {
   const h = await createHarness();
   h.click({ action: 'select', context: 'job:202' });
-  assert.match(h.root.innerHTML, /Actually running \/ observed/);
+  assert.match(h.root.innerHTML, /Working now/);
   assert.match(h.root.innerHTML, /Job 202 - Selected/);
   assert.doesNotMatch(h.root.innerHTML, /data-timer-action="pause"/);
   assert.deepEqual(h.timerActions, []);
@@ -299,7 +299,7 @@ test('UT-B2-PROTOUI-009 Open Job rejects synthetic clicks and opens only the val
 test('UT-B2-PROTOUI-010 a real operational Context change exits a nested menu and focuses the incoming Context', async () => {
   const h = await createHarness();
   h.click({ action: 'view', view: 'settings' });
-  assert.match(h.root.innerHTML, /Data tools/);
+  assert.match(h.root.innerHTML, /Local data and backups/);
 
   h.timer.currentContextId = 'job:202';
   h.timer.contextRows[0].isOperational = false;
@@ -309,7 +309,7 @@ test('UT-B2-PROTOUI-010 a real operational Context change exits a nested menu an
   h.ui.render();
 
   assert.match(h.root.innerHTML, /Job 202 - Selected/);
-  assert.doesNotMatch(h.root.innerHTML, /Data tools/);
+  assert.doesNotMatch(h.root.innerHTML, /Local data and backups/);
   assert.match(h.root.innerHTML, /sc-nav-grid/);
   h.ui.teardown();
 });
@@ -317,11 +317,12 @@ test('UT-B2-PROTOUI-010 a real operational Context change exits a nested menu an
 test('UT-B2-PROTOUI-011 B4 data controls cannot bypass an unavailable trusted data authority', async () => {
   const h = await createHarness();
   h.click({ action: 'view', view: 'settings' });
-  assert.match(h.root.innerHTML, /Archives &amp; Backup/);
+  assert.match(h.root.innerHTML, /Local data and backups/);
   h.click({ action: 'view', view: 'data-tools' });
   h.click({ action: 'data-simple', dataType: 'DATA_WIPE_HISTORY' }, true);
   await h.drain();
-  assert.match(h.root.innerHTML, /Trusted data staging is not available yet/);
+  assert.match(h.root.innerHTML, /That change could not be completed\. No SquareCoil data was changed/);
+  assert.doesNotMatch(h.root.innerHTML, /This data tool is not available yet/);
   assert.equal(h.timerActions.length, 0);
   h.ui.teardown();
 });

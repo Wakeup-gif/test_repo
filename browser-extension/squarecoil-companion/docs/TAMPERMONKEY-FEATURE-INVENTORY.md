@@ -67,6 +67,19 @@ CKEditor iframe-document repair and every broader route/vendor adapter remain th
 | Cinematic Background | `NONE` | Optional `https://www.bing.com/*`; requested only after the explicit On action and removed by Off/Restore Native | Durable preference plus one bounded presentation cache entry, `squarecoilCompanionB5BWallpaperCacheV1`; maximum 4 MB source image, seven-day cache acceptance | Provider URL is constructed from fixed `format`, `idx`, `n`, `mkt`, `uhd`, width, and height values. No SquareCoil URL, job, timer, page content, identity, or user text is sent. | Sleek Dark only. Forced colors/reduced transparency suspend without erasing preference. Reduced motion keeps the image static. Disable/theme change/teardown increments generation, removes owned resources, and rejects late results. Cache, embedded fallback, or native base theme remains safe on failure. |
 | Design Dashboard Profile | `OFF` | None beyond the existing exact SquareCoil route | Durable preference only | No network or extracted data | Applies only at exact pathname `/dashboard.php` with one `show=2`. CSS-only selectors preserve native values/order/targets/disabled state. Missing audited surfaces yield `PARTIAL_SAFE`; route/theme/accessibility changes remove the one owned layer. |
 
+## B5-E visual and extension-native reconciliation
+
+The final visual/optional integration re-audited the Dark Glass v2.3.4, Light Glass v1.0.0, and Refined Light v1.0.1 evidence commits from `codex/squarecoil-theme-v2.3.3`. Only tokens, selector facts, layout facts, semantic-color behavior, and bounded editor timing were used. The production runtime remains MV3 extension code.
+
+The authoritative current dispositions and route limits are now recorded in:
+
+- `docs/EXTENSION-NATIVE-MIGRATION-INVENTORY.md`;
+- `docs/ROUTE-CAPABILITY-MATRIX.md`.
+
+Dark Glass retains the accepted `SLEEK_DARK` durable value for upgrade compatibility. Light Glass adds one durable `LIGHT_GLASS` value. Refined Light remains distinct. Native / Off remains the default and exact restoration path. The Design Dashboard optional profile now owns one additional read-only Companion summary host on the same exact audited route; it does not read or alter SquareCoil business fields.
+
+Watched-job changes, notifications, and file/folder indicators remain blocked because no bounded read-only source and staleness contract is proven. Design Job Tools and other write-capable families remain excluded. This is an explicit fail-closed result, not an omitted implementation.
+
 ## Gate conclusion
 
 B5-B activates only the two optional presentation packs above. Every other inventoried feature remains deferred, superseded, excluded, or evidence-only. None is silently promoted into B6.

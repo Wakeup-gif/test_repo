@@ -81,11 +81,13 @@ async function harness({ confirms = [], clipboardAvailable = true, cinematicPerm
     replaceRoot() { activeRoot = makeRoot(); ui.render(); } };
 }
 
-test('UT-B5-UI-001 one Settings router exposes core appearance Library data Support and About destinations', async () => {
+test('UT-B5-UI-001 one Settings router exposes the settled user-facing feature groups', async () => {
   const h = await harness();
   h.click({ action: 'view', view: 'settings' });
-  for (const label of ['Appearance &amp; Finish', 'Timer Limits', 'Recent Jobs', 'Time Overview', 'History', 'Archives &amp; Backup',
-    'Website Theme', 'Optional Presentation', 'Submit a Ticket', 'Send Feedback', 'Support the Developer']) assert.match(h.root.innerHTML, new RegExp(label));
+  for (const label of ['Appearance', 'Time tracking', 'Jobs and watching', 'Notifications', 'Dashboard', 'Privacy and permissions',
+    'Advanced diagnostics', 'Companion appearance', 'SquareCoil theme', 'Local data and backups', 'Submit a ticket']) {
+    assert.match(h.root.innerHTML, new RegExp(label));
+  }
   h.ui.teardown();
 });
 
@@ -122,7 +124,7 @@ test('UT-B5-UI-004 a newer cross-tab preference revision marks an unsaved Limits
   h.inputLimit('yellowMinutes', '30');
   h.core.preferences.preferenceRevision = 2;
   h.ui.render();
-  assert.match(h.root.innerHTML, /newer preference revision/);
+  assert.match(h.root.innerHTML, /Settings changed in another tab/);
   h.submit();
   assert.equal(h.preferenceCommands.length, 0);
   h.ui.teardown();
@@ -136,7 +138,7 @@ test('UT-B5-UI-005 modified Support draft cannot be silently discarded by Back',
   h.ui.render();
   assert.match(h.root.innerHTML, /Do not lose this/);
   h.click({ action: 'settings-back', view: 'settings' });
-  assert.match(h.root.innerHTML, /Appearance &amp; Finish/);
+  assert.match(h.root.innerHTML, /Companion appearance/);
   h.ui.teardown();
 });
 
@@ -172,7 +174,7 @@ test('UT-B5-UI-008 recovered Companion root returns to Settings Home without res
   h.click({ action: 'view', view: 'settings' }); h.click({ action: 'settings-route', view: 'submit-ticket' });
   h.supportField('ticket', 'subject', 'transient private draft');
   h.replaceRoot();
-  assert.match(h.root.innerHTML, /Appearance &amp; Finish/);
+  assert.match(h.root.innerHTML, /Companion appearance/);
   assert.doesNotMatch(h.root.innerHTML, /transient private draft/);
   h.ui.teardown();
 });
@@ -182,7 +184,12 @@ test('UT-B5-UI-009 Cinematic enable requires optional permission while denial re
   denied.click({ action: 'view', view: 'settings' }); denied.click({ action: 'settings-route', view: 'presentation-packs' });
   denied.click({ action: 'preference-cinematic', value: 'CINEMATIC' }); await denied.drain();
   assert.deepEqual(denied.permissionCalls, ['request']); assert.equal(denied.preferenceCommands.length, 0);
-  assert.match(denied.root.innerHTML, /Fresh Bing access was not granted/); denied.ui.teardown();
+  assert.match(denied.root.innerHTML, /Wallpaper permission was not granted/);
+  assert.doesNotMatch(denied.root.innerHTML, /cinematic-permission-not-granted/);
+  denied.click({ action: 'settings-back', view: 'settings' });
+  denied.click({ action: 'settings-route', view: 'advanced-diagnostics' });
+  assert.match(denied.root.innerHTML, /Last internal error: cinematic-permission-not-granted/);
+  denied.ui.teardown();
 
   const granted = await harness({ cinematicPermission: true });
   granted.click({ action: 'view', view: 'settings' }); granted.click({ action: 'settings-route', view: 'presentation-packs' });
@@ -202,14 +209,46 @@ test('UT-B5-UI-010 Restore Native commits one fenced presentation batch and remo
 
 test('UT-B5-UI-011 zero-history Home keeps Library and Settings reachable before the first clock-in', async () => {
   const h = await harness();
-  assert.match(h.root.innerHTML, /No Companion job history yet/);
+  assert.match(h.root.innerHTML, /No recent jobs yet/);
   for (const destination of ['recent', 'overview', 'history', 'settings']) {
     assert.match(h.root.innerHTML, new RegExp(`data-action="view" data-view="${destination}"`));
   }
   const before = structuredClone(h.core.timer);
   h.click({ action: 'view', view: 'settings' });
-  assert.match(h.root.innerHTML, /Appearance &amp; Finish/);
+  assert.match(h.root.innerHTML, /Companion appearance/);
   assert.deepEqual(h.core.timer, before);
   assert.equal(h.preferenceCommands.length, 0);
+  h.ui.teardown();
+});
+
+test('UT-B5-UI-012 theme choices and Advanced diagnostics stay available with zero history', async () => {
+  const h = await harness();
+  h.click({ action: 'view', view: 'settings' });
+  h.click({ action: 'settings-route', view: 'website-theme' });
+  for (const label of ['Native / Off', 'Dark Glass', 'Light Glass', 'Refined Light']) assert.match(h.root.innerHTML, new RegExp(label));
+  h.click({ action: 'preference-site', value: 'LIGHT_GLASS' });
+  await h.drain();
+  assert.deepEqual(h.preferenceCommands[0], { patch: { websiteTheme: 'LIGHT_GLASS' }, expectedPreferenceRevision: 1 });
+  h.click({ action: 'settings-back', view: 'settings' });
+  h.click({ action: 'settings-route', view: 'advanced-diagnostics' });
+  assert.match(h.root.innerHTML, /Advanced diagnostics/);
+  assert.match(h.root.innerHTML, /Technical details/);
+  assert.match(h.root.innerHTML, /privacy-safe/i);
+  h.ui.teardown();
+});
+
+test('UT-B5-UI-013 long job labels remain contained and escaped in the compact workspace', async () => {
+  const h = await harness();
+  const longLabel = `260701 - ${'Very long production label '.repeat(12)}<script>private</script>`;
+  h.core.timer.contextRows = [{
+    contextId: 'job:260701', kind: 'job', projectId: '260701', label: longLabel, shortLabel: '260701',
+    status: 'NOT_RUNNING', todayMs: 0, totalMs: 0, thresholdLevel: 'NONE', isOperational: false,
+    isSafetyHeld: false, isProvisional: false, lastSeenAtMs: 1, lastRecordedActivityAtMs: null
+  }];
+  h.ui.render();
+  assert.match(h.root.innerHTML, /Very long production label/);
+  assert.doesNotMatch(h.root.innerHTML, /<script>private<\/script>/);
+  assert.match(h.root.innerHTML, /&lt;script&gt;private&lt;\/script&gt;/);
+  assert.match(h.root.innerHTML, /overflow-wrap:anywhere/);
   h.ui.teardown();
 });

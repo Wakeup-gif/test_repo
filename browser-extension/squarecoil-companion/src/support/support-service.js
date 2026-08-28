@@ -57,6 +57,11 @@ function safeToken(value, fallback = 'unknown') {
   return /^[A-Za-z0-9_.:/+ -]{1,120}$/.test(token) ? token : fallback;
 }
 
+function safeTechnicalReason(value, fallback = 'none') {
+  const token = String(value ?? '').trim();
+  return /^[A-Za-z0-9_.:/+-]{1,120}$/.test(token) ? token : fallback;
+}
+
 function createDiagnosticSnapshot(input = {}) {
   const browser = browserIdentity(input.userAgent);
   const presentation = input.presentation || {};
@@ -67,10 +72,20 @@ function createDiagnosticSnapshot(input = {}) {
   const lines = [
     'SquareCoil Companion diagnostics (privacy-safe preview)',
     `Package: ${safeToken(input.packageName, 'SquareCoil Companion')} ${safeToken(input.packageVersion)}`,
+    `Build: ${safeTechnicalReason(input.buildId, 'unknown')} / ${safeTechnicalReason(input.buildStage, 'unknown')}`,
+    `Candidate: ${safeTechnicalReason(input.candidateFingerprint, 'unknown')}`,
     `Browser: ${browser.family} ${browser.version}`,
     `Page type: ${coarsePageType(input.url)}`,
     `Lifecycle: ${safeToken(input.lifecycle)}`,
+    `Runtime: ${safeTechnicalReason(input.runtimeInstanceId, 'unknown')}`,
+    `Worker generation: ${safeTechnicalReason(input.workerInstanceId, 'unknown')}`,
+    `Coordination generation: ${Number.isSafeInteger(input.coordinationEpoch) ? input.coordinationEpoch : 'unknown'}`,
+    `Settlement: ${safeTechnicalReason(input.settlementStatus, 'not-ready')}`,
+    `Migration: ${safeTechnicalReason(input.migrationDisposition, 'unavailable')} / ${safeTechnicalReason(input.migrationReason, 'none')}`,
     `Bridge: ${safeToken(input.bridgeCapability)} / ${safeToken(input.bridgeStatus)}`,
+    `Bridge generation: ${Number.isSafeInteger(input.bridgeGeneration) ? input.bridgeGeneration : 'unknown'}`,
+    `Bridge reason: ${safeTechnicalReason(input.bridgeReason, 'none')}`,
+    `Last internal error: ${safeTechnicalReason(input.lastTechnicalError, 'none')}`,
     `Core readiness: ${safeToken(input.coreReadiness)}`,
     `Timer appearance: ${safeToken(preferences.timerAppearance)} / ${safeToken(presentation.timerAppearanceEffective)}`,
     `Panel finish: ${safeToken(preferences.panelFinish)} / ${safeToken(presentation.panelFinishEffective)}`,

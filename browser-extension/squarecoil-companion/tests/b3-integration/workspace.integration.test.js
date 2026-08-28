@@ -48,7 +48,7 @@ test('IT-B3-WORKSPACE-001 selecting and inspecting inactive history never mutate
   assert.deepEqual(h.source.ledger, before.ledger);
   assert.deepEqual(h.timerActions, []);
   assert.match(h.root.innerHTML, /Job 702/);
-  assert.match(h.root.innerHTML, /Actually running \/ observed/);
+  assert.match(h.root.innerHTML, /Working now/);
   h.ui.teardown();
 });
 
@@ -65,7 +65,8 @@ test('IT-B3-WORKSPACE-002 one committed native switch drives read model, tab foc
   h.click({ action: 'view', view: 'overview' });
   assert.match(h.root.innerHTML, /Today by job \/ context/);
   h.click({ action: 'view', view: 'history' });
-  assert.match(h.root.innerHTML, /Session live-a/);
+  assert.match(h.root.innerHTML, /data-history-session="live-a"/);
+  assert.match(h.root.innerHTML, /Job 701/);
   assert.equal(h.source.revision, 2);
   h.ui.teardown();
 });

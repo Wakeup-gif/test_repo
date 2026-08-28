@@ -49,7 +49,13 @@ function preferenceCandidates(raw) {
     first(nested, ['panelFinish', 'timerSurface', 'protoUiSurface', 'surface']),
     ['SOLID', 'GLASS'], { GLASS_BLUR: 'GLASS', BLUR: 'GLASS' });
   const websiteTheme = enumValue(first(source, ['websiteTheme', 'squareCoilTheme']) ?? first(nested, ['websiteTheme', 'squareCoilTheme']),
-    ['ORIGINAL', 'REFINED_LIGHT', 'SLEEK_DARK'], { LIGHT: 'REFINED_LIGHT', DARK: 'SLEEK_DARK', REFINED: 'REFINED_LIGHT', SLEEK: 'SLEEK_DARK' });
+    ['ORIGINAL', 'LIGHT_GLASS', 'REFINED_LIGHT', 'SLEEK_DARK'], {
+      LIGHT: 'REFINED_LIGHT',
+      DARK: 'SLEEK_DARK',
+      DARK_GLASS: 'SLEEK_DARK',
+      REFINED: 'REFINED_LIGHT',
+      SLEEK: 'SLEEK_DARK'
+    });
   const cinematicBackground = enumValue(first(source, ['cinematicBackground']) ?? first(nested, ['cinematicBackground']), ['NONE', 'CINEMATIC'],
     { OFF: 'NONE', ON: 'CINEMATIC' });
   const dashboardProfile = enumValue(first(source, ['dashboardProfile']) ?? first(nested, ['dashboardProfile']), ['OFF', 'ON']);

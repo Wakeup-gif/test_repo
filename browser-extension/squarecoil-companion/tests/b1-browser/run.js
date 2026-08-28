@@ -1156,6 +1156,16 @@ function runB5DThemeBrowserCase(cases, family, fixtureIds, slug, name, task) {
   });
 }
 
+async function captureUiEvidence(page, options, family, name, selector = 'body') {
+  if (!options.evidencePath) return null;
+  const evidenceBase = path.basename(options.evidencePath, path.extname(options.evidencePath));
+  const directory = path.join(path.dirname(options.evidencePath), `${evidenceBase}-screenshots`);
+  fs.mkdirSync(directory, { recursive: true });
+  const outputPath = path.join(directory, `${family}-${name}.png`);
+  await page.locator(selector).screenshot({ path: outputPath, animations: 'disabled' });
+  return outputPath;
+}
+
 function runB6CandidateBrowserCase(cases, family, fixtureIds, slug, name, task, extraMetadata = {}) {
   for (const fixtureId of fixtureIds) {
     if (!REQUIRED_B6_A4_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown B6 A4 fixture ID: ${fixtureId}`);
@@ -1455,18 +1465,105 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
           const before = { revision: empty.revision, ledgerSegmentCount: empty.ledgerSegmentCount,
             timerState: empty.timer.timerState, currentContextId: empty.timer.currentContextId };
           const home = await emptyPage.locator(`#${ROOT_ID} .sc-content`).innerText();
-          assert(home.includes('No Companion job history yet') && home.includes('Settings') && home.includes('Time Overview') && home.includes('History'),
+          assert(home.includes('No recent jobs yet') && home.includes('Settings') && home.includes('Time overview') && home.includes('History'),
             'B5-D zero-history Home omitted feature navigation', home);
           await clickWorkspaceControl(emptyPage, `[data-action="view"][data-view="settings"]`, options.timeoutMs);
           const settings = await emptyPage.locator(`#${ROOT_ID} .sc-content`).innerText();
-          assert(settings.includes('Appearance & Finish') && settings.includes('Website Theme') && settings.includes('Archives & Backup') && settings.includes('Optional Presentation'),
+          const normalizedSettings = settings.toLowerCase();
+          assert(normalizedSettings.includes('appearance') && normalizedSettings.includes('time tracking') &&
+            normalizedSettings.includes('jobs and watching') && normalizedSettings.includes('notifications') &&
+            normalizedSettings.includes('dashboard') && normalizedSettings.includes('privacy and permissions') &&
+            normalizedSettings.includes('advanced diagnostics') && normalizedSettings.includes('not available yet'),
             'B5-D zero-history Settings did not expose the accepted feature areas', settings);
+          const settingsHomeScreenshot = await captureUiEvidence(emptyPage, options, family, 'settings-home-zero-history', `#${ROOT_ID}`);
+
+          await clickWorkspaceControl(emptyPage, `[data-action="settings-route"][data-view="website-theme"]`, options.timeoutMs);
+          const nativeThemeScreenshot = await captureUiEvidence(emptyPage, options, family, 'settings-native-zero-history', `#${ROOT_ID}`);
+          const darkStart = await emptyBridge.coreSnapshot();
+          await emptyBridge.preferenceAction({ timerAppearance: 'DARK', panelFinish: 'GLASS', websiteTheme: 'SLEEK_DARK' },
+            darkStart.preferences.preferenceRevision);
+          const darkTheme = await waitFor(async () => emptyPage.evaluate(rootId => {
+            const root = document.getElementById(rootId);
+            return {
+              panelTheme: root?.dataset.protoTheme || null,
+              panelSurface: root?.dataset.protoSurface || null,
+              websiteTheme: document.documentElement.getAttribute('data-squarecoil-companion-site-theme'),
+              themeLayers: document.querySelectorAll('#squarecoil-companion-site-theme').length,
+              activeChoice: root?.querySelector('[data-action="preference-site"][data-active="true"]')?.dataset.value || null
+            };
+          }, ROOT_ID).then(value => value.panelTheme === 'dark' && value.panelSurface === 'glass' && value.websiteTheme === 'SLEEK_DARK' &&
+            value.themeLayers === 1 && value.activeChoice === 'SLEEK_DARK' ? value : null),
+          'B5-E dark zero-history Settings presentation', options.timeoutMs);
+          const darkThemeScreenshot = await captureUiEvidence(emptyPage, options, family, 'settings-dark-glass-zero-history', `#${ROOT_ID}`);
+
+          const lightStart = await emptyBridge.coreSnapshot();
+          await emptyBridge.preferenceAction({ timerAppearance: 'LIGHT', panelFinish: 'GLASS', websiteTheme: 'LIGHT_GLASS' },
+            lightStart.preferences.preferenceRevision);
+          const lightTheme = await waitFor(async () => emptyPage.evaluate(rootId => {
+            const root = document.getElementById(rootId);
+            return {
+              panelTheme: root?.dataset.protoTheme || null,
+              panelSurface: root?.dataset.protoSurface || null,
+              websiteTheme: document.documentElement.getAttribute('data-squarecoil-companion-site-theme'),
+              themeLayers: document.querySelectorAll('#squarecoil-companion-site-theme').length,
+              activeChoice: root?.querySelector('[data-action="preference-site"][data-active="true"]')?.dataset.value || null
+            };
+          }, ROOT_ID).then(value => value.panelTheme === 'light' && value.panelSurface === 'glass' && value.websiteTheme === 'LIGHT_GLASS' &&
+            value.themeLayers === 1 && value.activeChoice === 'LIGHT_GLASS' ? value : null),
+          'B5-E light zero-history Settings presentation', options.timeoutMs);
+          const lightThemeScreenshot = await captureUiEvidence(emptyPage, options, family, 'settings-light-glass-zero-history', `#${ROOT_ID}`);
+
+          await clickWorkspaceControl(emptyPage, `[data-action="settings-back"][data-view="settings"]`, options.timeoutMs);
+          await clickWorkspaceControl(emptyPage, `[data-action="settings-route"][data-view="advanced-diagnostics"]`, options.timeoutMs);
+          await emptyPage.locator(`#${ROOT_ID} details.sc-technical`).evaluate(node => { node.open = true; });
+          const diagnosticsScreenshot = await captureUiEvidence(emptyPage, options, family, 'advanced-diagnostics', `#${ROOT_ID}`);
+          const copyDiagnostics = emptyPage.locator(`#${ROOT_ID} [data-action="copy-advanced-diagnostics"]`);
+          await emptyPage.locator(`#${ROOT_ID} details.sc-technical summary`).focus();
+          for (let index = 0; index < 8 && !await copyDiagnostics.evaluate(node => document.activeElement === node); index += 1) {
+            await emptyPage.keyboard.press('Tab');
+          }
+          const focus = await copyDiagnostics.evaluate(node => ({
+            active: document.activeElement === node,
+            outlineStyle: getComputedStyle(node).outlineStyle,
+            outlineWidth: getComputedStyle(node).outlineWidth
+          }));
+          assert(focus.active && focus.outlineStyle === 'solid' && Number.parseFloat(focus.outlineWidth) >= 2,
+            'B5-E keyboard focus was not visibly preserved', focus);
+          await emptyPage.setViewportSize({ width: 360, height: 800 });
+          const responsive = await emptyPage.evaluate(rootId => {
+            const root = document.getElementById(rootId);
+            const rect = root?.getBoundingClientRect();
+            return {
+              left: rect?.left ?? null,
+              right: rect?.right ?? null,
+              width: rect?.width ?? null,
+              viewportWidth: document.documentElement.clientWidth,
+              rootScrollWidth: root?.scrollWidth ?? null,
+              rootClientWidth: root?.clientWidth ?? null
+            };
+          }, ROOT_ID);
+          assert(responsive.left >= 0 && responsive.right <= responsive.viewportWidth && responsive.width <= 336 &&
+            responsive.rootScrollWidth <= responsive.rootClientWidth,
+          'B5-E narrow Companion workspace overflowed horizontally', responsive);
+
+          await copyDiagnostics.evaluate(node => node.blur());
+          const restoreStart = await emptyBridge.coreSnapshot();
+          await emptyBridge.preferenceAction({ timerAppearance: 'LIGHT', panelFinish: 'SOLID', websiteTheme: 'ORIGINAL' },
+            restoreStart.preferences.preferenceRevision);
+          await waitFor(async () => emptyPage.evaluate(rootId => ({
+            panelTheme: document.getElementById(rootId)?.dataset.protoTheme || null,
+            panelSurface: document.getElementById(rootId)?.dataset.protoSurface || null,
+            websiteTheme: document.documentElement.getAttribute('data-squarecoil-companion-site-theme'),
+            themeLayers: document.querySelectorAll('#squarecoil-companion-site-theme').length
+          }), ROOT_ID).then(value => value.panelTheme === 'light' && value.panelSurface === 'solid' && value.websiteTheme === null &&
+            value.themeLayers === 0 ? value : null), 'B5-E native Settings restoration', options.timeoutMs);
           const after = await emptyBridge.coreSnapshot();
           assert(after.ledgerSegmentCount === before.ledgerSegmentCount && after.timer.timerState === before.timerState &&
             after.timer.currentContextId === before.currentContextId && after.timer.contextRows.length === 0,
           'B5-D zero-history navigation changed Timer or Ledger authority', { before, after });
           assert(result.network.nativeMutationAttempts.length === 0, 'B5-D zero-history navigation attempted a native SquareCoil mutation', result.network.nativeMutationAttempts);
-          return { home, settings, before, afterRevision: after.revision };
+          return { home, settings, before, afterRevision: after.revision, darkTheme, lightTheme, focus, responsive,
+            screenshots: { settingsHomeScreenshot, nativeThemeScreenshot, darkThemeScreenshot, lightThemeScreenshot, diagnosticsScreenshot } };
         } finally {
           if (emptyBridge) {
             await emptyBridge.setEnabled(false).catch(() => {});
@@ -1793,7 +1890,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
             mainText: root.querySelector('.sc-content')?.textContent || ''
           } : null;
         }, ROOT_ID), 'B3 canonical workspace initial render', options.timeoutMs);
-        assert(main.brand === 'B6 release candidate', 'B6 workspace brand did not identify the active release-candidate gate', main);
+        assert(main.brand === 'Companion', 'Workspace brand did not use the friendly Companion identity', main);
         assert(main.selectedContextId === 'job:260701', 'Initial B3 selection did not reflect current Context truth', main);
         assert(main.selectedAria.includes('Today') && main.selectedAria.includes('timer limit') && main.selectedAria.includes('Running'), 'Compact tab omitted Today, threshold, or operational semantics', main);
 
@@ -1804,7 +1901,8 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
         await page.locator(`#${ROOT_ID} [data-action="view"][data-view="main"]`).click();
         await page.locator(`#${ROOT_ID} [data-action="view"][data-view="history"]`).click();
         const history = await page.locator(`#${ROOT_ID} .sc-content`).innerText();
-        assert(history.includes('History') && history.includes('finalized Companion work only'), 'B3 History did not preserve finalized-work semantics', history);
+        assert(history.includes('History') && history.includes('Current work stays on the Home screen until the session is complete.'),
+          'B3 History did not preserve completed-session semantics', history);
         await page.locator(`#${ROOT_ID} [data-action="view"][data-view="main"]`).click();
 
         const after = await bridge.coreSnapshot();
@@ -1883,11 +1981,15 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
           try {
             popupHealth = await waitFor(async () => popupPage.evaluate(() => ({
               stage: document.getElementById('stage')?.textContent || '',
+              friendlyStatus: document.getElementById('friendlyStatus')?.textContent || '',
+              friendlyMessage: document.getElementById('friendlyMessage')?.textContent || '',
               classification: document.getElementById('classification')?.textContent || '',
               lifecycle: document.getElementById('lifecycle')?.textContent || '',
               reason: document.getElementById('reason')?.textContent || '',
               healthTone: document.body.dataset.health || '',
-              explanation: document.querySelector('.health > p')?.textContent || ''
+              statusTone: document.body.dataset.status || '',
+              explanation: document.querySelector('.technical-card > p')?.textContent || '',
+              technicalCollapsed: document.querySelector('.technical-card')?.open === false
             })).then(value => {
               lastPopupHealth = value;
               return value.lifecycle === 'READY' ? value : null;
@@ -1896,11 +1998,19 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
             error.details = { popupTarget, popupUrl: popupPage.url(), lastPopupHealth };
             throw error;
           }
-          assert(popupHealth.stage === 'B6 · Release candidate', 'Popup stage did not identify the B6 release-candidate runtime', popupHealth);
+          assert(popupHealth.stage === 'Companion workspace', 'Popup did not use the friendly Companion workspace identity', popupHealth);
+          assert(popupHealth.friendlyStatus === 'Ready' && popupHealth.friendlyMessage === 'Companion is connected and ready.' && popupHealth.statusTone === 'ready',
+            'Popup did not render the friendly READY status', popupHealth);
           assert(popupHealth.classification === 'HEALTHY_SAME_BUILD', 'Popup did not display healthy same-build classification', popupHealth);
           assert(popupHealth.reason === 'ready' && popupHealth.healthTone === 'ok', 'Popup did not render positive READY health', popupHealth);
-          assert(popupHealth.explanation.includes('never bypasses those checks, restores live timer state, or modifies SquareCoil official data'), 'Popup did not retain the fail-closed B6 authority boundary', popupHealth);
-          return { settledHealth, popupTarget, popupHealth };
+          assert(popupHealth.explanation.includes('only after every required safety check passes') && popupHealth.technicalCollapsed,
+            'Popup did not retain the fail-closed boundary behind collapsed Technical details', popupHealth);
+          await popupPage.emulateMedia({ colorScheme: 'dark' });
+          const popupDarkScreenshot = await captureUiEvidence(popupPage, options, family, 'popup-dark-ready', 'body');
+          await popupPage.emulateMedia({ colorScheme: 'light' });
+          const popupLightScreenshot = await captureUiEvidence(popupPage, options, family, 'popup-light-ready', 'body');
+          await popupPage.emulateMedia({ colorScheme: null });
+          return { settledHealth, popupTarget, popupHealth, screenshots: { popupDarkScreenshot, popupLightScreenshot } };
         } finally {
           await popupPage.close().catch(() => {});
           await page.bringToFront().catch(() => {});
@@ -2245,7 +2355,13 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
 
           await openSettingsHome(page, options.timeoutMs);
           const settingsHome = await page.locator(`#${ROOT_ID} .sc-content`).innerText();
-          assert(settingsHome.includes('Appearance & Finish') && settingsHome.includes('Timer Limits') && settingsHome.includes('Website Theme') && settingsHome.includes('Optional Presentation') && settingsHome.includes('Submit a Ticket') && settingsHome.includes('Send Feedback'), 'B5-A Settings Home was incomplete', settingsHome);
+          const normalizedSettingsHome = settingsHome.toLowerCase();
+          assert(normalizedSettingsHome.includes('appearance') && normalizedSettingsHome.includes('time tracking') &&
+            normalizedSettingsHome.includes('jobs and watching') && normalizedSettingsHome.includes('notifications') &&
+            normalizedSettingsHome.includes('dashboard') && normalizedSettingsHome.includes('privacy and permissions') &&
+            normalizedSettingsHome.includes('advanced diagnostics') && normalizedSettingsHome.includes('submit a ticket') &&
+            normalizedSettingsHome.includes('send feedback'),
+          'B5-A Settings Home was incomplete', settingsHome);
 
           await clickWorkspaceControl(page, `[data-action="settings-route"][data-view="timer-appearance"]`, options.timeoutMs);
           await clickWorkspaceControl(page, `[data-action="preference"][data-value="AUTO"]`, options.timeoutMs);
@@ -2270,6 +2386,12 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
             effective: document.documentElement.getAttribute('data-squarecoil-companion-site-theme')
           })).then(value => value.layerCount === 1 && value.effective === 'SLEEK_DARK' ? value : null), 'B5-A Sleek Dark presentation', options.timeoutMs);
           await waitFor(async () => await page.locator(`#${ROOT_ID} [data-action="preference-site"][data-value="SLEEK_DARK"][data-active="true"]`).count() ? true : null, 'B5-A Sleek Dark UI settlement', options.timeoutMs);
+          await clickWorkspaceControl(page, `[data-action="preference-site"][data-value="LIGHT_GLASS"]`, options.timeoutMs);
+          const lightGlassPresentation = await waitFor(async () => page.evaluate(() => ({
+            layerCount: document.querySelectorAll('#squarecoil-companion-site-theme').length,
+            effective: document.documentElement.getAttribute('data-squarecoil-companion-site-theme')
+          })).then(value => value.layerCount === 1 && value.effective === 'LIGHT_GLASS' ? value : null), 'B5-E Light Glass presentation', options.timeoutMs);
+          await waitFor(async () => await page.locator(`#${ROOT_ID} [data-action="preference-site"][data-value="LIGHT_GLASS"][data-active="true"]`).count() ? true : null, 'B5-E Light Glass UI settlement', options.timeoutMs);
           await clickWorkspaceControl(page, `[data-action="preference-site"][data-value="REFINED_LIGHT"]`, options.timeoutMs);
           const refinedPresentation = await waitFor(async () => page.evaluate(() => ({
             layerCount: document.querySelectorAll('#squarecoil-companion-site-theme').length,
@@ -2298,7 +2420,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
           await waitFor(async () => {
             const text = await page.locator(`#${ROOT_ID} .sc-content`).innerText();
             const disabled = await page.locator(`#${ROOT_ID} [data-sc-limits-form] button[type="submit"]`).isDisabled().catch(() => false);
-            return text.includes('newer preference revision') && disabled ? { text, disabled } : null;
+            return text.includes('Settings changed in another tab') && disabled ? { text, disabled } : null;
           }, 'B5-A stale Limits rejection', options.timeoutMs);
           page.once('dialog', dialog => dialog.accept());
           await clickWorkspaceControl(page, `[data-action="settings-back"][data-view="settings"]`, options.timeoutMs);
@@ -2351,6 +2473,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
             autoEffective: autoSnapshot.presentation.timerAppearanceEffective,
             glassEffective: glassSnapshot.presentation.panelFinishEffective,
             darkPresentation,
+            lightGlassPresentation,
             refinedPresentation,
             originalPresentation,
             staleRevision: crossTab.owner.preferences.preferenceRevision,
@@ -2395,8 +2518,8 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
         await openSettingsHome(page, options.timeoutMs);
         await clickWorkspaceControl(page, `[data-action="settings-route"][data-view="presentation-packs"]`, options.timeoutMs);
         const optionalSurface = await page.locator(`#${ROOT_ID} .sc-content`).innerText();
-        assert(/Fresh Bing Cinematic Background/i.test(optionalSurface) && /Design Dashboard Profile/i.test(optionalSurface) &&
-          optionalSurface.includes('Restore Native SquareCoil') && optionalSurface.includes('never job, timer, page, or user content'),
+        assert(/Cinematic wallpaper/i.test(optionalSurface) && /Design dashboard/i.test(optionalSurface) &&
+          optionalSurface.includes('Restore Native / Off') && optionalSurface.includes('Job, timer, page and user content are never sent'),
         'B5-B Settings surface did not disclose permission privacy and restoration behavior', optionalSurface);
         await bridge.preferenceAction({ websiteTheme: 'SLEEK_DARK',
           cinematicBackground: 'CINEMATIC', dashboardProfile: 'ON' },
@@ -2437,12 +2560,19 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
             rows: [...document.querySelectorAll('#inProgress .clickableRowx')].map(node => ({ text: node.textContent, href: node.getAttribute('href') })),
             selected: document.getElementById('multiple_location_id')?.value,
             disabled: document.querySelector('#nextJob button')?.disabled,
-            warning: document.querySelector('#onHold .text-warning')?.textContent
+            warning: document.querySelector('#onHold .text-warning')?.textContent,
+            summaryCount: document.querySelectorAll('#squarecoil-companion-dashboard-summary').length,
+            summaryText: document.getElementById('squarecoil-companion-dashboard-summary')?.innerText || '',
+            summaryInteractive: document.querySelectorAll('#squarecoil-companion-dashboard-summary :is(a,button,input,select,textarea,form)').length
           }));
           assert(exactDom.attribute === 'active' && exactDom.layers === 1, 'B5-B exact dashboard did not own one profile layer', exactDom);
           assert(JSON.stringify(exactDom.kpis) === JSON.stringify(['17Tasks', '8Designs', '3Estimates']), 'B5-B dashboard changed KPI text', exactDom);
           assert(JSON.stringify(exactDom.rows) === JSON.stringify([{ text: 'A', href: '/project.php?id=260701' }, { text: 'B', href: '/project.php?id=260702' }]), 'B5-B dashboard changed native row order or targets', exactDom);
           assert(exactDom.selected === 'shop-2' && exactDom.disabled === true && exactDom.warning === 'Native warning', 'B5-B dashboard changed native control or warning state', exactDom);
+          const normalizedSummaryText = exactDom.summaryText.toLowerCase();
+          assert(exactDom.summaryCount === 1 && exactDom.summaryInteractive === 0 && normalizedSummaryText.includes('squarecoil companion') &&
+            normalizedSummaryText.includes('today') && normalizedSummaryText.includes('this week') && normalizedSummaryText.includes('current session'),
+          'B5-E dashboard summary was not one bounded read-only Companion layer', exactDom);
 
           await wrongDashboardPage.goto(`${FIXTURE_ORIGIN}${DASHBOARD_PATH}?show=1`, { waitUntil: 'domcontentloaded', timeout: options.timeoutMs });
           await waitFor(async () => (await pageState(wrongDashboardPage)).documentToken, 'B5-B non-design dashboard document identity', options.timeoutMs);
@@ -2452,8 +2582,12 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
             const snapshot = await wrongDashboardBridge.coreSnapshot();
             return snapshot?.preferences?.dashboardProfile === 'ON' ? snapshot : null;
           }, 'B5-B non-design dashboard preference settlement', options.timeoutMs);
-          const wrongLayers = await wrongDashboardPage.evaluate(() => document.querySelectorAll('#squarecoil-companion-design-dashboard-profile').length);
-          assert(wrong.presentation.optional.dashboard.state === 'INACTIVE_PAGE' && wrongLayers === 0, 'B5-B selector accident applied to a different dashboard mode', { wrong: wrong.presentation.optional.dashboard, wrongLayers });
+          const wrongLayers = await wrongDashboardPage.evaluate(() => ({
+            styles: document.querySelectorAll('#squarecoil-companion-design-dashboard-profile').length,
+            summaries: document.querySelectorAll('#squarecoil-companion-dashboard-summary').length
+          }));
+          assert(wrong.presentation.optional.dashboard.state === 'INACTIVE_PAGE' && wrongLayers.styles === 0 && wrongLayers.summaries === 0,
+            'B5-B selector accident applied to a different dashboard mode', { wrong: wrong.presentation.optional.dashboard, wrongLayers });
 
           await openSettingsHome(page, options.timeoutMs);
           await clickWorkspaceControl(page, `[data-action="settings-route"][data-view="presentation-packs"]`, options.timeoutMs);
@@ -2469,6 +2603,12 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
             cinematicStyles: document.querySelectorAll('#squarecoil-companion-cinematic-style').length
           }));
           assert(Object.values(restoredDom).every(value => value === 0), 'B5-B Restore Native left owned presentation artifacts', restoredDom);
+          const restoredDashboard = await waitFor(async () => dashboardPage.evaluate(() => ({
+            attribute: document.documentElement.getAttribute('data-squarecoil-companion-dashboard-profile'),
+            layers: document.querySelectorAll('#squarecoil-companion-design-dashboard-profile').length,
+            summaries: document.querySelectorAll('#squarecoil-companion-dashboard-summary').length
+          })).then(value => value.attribute === null && value.layers === 0 && value.summaries === 0 ? value : null),
+          'B5-E dashboard summary teardown', options.timeoutMs);
           const permissionProbe = await bridge.send({ type: MESSAGES.B5B_WALLPAPER, requestId: 'b5b-a4-after-restore' });
           assert(permissionProbe?.ok === false && permissionProbe?.reason === 'optional-origin-permission-required',
             'B5-B Restore Native did not remove optional Bing access and its cache', permissionProbe);
@@ -2478,7 +2618,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
           return { defaultDom, installedOptionalPermission: 'not-granted', bingRequests: result.network.bing,
             cinematic: cinematic.presentation.optional.cinematic, cinematicDom,
             exactDashboard: exact.presentation.optional.dashboard, exactDom, wrongDashboard: wrong.presentation.optional.dashboard,
-            restoredDom, permissionProbe: { ok: permissionProbe.ok, reason: permissionProbe.reason },
+            restoredDom, restoredDashboard, permissionProbe: { ok: permissionProbe.ok, reason: permissionProbe.reason },
             nativeMutationAttempts: result.network.nativeMutationAttempts.length };
         } finally {
           if (wrongDashboardBridge) { await wrongDashboardBridge.authorityTeardown().catch(() => {}); await wrongDashboardBridge.detach(); }
@@ -2738,6 +2878,50 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
           assert(lookalike.wrapperBackground === 'rgb(255, 255, 255)' && lookalike.editorFrameMarker === null && lookalike.editorDocumentLayers === 0,
             'B5-D applied a vendor or editor adapter to an unlisted route', lookalike);
 
+          const darkCurrent = await bridge.coreSnapshot();
+          await bridge.preferenceAction({ websiteTheme: 'LIGHT_GLASS' }, darkCurrent.preferences.preferenceRevision);
+          const lightGlass = await waitFor(async () => vendorPage.evaluate(() => {
+            const frame = document.getElementById('editor-frame');
+            const editorDocument = frame?.contentDocument;
+            const panel = getComputedStyle(document.querySelector('.panel-body'));
+            return {
+              theme: document.documentElement.getAttribute('data-squarecoil-companion-site-theme'),
+              layers: document.querySelectorAll('#squarecoil-companion-site-theme').length,
+              panelColor: panel.color,
+              panelBackground: panel.backgroundColor,
+              editorFrameMarker: frame?.getAttribute('data-squarecoil-companion-editor-frame') || null,
+              editorDocumentLayers: editorDocument?.querySelectorAll('#squarecoil-companion-ckeditor-document-theme').length || 0,
+              editorBodyColor: editorDocument?.body ? getComputedStyle(editorDocument.body).color : null,
+              editorBodyBackground: editorDocument?.body ? getComputedStyle(editorDocument.body).backgroundColor : null
+            };
+          }).then(state => state.theme === 'LIGHT_GLASS' && state.layers === 1 && state.editorFrameMarker === 'light-glass' &&
+            state.editorDocumentLayers === 1 ? state : null), 'B5-E Light Glass vendor/editor settlement', options.timeoutMs);
+          assert(lightGlass.panelColor === 'rgb(23, 33, 44)' && lightGlass.panelBackground !== 'rgb(255, 255, 255)' &&
+            lightGlass.editorBodyColor === 'rgb(24, 33, 43)' && lightGlass.editorBodyBackground === 'rgb(248, 250, 252)',
+          'B5-E Light Glass did not apply pale translucent surfaces and readable editor text', lightGlass);
+
+          const lightCurrent = await bridge.coreSnapshot();
+          await bridge.preferenceAction({ websiteTheme: 'REFINED_LIGHT' }, lightCurrent.preferences.preferenceRevision);
+          const refinedLight = await waitFor(async () => vendorPage.evaluate(() => {
+            const frame = document.getElementById('editor-frame');
+            return {
+              theme: document.documentElement.getAttribute('data-squarecoil-companion-site-theme'),
+              layers: document.querySelectorAll('#squarecoil-companion-site-theme').length,
+              editorFrameMarker: frame?.getAttribute('data-squarecoil-companion-editor-frame') || null,
+              editorDocumentLayers: frame?.contentDocument?.querySelectorAll('#squarecoil-companion-ckeditor-document-theme').length || 0
+            };
+          }).then(state => state.theme === 'REFINED_LIGHT' && state.layers === 1 && state.editorFrameMarker === 'refined-light' &&
+            state.editorDocumentLayers === 1 ? state : null), 'B5-E Refined Light vendor/editor settlement', options.timeoutMs);
+
+          const refinedCurrent = await bridge.coreSnapshot();
+          await bridge.preferenceAction({ websiteTheme: 'SLEEK_DARK' }, refinedCurrent.preferences.preferenceRevision);
+          await waitFor(async () => vendorPage.evaluate(() => ({
+            theme: document.documentElement.getAttribute('data-squarecoil-companion-site-theme'),
+            layers: document.querySelectorAll('#squarecoil-companion-site-theme').length,
+            editorFrameMarker: document.getElementById('editor-frame')?.getAttribute('data-squarecoil-companion-editor-frame') || null
+          })).then(state => state.theme === 'SLEEK_DARK' && state.layers === 1 && state.editorFrameMarker === 'dark' ? state : null),
+          'B5-E Dark Glass restoration before layout checks', options.timeoutMs);
+
           await vendorPage.setViewportSize({ width: 720, height: 900 });
           const responsive = await vendorPage.evaluate(() => {
             const content = getComputedStyle(document.getElementById('content'));
@@ -2806,7 +2990,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
             after.timer.currentContextId === before.timer.currentContextId,
           'B5-D theme adapters changed Timer or Ledger authority', { before, after });
           assert(result.network.nativeMutationAttempts.length === 0, 'B5-D theme adapters attempted a native SquareCoil mutation', result.network.nativeMutationAttempts);
-          return { vendor, gantt, lookalike, responsive, print, forced, restored, native,
+          return { vendor, gantt, lookalike, lightGlass, refinedLight, responsive, print, forced, restored, native,
             nativeMutationAttempts: result.network.nativeMutationAttempts.length };
         } finally {
           for (const themedBridge of bridges.reverse()) {

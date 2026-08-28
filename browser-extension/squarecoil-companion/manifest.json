@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "US Sign SquareCoil Companion",
   "version": "0.7.1",
-  "version_name": "0.7.1 B6 Release Candidate",
-  "description": "SquareCoil Companion B6 release candidate. Exact-package acceptance testing only; not a published production release.",
+  "version_name": "0.7.1 Companion Workspace",
+  "description": "A local SquareCoil companion for time context, themes, dashboard summaries, settings, and privacy-safe diagnostics.",
   "permissions": ["storage", "scripting", "webRequest"],
   "host_permissions": [
     "https://ussignandmill.squarecoil.net/*"

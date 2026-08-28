@@ -8,7 +8,7 @@ const OPTIONAL_PRESENTATION_FEATURES = Object.freeze({
     defaultPreference: 'NONE',
     routes: Object.freeze(['https://ussignandmill.squarecoil.net/*']),
     optionalOrigins: Object.freeze(['https://www.bing.com/*']),
-    dependencies: Object.freeze(['websiteTheme=SLEEK_DARK']),
+    dependencies: Object.freeze(['websiteTheme=SLEEK_DARK|LIGHT_GLASS']),
     conflicts: Object.freeze(['forced-colors', 'reduced-transparency']),
     storage: Object.freeze(['preferences.cinematicBackground', 'squarecoilCompanionB5BWallpaperCacheV1'])
   }),

@@ -222,9 +222,11 @@ for (const reference of manifestReferences) {
 }
 
 const popupHtml = fs.readFileSync(path.join(root, 'popup/popup.html'), 'utf8');
-assert(popupHtml.includes('B6 · Release candidate'), 'Popup fallback stage must identify the B6 release-candidate runtime');
-assert(popupHtml.includes('READY requires lifecycle, fenced authority, migration, trusted core, and Bridge settlement.'), 'Popup must preserve the fail-closed READY settlement prerequisites');
-assert(popupHtml.includes('never bypasses those checks, restores live timer state, or modifies SquareCoil official data'), 'Popup must state the B6 fail-closed authority boundary');
+assert(popupHtml.includes('Companion workspace'), 'Popup must use the friendly Companion workspace identity');
+assert(popupHtml.includes('Ready appears only after every required safety check passes.'), 'Popup Technical details must preserve the fail-closed READY boundary');
+assert(popupHtml.includes('Companion is available before you clock in.'), 'Popup must expose the zero-history settings entry point');
+assert(popupHtml.includes('Technical details'), 'Popup must retain secondary access to technical diagnostics');
+assert(!popupHtml.includes('B6 · Release candidate'), 'Popup primary copy must not expose an internal stage label');
 assert(!popupHtml.includes('B1 intentionally stays degraded'), 'Popup must not retain the obsolete pre-B2 degraded explanation');
 assert(!/<base\b/i.test(popupHtml), 'B1 popup must not redefine its local base URL');
 assert(!/<(?:iframe|object|embed)\b/i.test(popupHtml), 'B1 popup must not embed executable documents or plugins');
@@ -506,7 +508,10 @@ assert(background.includes('src/data/data-safety-command.js'), 'The worker bundl
 assert(contentBundle.includes('src/preferences/preferences.js'), 'B5-A isolated bundle must package the preference schema and migration adapters');
 assert(contentBundle.includes('src/presentation/theme-service.js'), 'B5-A isolated bundle must package the owned presentation service');
 assert(contentBundle.includes('src/support/support-service.js'), 'B5-A isolated bundle must package privacy-safe Support composition');
-assert(contentBundle.includes('B6 release candidate'), 'B6 isolated bundle must identify the exact release-candidate workspace surface');
+assert(contentBundle.includes('SquareCoil') && contentBundle.includes('Companion') && contentBundle.includes('Advanced diagnostics'), 'The isolated bundle must package the friendly Companion workspace and secondary diagnostics surface');
+assert(contentBundle.includes('LIGHT_GLASS') && contentBundle.includes('REFINED_LIGHT'), 'The isolated bundle must package every accepted mutually exclusive website theme');
+assert(contentBundle.includes('No recent jobs yet'), 'The isolated bundle must package the useful zero-history workspace');
+assert(!contentBundle.includes('<small>B6 release candidate</small>'), 'The primary workspace must not expose an internal stage label');
 assert(contentBundle.includes('src/presentation/cinematic-background.js'), 'B5-B isolated bundle must package the fenced cinematic service');
 assert(contentBundle.includes('src/presentation/dashboard-profile.js'), 'B5-B isolated bundle must package the exact-route dashboard profile');
 assert(background.includes('src/extension/wallpaper-provider.js'), 'B5-B worker must package the privacy-bounded wallpaper provider');

@@ -29,6 +29,7 @@
     "check:b5-optional": "npm test && npm run test:proto-ui && npm run validate",
     "check:b5c-theme": "npm test && npm run test:proto-ui && npm run validate",
     "check:b5d-theme": "npm test && npm run test:proto-ui && npm run validate",
+    "check:b5e-integration": "npm test && npm run test:proto-ui && npm run validate",
     "check:b6-candidate": "npm test && npm run test:proto-ui && npm run validate"
   }
 }

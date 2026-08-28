@@ -28,9 +28,13 @@ test('UT-B5-SUPPORT-002 coarse page classification never includes job IDs paths 
 test('UT-B5-SUPPORT-003 diagnostics use only the frozen whitelist and omit private SquareCoil context', () => {
   const diagnostics = createDiagnosticSnapshot({
     packageName: 'SquareCoil Companion', packageVersion: '0.7.1',
+    buildId: 'rebuild-b6-release-candidate', buildStage: 'B6', candidateFingerprint: 'a'.repeat(64),
     userAgent: 'Mozilla/5.0 Chrome/151.0.7922.174 Safari/537.36',
     url: 'https://ussignandmill.squarecoil.net/project.php?id=260701&customer=VeryPrivate',
     lifecycle: 'trusted-core-owner-active', bridgeCapability: 'FULL', bridgeStatus: 'active', coreReadiness: 'ready',
+    runtimeInstanceId: 'runtime-safe-001', workerInstanceId: 'worker-safe-001', coordinationEpoch: 7,
+    settlementStatus: 'ready', migrationDisposition: 'COMPLETE_MATCH', migrationReason: 'none',
+    bridgeGeneration: 3, bridgeReason: 'native-observation-current', lastTechnicalError: 'private customer failure',
     preferences: { timerAppearance: 'AUTO', panelFinish: 'GLASS', websiteTheme: 'SLEEK_DARK' },
     presentation: { timerAppearanceEffective: 'DARK', panelFinishEffective: 'GLASS', websiteThemeEffective: 'SLEEK_DARK' },
     rootCount: 1, capturedAtMs: Date.parse('2026-08-28T15:00:00Z'),
@@ -38,6 +42,14 @@ test('UT-B5-SUPPORT-003 diagnostics use only the frozen whitelist and omit priva
   });
   assert.match(diagnostics.text, /Browser: Chrome 151\.0\.7922\.174/);
   assert.match(diagnostics.text, /Page type: project-page/);
+  assert.match(diagnostics.text, /Build: rebuild-b6-release-candidate \/ B6/);
+  assert.match(diagnostics.text, /Runtime: runtime-safe-001/);
+  assert.match(diagnostics.text, /Worker generation: worker-safe-001/);
+  assert.match(diagnostics.text, /Coordination generation: 7/);
+  assert.match(diagnostics.text, /Settlement: ready/);
+  assert.match(diagnostics.text, /Migration: COMPLETE_MATCH \/ none/);
+  assert.match(diagnostics.text, /Bridge generation: 3/);
+  assert.match(diagnostics.text, /Last internal error: none/);
   assert.doesNotMatch(diagnostics.text, /260701|VeryPrivate|customer|history|project\.php/);
 });
 
