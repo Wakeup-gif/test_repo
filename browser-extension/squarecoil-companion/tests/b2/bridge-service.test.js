@@ -258,3 +258,173 @@ test('UT-B2-BRIDGE-032 successful observed action 2 verifies one native-confirme
   assert.equal(boundaries[0].boundaryAtMs, 4_010);
   assert.equal(boundaries[0].boundaryCertainty, 'NATIVE_CONFIRMED');
 });
+
+test('UT-B2-BRIDGE-034 OWNER readiness waits for a completed observation in the current authority tenure', async () => {
+  const fixture = browserFixture();
+  const pendingFetches = [];
+  const events = [];
+  let project = '260702';
+  fixture.document.querySelectorAll = selector => {
+    if (selector === '#clockin-remaining-time') return [element(
+      `<a href="/project.php?id=${project}">${project} - Fabrication</a>`,
+      `${project} - Fabrication`
+    )];
+    if (selector === '#clockout' || selector === '.timeclock-container') return [element()];
+    return [];
+  };
+  const bridge = createSquareCoilBridgeService({
+    document: fixture.document,
+    window: fixture.window,
+    timers: fixture.timers,
+    sourceRuntimeId: 'runtime-owner-tenure-ready-01',
+    now: () => 5_000,
+    fetch: () => new Promise(resolve => pendingFetches.push(resolve)),
+    onEvents: async values => events.push(...values)
+  });
+  const finishFetch = (resolve, projectId = project) => resolve({
+    ok: true,
+    text: async () => `<span id="clockin-remaining-time"><a href="/project.php?id=${projectId}">${projectId} - Fabrication</a></span>`
+  });
+  const waitForFetchCount = async expected => {
+    for (let attempt = 0; attempt < 20 && pendingFetches.length < expected; attempt += 1) {
+      await Promise.resolve();
+    }
+    assert.equal(pendingFetches.length, expected);
+  };
+
+  const initialEnsure = bridge.ensure({ owner: true });
+  await waitForFetchCount(1);
+  assert.equal(bridge.snapshot().verificationInFlight, true);
+  assert.equal(bridge.snapshot().requestCount, 1);
+  assert.equal(bridge.snapshot().ownerInitialObservationCompleted, false);
+  finishFetch(pendingFetches[0]);
+  await initialEnsure;
+  assert.equal(bridge.snapshot().ownerInitialObservationCompleted, true);
+  events.length = 0;
+
+  const oldTenureVerification = bridge.verifyNow('old-owner-tenure');
+  await waitForFetchCount(2);
+  await bridge.setOwner(false);
+  const reacquired = bridge.setOwner(true);
+  assert.equal(bridge.snapshot().ownerInitialObservationCompleted, false);
+  await waitForFetchCount(3);
+  project = '260703';
+  finishFetch(pendingFetches[1], project);
+  const staleResult = await oldTenureVerification;
+  assert.equal(staleResult.accepted, false);
+  assert.equal(staleResult.reason, 'STALE_OWNER_TENURE');
+  assert.equal(events.length, 0);
+  assert.equal(bridge.snapshot().ownerInitialObservationCompleted, false);
+  finishFetch(pendingFetches[2], project);
+  await reacquired;
+  assert.equal(bridge.snapshot().ownerInitialObservationCompleted, true);
+  assert.equal(events.filter(event => event.type === 'CONTEXT_CHANGED').length, 1);
+
+  await bridge.teardown();
+  assert.equal(bridge.snapshot().ownerInitialObservationCompleted, false);
+});
+
+test('UT-B2-BRIDGE-035 action-7 timeout bounds initial OWNER settlement and clears in-flight health', async () => {
+  const fixture = browserFixture({
+    selectors: {
+      '#clockin-remaining-time': [element(), element()],
+      '#clockout': [],
+      '.timeclock-container': []
+    }
+  });
+  let aborted = false;
+  const bridge = createSquareCoilBridgeService({
+    document: fixture.document,
+    window: fixture.window,
+    timers: fixture.timers,
+    sourceRuntimeId: 'runtime-owner-timeout-0001',
+    verificationTimeoutMs: 25,
+    now: () => 6_000,
+    fetch: (_url, options) => new Promise((_resolve, reject) => {
+      options.signal.addEventListener('abort', () => {
+        aborted = true;
+        reject(new Error('fetch-aborted'));
+      }, { once: true });
+    })
+  });
+
+  const ensuring = bridge.ensure({ owner: true });
+  let timeout = null;
+  for (let attempt = 0; attempt < 20 && !timeout; attempt += 1) {
+    await Promise.resolve();
+    timeout = [...fixture.timeouts.values()].find(value => value.delayMs === 25) || null;
+  }
+  assert.ok(timeout);
+  timeout.callback();
+  const health = await ensuring;
+
+  assert.equal(aborted, true);
+  assert.equal(health.verificationInFlight, false);
+  assert.equal(health.capability, 'UNAVAILABLE');
+  assert.equal(health.ownerInitialObservationCompleted, true);
+  assert.equal(health.lastError, 'action-7-timeout');
+  assert.equal(fixture.timeouts.size, 0);
+  await bridge.teardown();
+});
+
+test('UT-B2-BRIDGE-036 a successful current-tenure follow-up latches the OWNER observation', async () => {
+  const fixture = browserFixture();
+  const pendingFetches = [];
+  const events = [];
+  let project = '260702';
+  fixture.document.querySelectorAll = selector => {
+    if (selector === '#clockin-remaining-time') return [element(
+      `<a href="/project.php?id=${project}">${project} - Fabrication</a>`,
+      `${project} - Fabrication`
+    )];
+    if (selector === '#clockout' || selector === '.timeclock-container') return [element()];
+    return [];
+  };
+  const bridge = createSquareCoilBridgeService({
+    document: fixture.document,
+    window: fixture.window,
+    timers: fixture.timers,
+    sourceRuntimeId: 'runtime-owner-follow-up-latch',
+    followUpMs: 17,
+    now: () => 7_000,
+    fetch: () => new Promise(resolve => pendingFetches.push(resolve)),
+    onEvents: async values => events.push(...values)
+  });
+  const waitFor = async predicate => {
+    for (let attempt = 0; attempt < 30 && !predicate(); attempt += 1) await Promise.resolve();
+    assert.equal(predicate(), true);
+  };
+  const finishFetch = (resolve, projectId) => resolve({
+    ok: true,
+    text: async () => `<span id="clockin-remaining-time"><a href="/project.php?id=${projectId}">${projectId} - Fabrication</a></span>`
+  });
+
+  const ensuring = bridge.ensure({
+    owner: true,
+    authorityTenure: { coordinationEpoch: 7, workerInstanceId: 'worker-follow-up-latch' }
+  });
+  await waitFor(() => pendingFetches.length === 1);
+  const completion = bridge.observeNativeCompletion({
+    nativeAction: 3,
+    successful: true,
+    completedAtMs: 7_010,
+    completionKey: 'native-follow-up-latch-001',
+    requestProjectId: '260703'
+  });
+  project = '260703';
+  finishFetch(pendingFetches[0], project);
+  await Promise.all([ensuring, completion]);
+
+  assert.equal(bridge.snapshot().ownerInitialObservationCompleted, false);
+  const followUp = [...fixture.timeouts.values()].find(value => value.delayMs === 17);
+  assert.ok(followUp);
+  followUp.callback();
+  await waitFor(() => pendingFetches.length === 2);
+  finishFetch(pendingFetches[1], project);
+  await waitFor(() => bridge.snapshot().ownerInitialObservationCompleted === true);
+
+  assert.equal(bridge.snapshot().requestCount, 2);
+  assert.equal(bridge.snapshot().ownerInitialObservationCompleted, true);
+  assert.equal(events.some(event => event.type === 'CONTEXT_DETECTED'), true);
+  await bridge.teardown();
+});

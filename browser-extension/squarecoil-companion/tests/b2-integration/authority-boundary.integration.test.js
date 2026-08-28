@@ -4,7 +4,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { AUTHORITY_PROTOCOL_VERSION, AUTHORITY_MESSAGES } = require('../../src/extension/authority-protocol');
+const {
+  AUTHORITY_PROTOCOL_VERSION,
+  AUTHORITY_MESSAGES,
+  AUTHORITY_CONTROL_MESSAGES,
+  B2_SETTLEMENT_ACK
+} = require('../../src/extension/authority-protocol');
 const { createAuthorityRouter } = require('../../src/extension/authority-router');
 const {
   KERNEL_ONLY_DISPOSITION,
@@ -24,6 +29,19 @@ const LIFECYCLE_MESSAGES = Object.freeze({
 
 function isolatedAuthority(page) {
   return page.isolatedSandbox?.__squareCoilCompanionAuthorityHealth || null;
+}
+
+function b2SettlementMessage(page, suffix) {
+  const authority = isolatedAuthority(page).snapshot();
+  return {
+    type: AUTHORITY_CONTROL_MESSAGES.GET_B2_SETTLEMENT,
+    protocolVersion: AUTHORITY_PROTOCOL_VERSION,
+    settlementId: `settlement-${suffix}`,
+    settlementMode: 'REFRESH',
+    workerInstanceId: authority.workerInstanceId,
+    documentToken: page.documentToken,
+    runtimeInstanceId: page.health.runtimeInstanceId
+  };
 }
 
 class FakeTimers {
@@ -701,4 +719,208 @@ test('IT-B2-PLATFORM-024 ownership-conflict self-retirement also stops isolated 
   assert.equal(page.document.documentElement.dataset.squarecoilCompanionReloadRequired, 'ownership-conflict');
   assert.equal(isolatedAuthority(page).snapshot().healthy, false);
   assert.equal(isolatedAuthority(page).snapshot().subscribed, false);
+});
+
+test('IT-B2-PLATFORM-028 same-generation settlement refresh is single-flight and never cached', async () => {
+  const harness = createA3Harness({ authorityKernel: true });
+  const page = harness.createPage();
+  await harness.startContentController(page);
+  await harness.waitForStableRuntime(page);
+  await harness.waitFor(
+    () => isolatedAuthority(page)?.snapshot()?.healthy === true &&
+      isolatedAuthority(page)?.coreSnapshot()?.initialized === true,
+    'initialized authority and trusted core before settlement single-flight'
+  );
+
+  const originalSendMessage = page.isolatedSandbox.chrome.runtime.sendMessage;
+  let counts = { heartbeat: 0, subscribe: 0, read: 0 };
+  page.isolatedSandbox.chrome.runtime.sendMessage = async message => {
+    if (message?.type === AUTHORITY_MESSAGES.HEARTBEAT) counts.heartbeat += 1;
+    if (message?.type === AUTHORITY_MESSAGES.SUBSCRIBE) counts.subscribe += 1;
+    if (message?.type === AUTHORITY_MESSAGES.READ) counts.read += 1;
+    return originalSendMessage(message);
+  };
+
+  try {
+    const firstMessage = b2SettlementMessage(page, 'single-flight-first-0001');
+    const secondMessage = { ...firstMessage, settlementId: 'settlement-single-flight-second-0002' };
+    const [first, second] = await Promise.all([
+      harness._dispatchContentMessage(page.tabId, firstMessage, { documentId: page.documentId }),
+      harness._dispatchContentMessage(page.tabId, secondMessage, { documentId: page.documentId })
+    ]);
+    assert.equal(first.type, B2_SETTLEMENT_ACK);
+    assert.equal(second.type, B2_SETTLEMENT_ACK);
+    assert.equal(first.settlementId, firstMessage.settlementId);
+    assert.equal(second.settlementId, secondMessage.settlementId);
+    const sharedCounts = { ...counts };
+    assert.ok(sharedCounts.read > 0);
+
+    counts = { heartbeat: 0, subscribe: 0, read: 0 };
+    const thirdMessage = b2SettlementMessage(page, 'single-flight-third-0003');
+    const third = await harness._dispatchContentMessage(
+      page.tabId,
+      thirdMessage,
+      { documentId: page.documentId }
+    );
+    assert.equal(third.type, B2_SETTLEMENT_ACK);
+    assert.deepEqual(counts, sharedCounts);
+  } finally {
+    page.isolatedSandbox.chrome.runtime.sendMessage = originalSendMessage;
+    await isolatedAuthority(page)?.teardown?.().catch(() => {});
+  }
+});
+
+test('IT-B2-PLATFORM-029 settlement response budget reports in-progress once without canceling shared work', async () => {
+  const harness = createA3Harness({ authorityKernel: true });
+  const page = harness.createPage();
+  await harness.startContentController(page);
+  await harness.waitForStableRuntime(page);
+  await harness.waitFor(
+    () => isolatedAuthority(page)?.snapshot()?.healthy === true &&
+      isolatedAuthority(page)?.coreSnapshot()?.initialized === true,
+    'initialized authority and trusted core before settlement response budget'
+  );
+
+  const isolated = page.isolatedSandbox;
+  const originalSendMessage = isolated.chrome.runtime.sendMessage;
+  const originalSetTimeout = isolated.setTimeout;
+  const originalClearTimeout = isolated.clearTimeout;
+  const budgetHandle = Object.freeze({ settlementBudget: true });
+  let held = false;
+  let releaseRefresh;
+  const refreshGate = new Promise(resolve => { releaseRefresh = resolve; });
+  isolated.chrome.runtime.sendMessage = async message => {
+    if (!held && message?.type === AUTHORITY_MESSAGES.HEARTBEAT) {
+      held = true;
+      await refreshGate;
+    }
+    return originalSendMessage(message);
+  };
+  isolated.setTimeout = (callback, delayMs, ...args) => {
+    if (delayMs === 15_000) {
+      queueMicrotask(() => callback(...args));
+      return budgetHandle;
+    }
+    return originalSetTimeout(callback, delayMs, ...args);
+  };
+  isolated.clearTimeout = handle => {
+    if (handle !== budgetHandle) originalClearTimeout(handle);
+  };
+
+  const responses = [];
+  const message = b2SettlementMessage(page, 'response-budget-first-0001');
+  const listeners = [...harness.contentRuntimeOnMessage.get(page.tabId).listeners];
+  try {
+    let asyncExpected = false;
+    for (const listener of listeners) {
+      if (listener(message, {}, value => responses.push(JSON.parse(JSON.stringify(value)))) === true) {
+        asyncExpected = true;
+      }
+    }
+    assert.equal(asyncExpected, true);
+    await harness.waitFor(
+      () => held && responses.length === 1,
+      'bounded settlement in-progress response'
+    );
+    assert.deepEqual(responses, [{ ok: false, reason: 'settlement-refresh-in-progress' }]);
+
+    isolated.setTimeout = originalSetTimeout;
+    isolated.clearTimeout = originalClearTimeout;
+    releaseRefresh();
+    const followupMessage = b2SettlementMessage(page, 'response-budget-followup-0002');
+    const followup = await harness._dispatchContentMessage(
+      page.tabId,
+      followupMessage,
+      { documentId: page.documentId }
+    );
+    assert.equal(followup.type, B2_SETTLEMENT_ACK);
+    await harness.tick();
+    assert.equal(responses.length, 1);
+  } finally {
+    releaseRefresh?.();
+    isolated.chrome.runtime.sendMessage = originalSendMessage;
+    isolated.setTimeout = originalSetTimeout;
+    isolated.clearTimeout = originalClearTimeout;
+    await isolatedAuthority(page)?.teardown?.().catch(() => {});
+  }
+});
+
+test('IT-B2-PLATFORM-030 late over-budget settlement work cannot acknowledge a replacement document generation', async () => {
+  const harness = createA3Harness({ authorityKernel: true });
+  const page = harness.createPage();
+  await harness.startContentController(page);
+  await harness.waitForStableRuntime(page);
+  await harness.waitFor(
+    () => isolatedAuthority(page)?.snapshot()?.healthy === true &&
+      isolatedAuthority(page)?.coreSnapshot()?.initialized === true,
+    'initialized authority and trusted core before replacement-generation settlement race'
+  );
+
+  const isolated = page.isolatedSandbox;
+  const originalSendMessage = isolated.chrome.runtime.sendMessage;
+  const originalSetTimeout = isolated.setTimeout;
+  const originalClearTimeout = isolated.clearTimeout;
+  const budgetHandle = Object.freeze({ settlementBudgetReplacement: true });
+  let held = false;
+  let releaseRefresh;
+  const refreshGate = new Promise(resolve => { releaseRefresh = resolve; });
+  isolated.chrome.runtime.sendMessage = async message => {
+    if (!held && message?.type === AUTHORITY_MESSAGES.HEARTBEAT) {
+      held = true;
+      await refreshGate;
+    }
+    return originalSendMessage(message);
+  };
+  isolated.setTimeout = (callback, delayMs, ...args) => {
+    if (delayMs === 15_000) {
+      queueMicrotask(() => callback(...args));
+      return budgetHandle;
+    }
+    return originalSetTimeout(callback, delayMs, ...args);
+  };
+  isolated.clearTimeout = handle => {
+    if (handle !== budgetHandle) originalClearTimeout(handle);
+  };
+
+  const responses = [];
+  const oldMessage = b2SettlementMessage(page, 'replacement-race-old-0001');
+  const listeners = [...harness.contentRuntimeOnMessage.get(page.tabId).listeners];
+  try {
+    for (const listener of listeners) {
+      listener(oldMessage, {}, value => responses.push(JSON.parse(JSON.stringify(value))));
+    }
+    await harness.waitFor(
+      () => held && responses.length === 1,
+      'old generation bounded settlement response'
+    );
+    assert.deepEqual(responses, [{ ok: false, reason: 'settlement-refresh-in-progress' }]);
+
+    page.setDocumentToken('document-replacement-generation-0002');
+    isolated.setTimeout = originalSetTimeout;
+    isolated.clearTimeout = originalClearTimeout;
+    releaseRefresh();
+    await harness.tick();
+    await harness.tick();
+    assert.equal(responses.length, 1);
+
+    const replacementMessage = {
+      ...oldMessage,
+      settlementId: 'settlement-replacement-race-new-0002',
+      documentToken: page.documentToken
+    };
+    const replacement = await harness._dispatchContentMessage(
+      page.tabId,
+      replacementMessage,
+      { documentId: page.documentId }
+    );
+    assert.equal(replacement.ok, false);
+    assert.equal(replacement.reason, 'authority-runtime-identity-mismatch');
+    assert.notEqual(replacement.type, B2_SETTLEMENT_ACK);
+  } finally {
+    releaseRefresh?.();
+    isolated.chrome.runtime.sendMessage = originalSendMessage;
+    isolated.setTimeout = originalSetTimeout;
+    isolated.clearTimeout = originalClearTimeout;
+    await isolatedAuthority(page)?.teardown?.().catch(() => {});
+  }
 });

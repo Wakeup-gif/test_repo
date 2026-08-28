@@ -9,6 +9,7 @@ const { BUILD_ID, CANDIDATE_FINGERPRINT } = require('../core/build-identity');
 const {
   AUTHORITY_PROTOCOL_VERSION,
   AUTHORITY_CONTROL_MESSAGES,
+  B2_SETTLEMENT_MODES,
   KERNEL_ONLY_DISPOSITION,
   createB2SettlementAcknowledgment
 } = require('../extension/authority-protocol');
@@ -20,6 +21,7 @@ const BOOT_MESSAGE = 'SC_COMPANION_BOOT';
 const ENABLE_MESSAGE = 'SC_COMPANION_SET_ENABLED';
 const REVALIDATE_MESSAGE = 'SC_COMPANION_REVALIDATE';
 const TRANSPORT_RETRY_DELAYS_MS = Object.freeze([250, 1000, 3000]);
+const B2_SETTLEMENT_REFRESH_RESPONSE_BUDGET_MS = 15_000;
 const PACKAGE_VERSION = String(chrome.runtime.getManifest().version || '0.0.0');
 const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
 
@@ -33,6 +35,8 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
   let authorityClient = null;
   let authorityRuntimeInstanceId = null;
   let trustedCore = null;
+  let authorityCoreSync = Promise.resolve();
+  let b2SettlementRefresh = null;
   let settingChangeQueue = Promise.resolve();
 
   function createDocumentToken() {
@@ -95,22 +99,33 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
     };
   }
 
-  function settlementAuthoritySnapshot() {
-    const current = authoritySnapshot();
+  function settlementAuthoritySnapshot(current = authoritySnapshot(), capturedAtMs = Date.now()) {
     return {
       enabled: current.enabled === true,
       healthy: current.healthy === true,
-      disposition: current.disposition || 'UNAVAILABLE'
+      subscribed: current.subscribed === true,
+      errorFree: current.lastError == null,
+      capturedAtMs,
+      leaseExpiry: current.leaseExpiry,
+      disposition: current.disposition || 'UNAVAILABLE',
+      coordinationEpoch: current.coordinationEpoch,
+      workerInstanceId: current.workerInstanceId,
+      revision: current.revision
     };
   }
 
-  function settlementCoreSnapshot() {
-    const current = coreSnapshot();
+  function settlementCoreSnapshot(current = coreSnapshot()) {
     return {
       initialized: current.initialized === true,
       disposed: current.disposed === true,
       blocked: current.blocked === true,
+      authorityOwner: current.authorityOwner === true,
+      authorityTenure: current.authorityTenure ? {
+        coordinationEpoch: current.authorityTenure.coordinationEpoch,
+        workerInstanceId: current.authorityTenure.workerInstanceId
+      } : null,
       status: current.status || 'unavailable',
+      revision: current.revision,
       preflight: current.preflight ? {
         checked: current.preflight.checked === true,
         blocked: current.preflight.blocked === true,
@@ -126,7 +141,13 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
         disposed: current.bridge.disposed === true,
         capability: current.bridge.capability || 'UNAVAILABLE',
         listenersAttached: current.bridge.listenersAttached === true,
+        verificationInFlight: current.bridge.verificationInFlight === true,
         requestCount: current.bridge.requestCount,
+        ownerInitialObservationCompleted: current.bridge.ownerInitialObservationCompleted === true,
+        authorityTenure: current.bridge.authorityTenure ? {
+          coordinationEpoch: current.bridge.authorityTenure.coordinationEpoch,
+          workerInstanceId: current.bridge.authorityTenure.workerInstanceId
+        } : null,
         nativeMutationRequestCount: current.bridge.nativeMutationRequestCount,
         lastReason: current.bridge.lastReason || null,
         lastError: current.bridge.lastError || null
@@ -206,6 +227,133 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
     setDataset('squarecoilCompanionTrustedCoreReason', error
       ? String(error?.message || error)
       : current.status || null);
+  }
+
+  function synchronizeTrustedCore(authority) {
+    const core = trustedCore;
+    if (!core) return Promise.reject(new Error('settlement-trusted-core-unavailable'));
+    const task = authorityCoreSync.then(() => {
+      if (trustedCore !== core) throw new Error('settlement-trusted-core-replaced');
+      return core.handleAuthoritySnapshot(authority);
+    });
+    authorityCoreSync = task.then(() => undefined, () => undefined);
+    return task;
+  }
+
+  function requireCurrentSettlementRuntime(message, client, core) {
+    if (authorityClient !== client || trustedCore !== core) {
+      throw new Error('settlement-runtime-replaced');
+    }
+    if (authorityRuntimeInstanceId !== message.runtimeInstanceId) {
+      throw new Error('settlement-runtime-generation-changed');
+    }
+    const documentToken = document.documentElement?.dataset?.[DOCUMENT_TOKEN_DATASET_KEY] || null;
+    if (documentToken !== message.documentToken) {
+      throw new Error('settlement-document-changed');
+    }
+    const authority = client.snapshot();
+    if (
+      authority.runtimeInstanceId !== message.runtimeInstanceId ||
+      authority.documentToken !== message.documentToken
+    ) {
+      throw new Error('settlement-client-identity-changed');
+    }
+    if (authority.workerInstanceId !== message.workerInstanceId) {
+      throw new Error('settlement-worker-generation-changed');
+    }
+    return { authority, core: core.snapshot() };
+  }
+
+  function sharedB2SettlementRefresh(message, client, core) {
+    if (
+      b2SettlementRefresh &&
+      b2SettlementRefresh.client === client &&
+      b2SettlementRefresh.core === core &&
+      b2SettlementRefresh.runtimeInstanceId === message.runtimeInstanceId &&
+      b2SettlementRefresh.workerInstanceId === message.workerInstanceId &&
+      b2SettlementRefresh.documentToken === message.documentToken
+    ) return b2SettlementRefresh.promise;
+
+    const refresh = {
+      client,
+      core,
+      runtimeInstanceId: message.runtimeInstanceId,
+      workerInstanceId: message.workerInstanceId,
+      documentToken: message.documentToken,
+      promise: null
+    };
+    const work = (async () => {
+      const connected = await client.ensure();
+      requireCurrentSettlementRuntime(message, client, core);
+      await core.settle(connected);
+      requireCurrentSettlementRuntime(message, client, core);
+    })();
+    refresh.promise = work.finally(() => {
+      if (b2SettlementRefresh === refresh) b2SettlementRefresh = null;
+    });
+    b2SettlementRefresh = refresh;
+    return refresh.promise;
+  }
+
+  function respondToB2Settlement(message, sendResponse) {
+    const client = authorityClient;
+    const core = trustedCore;
+    if (!client || !core) {
+      sendResponse({ ok: false, reason: 'settlement-runtime-unavailable' });
+      return false;
+    }
+
+    if (message.settlementMode === B2_SETTLEMENT_MODES.CONFIRM) {
+      if (b2SettlementRefresh) {
+        sendResponse({ ok: false, reason: 'settlement-refresh-in-progress' });
+        return false;
+      }
+      try {
+        const current = requireCurrentSettlementRuntime(message, client, core);
+        const capturedAtMs = Date.now();
+        sendResponse(createB2SettlementAcknowledgment(
+          message,
+          settlementAuthoritySnapshot(current.authority, capturedAtMs),
+          settlementCoreSnapshot(current.core)
+        ));
+      } catch (error) {
+        sendResponse({
+          ok: false,
+          reason: String(error?.message || error || 'settlement-confirmation-failed')
+        });
+      }
+      return false;
+    }
+
+    let responded = false;
+    let timeoutId = null;
+    const respondOnce = value => {
+      if (responded) return false;
+      responded = true;
+      if (timeoutId !== null) clearTimeout(timeoutId);
+      sendResponse(value);
+      return true;
+    };
+    const refresh = sharedB2SettlementRefresh(message, client, core);
+    timeoutId = setTimeout(() => {
+      respondOnce({ ok: false, reason: 'settlement-refresh-in-progress' });
+    }, B2_SETTLEMENT_REFRESH_RESPONSE_BUDGET_MS);
+    refresh.then(() => {
+      if (responded) return;
+      const current = requireCurrentSettlementRuntime(message, client, core);
+      const capturedAtMs = Date.now();
+      respondOnce(createB2SettlementAcknowledgment(
+        message,
+        settlementAuthoritySnapshot(current.authority, capturedAtMs),
+        settlementCoreSnapshot(current.core)
+      ));
+    }, error => {
+      respondOnce({
+        ok: false,
+        reason: String(error?.message || error || 'settlement-authority-refresh-failed')
+      });
+    });
+    return true;
   }
 
   function effectiveEnabled(result, fallback) {
@@ -310,7 +458,7 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
         onHealthChange: snapshot => {
           renderAuthority(snapshot);
           if (trustedCore) {
-            trustedCore.handleAuthoritySnapshot(snapshot)
+            synchronizeTrustedCore(snapshot)
               .then(renderCore, error => renderCore(coreSnapshot(), error));
           }
         }
@@ -402,8 +550,18 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
       return false;
     }
     if (message.type === AUTHORITY_CONTROL_MESSAGES.GET_B2_SETTLEMENT) {
-      sendResponse(createB2SettlementAcknowledgment(message, settlementAuthoritySnapshot(), settlementCoreSnapshot()));
-      return false;
+      if (
+        message.runtimeInstanceId !== authorityRuntimeInstanceId ||
+        typeof message.workerInstanceId !== 'string' ||
+        message.workerInstanceId.length < 8 ||
+        typeof message.settlementId !== 'string' ||
+        message.settlementId.length < 8 ||
+        !Object.values(B2_SETTLEMENT_MODES).includes(message.settlementMode)
+      ) {
+        sendResponse({ ok: false, reason: 'settlement-control-identity-invalid' });
+        return false;
+      }
+      return respondToB2Settlement(message, sendResponse);
     }
     prepareDisableAndTeardownAuthority().then(response => sendResponse({
       ok: true,

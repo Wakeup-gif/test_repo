@@ -11,7 +11,7 @@
     <header>
       <div>
         <h1>SquareCoil Companion</h1>
-        <p id="stage">B1 · Shell / Lifecycle</p>
+        <p id="stage">B2 · Settlement-gated runtime</p>
       </div>
       <span id="version">v0.7.1</span>
     </header>
@@ -32,7 +32,7 @@
       <div><span>Lifecycle</span><b id="lifecycle">Checking…</b></div>
       <div><span>Reason</span><b id="reason">—</b></div>
       <div><span>Runtime</span><code id="runtimeId">—</code></div>
-      <p>B1 intentionally stays degraded on a live page until B2 adds one-writer coordination.</p>
+      <p>READY appears only after lifecycle, fenced authority, migration, trusted core, and Bridge checks all settle. Incomplete or blocked checks stay degraded.</p>
       <button id="refresh" type="button">Refresh health</button>
       <button id="retryCleanup" type="button" hidden>Retry cleanup only</button>
       <button id="startFresh" type="button" hidden>Start fresh runtime</button>

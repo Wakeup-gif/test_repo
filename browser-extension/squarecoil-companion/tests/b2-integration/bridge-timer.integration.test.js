@@ -234,7 +234,7 @@ function nativeBridgeFactory(holder) {
     holder.completions = 0;
     return Object.freeze({
       ensure: values => service.ensure(values),
-      setOwner: value => service.setOwner(value),
+      setOwner: (value, authorityTenure) => service.setOwner(value, authorityTenure),
       verifyNow: trigger => service.verifyNow(trigger),
       async observeNativeCompletion(evidence) {
         holder.completions += 1;
@@ -307,6 +307,11 @@ test('IT-B2-BRIDGE-TIMER-001 Bridge events cross the owner fence into one Timer/
   assert.equal(publicActive.document.authorityView.redacted, true);
   assert.equal(Object.hasOwn(publicActive.document.timer.active, 'accrualOwnerToken'), false);
   assert.equal(publicActive.document.timer.active.accrualOwnershipBound, true);
+
+  const settledWhileLive = await ownerCore.settle(await ownerClient.ensure());
+  assert.equal(settledWhileLive.recoveryMode, null);
+  assert.equal(settledWhileLive.timer.timerState, 'ACTIVE');
+  assert.equal(settledWhileLive.timer.currentContextId, 'job:260701');
 
   fixture.clock.value = 1_500;
   await ownerBridge.value.emit([
@@ -573,4 +578,221 @@ test('IT-B2-BRIDGE-TIMER-004 MIG-C02 waiting OBSERVER migrates after fenced owne
 
   await waitingCore.teardown();
   await waitingClient.teardown();
+});
+
+test('IT-B2-BRIDGE-TIMER-007 concurrent initialization and authority sync submit exactly one migration', async () => {
+  const fixture = createFixture();
+  const client = fixture.client(603, 'runtime-migration-singleflight');
+  const legacyStorage = { getItem(key) { return key === LEGACY_KEYS[0] ? '{"contexts":{}}' : null; } };
+  let subscriptions = 0;
+  let migrationCommands = 0;
+  let bridgeCreations = 0;
+  let releaseMigration;
+  let markMigrationStarted;
+  const migrationStarted = new Promise(resolve => { markMigrationStarted = resolve; });
+  const migrationRelease = new Promise(resolve => { releaseMigration = resolve; });
+  const guardedAuthority = {
+    ...client,
+    subscribe(...args) {
+      subscriptions += 1;
+      return client.subscribe(...args);
+    },
+    async migrationCommand(...args) {
+      migrationCommands += 1;
+      markMigrationStarted();
+      await migrationRelease;
+      return client.migrationCommand(...args);
+    }
+  };
+  const makeBridge = bridgeFactory({});
+  const core = createTrustedTransitionCore({
+    authorityClient: guardedAuthority,
+    legacyStorage,
+    now: () => fixture.clock.value,
+    randomId: ids('migration-singleflight-command'),
+    createBridge(options) {
+      bridgeCreations += 1;
+      return makeBridge(options);
+    }
+  });
+
+  const firstEnsure = core.ensure();
+  await migrationStarted;
+  const secondEnsure = core.ensure();
+  const concurrentSync = core.handleAuthoritySnapshot(client.snapshot());
+  assert.equal(core.snapshot().initialized, false);
+  assert.equal(core.snapshot().preflight.disposition, 'REQUIRED');
+  assert.equal(core.snapshot().bridge, null);
+  assert.equal(migrationCommands, 1);
+  assert.equal(subscriptions, 1);
+  assert.equal(bridgeCreations, 0);
+
+  releaseMigration();
+  const results = await Promise.all([firstEnsure, secondEnsure, concurrentSync]);
+  assert.equal(migrationCommands, 1);
+  assert.equal(subscriptions, 1);
+  assert.equal(bridgeCreations, 1);
+  assert.equal(fixture.area.read().document.revision, 1);
+  for (const result of results) {
+    assert.equal(result.initialized, true);
+    assert.equal(result.blocked, false);
+    assert.equal(result.preflight.disposition, 'COMPLETE_MATCH');
+    assert.notEqual(result.bridge, null);
+  }
+
+  await core.teardown();
+  await client.teardown();
+});
+
+test('IT-B2-BRIDGE-TIMER-008 settlement refresh rechecks retained migration sources after completion', async () => {
+  const fixture = createFixture();
+  const client = fixture.client(604, 'runtime-migration-settlement-refresh');
+  let legacyValue = '{"contexts":{}}';
+  const core = createTrustedTransitionCore({
+    authorityClient: client,
+    legacyStorage: { getItem(key) { return key === LEGACY_KEYS[0] ? legacyValue : null; } },
+    now: () => fixture.clock.value,
+    randomId: ids('migration-settlement-refresh-command'),
+    createBridge: bridgeFactory({})
+  });
+
+  const initial = await core.ensure();
+  assert.equal(initial.preflight.disposition, 'COMPLETE_MATCH');
+  assert.equal(initial.blocked, false);
+  legacyValue = '{"contexts":{"job:changed":{}}}';
+  const refreshed = await core.settle(await client.ensure());
+  assert.equal(refreshed.blocked, true);
+  assert.equal(refreshed.preflight.disposition, 'SOURCE_CHANGED_AFTER_COMPLETION');
+  assert.equal(refreshed.preflight.reason, 'legacy-source-changed-after-completion');
+
+  await core.teardown();
+  await client.teardown();
+});
+
+test('IT-B2-BRIDGE-TIMER-009 queued settlement cannot restore an older authority revision', async () => {
+  const fixture = createFixture();
+  const sourceClient = fixture.client(605, 'runtime-settlement-current-read');
+  const staleConnection = await sourceClient.ensure();
+  let currentRead = structuredClone(staleConnection.initialRead);
+  let authorityRevision = currentRead.document.revision;
+  let disposition = 'OWNER';
+  let subscriber = null;
+  let releaseDemotion;
+  let markDemotionStarted;
+  const demotionStarted = new Promise(resolve => { markDemotionStarted = resolve; });
+  const demotionRelease = new Promise(resolve => { releaseDemotion = resolve; });
+  const authorityClient = {
+    async ensure() { return structuredClone(staleConnection); },
+    async read() {
+      authorityRevision = currentRead.document.revision;
+      return structuredClone(currentRead);
+    },
+    async command() { throw new Error('unexpected-command'); },
+    subscribe(listener) { subscriber = listener; return () => { subscriber = null; }; },
+    snapshot() {
+      return {
+        enabled: true,
+        healthy: true,
+        disposition,
+        revision: authorityRevision,
+        runtimeInstanceId: 'runtime-settlement-current-read',
+        documentToken: 'document-trusted-core-605',
+        nativeObservationAvailable: true
+      };
+    },
+    async forwardNativeEvidence() { return { accepted: false }; },
+    async teardown() { return { disconnected: true }; }
+  };
+  let bridgeOwner = false;
+  const core = createTrustedTransitionCore({
+    authorityClient,
+    legacyStorage: { getItem() { return null; } },
+    now: () => fixture.clock.value,
+    randomId: ids('settlement-current-read-command'),
+    createBridge() {
+      return {
+        async ensure(value) { bridgeOwner = value.owner === true; return this.snapshot(); },
+        async setOwner(value) {
+          if (value === false) {
+            markDemotionStarted();
+            await demotionRelease;
+          }
+          bridgeOwner = value === true;
+          return this.snapshot();
+        },
+        async verifyNow() { return this.snapshot(); },
+        async observeNativeCompletion() { return { accepted: false }; },
+        async teardown() { bridgeOwner = false; return this.snapshot(); },
+        snapshot() {
+          return { initialized: true, active: true, disposed: false, owner: bridgeOwner, capability: 'FULL' };
+        }
+      };
+    }
+  });
+
+  assert.equal((await core.ensure(staleConnection)).revision, 0);
+  disposition = 'OBSERVER_CONNECTED';
+  const demotion = core.handleAuthoritySnapshot({ healthy: true, disposition });
+  await demotionStarted;
+
+  currentRead = structuredClone(currentRead);
+  currentRead.document.revision = 1;
+  subscriber(structuredClone(currentRead));
+  assert.equal(core.snapshot().revision, 1);
+  assert.equal(authorityRevision, 0);
+
+  const settling = core.settle(staleConnection);
+  releaseDemotion();
+  await demotion;
+  const settled = await settling;
+  assert.equal(settled.revision, 1);
+  assert.equal(authorityRevision, 1);
+  assert.equal(settled.authorityOwner, false);
+
+  await core.teardown();
+  await sourceClient.teardown();
+});
+
+test('IT-B2-BRIDGE-TIMER-010 expired same-principal OWNER reacquisition rotates Bridge tenure and reobserves', async () => {
+  const fixture = createFixture({ leaseDurationMs: 50 });
+  const client = fixture.client(606, 'runtime-same-principal-reacquire');
+  const bridge = {};
+  const bridgeState = { clockedOut: false, fetches: 0 };
+  const core = createTrustedTransitionCore({
+    authorityClient: client,
+    legacyStorage: emptyLegacyStorage,
+    now: () => fixture.clock.value,
+    randomId: ids('same-principal-reacquire-command'),
+    bridgeEnvironment: nativeBridgeEnvironment(fixture.clock, bridgeState),
+    createBridge: nativeBridgeFactory(bridge)
+  });
+
+  const initial = await core.ensure();
+  assert.equal(initial.authorityOwner, true);
+  assert.deepEqual(initial.authorityTenure, {
+    coordinationEpoch: 1,
+    workerInstanceId: 'worker-trusted-core-001'
+  });
+  assert.equal(initial.bridge.ownerInitialObservationCompleted, true);
+  assert.equal(bridgeState.fetches, 1);
+  const initialBridgeGeneration = initial.bridge.bridgeGeneration;
+
+  fixture.clock.value = 1_050;
+  const reacquired = await client.ensure();
+  assert.equal(reacquired.disposition, 'OWNER');
+  assert.equal(reacquired.coordinationEpoch, 2);
+
+  const settled = await core.settle(reacquired);
+  assert.equal(settled.authorityOwner, true);
+  assert.deepEqual(settled.authorityTenure, {
+    coordinationEpoch: 2,
+    workerInstanceId: 'worker-trusted-core-001'
+  });
+  assert.deepEqual(settled.bridge.authorityTenure, settled.authorityTenure);
+  assert.ok(settled.bridge.bridgeGeneration > initialBridgeGeneration);
+  assert.equal(settled.bridge.ownerInitialObservationCompleted, true);
+  assert.equal(bridgeState.fetches, 2);
+
+  await core.teardown();
+  await client.teardown();
 });

@@ -1,5 +1,7 @@
 # Cloud Codex Task — SquareCoil B2-C Migration Slice
 
+> **Historical completed task record.** This file preserves the original first-slice authorization and must not be treated as the current implementation boundary. The active branch now contains the later authorized native-observation and final B2 READY settlement work. Use `AGENTS.md`, `REBUILD-START-HERE.md`, and `logic/B2C-COMPLETION-READINESS.md` for current instructions, and do not begin B3, B4, or B5 without separate explicit authorization.
+
 ## Objective
 Implement only the first unresolved B2-C engineering slice: production v0.7 migration invocation and marker-aware preflight.
 

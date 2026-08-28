@@ -9,7 +9,8 @@ const {
   beginVerification,
   acceptVerification,
   recordNativeCompletion,
-  teardownBridge
+  teardownBridge,
+  reinitializeBridge
 } = require('./bridge-engine');
 
 const ACTION_7_PATH = '/ajax_time_clock.php';
@@ -19,6 +20,7 @@ const DEFAULT_HEARTBEAT_MS = 60_000;
 const DEFAULT_MUTATION_DEBOUNCE_MS = 180;
 const DEFAULT_CLICK_VERIFY_DELAY_MS = 900;
 const DEFAULT_FOLLOW_UP_MS = 300;
+const DEFAULT_VERIFICATION_TIMEOUT_MS = 8_000;
 const NATIVE_ACTIONS = new Set([2, 3, 4]);
 
 function defaultId(prefix) {
@@ -27,6 +29,22 @@ function defaultId(prefix) {
   } catch (_) {
     return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   }
+}
+
+function normalizeAuthorityTenure(value) {
+  const coordinationEpoch = Number.isSafeInteger(value?.coordinationEpoch) &&
+    value.coordinationEpoch >= 0
+    ? value.coordinationEpoch
+    : null;
+  const workerInstanceId = typeof value?.workerInstanceId === 'string' && value.workerInstanceId.trim()
+    ? value.workerInstanceId.trim()
+    : null;
+  return Object.freeze({ coordinationEpoch, workerInstanceId });
+}
+
+function sameAuthorityTenure(left, right) {
+  return left.coordinationEpoch === right.coordinationEpoch &&
+    left.workerInstanceId === right.workerInstanceId;
 }
 
 function visible(element) {
@@ -88,11 +106,15 @@ function createSquareCoilBridgeService(options = {}) {
   const mutationDebounceMs = options.mutationDebounceMs ?? DEFAULT_MUTATION_DEBOUNCE_MS;
   const clickVerifyDelayMs = options.clickVerifyDelayMs ?? DEFAULT_CLICK_VERIFY_DELAY_MS;
   const followUpMs = options.followUpMs ?? DEFAULT_FOLLOW_UP_MS;
+  const verificationTimeoutMs = options.verificationTimeoutMs ?? DEFAULT_VERIFICATION_TIMEOUT_MS;
   if (!documentObject || !windowObject) throw new Error('bridge-browser-context-required');
   if (typeof fetchFunction !== 'function') throw new Error('bridge-fetch-required');
   if (sourceRuntimeId.length < 8) throw new Error('bridge-runtime-id-required');
   for (const value of [heartbeatMs, mutationDebounceMs, clickVerifyDelayMs, followUpMs]) {
     if (!Number.isSafeInteger(value) || value < 0) throw new Error('bridge-timing-invalid');
+  }
+  if (!Number.isSafeInteger(verificationTimeoutMs) || verificationTimeoutMs < 1) {
+    throw new Error('bridge-verification-timeout-invalid');
   }
 
   let engineState = createBridgeEngineState({
@@ -111,6 +133,9 @@ function createSquareCoilBridgeService(options = {}) {
   let activeAbort = null;
   let pendingEvents = [];
   let requestCount = 0;
+  let ownerTenure = 0;
+  let authorityTenure = normalizeAuthorityTenure();
+  let ownerInitialObservationCompleted = false;
   let lastReason = 'not-initialized';
   let lastError = null;
   let lastEventType = null;
@@ -137,6 +162,8 @@ function createSquareCoilBridgeService(options = {}) {
       verificationInFlight: verificationPromise !== null,
       listenersAttached: initialized && !disposed,
       requestCount,
+      authorityTenure,
+      ownerInitialObservationCompleted,
       nativeMutationRequestCount: 0,
       lastReason,
       lastError,
@@ -238,10 +265,41 @@ function createSquareCoilBridgeService(options = {}) {
     }, heartbeatMs);
   }
 
-  async function flushEvents() {
-    while (pendingEvents.length && !disposed && owner) {
+  function currentOwnerTenure(expectedTenure) {
+    return !disposed && owner && ownerTenure === expectedTenure;
+  }
+
+  function staleOwnerTenureResult() {
+    return { accepted: false, changed: false, reason: 'STALE_OWNER_TENURE', events: [], needsVerification: false };
+  }
+
+  function invalidateOwnerTenure() {
+    if (activeAbort) activeAbort.abort();
+    verificationPromise = null;
+    const tornDown = teardownBridge(engineState);
+    engineState = reinitializeBridge(tornDown.state).state;
+    pendingEvents = [];
+    clearTimer('followUp');
+  }
+
+  function adoptOwnerState(nextOwner, nextAuthorityTenure) {
+    const normalizedTenure = normalizeAuthorityTenure(nextAuthorityTenure);
+    const changed = owner !== nextOwner || !sameAuthorityTenure(authorityTenure, normalizedTenure);
+    if (changed) {
+      ownerTenure += 1;
+      ownerInitialObservationCompleted = false;
+      invalidateOwnerTenure();
+    }
+    owner = nextOwner;
+    authorityTenure = normalizedTenure;
+    return changed;
+  }
+
+  async function flushEvents(expectedTenure = ownerTenure) {
+    while (pendingEvents.length && currentOwnerTenure(expectedTenure)) {
       const event = pendingEvents[0];
       await onEvents([event]);
+      if (!currentOwnerTenure(expectedTenure)) return;
       pendingEvents.shift();
       lastEventType = event.type;
     }
@@ -253,7 +311,9 @@ function createSquareCoilBridgeService(options = {}) {
       publishHealth();
       return { accepted: false, reason: lastReason, events: [] };
     }
-    await flushEvents();
+    const verificationTenure = ownerTenure;
+    await flushEvents(verificationTenure);
+    if (!currentOwnerTenure(verificationTenure)) return staleOwnerTenureResult();
     const requestStartedAtMs = now();
     const started = beginVerification(engineState, {
       bridgeGeneration: engineState.bridgeGeneration,
@@ -269,12 +329,14 @@ function createSquareCoilBridgeService(options = {}) {
 
     const observedAtMs = Math.max(requestStartedAtMs, now());
     let serverEvidence;
-    activeAbort = typeof windowObject.AbortController === 'function'
+    const requestAbort = typeof windowObject.AbortController === 'function'
       ? new windowObject.AbortController()
       : null;
+    activeAbort = requestAbort;
+    let verificationTimeout = null;
     try {
       requestCount += 1;
-      const response = await fetchFunction(new windowObject.URL(ACTION_7_PATH, windowObject.location.origin).href, {
+      const request = fetchFunction(new windowObject.URL(ACTION_7_PATH, windowObject.location.origin).href, {
         method: 'POST',
         credentials: 'same-origin',
         headers: {
@@ -283,14 +345,23 @@ function createSquareCoilBridgeService(options = {}) {
         },
         body: ACTION_7_BODY,
         cache: 'no-store',
-        signal: activeAbort?.signal
+        signal: requestAbort?.signal
       });
+      const timeout = new Promise((_, reject) => {
+        verificationTimeout = timers.setTimeout(() => {
+          reject(new Error('action-7-timeout'));
+          if (requestAbort) requestAbort.abort();
+        }, verificationTimeoutMs);
+      });
+      const response = await Promise.race([request, timeout]);
+      if (!currentOwnerTenure(verificationTenure)) return staleOwnerTenureResult();
       if (!response || response.ok !== true) throw new Error(`action-7-http-${response?.status || 'failed'}`);
       const html = await response.text();
+      if (!currentOwnerTenure(verificationTenure)) return staleOwnerTenureResult();
       serverAvailable = true;
       serverEvidence = parseServerSnapshot(html, { observedAtMs: Math.max(observedAtMs, now()) });
     } catch (error) {
-      if (disposed) return { accepted: false, reason: 'bridge-disposed', events: [] };
+      if (!currentOwnerTenure(verificationTenure)) return staleOwnerTenureResult();
       serverAvailable = false;
       lastError = String(error?.message || error);
       serverEvidence = parseServerSnapshot(null, {
@@ -298,15 +369,18 @@ function createSquareCoilBridgeService(options = {}) {
         available: false
       });
     } finally {
-      activeAbort = null;
+      if (verificationTimeout !== null) timers.clearTimeout(verificationTimeout);
+      if (activeAbort === requestAbort) activeAbort = null;
     }
 
+    if (!currentOwnerTenure(verificationTenure)) return staleOwnerTenureResult();
     const captured = readAuditedDomSnapshot(documentObject);
     domAvailable = captured.available;
     const domEvidence = parseDomSnapshot(captured.snapshot, {
       observedAtMs: Math.max(serverEvidence.observedAtMs, now()),
       available: captured.available
     });
+    if (!currentOwnerTenure(verificationTenure)) return staleOwnerTenureResult();
     const accepted = acceptVerification(engineState, {
       request: started.request,
       evidence: [serverEvidence, domEvidence]
@@ -314,12 +388,14 @@ function createSquareCoilBridgeService(options = {}) {
     engineState = accepted.state;
     if (accepted.accepted && accepted.events.length) {
       pendingEvents.push(...accepted.events);
-      await flushEvents();
+      await flushEvents(verificationTenure);
     }
+    if (!currentOwnerTenure(verificationTenure)) return staleOwnerTenureResult();
+    if (accepted.accepted) ownerInitialObservationCompleted = true;
     lastReason = accepted.reason;
     if (serverAvailable === true) lastError = null;
     publishHealth();
-    if (accepted.needsVerification && !disposed && owner) {
+    if (accepted.needsVerification && currentOwnerTenure(verificationTenure)) {
       schedule('followUp', followUpMs, 'bounded-follow-up');
     }
     return accepted;
@@ -335,23 +411,39 @@ function createSquareCoilBridgeService(options = {}) {
     });
   }
 
-  async function ensure(values = {}) {
-    if (disposed) throw new Error('bridge-service-disposed');
-    attach();
-    owner = values.owner === true;
-    lastReason = owner ? 'bridge-owner-initializing' : 'bridge-observer-listening';
+  async function completeOwnerInitialObservation(trigger, expectedTenure) {
+    if (verificationPromise) {
+      try { await verificationPromise; } catch (_) {}
+    }
+    if (disposed || !owner || ownerTenure !== expectedTenure) return snapshot();
+    if (ownerInitialObservationCompleted) return snapshot();
+    await verifyNow(trigger);
     publishHealth();
-    if (owner) await verifyNow('initial-action-7');
     return snapshot();
   }
 
-  async function setOwner(value) {
+  async function ensure(values = {}) {
+    if (disposed) throw new Error('bridge-service-disposed');
+    attach();
+    const nextOwner = values.owner === true;
+    adoptOwnerState(nextOwner, values.authorityTenure);
+    lastReason = owner ? 'bridge-owner-initializing' : 'bridge-observer-listening';
+    publishHealth();
+    if (owner && !ownerInitialObservationCompleted) {
+      await completeOwnerInitialObservation('initial-action-7', ownerTenure);
+    }
+    return snapshot();
+  }
+
+  async function setOwner(value, nextAuthorityTenure = authorityTenure) {
     if (disposed) return snapshot();
-    const changed = owner !== (value === true);
-    owner = value === true;
+    const nextOwner = value === true;
+    const changed = adoptOwnerState(nextOwner, nextAuthorityTenure);
     lastReason = owner ? 'bridge-owner' : 'bridge-observer-listening';
     publishHealth();
-    if (changed && owner) await verifyNow('authority-owner-acquired');
+    if (changed && owner) {
+      await completeOwnerInitialObservation('authority-owner-acquired', ownerTenure);
+    }
     return snapshot();
   }
 
@@ -359,6 +451,8 @@ function createSquareCoilBridgeService(options = {}) {
     if (disposed) return snapshot();
     disposed = true;
     owner = false;
+    ownerTenure += 1;
+    ownerInitialObservationCompleted = false;
     if (activeAbort) activeAbort.abort();
     if (observer) observer.disconnect();
     observer = null;
@@ -386,6 +480,7 @@ module.exports = {
   ACTION_7_BODY,
   AUDITED_SELECTOR,
   DEFAULT_HEARTBEAT_MS,
+  DEFAULT_VERIFICATION_TIMEOUT_MS,
   readAuditedDomSnapshot,
   createSquareCoilBridgeService
 };

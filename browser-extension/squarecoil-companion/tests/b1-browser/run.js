@@ -6,8 +6,8 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const zlib = require('node:zlib');
 
-const CANONICAL_BUILD_ID = 'rebuild-b2-trusted-transition-core';
-const CANONICAL_STAGE = 'B2.2';
+const CANONICAL_BUILD_ID = 'rebuild-b2-ready-settlement';
+const CANONICAL_STAGE = 'B2-C';
 const FIXTURE_ORIGIN = 'https://ussignandmill.squarecoil.net';
 const FIXTURE_PATH = '/__b1_fixture__/a4.html';
 const FRAME_PATH = '/__b1_fixture__/frame.html';
@@ -48,6 +48,11 @@ const REQUIRED_B2_2_A4_FIXTURE_IDS = Object.freeze([
   'B2-TRANSITION-003',
   'B2-TRANSITION-004',
   'B2-TRANSITION-005'
+]);
+const REQUIRED_B2_READY_A4_FIXTURE_IDS = Object.freeze([
+  'B2-READY-001',
+  'B2-READY-002',
+  'B2-READY-003'
 ]);
 const REQUIRED_PACKAGE_FILES = Object.freeze([
   'dist/background.js',
@@ -491,8 +496,8 @@ function assertExpectedB1Shell(state, label, candidateIdentity) {
   assert(state.runtimeDocumentToken === state.documentToken, `${label}: runtime/document identity differs`, state);
   assert(state.roots[0].documentToken === state.documentToken, `${label}: root/document identity differs`, state);
   const health = state.health;
-  assert(health?.state === 'DEGRADED', `${label}: B2.2 lifecycle must remain DEGRADED until live Bridge wiring and migration closure exist`, health);
-  assert(health?.state !== 'READY', `${label}: B2.2 partial transition core falsely reported READY`, health);
+  assert(health?.state === 'DEGRADED', `${label}: isolated MAIN shell must retain the pre-settlement sentinel`, health);
+  assert(health?.state !== 'READY', `${label}: isolated MAIN shell bypassed worker-owned B2 settlement`, health);
   assert(health?.reason === EXPECTED_DEGRADED_REASON, `${label}: unexpected degraded reason`, health);
   assert(health?.buildId === candidateIdentity.buildId, `${label}: health build identity differs`, health);
   assert(health?.packageVersion === candidateIdentity.packageVersion, `${label}: health package identity differs`, health);
@@ -874,12 +879,15 @@ function runBrowserCase(cases, family, stableFixtureIds, slug, name, task) {
   return runCase(cases, browserFixtureId(family, stableFixtureIds, slug), name, task, { stableFixtureIds });
 }
 
-function runB2KernelBrowserCase(cases, family, b2KernelFixtureIds, stableFixtureIds, slug, name, task) {
+function runB2KernelBrowserCase(cases, family, b2KernelFixtureIds, stableFixtureIds, slug, name, task, extraMetadata = {}) {
   for (const fixtureId of b2KernelFixtureIds) {
     if (!REQUIRED_B2_1_A4_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown B2.1 A4 fixture ID: ${fixtureId}`);
   }
   for (const fixtureId of stableFixtureIds) {
     if (!REQUIRED_A4_STABLE_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown B1 A4 stable fixture ID: ${fixtureId}`);
+  }
+  for (const fixtureId of extraMetadata.b2ReadyFixtureIds || []) {
+    if (!REQUIRED_B2_READY_A4_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown final B2 READY A4 fixture ID: ${fixtureId}`);
   }
   const browserCode = family === 'chrome' ? 'CH' : 'ED';
   const fixtureCode = b2KernelFixtureIds.map(value => value.replace('B2-KERNEL-', '')).join('-');
@@ -891,36 +899,57 @@ function runB2KernelBrowserCase(cases, family, b2KernelFixtureIds, stableFixture
     {
       stableFixtureIds,
       b2KernelFixtureIds,
-      b2Scope: 'ISOLATED_AUTHORITY_KERNEL_ONLY'
+      b2Scope: 'ISOLATED_AUTHORITY_KERNEL_ONLY',
+      ...extraMetadata
     }
   );
 }
 
-function runB2TransitionBrowserCase(cases, family, fixtureIds, slug, name, task) {
+function runB2TransitionBrowserCase(cases, family, fixtureIds, slug, name, task, extraMetadata = {}) {
   for (const fixtureId of fixtureIds) {
     if (!REQUIRED_B2_2_A4_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown B2.2 A4 fixture ID: ${fixtureId}`);
+  }
+  for (const fixtureId of extraMetadata.b2ReadyFixtureIds || []) {
+    if (!REQUIRED_B2_READY_A4_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown final B2 READY A4 fixture ID: ${fixtureId}`);
   }
   const browserCode = family === 'chrome' ? 'CH' : 'ED';
   const fixtureCode = fixtureIds.map(value => value.replace('B2-TRANSITION-', '')).join('-');
   return runCase(cases, `A4-B2.2-${browserCode}-${fixtureCode}-${slug}`, name, task, {
     b2TransitionFixtureIds: fixtureIds,
-    b2Scope: 'TRUSTED_TRANSITION_CORE_PARTIAL'
+    b2Scope: 'TRUSTED_TRANSITION_CORE_PARTIAL',
+    ...extraMetadata
   });
 }
 
-function runB2TransitionLifecycleBrowserCase(cases, family, fixtureIds, stableFixtureIds, slug, name, task) {
+function runB2TransitionLifecycleBrowserCase(cases, family, fixtureIds, stableFixtureIds, slug, name, task, extraMetadata = {}) {
   for (const fixtureId of fixtureIds) {
     if (!REQUIRED_B2_2_A4_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown B2.2 A4 fixture ID: ${fixtureId}`);
   }
   for (const fixtureId of stableFixtureIds) {
     if (!REQUIRED_A4_STABLE_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown B1 A4 stable fixture ID: ${fixtureId}`);
   }
+  for (const fixtureId of extraMetadata.b2ReadyFixtureIds || []) {
+    if (!REQUIRED_B2_READY_A4_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown final B2 READY A4 fixture ID: ${fixtureId}`);
+  }
   const browserCode = family === 'chrome' ? 'CH' : 'ED';
   const fixtureCode = fixtureIds.map(value => value.replace('B2-TRANSITION-', '')).join('-');
   return runCase(cases, `A4-B2.2-${browserCode}-${fixtureCode}-${slug}`, name, task, {
     stableFixtureIds,
     b2TransitionFixtureIds: fixtureIds,
-    b2Scope: 'TRUSTED_TRANSITION_CORE_PARTIAL'
+    b2Scope: 'TRUSTED_TRANSITION_CORE_PARTIAL',
+    ...extraMetadata
+  });
+}
+
+function runB2ReadyBrowserCase(cases, family, fixtureIds, slug, name, task) {
+  for (const fixtureId of fixtureIds) {
+    if (!REQUIRED_B2_READY_A4_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown final B2 READY A4 fixture ID: ${fixtureId}`);
+  }
+  const browserCode = family === 'chrome' ? 'CH' : 'ED';
+  const fixtureCode = fixtureIds.map(value => value.replace('B2-READY-', '')).join('-');
+  return runCase(cases, `A4-B2-C-${browserCode}-${fixtureCode}-${slug}`, name, task, {
+    b2ReadyFixtureIds: fixtureIds,
+    b2Scope: 'FINAL_READY_SETTLEMENT'
   });
 }
 
@@ -1367,13 +1396,72 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
       }
     );
 
+    await runB2ReadyBrowserCase(
+      result.cases,
+      family,
+      ['B2-READY-001'],
+      'OWNER-POPUP',
+      'OWNER effective health and the packaged popup report final B2 READY',
+      async () => {
+        const settledHealth = await bridge.send({ type: MESSAGES.HEALTH });
+        assert(settledHealth?.ready === true && settledHealth?.health?.state === 'READY', 'OWNER effective health was not READY', settledHealth);
+        assert(settledHealth?.b2Settlement?.authorityDisposition === 'OWNER', 'OWNER settlement lost its authority disposition', settledHealth);
+
+        const popupPage = await context.newPage();
+        try {
+          await popupPage.goto(`chrome-extension://${extensionId}/popup/popup.html`, { waitUntil: 'domcontentloaded', timeout: options.timeoutMs });
+          const popupTarget = await popupPage.evaluate(async fixtureOrigin => {
+            const candidates = await chrome.tabs.query({ url: `${fixtureOrigin}/*` });
+            const target = candidates.find(tab => Number.isInteger(tab.id));
+            if (!target) return { activated: false, reason: 'fixture-tab-not-found' };
+            await chrome.tabs.update(target.id, { active: true });
+            const active = await chrome.tabs.query({ active: true, currentWindow: true });
+            return {
+              activated: active?.[0]?.id === target.id,
+              targetTabId: target.id,
+              activeTabId: active?.[0]?.id ?? null,
+              activeUrl: active?.[0]?.url || null
+            };
+          }, FIXTURE_ORIGIN);
+          assert(popupTarget.activated === true, 'Harness could not restore the SquareCoil fixture as the popup target tab', popupTarget);
+          await popupPage.evaluate(() => document.getElementById('refresh')?.click());
+          let lastPopupHealth = null;
+          let popupHealth;
+          try {
+            popupHealth = await waitFor(async () => popupPage.evaluate(() => ({
+              stage: document.getElementById('stage')?.textContent || '',
+              classification: document.getElementById('classification')?.textContent || '',
+              lifecycle: document.getElementById('lifecycle')?.textContent || '',
+              reason: document.getElementById('reason')?.textContent || '',
+              healthTone: document.body.dataset.health || '',
+              explanation: document.querySelector('.health > p')?.textContent || ''
+            })).then(value => {
+              lastPopupHealth = value;
+              return value.lifecycle === 'READY' ? value : null;
+            }), 'packaged popup READY rendering', options.timeoutMs);
+          } catch (error) {
+            error.details = { popupTarget, popupUrl: popupPage.url(), lastPopupHealth };
+            throw error;
+          }
+          assert(popupHealth.stage === 'B2 · Settlement-gated runtime', 'Popup stage did not identify the final B2 settlement runtime', popupHealth);
+          assert(popupHealth.classification === 'HEALTHY_SAME_BUILD', 'Popup did not display healthy same-build classification', popupHealth);
+          assert(popupHealth.reason === 'ready' && popupHealth.healthTone === 'ok', 'Popup did not render positive READY health', popupHealth);
+          assert(popupHealth.explanation.includes('Incomplete or blocked checks stay degraded.'), 'Popup did not retain fail-closed settlement guidance', popupHealth);
+          return { settledHealth, popupTarget, popupHealth };
+        } finally {
+          await popupPage.close().catch(() => {});
+          await page.bringToFront().catch(() => {});
+        }
+      }
+    );
+
     await runB2KernelBrowserCase(
       result.cases,
       family,
       ['B2-KERNEL-001'],
       [],
       'MULTI-TAB',
-      'Two tabs share one isolated authority kernel as OWNER and OBSERVER without false READY',
+      'Two tabs share one authority kernel and settle READY as OWNER and non-writing OBSERVER',
       async () => {
         assert(activeRuntimeId, 'Initial runtime was unavailable because the prerequisite case failed');
         const primaryAuthorityBefore = await waitFor(async () => {
@@ -1416,10 +1504,22 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
           assert(observerAuthority.disposition === 'OBSERVER_CONNECTED', 'Second tab did not join as OBSERVER_CONNECTED', { primaryAuthority, observerAuthority });
           assert(primaryAuthority.workerInstanceId === observerAuthority.workerInstanceId, 'Tabs did not connect to one worker authority', { primaryAuthority, observerAuthority });
           assert(primaryAuthority.revision === observerAuthority.revision, 'Tabs did not observe the same authoritative revision', { primaryAuthority, observerAuthority });
-          assert(primaryState.health?.state !== 'READY' && observerState.health?.state !== 'READY', 'Kernel-only multi-tab state falsely reached READY', { primaryState, observerState });
+          assert(primaryState.health?.state !== 'READY' && observerState.health?.state !== 'READY', 'Isolated MAIN shells bypassed worker-owned settlement', { primaryState, observerState });
+          const effectiveHealth = await waitFor(async () => {
+            const owner = await bridge.send({ type: MESSAGES.HEALTH });
+            const observer = await observerBridge.send({ type: MESSAGES.HEALTH });
+            return owner?.ready === true && observer?.ready === true ? { owner, observer } : null;
+          }, 'OWNER and OBSERVER effective READY settlement', options.timeoutMs);
+          assert(effectiveHealth.owner.b2Settlement?.authorityDisposition === 'OWNER', 'Primary effective health did not settle as OWNER', effectiveHealth);
+          assert(effectiveHealth.observer.b2Settlement?.authorityDisposition === 'OBSERVER_CONNECTED', 'Observer effective health did not settle as OBSERVER_CONNECTED', effectiveHealth);
+          const observerCore = await observerBridge.coreSnapshot();
+          assert(observerCore?.authorityOwner === false, 'Observer trusted core became an authority owner', observerCore);
+          assert(observerCore?.bridge?.owner === false && observerCore.bridge.requestCount === 0, 'Observer Bridge became a verification writer', observerCore?.bridge);
           evidence = {
             primaryAuthority,
             observerAuthority,
+            effectiveHealth,
+            observerCore,
             primaryRuntimeInstanceId: primaryState.runtimeInstanceId,
             observerRuntimeInstanceId: observerState.runtimeInstanceId,
             sharedRevision: primaryAuthority.revision,
@@ -1456,7 +1556,8 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
         assert(fixturePages.length === 1 && fixturePages[0] === page, 'Observer fixture page was not cleaned up', fixturePages.map(candidate => candidate.url()));
         assertHealthyB2KernelAuthority(afterCleanup, 'primary authority after observer cleanup', await pageState(page));
         return { ...evidence, afterCleanup, remainingFixturePages: fixturePages.length };
-      }
+      },
+      { b2ReadyFixtureIds: ['B2-READY-002'] }
     );
 
     await runB2TransitionBrowserCase(
@@ -1497,17 +1598,30 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
             }
           }, transitionFixture.clockContext);
           await bridge.syncBridge();
-          const after = await waitFor(async () => {
-            const ownerCore = await bridge.coreSnapshot();
-            const observerCore = await observerBridge.coreSnapshot();
-            return ownerCore?.timer?.currentContextId === 'job:260702' &&
-              observerCore?.timer?.currentContextId === 'job:260702' &&
-              ownerCore.bridge?.initialized === true && observerCore.bridge?.initialized === true &&
-              ownerCore.revision === observerCore.revision &&
-              ownerCore.ledgerSegmentCount === 1 && observerCore.ledgerSegmentCount === 1
-              ? { ownerCore, observerCore }
-              : null;
-          }, 'atomic Job A to Job B propagation', options.timeoutMs);
+          let lastPropagation = null;
+          let after;
+          try {
+            after = await waitFor(async () => {
+              const ownerCore = await bridge.coreSnapshot();
+              const observerCore = await observerBridge.coreSnapshot();
+              lastPropagation = { ownerCore, observerCore };
+              return ownerCore?.timer?.currentContextId === 'job:260702' &&
+                observerCore?.timer?.currentContextId === 'job:260702' &&
+                ownerCore.bridge?.initialized === true && observerCore.bridge?.initialized === true &&
+                ownerCore.revision === observerCore.revision &&
+                ownerCore.ledgerSegmentCount === 1 && observerCore.ledgerSegmentCount === 1
+                ? lastPropagation
+                : null;
+            }, 'atomic Job A to Job B propagation', options.timeoutMs);
+          } catch (error) {
+            error.details = {
+              before,
+              lastPropagation,
+              action7Requests: result.network.action7.length,
+              fixtureContext: transitionFixture.clockContext
+            };
+            throw error;
+          }
           assert(after.ownerCore.revision === before.ownerCore.revision + 1, 'Job switch did not commit as one authoritative revision', { before, after });
           assert(after.ownerCore.timer.todayTotalMs > 0, 'Closed Job A interval was not reflected in today total', after.ownerCore.timer);
           assert(after.ownerCore.timer.currentContextTotalMs >= 0, 'Job B total was unavailable', after.ownerCore.timer);
@@ -1547,7 +1661,11 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
       const revalidated = await bridge.send({ type: MESSAGES.REVALIDATE });
       const repairedInteraction = await waitFor(async () => {
         const state = await pageState(page);
-        return state.health?.ui?.interactionReady === true ? state : null;
+        return state.health?.ui?.interactionReady === true &&
+          state.health?.state === 'DEGRADED' &&
+          state.health?.reason === EXPECTED_DEGRADED_REASON
+          ? state
+          : null;
       }, 'dead-interaction recovery', options.timeoutMs);
       assertExpectedB1Shell(repairedInteraction, 'dead-interaction recovery', candidateIdentity);
       assert(repairedInteraction.runtimeInstanceId === activeRuntimeId, 'Interaction recovery replaced the runtime', repairedInteraction);
@@ -1621,7 +1739,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
         'service-worker termination',
         options.timeoutMs
       );
-      const response = await bridge.send({ type: MESSAGES.REVALIDATE });
+      const response = await bridge.send({ type: MESSAGES.HEALTH });
       const after = await waitFor(async () => serviceWorkerTarget(await browserCdp.send('Target.getTargets'), extensionId), 'service-worker restart', options.timeoutMs);
       let authorityAfter = await waitFor(async () => {
         const snapshot = await bridge.authoritySnapshot();
@@ -1638,7 +1756,8 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
       assertHealthyB2KernelAuthority(authorityAfter, 'authority after service-worker restart', state);
       assert(state.runtimeInstanceId === activeRuntimeId, 'Worker restart replaced the live page runtime', state);
       assert(response?.health?.runtimeInstanceId === activeRuntimeId, 'Restarted worker did not reuse the live runtime', response);
-      assert(response?.classification === 'DEGRADED_SAME_BUILD', 'Restarted worker returned an unexpected classification', response);
+      assert(response?.classification === 'HEALTHY_SAME_BUILD' && response?.ready === true, 'Fresh settlement did not reconnect through the restarted worker before reporting READY', response);
+      assert(response?.b2Settlement?.authorityDisposition === 'OWNER', 'Post-restart settlement did not retain OWNER authority', response);
       assert(authorityAfter.workerInstanceId !== authorityBefore.workerInstanceId, 'Isolated authority retained the terminated worker identity', { authorityBefore, authorityAfter });
       assert(authorityBefore.disposition === 'OWNER' && authorityAfter.disposition === 'OWNER', 'Worker restart did not preserve OWNER disposition', { authorityBefore, authorityAfter });
       assert(authorityAfter.coordinationEpoch === authorityBefore.coordinationEpoch, 'Worker restart changed the live ownership epoch', { authorityBefore, authorityAfter });
@@ -1894,6 +2013,9 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
         assert(blockedCore.preflight?.reason === 'legacy-preflight-failed' && blockedCore.preflight?.disposition === 'FAILED', 'Legacy preflight returned an unexpected block reason', blockedCore);
         assert(blockedCore.preflight?.presentKeys?.length === 1 && blockedCore.preflight.presentKeys[0] === legacyKey, 'Legacy preflight did not report only the key identity', blockedCore.preflight);
         assert(JSON.stringify(blockedCore).includes(sensitiveSentinel) === false, 'Legacy preflight leaked the stored value', blockedCore);
+        const blockedHealth = await bridge.send({ type: MESSAGES.HEALTH });
+        assert(blockedHealth?.ready === false && blockedHealth?.health?.state === 'DEGRADED', 'Blocked migration falsely reported READY', blockedHealth);
+        assert(blockedHealth?.reason === 'legacy-preflight-failed', 'Blocked migration reported an unexpected settlement reason', blockedHealth);
         assert(afterEnvelope?.document?.revision === beforeEnvelope?.document?.revision, 'Legacy-blocked boot committed a Timer write', {
           beforeRevision: beforeEnvelope?.document?.revision,
           afterRevision: afterEnvelope?.document?.revision
@@ -1905,11 +2027,13 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
         assert(removed === null, 'Synthetic legacy marker was not removed');
         return {
           enabledResponse,
+          blockedHealth,
           blockedCore,
           authoritativeRevision: afterEnvelope?.document?.revision,
           action7RequestsBeforeAndAfter: [action7Before, result.network.action7.length]
         };
-      }
+      },
+      { b2ReadyFixtureIds: ['B2-READY-003'] }
     );
 
     const finalState = await pageState(page);
@@ -1946,8 +2070,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
     }
     const observedB2KernelFixtureIds = [...new Set(result.cases.flatMap(testCase => testCase.b2KernelFixtureIds || []))].sort();
     result.b2KernelFixtureCoverage = {
-      scope: 'B2.2_TRUSTED_TRANSITION_CORE_PARTIAL',
-      fullB2Acceptance: 'PENDING',
+      scope: 'B2_1_AUTHORITY_KERNEL',
       required: [...REQUIRED_B2_1_A4_FIXTURE_IDS],
       observed: observedB2KernelFixtureIds,
       missing: REQUIRED_B2_1_A4_FIXTURE_IDS.filter(fixtureId => !observedB2KernelFixtureIds.includes(fixtureId))
@@ -1964,7 +2087,6 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
     const observedB2TransitionFixtureIds = [...new Set(result.cases.flatMap(testCase => testCase.b2TransitionFixtureIds || []))].sort();
     result.b2TransitionFixtureCoverage = {
       scope: 'B2.2_TRUSTED_TRANSITION_CORE_PARTIAL',
-      fullB2Acceptance: 'PENDING',
       required: [...REQUIRED_B2_2_A4_FIXTURE_IDS],
       observed: observedB2TransitionFixtureIds,
       missing: REQUIRED_B2_2_A4_FIXTURE_IDS.filter(fixtureId => !observedB2TransitionFixtureIds.includes(fixtureId))
@@ -1976,6 +2098,22 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
         b2Scope: 'TRUSTED_TRANSITION_CORE_PARTIAL',
         status: 'FAIL',
         error: `Missing B2.2 fixture IDs: ${result.b2TransitionFixtureCoverage.missing.join(', ')}`
+      });
+    }
+    const observedB2ReadyFixtureIds = [...new Set(result.cases.flatMap(testCase => testCase.b2ReadyFixtureIds || []))].sort();
+    result.b2ReadySettlementCoverage = {
+      scope: 'B2_FINAL_READY_SETTLEMENT_A4',
+      required: [...REQUIRED_B2_READY_A4_FIXTURE_IDS],
+      observed: observedB2ReadyFixtureIds,
+      missing: REQUIRED_B2_READY_A4_FIXTURE_IDS.filter(fixtureId => !observedB2ReadyFixtureIds.includes(fixtureId))
+    };
+    if (result.b2ReadySettlementCoverage.missing.length) {
+      result.cases.push({
+        id: `A4-B2-C-${family === 'chrome' ? 'CH' : 'ED'}-FIXTURE-COVERAGE`,
+        name: 'Mandatory final B2 READY settlement fixture coverage',
+        b2Scope: 'FINAL_READY_SETTLEMENT',
+        status: 'FAIL',
+        error: `Missing final B2 READY fixture IDs: ${result.b2ReadySettlementCoverage.missing.join(', ')}`
       });
     }
     const failedCases = result.cases.filter(testCase => testCase.status === 'FAIL');

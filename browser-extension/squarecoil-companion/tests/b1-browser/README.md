@@ -1,6 +1,6 @@
-# B1 lifecycle regression and B2.2 trusted transition-core browser harness
+# B1/B2 regression and final B2 READY settlement browser harness
 
-This harness loads one exact unpacked package into installed, branded Google Chrome and Microsoft Edge. It retains the settled B1 lifecycle and B2.1 authority-kernel gates while adding narrowly scoped B2.2 trusted transition-core checks. It serves only synthetic fixture HTML in memory. No request reaches SquareCoil or customer data.
+This harness loads one exact unpacked package into installed, branded Google Chrome and Microsoft Edge. It retains the settled B1 lifecycle, B2.1 authority-kernel, and B2.2 trusted transition-core gates while exercising the final B2 READY settlement against the exact packaged bytes. It serves only synthetic fixture HTML in memory. No request reaches SquareCoil or customer data.
 
 ## Required package
 
@@ -19,8 +19,8 @@ The `--package` directory must contain exactly the eight allowlisted release fil
 
 `dist/build-info.json` must contain:
 
-- `buildId: "rebuild-b2-trusted-transition-core"`;
-- `stage: "B2.2"`;
+- `buildId: "rebuild-b2-ready-settlement"`;
+- `stage: "B2-C"`;
 - a lowercase 64-character `candidateFingerprint` embedded exactly in `dist/background.js`, `dist/companion-app.js`, and `dist/content-controller.js`;
 - a lowercase 40-character `sourceSha` exactly matching `--expected-source-sha`;
 - boolean `sourceDirty`, which must be `false` for acceptance.
@@ -60,8 +60,11 @@ Every message the harness sends directly from the content-script execution world
 
 - disabled boot performs observation only;
 - concurrent/repeated boot produces one injection, runtime, and root; root inventory is the deduplicated union of the canonical timer selector and every rebuild-owned marker, so a noncanonical rebuild node cannot be hidden;
-- MAIN lifecycle health remains `DEGRADED / coordination-not-implemented-b1`, never `READY`, while readiness reports the bounded `KERNEL_CONNECTED_B2_1` disposition;
-- the isolated content world exposes healthy authority evidence independently of MAIN-world lifecycle health;
+- the isolated MAIN shell retains `DEGRADED / coordination-not-implemented-b1`; only the worker-owned, generation-bound settlement response may promote effective health to `READY`;
+- the isolated content world refreshes authority against the current worker generation and exposes only narrowed settlement evidence independently of MAIN-world lifecycle health;
+- exact refresh and post-probe confirmation acknowledgments each bind a unique request, worker generation, Runtime ID, and Document Token;
+- OWNER and OBSERVER effective health both reach `READY` only after migration, trusted-core, Bridge-role, listener, and observation prerequisites agree;
+- the packaged popup reports final B2 `READY` and retains fail-closed guidance for incomplete or blocked prerequisites;
 - two live tabs connect to one worker authority as exactly one `OWNER` and one `OBSERVER_CONNECTED`, observe the same authoritative revision, and require an explicit successful observer-disconnect acknowledgement before the observer tab closes;
 - clearly owned noncanonical rebuild-marker orphan recovery and ambiguous noncanonical rebuild-marker retention;
 - dead interaction and removed root recover without reinjection;
@@ -69,17 +72,17 @@ Every message the harness sends directly from the content-script execution world
 - legacy runtime exclusion;
 - malformed and unreadable runtime-global exclusion;
 - build, package-version, and candidate-fingerprint mismatch reload boundaries;
-- service-worker restart changes the authority worker identity, reconnects the isolated client, reuses the live page runtime, preserves `OWNER`, revision, and coordination epoch, and leaves the persisted authoritative document canonically equivalent by SHA-256;
+- an immediate health request after service-worker restart refreshes authority against the new worker before reporting `READY`, reuses the live page runtime, preserves `OWNER`, revision, and coordination epoch, and leaves the persisted authoritative document canonically equivalent by SHA-256;
 - real BFCache restoration produces `pageshow.persisted === true` and reuses the runtime;
 - clean disable/re-enable creates a fresh Runtime ID;
-- the exact read-only `action=7` transport starts one authoritative Timer while lifecycle remains intentionally `DEGRADED`;
+- the exact read-only `action=7` transport starts one authoritative Timer while the isolated MAIN shell remains intentionally degraded and effective health settles `READY`;
 - OWNER and OBSERVER tabs share one redacted read model, with only OWNER performing Bridge verification;
 - a synthetic Job A to Job B change closes one ledger segment and commits one authoritative revision;
 - disable finalizes non-idle Timer state exactly once and issues no native SquareCoil mutation;
-- detected legacy storage blocks Bridge and Timer writes without exposing stored values;
+- detected malformed legacy storage blocks Bridge, Timer writes, and final READY without exposing stored values;
 - a delayed stale content response cannot overwrite newer disabled state;
 - a safely injected cleanup failure remains sticky until explicit cleanup-only retry succeeds.
 
-Each browser result carries the canonical stable IDs it proves: `B1-LC-001` through `B1-LC-010` and `B1-LC-012` through `B1-LC-018`. `B1-LC-011` is intentionally an A2/A3-only persistence-concurrency fixture. The B2.1 cases carry `B2-KERNEL-001` (multi-tab OWNER/OBSERVER) and `B2-KERNEL-002` (worker-restart reconnection). The B2.2 cases carry `B2-TRANSITION-001` through `B2-TRANSITION-005` for action 7 start, owner/observer synchronization, atomic job switch, exactly-once disable, and legacy fail-closed behavior.
+Each browser result carries the canonical stable IDs it proves: `B1-LC-001` through `B1-LC-010` and `B1-LC-012` through `B1-LC-018`. `B1-LC-011` is intentionally an A2/A3-only persistence-concurrency fixture. The B2.1 cases carry `B2-KERNEL-001` (multi-tab OWNER/OBSERVER) and `B2-KERNEL-002` (worker-restart reconnection). The B2.2 cases carry `B2-TRANSITION-001` through `B2-TRANSITION-005` for action 7 start, owner/observer synchronization, atomic job switch, exactly-once disable, and legacy fail-closed behavior. Final settlement cases carry `B2-READY-001` through `B2-READY-003` for OWNER plus popup READY, non-writing OBSERVER READY, and migration-blocked degradation.
 
-Passing these cases proves the fenced B2.1 authority-kernel slice, the partial B2.2 trusted Bridge-to-Timer transition slice, and the continuing B1 lifecycle regression gates. Full B2 acceptance remains **PENDING**: migration execution, the intentionally excluded native action 2 completion hook, broader concurrent Timer writes, and later-stage behavior must still be implemented and proven before B2 can be called settled.
+Passing these cases proves the installed-browser A4 portion of final B2 settlement for the native-`FULL` candidate while preserving all earlier B1/B2 gates. READY-C04 verification-fallback behavior remains covered by the mandatory unit/integration fixtures because the exact installed candidate has `chrome.webRequest` available; A4 does not alter the candidate or browser to manufacture an unavailable native hook. Final B2 settlement therefore requires this A4 pass together with the repository's required unit, integration, UI, transition, package, and CI gates.

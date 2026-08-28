@@ -22,6 +22,10 @@ const AUTHORITY_CONTROL_MESSAGES = Object.freeze({
 
 const AUTHORITY_UPDATE_ACK = `${AUTHORITY_MESSAGE_PREFIX}UPDATE_ACK`;
 const B2_SETTLEMENT_ACK = `${AUTHORITY_MESSAGE_PREFIX}B2_SETTLEMENT_ACK`;
+const B2_SETTLEMENT_MODES = Object.freeze({
+  REFRESH: 'REFRESH',
+  CONFIRM: 'CONFIRM'
+});
 
 const REQUEST_TYPES = new Set([
   AUTHORITY_MESSAGES.CONNECT,
@@ -77,6 +81,9 @@ function createB2SettlementAcknowledgment(message, authority, core) {
     ok: true,
     type: B2_SETTLEMENT_ACK,
     protocolVersion: AUTHORITY_PROTOCOL_VERSION,
+    settlementId: message.settlementId,
+    settlementMode: message.settlementMode,
+    workerInstanceId: message.workerInstanceId,
     documentToken: message.documentToken,
     runtimeInstanceId: message.runtimeInstanceId,
     authority,
@@ -87,12 +94,29 @@ function createB2SettlementAcknowledgment(message, authority, core) {
 function isB2SettlementAcknowledgment(value, message) {
   if (!isPlainObject(value) || !isPlainObject(message)) return false;
   const keys = Object.keys(value).sort();
-  const expectedKeys = ['authority', 'core', 'documentToken', 'ok', 'protocolVersion', 'runtimeInstanceId', 'type'].sort();
+  const expectedKeys = [
+    'authority',
+    'core',
+    'documentToken',
+    'ok',
+    'protocolVersion',
+    'runtimeInstanceId',
+    'settlementId',
+    'settlementMode',
+    'type',
+    'workerInstanceId'
+  ].sort();
   return keys.length === expectedKeys.length &&
     keys.every((key, index) => key === expectedKeys[index]) &&
     value.ok === true &&
     value.type === B2_SETTLEMENT_ACK &&
     value.protocolVersion === AUTHORITY_PROTOCOL_VERSION &&
+    isConcreteId(message.settlementId) &&
+    isConcreteId(message.workerInstanceId) &&
+    Object.values(B2_SETTLEMENT_MODES).includes(message.settlementMode) &&
+    value.settlementId === message.settlementId &&
+    value.settlementMode === message.settlementMode &&
+    value.workerInstanceId === message.workerInstanceId &&
     value.documentToken === message.documentToken &&
     value.runtimeInstanceId === message.runtimeInstanceId &&
     isPlainObject(value.authority) &&
@@ -146,6 +170,7 @@ module.exports = {
   AUTHORITY_CONTROL_MESSAGES,
   AUTHORITY_UPDATE_ACK,
   B2_SETTLEMENT_ACK,
+  B2_SETTLEMENT_MODES,
   KERNEL_ONLY_DISPOSITION,
   isConcreteId,
   isPlainObject,

@@ -1,6 +1,8 @@
 # SquareCoil Companion Rebuild
 ## B2-C Builder Handoff
 
+> **Historical implementation baseline:** this handoff described the next B2-C work before the migration, native-observation, and final READY settlement slices were implemented. Preserve its contracts, but use the 2026-08-27 completion addendum in `logic/B2C-COMPLETION-READINESS.md` and current `AGENTS.md` for live status. Do not interpret the “next slice” wording below as current authorization.
+
 **Status:** Ready for downstream implementation  
 **Branch:** `proto/squirel-coil-plugin`  
 **Logic baseline:** `20dba0b7edad9373417f84f0b7277968a93d4f30`  

@@ -760,3 +760,31 @@ Full B2 acceptance remains blocked on implementation + required evidence, not mi
 No remaining core behavior must be guessed.
 
 The next unresolved work is downstream implementation/acceptance of B2-C. Logic should not invent implementation mechanics or package/release structure unless a builder discovers a genuine behavioral contradiction and escalates it back here.
+
+---
+
+# 27. Implementation Completion Addendum — 2026-08-27
+
+Sections 24-26 record the pre-implementation readiness judgment. The active B2-C branch has since implemented the bounded completion work described by this document:
+
+- marker-aware OWNER-only migration invocation;
+- passive native action 2/3/4 observation through `chrome.webRequest`;
+- exact current-OWNER evidence delivery and mandatory post-state verification;
+- duplicate, stale-generation, retired-runtime, and superseded evidence rejection;
+- final effective READY settlement.
+
+The READY decision remains fail closed and requires all of the following at the same settlement point:
+
+```text
+R1-R8 shell prerequisites
++ exact request/runtime/document/current-worker refresh acknowledgment plus a fresh post-probe confirmation
++ fresh positive OWNER or OBSERVER_CONNECTED authority
++ trusted-core/Bridge role alignment
++ checked, unblocked NOT_REQUIRED or COMPLETE_MATCH migration
++ usable initialized Bridge with listeners
++ at least one completed OWNER initial observation in the current authority tenure
+```
+
+The isolated MAIN-world shell retains its non-positive B1 coordination sentinel because it does not own trusted authority state. Only the extension worker may combine the narrowed isolated-world evidence with shell health and publish effective READY. That boundary is intentional; changing the label alone is not settlement.
+
+Final B2 acceptance requires the mandatory unit, integration, UI, full transition/package validation, installed Chrome, installed Edge, and CI gates to pass for the exact candidate. This addendum authorizes no B3, B4, B5, or production-promotion work.

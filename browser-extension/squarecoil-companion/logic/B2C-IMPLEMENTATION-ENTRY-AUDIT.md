@@ -1,6 +1,8 @@
 # SquareCoil Companion Rebuild
 ## B2-C Implementation Entry Audit
 
+> **Historical entry snapshot:** this audit records the state before the bounded B2-C implementation began. The migration, native-observation, and final READY settlement slices are now implemented on the active B2-C branch; current boundaries and required checks live in `AGENTS.md` and the completion addendum in `logic/B2C-COMPLETION-READINESS.md`.
+
 **Status:** Implementation blocker identified; behavior already settled  
 **Active branch:** `proto/squirel-coil-plugin`  
 **Role boundary:** Logic Systems Architect  

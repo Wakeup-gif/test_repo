@@ -8,18 +8,27 @@ If chat context is lost or implementation direction becomes unclear, start here 
 
 ## Current checkpoint
 
-**Active branch:** `proto/squirel-coil-plugin`  
-**Production baseline:** `main` at `9378da24f393b40066816133e7fa0f48063115f0` (`v0.7.1 Chrome Interaction Recovery`)  
-**Production main changed by prototype work:** No  
-**Framework status:** Reconciled after full legacy feature mine  
-**Logic status:** L0-L8 settled + post-mine L5A tab/focus delta settled  
-**Implementation status:** B1 accepted; B2.1 accepted; B2.2 accepted; full B2 not yet settled  
-**Prototype UI:** nested workspace prototype + dedicated UI interaction gate present  
-**Latest accepted implementation/UI-gate checkpoint before documentation/logic reconciliation:** `ba06297e689fa7a68574ea0c0fe6d12ee59e53bf`  
-**Logic delta authority:** `logic/L5A-TAB-PARITY-FOCUS-DELTA.md`  
-**Next canonical build action:** close remaining B2 gaps before treating B3 prototype work as canonical
+**Active branch:** `codex/squarecoil-b2c-migration`
 
-The current branch intentionally contains exploratory B3-facing UI work on top of the accepted B2.2 core. The prototype does not promote itself to production and does not mean full B2 or B3 are settled.
+**Production baseline:** `main` at `9378da24f393b40066816133e7fa0f48063115f0` (`v0.7.1 Chrome Interaction Recovery`)
+
+**Production main changed by prototype work:** No
+
+**Framework status:** Reconciled after full legacy feature mine
+
+**Logic status:** L0-L8 settled + post-mine L5A tab/focus delta settled
+
+**Implementation status:** B1, B2.1, and B2.2 accepted; final B2-C migration/native-observation/READY settlement implemented and acceptance-gated
+
+**Prototype UI:** nested workspace prototype + dedicated UI interaction gate present
+
+**Latest accepted implementation/UI-gate checkpoint before documentation/logic reconciliation:** `ba06297e689fa7a68574ea0c0fe6d12ee59e53bf`
+
+**Logic delta authority:** `logic/L5A-TAB-PARITY-FOCUS-DELTA.md`
+
+**Next canonical build action:** hold at the final B2 boundary pending review/promotion direction; B3 requires separate explicit authorization
+
+The current branch still contains exploratory B3-facing UI work inherited from the prototype. Final B2 settlement does not promote that UI to canonical B3 and does not promote the branch to production.
 
 ---
 
@@ -159,28 +168,29 @@ Known prototype limitations still include:
 
 ---
 
-## Canonical B2 gaps still open
+## Canonical B2 closure
 
-Do not call full B2 settled until the owning implementation/acceptance work closes at least the currently known gaps:
+The active branch closes the previously known B2 implementation gaps:
 
-- legacy migration invocation;
-- safe observation of relevant native action 2/3/4 completion without Companion initiating native mutation;
-- final READY/full B2 acceptance evidence;
-- full B2 settlement.
+- fenced OWNER-only legacy migration invocation with retained-source conflict handling;
+- passive native action 2/3/4 completion observation and current-OWNER forwarding without Companion native mutation;
+- exact current-worker refresh plus post-probe confirmation acknowledgments;
+- final effective READY only when shell R1-R8, positive authority R9, settled migration, aligned trusted core, and usable Bridge evidence all agree;
+- fail-closed degradation for stale authority, ownership mismatch, blocked/incomplete migration, or unavailable Bridge.
 
-The prototype UI and settled L5A Logic do not waive these requirements.
+Settlement remains acceptance-gated: all required automated checks, clean exact-package Chrome/Edge runs, and CI must pass for the candidate. The prototype UI and settled L5A Logic do not widen this B2 boundary.
 
 ---
 
 ## Next action
 
-### Complete canonical B2
+### Review and preserve canonical B2
 
-Close the remaining B2 core authority gaps under the existing L2-L4 contracts.
+Review the final B2-C implementation and evidence. Fix only B2 regressions or settlement defects within this boundary.
 
-### Then convert the prototype workspace into canonical B3
+### Stop before canonical B3
 
-B3 must implement and accept the full L5 + L5A behavior, including:
+B3 requires a new explicit authorization. When authorized, it must implement and accept the full L5 + L5A behavior, including:
 
 - canonical live tab Today;
 - threshold accent/accessibility;
@@ -198,7 +208,7 @@ B3 must implement and accept the full L5 + L5A behavior, including:
 ```text
 R1  Targeted Logic delta — SETTLED
         ↓
-B2-C  Complete canonical B2
+B2-C  Canonical B2 implemented + acceptance-gated
         ↓
 B3  Canonical Time Views / Workspace using L5 + L5A
         ↓
@@ -237,6 +247,6 @@ Optional presentation must never block a core build that does not include it.
 
 ## Logic readiness
 
-**Ready** for implementation of the L5A delta under the existing staged dependencies.
+**Ready** only for review and acceptance of the implemented final B2-C candidate under the existing staged dependencies.
 
-There are no open behavior blockers in this delta. The next blockers are implementation/acceptance gaps in canonical B2, not missing framework or Logic definition.
+There are no open framework or Logic blockers in this delta. The final B2 implementation and acceptance gates are present on the active branch; promotion remains a separate decision, and B3 requires separate explicit authorization.

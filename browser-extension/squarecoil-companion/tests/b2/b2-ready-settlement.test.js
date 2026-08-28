@@ -31,7 +31,18 @@ function shell() {
 }
 
 function authority(disposition = 'OWNER') {
-  return { enabled: true, healthy: true, disposition };
+  return {
+    enabled: true,
+    healthy: true,
+    subscribed: true,
+    errorFree: true,
+    capturedAtMs: Date.now() - 1_000,
+    leaseExpiry: Date.now() + 60_000,
+    disposition,
+    coordinationEpoch: 3,
+    workerInstanceId: 'worker-settlement-current',
+    revision: 7
+  };
 }
 
 function core(overrides = {}) {
@@ -39,15 +50,33 @@ function core(overrides = {}) {
     initialized: true,
     disposed: false,
     blocked: false,
+    authorityOwner: true,
+    authorityTenure: {
+      coordinationEpoch: 3,
+      workerInstanceId: 'worker-settlement-current'
+    },
+    revision: 7,
     readModelError: null,
-    preflight: { disposition: 'NOT_REQUIRED', reason: 'legacy-not-present' },
+    preflight: {
+      checked: true,
+      blocked: false,
+      disposition: 'NOT_REQUIRED',
+      reason: 'legacy-not-present'
+    },
     bridge: {
       initialized: true,
       active: true,
+      owner: true,
       disposed: false,
       listenersAttached: true,
+      verificationInFlight: false,
       capability: 'FULL',
-      requestCount: 1
+      requestCount: 1,
+      ownerInitialObservationCompleted: true,
+      authorityTenure: {
+        coordinationEpoch: 3,
+        workerInstanceId: 'worker-settlement-current'
+      }
     },
     ...overrides
   };
@@ -64,7 +93,10 @@ test('UT-B2-READY-001 READY-C01 settles an OWNER only after lifecycle, migration
 });
 
 test('UT-B2-READY-002 READY-C02 settles an OBSERVER_CONNECTED with initialized listeners without making it a writer', () => {
-  const observerCore = core({ bridge: { ...core().bridge, owner: false, requestCount: 0 } });
+  const observerCore = core({
+    authorityOwner: false,
+    bridge: { ...core().bridge, owner: false, requestCount: 0 }
+  });
   assert.equal(evaluateB2ReadySettlement(shell(), authority('OBSERVER_CONNECTED'), observerCore).ready, true);
 });
 
@@ -72,7 +104,12 @@ test('UT-B2-READY-003 READY-C03 every unresolved or blocked migration dispositio
   for (const disposition of ['REQUIRED', 'IN_PROGRESS', 'SOURCE_CHANGED_AFTER_COMPLETION', 'UNAVAILABLE', 'FAILED']) {
     const value = evaluateB2ReadySettlement(shell(), authority(), core({
       blocked: true,
-      preflight: { disposition, reason: `migration-${disposition.toLowerCase()}` }
+      preflight: {
+        checked: true,
+        blocked: true,
+        disposition,
+        reason: `migration-${disposition.toLowerCase()}`
+      }
     }));
     assert.equal(value.ready, false, disposition);
   }
@@ -100,6 +137,9 @@ test('UT-B2-READY-006 B2 settlement delivery requires an exact runtime and docum
   const message = {
     type: AUTHORITY_CONTROL_MESSAGES.GET_B2_SETTLEMENT,
     protocolVersion: AUTHORITY_PROTOCOL_VERSION,
+    settlementId: 'settlement-request-001',
+    settlementMode: 'REFRESH',
+    workerInstanceId: 'worker-settlement-001',
     documentToken: 'document-settlement-001',
     runtimeInstanceId: 'runtime-settlement-001'
   };
@@ -108,4 +148,117 @@ test('UT-B2-READY-006 B2 settlement delivery requires an exact runtime and docum
   assert.equal(isB2SettlementAcknowledgment({ ...acknowledgment, extra: true }, message), false);
   assert.equal(isB2SettlementAcknowledgment({ ...acknowledgment, runtimeInstanceId: 'runtime-stale-001' }, message), false);
   assert.equal(isB2SettlementAcknowledgment({ ...acknowledgment, documentToken: 'document-stale-001' }, message), false);
+  assert.equal(isB2SettlementAcknowledgment({ ...acknowledgment, workerInstanceId: 'worker-stale-001' }, message), false);
+  assert.equal(isB2SettlementAcknowledgment({ ...acknowledgment, settlementId: 'settlement-stale-001' }, message), false);
+  assert.equal(isB2SettlementAcknowledgment({ ...acknowledgment, settlementMode: 'CONFIRM' }, message), false);
+});
+
+test('UT-B2-READY-007 cached, unsubscribed, errored, or expired coordination cannot settle READY', () => {
+  for (const stale of [
+    { subscribed: false },
+    { errorFree: false },
+    { leaseExpiry: Date.now() - 1 },
+    { capturedAtMs: Date.now() + 60_000 }
+  ]) {
+    const value = evaluateB2ReadySettlement(shell(), { ...authority(), ...stale }, core());
+    assert.equal(value.ready, false);
+    assert.equal(value.reason, 'coordination-not-current');
+  }
+});
+
+test('UT-B2-READY-008 trusted-core and Bridge ownership must match the current authority disposition', () => {
+  assert.equal(evaluateB2ReadySettlement(
+    shell(),
+    authority('OWNER'),
+    core({ authorityOwner: false })
+  ).reason, 'trusted-core-authority-mismatch');
+  assert.equal(evaluateB2ReadySettlement(
+    shell(),
+    authority('OWNER'),
+    core({ bridge: { ...core().bridge, owner: false } })
+  ).reason, 'bridge-authority-mismatch');
+  assert.equal(evaluateB2ReadySettlement(
+    shell(),
+    authority('OWNER'),
+    core({ revision: 6 })
+  ).reason, 'trusted-core-not-current');
+  assert.equal(evaluateB2ReadySettlement(
+    shell(),
+    authority('OBSERVER_CONNECTED'),
+    core({ authorityOwner: false, bridge: { ...core().bridge, owner: true, requestCount: 0 } })
+  ).reason, 'bridge-authority-mismatch');
+});
+
+test('UT-B2-READY-009 a positive migration disposition is insufficient without checked, unblocked preflight evidence', () => {
+  const unchecked = evaluateB2ReadySettlement(shell(), authority(), core({
+    preflight: { ...core().preflight, checked: false }
+  }));
+  assert.equal(unchecked.ready, false);
+  assert.equal(unchecked.reason, 'migration-preflight-incomplete');
+
+  const blocked = evaluateB2ReadySettlement(shell(), authority(), core({
+    preflight: { ...core().preflight, blocked: true, reason: 'migration-blocked-test' }
+  }));
+  assert.equal(blocked.ready, false);
+  assert.equal(blocked.reason, 'migration-blocked-test');
+});
+
+test('UT-B2-READY-010 OWNER requires a completed initial Bridge observation for its current tenure', () => {
+  for (const bridge of [
+    { ...core().bridge, requestCount: 0 },
+    { ...core().bridge, requestCount: -1 },
+    { ...core().bridge, requestCount: null },
+    { ...core().bridge, requestCount: 1, verificationInFlight: true, ownerInitialObservationCompleted: false }
+  ]) {
+    const value = evaluateB2ReadySettlement(shell(), authority(), core({
+      bridge
+    }));
+    assert.equal(value.ready, false);
+    assert.equal(value.reason, 'bridge-initial-observation-missing');
+  }
+});
+
+test('UT-B2-READY-020 authority, trusted core, and Bridge must share one exact fencing tenure', () => {
+  assert.equal(evaluateB2ReadySettlement(
+    shell(),
+    { ...authority(), coordinationEpoch: null },
+    core()
+  ).reason, 'coordination-tenure-unavailable');
+  assert.equal(evaluateB2ReadySettlement(
+    shell(),
+    authority(),
+    core({ authorityTenure: { coordinationEpoch: 2, workerInstanceId: 'worker-settlement-current' } })
+  ).reason, 'trusted-core-tenure-mismatch');
+  assert.equal(evaluateB2ReadySettlement(
+    shell(),
+    authority(),
+    core({
+      bridge: {
+        ...core().bridge,
+        authorityTenure: { coordinationEpoch: 3, workerInstanceId: 'worker-settlement-stale' }
+      }
+    })
+  ).reason, 'bridge-tenure-mismatch');
+});
+
+test('UT-B2-READY-021 lease freshness is decided at the final worker gate, not cached by content', () => {
+  const expiring = {
+    ...authority(),
+    capturedAtMs: 1_000,
+    leaseExpiry: 2_000
+  };
+  assert.equal(evaluateB2ReadySettlement(
+    shell(),
+    expiring,
+    core(),
+    { decisionAtMs: 1_999 }
+  ).ready, true);
+  const expired = evaluateB2ReadySettlement(
+    shell(),
+    expiring,
+    core(),
+    { decisionAtMs: 2_000 }
+  );
+  assert.equal(expired.ready, false);
+  assert.equal(expired.reason, 'coordination-not-current');
 });

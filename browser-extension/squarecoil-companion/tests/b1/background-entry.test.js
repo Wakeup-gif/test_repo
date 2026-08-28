@@ -13,7 +13,8 @@ function installChromeHarness({
   onSetEnabled = null,
   onRetryTeardown = null,
   onRevalidate = null,
-  onRecover = null
+  onRecover = null,
+  onTabMessage = null
 }) {
   let currentSnapshot = runtimeSnapshot ? { candidateFingerprint: CANDIDATE_FINGERPRINT, ...runtimeSnapshot } : null;
   for (const root of roots) {
@@ -81,13 +82,15 @@ function installChromeHarness({
   };
   global.chrome = {
     tabs: {
-      sendMessage: async (_tabId, message) => ({
-        ok: true,
-        disconnected: true,
-        protocolVersion: message.protocolVersion,
-        documentToken: message.documentToken,
-        runtimeInstanceId: message.runtimeInstanceId
-      })
+      sendMessage: async (tabId, message, options) => onTabMessage
+        ? onTabMessage({ tabId, message, options })
+        : ({
+            ok: true,
+            disconnected: true,
+            protocolVersion: message.protocolVersion,
+            documentToken: message.documentToken,
+            runtimeInstanceId: message.runtimeInstanceId
+          })
     },
     scripting: {
       executeScript: async options => {
@@ -163,6 +166,7 @@ function installChromeHarness({
       }
     },
     runtime: {
+      id: 'squarecoil-test-extension-id',
       getManifest: () => ({ version: '0.7.1' }),
       onInstalled: { addListener: () => {} },
       onMessage: { addListener: () => {} }
@@ -182,6 +186,53 @@ function loadBackground() {
   const modulePath = require.resolve('../../src/extension/background-entry');
   delete require.cache[modulePath];
   return require(modulePath);
+}
+
+function completeB2SettlementAcknowledgment(message) {
+  return {
+    ok: true,
+    type: 'SC_COMPANION_AUTHORITY_B2_SETTLEMENT_ACK',
+    protocolVersion: message.protocolVersion,
+    settlementId: message.settlementId,
+    settlementMode: message.settlementMode,
+    workerInstanceId: message.workerInstanceId,
+    documentToken: message.documentToken,
+    runtimeInstanceId: message.runtimeInstanceId,
+    authority: {
+      enabled: true,
+      healthy: true,
+      subscribed: true,
+      errorFree: true,
+      capturedAtMs: Date.now(),
+      leaseExpiry: Date.now() + 60_000,
+      disposition: 'OWNER',
+      coordinationEpoch: 3,
+      workerInstanceId: message.workerInstanceId,
+      revision: 0
+    },
+    core: {
+      initialized: true,
+      disposed: false,
+      blocked: false,
+      authorityOwner: true,
+      authorityTenure: { coordinationEpoch: 3, workerInstanceId: message.workerInstanceId },
+      revision: 0,
+      readModelError: null,
+      preflight: { checked: true, blocked: false, disposition: 'NOT_REQUIRED', reason: 'legacy-not-present' },
+      bridge: {
+        initialized: true,
+        active: true,
+        owner: true,
+        disposed: false,
+        listenersAttached: true,
+        verificationInFlight: false,
+        capability: 'FULL',
+        requestCount: 1,
+        ownerInitialObservationCompleted: true,
+        authorityTenure: { coordinationEpoch: 3, workerInstanceId: message.workerInstanceId }
+      }
+    }
+  };
 }
 
 test.afterEach(() => {
@@ -543,6 +594,492 @@ test('a forged health snapshot cannot hide a mismatched runtime handle', async (
   assert.equal(result.reloadRequired, true);
 });
 
+test('UT-B2-READY-016 final B2 health requires and accepts exact refresh and confirmation acknowledgments', async () => {
+  const runtimeInstanceId = 'runtime-final-settlement-12345';
+  const root = {
+    dataset: {
+      squarecoilCompanionRoot: 'rebuild',
+      runtimeInstanceId,
+      buildId: BUILD_ID,
+      documentToken: DOCUMENT_TOKEN
+    }
+  };
+  installChromeHarness({
+    timerEnabled: true,
+    roots: [root],
+    runtimeSnapshot: {
+      buildId: BUILD_ID,
+      packageVersion: '0.7.1',
+      runtimeInstanceId,
+      documentToken: DOCUMENT_TOKEN,
+      mode: 'ENABLED',
+      state: 'DEGRADED',
+      reason: 'coordination-not-implemented-b1',
+      teardownInProgress: false,
+      readiness: {
+        oneLifecycleOwner: true,
+        validRuntimeIdentity: true,
+        oneOwnedRoot: true,
+        interactionReady: true,
+        persistenceAvailable: true,
+        bridgeInitialized: true,
+        initialObservationAttempted: true,
+        featureRegistryInitialized: true,
+        teardownRegistered: true,
+        coordinationPositive: false
+      },
+      ui: { rootPresent: true, interactionReady: true }
+    },
+    onTabMessage: ({ message }) => completeB2SettlementAcknowledgment(message)
+  });
+  const background = loadBackground();
+
+  const result = await background.getHealth(61);
+  assert.equal(result.ok, true);
+  assert.equal(result.ready, true);
+  assert.equal(result.classification, 'HEALTHY_SAME_BUILD');
+  assert.equal(result.health.state, 'READY');
+  assert.equal(result.b2Settlement.authorityDisposition, 'OWNER');
+});
+
+test('UT-B2-READY-014 an accepted settlement cannot outlive its exact MAIN runtime identity', async () => {
+  const runtimeInstanceId = 'runtime-settlement-before-race-001';
+  const replacementRuntimeInstanceId = 'runtime-settlement-after-race-002';
+  const root = {
+    dataset: {
+      squarecoilCompanionRoot: 'rebuild',
+      runtimeInstanceId,
+      buildId: BUILD_ID,
+      documentToken: DOCUMENT_TOKEN
+    }
+  };
+  installChromeHarness({
+    timerEnabled: true,
+    roots: [root],
+    runtimeSnapshot: {
+      buildId: BUILD_ID,
+      packageVersion: '0.7.1',
+      runtimeInstanceId,
+      documentToken: DOCUMENT_TOKEN,
+      mode: 'ENABLED',
+      state: 'DEGRADED',
+      reason: 'coordination-not-implemented-b1',
+      teardownInProgress: false,
+      readiness: {
+        oneLifecycleOwner: true,
+        validRuntimeIdentity: true,
+        oneOwnedRoot: true,
+        interactionReady: true,
+        persistenceAvailable: true,
+        bridgeInitialized: true,
+        initialObservationAttempted: true,
+        featureRegistryInitialized: true,
+        teardownRegistered: true,
+        coordinationPositive: false
+      },
+      ui: { rootPresent: true, interactionReady: true }
+    },
+    onTabMessage: ({ message }) => {
+      const runtime = global.window.__squareCoilCompanionRuntime;
+      const health = runtime.getHealth();
+      global.window.__squareCoilCompanionRuntime = {
+        ...runtime,
+        runtimeInstanceId: replacementRuntimeInstanceId,
+        getHealth: () => ({ ...health, runtimeInstanceId: replacementRuntimeInstanceId })
+      };
+      root.dataset.runtimeInstanceId = replacementRuntimeInstanceId;
+      return completeB2SettlementAcknowledgment(message);
+    }
+  });
+  const background = loadBackground();
+
+  const result = await background.getHealth(81);
+  assert.equal(result.ok, false);
+  assert.equal(result.ready, false);
+  assert.equal(result.classification, 'DEGRADED_SAME_BUILD');
+  assert.equal(result.reason, 'settlement-runtime-identity-changed');
+  assert.equal(result.health.runtimeInstanceId, replacementRuntimeInstanceId);
+  assert.equal(result.health.readiness.coordinationPositive, false);
+});
+
+test('UT-B2-READY-015 an accepted settlement is discarded when the final page classification changes', async () => {
+  const runtimeInstanceId = 'runtime-settlement-class-race-001';
+  const root = {
+    dataset: {
+      squarecoilCompanionRoot: 'rebuild',
+      runtimeInstanceId,
+      buildId: BUILD_ID,
+      documentToken: DOCUMENT_TOKEN
+    }
+  };
+  installChromeHarness({
+    timerEnabled: true,
+    roots: [root],
+    runtimeSnapshot: {
+      buildId: BUILD_ID,
+      packageVersion: '0.7.1',
+      runtimeInstanceId,
+      documentToken: DOCUMENT_TOKEN,
+      mode: 'ENABLED',
+      state: 'DEGRADED',
+      reason: 'coordination-not-implemented-b1',
+      teardownInProgress: false,
+      readiness: {
+        oneLifecycleOwner: true,
+        validRuntimeIdentity: true,
+        oneOwnedRoot: true,
+        interactionReady: true,
+        persistenceAvailable: true,
+        bridgeInitialized: true,
+        initialObservationAttempted: true,
+        featureRegistryInitialized: true,
+        teardownRegistered: true,
+        coordinationPositive: false
+      },
+      ui: { rootPresent: true, interactionReady: true }
+    },
+    onTabMessage: ({ message }) => {
+      const runtime = global.window.__squareCoilCompanionRuntime;
+      const health = runtime.getHealth();
+      global.window.__squareCoilCompanionRuntime = {
+        ...runtime,
+        getHealth: () => ({ ...health, state: 'RECOVERING', reason: 'synthetic-settlement-race' })
+      };
+      return completeB2SettlementAcknowledgment(message);
+    }
+  });
+  const background = loadBackground();
+
+  const result = await background.getHealth(82);
+  assert.equal(result.ok, false);
+  assert.equal(result.ready, false);
+  assert.equal(result.classification, 'DEGRADED_SAME_BUILD');
+  assert.equal(result.reason, 'settlement-page-classification-changed');
+  assert.equal(result.health.state, 'DEGRADED');
+  assert.equal(result.health.readiness.coordinationPositive, false);
+});
+
+test('UT-B2-READY-023 READY uses a fresh exact authority confirmation after the final MAIN probe', async () => {
+  const runtimeInstanceId = 'runtime-settlement-confirm-001';
+  const root = {
+    dataset: {
+      squarecoilCompanionRoot: 'rebuild',
+      runtimeInstanceId,
+      buildId: BUILD_ID,
+      documentToken: DOCUMENT_TOKEN
+    }
+  };
+  const modes = [];
+  const settlementIds = [];
+  installChromeHarness({
+    timerEnabled: true,
+    roots: [root],
+    runtimeSnapshot: {
+      buildId: BUILD_ID,
+      packageVersion: '0.7.1',
+      runtimeInstanceId,
+      documentToken: DOCUMENT_TOKEN,
+      mode: 'ENABLED',
+      state: 'DEGRADED',
+      reason: 'coordination-not-implemented-b1',
+      teardownInProgress: false,
+      readiness: {
+        oneLifecycleOwner: true,
+        validRuntimeIdentity: true,
+        oneOwnedRoot: true,
+        interactionReady: true,
+        persistenceAvailable: true,
+        bridgeInitialized: true,
+        initialObservationAttempted: true,
+        featureRegistryInitialized: true,
+        teardownRegistered: true,
+        coordinationPositive: false
+      },
+      ui: { rootPresent: true, interactionReady: true }
+    },
+    onTabMessage: ({ message }) => {
+      modes.push(message.settlementMode);
+      settlementIds.push(message.settlementId);
+      const acknowledgment = completeB2SettlementAcknowledgment(message);
+      if (message.settlementMode === 'CONFIRM') {
+        acknowledgment.authority = { ...acknowledgment.authority, healthy: false };
+      }
+      return acknowledgment;
+    }
+  });
+  const background = loadBackground();
+
+  const result = await background.getHealth(83);
+  assert.deepEqual(modes, ['REFRESH', 'CONFIRM']);
+  assert.equal(new Set(settlementIds).size, 2);
+  assert.equal(result.ok, false);
+  assert.equal(result.ready, false);
+  assert.equal(result.reason, 'coordination-unavailable');
+  assert.equal(result.health.state, 'DEGRADED');
+  assert.equal(result.health.readiness.coordinationPositive, false);
+});
+
+test('UT-B2-READY-024 explicit in-progress evidence beats and clears the worker settlement watchdog', async () => {
+  const runtimeInstanceId = 'runtime-settlement-in-progress-001';
+  const root = {
+    dataset: {
+      squarecoilCompanionRoot: 'rebuild',
+      runtimeInstanceId,
+      buildId: BUILD_ID,
+      documentToken: DOCUMENT_TOKEN
+    }
+  };
+  const modes = [];
+  installChromeHarness({
+    timerEnabled: true,
+    roots: [root],
+    runtimeSnapshot: {
+      buildId: BUILD_ID,
+      packageVersion: '0.7.1',
+      runtimeInstanceId,
+      documentToken: DOCUMENT_TOKEN,
+      mode: 'ENABLED',
+      state: 'DEGRADED',
+      reason: 'coordination-not-implemented-b1',
+      teardownInProgress: false,
+      readiness: {
+        oneLifecycleOwner: true,
+        validRuntimeIdentity: true,
+        oneOwnedRoot: true,
+        interactionReady: true,
+        persistenceAvailable: true,
+        bridgeInitialized: true,
+        initialObservationAttempted: true,
+        featureRegistryInitialized: true,
+        teardownRegistered: true,
+        coordinationPositive: false
+      },
+      ui: { rootPresent: true, interactionReady: true }
+    },
+    onTabMessage: ({ message }) => {
+      modes.push(message.settlementMode);
+      return { ok: false, reason: 'settlement-refresh-in-progress' };
+    }
+  });
+  const background = loadBackground();
+  const originalSetTimeout = global.setTimeout;
+  const originalClearTimeout = global.clearTimeout;
+  const watchdog = Object.freeze({ settlementWatchdog: true });
+  let watchdogScheduled = 0;
+  let watchdogCleared = 0;
+  global.setTimeout = (callback, delayMs, ...args) => {
+    if (delayMs === background.B2_SETTLEMENT_CONTROL_TIMEOUT_MS) {
+      watchdogScheduled += 1;
+      return watchdog;
+    }
+    return originalSetTimeout(callback, delayMs, ...args);
+  };
+  global.clearTimeout = handle => {
+    if (handle === watchdog) {
+      watchdogCleared += 1;
+      return;
+    }
+    originalClearTimeout(handle);
+  };
+  try {
+    const result = await background.getHealth(84);
+    assert.deepEqual(modes, ['REFRESH']);
+    assert.equal(watchdogScheduled, 1);
+    assert.equal(watchdogCleared, 1);
+    assert.equal(result.ok, false);
+    assert.equal(result.ready, false);
+    assert.equal(result.reason, 'settlement-refresh-in-progress');
+    assert.equal(result.health.state, 'DEGRADED');
+  } finally {
+    global.setTimeout = originalSetTimeout;
+    global.clearTimeout = originalClearTimeout;
+  }
+});
+
+test('UT-B2-READY-017 raw same-build READY cannot bypass a mismatched final B2 settlement acknowledgment', async () => {
+  const runtimeInstanceId = 'runtime-raw-ready-bypass-12345';
+  const root = {
+    dataset: {
+      squarecoilCompanionRoot: 'rebuild',
+      runtimeInstanceId,
+      buildId: BUILD_ID,
+      documentToken: DOCUMENT_TOKEN
+    }
+  };
+  installChromeHarness({
+    timerEnabled: true,
+    roots: [root],
+    runtimeSnapshot: {
+      buildId: BUILD_ID,
+      packageVersion: '0.7.1',
+      runtimeInstanceId,
+      documentToken: DOCUMENT_TOKEN,
+      mode: 'ENABLED',
+      state: 'READY',
+      reason: 'ready',
+      teardownInProgress: false,
+      readiness: {
+        oneLifecycleOwner: true,
+        validRuntimeIdentity: true,
+        oneOwnedRoot: true,
+        interactionReady: true,
+        persistenceAvailable: true,
+        bridgeInitialized: true,
+        initialObservationAttempted: true,
+        featureRegistryInitialized: true,
+        teardownRegistered: true,
+        coordinationPositive: true
+      },
+      ui: { rootPresent: true, interactionReady: true }
+    },
+    onTabMessage: ({ message }) => ({
+      ok: true,
+      type: 'SC_COMPANION_AUTHORITY_B2_SETTLEMENT_ACK',
+      protocolVersion: message.protocolVersion,
+      settlementId: message.settlementId,
+      settlementMode: message.settlementMode,
+      workerInstanceId: 'worker-stale-ready-bypass',
+      documentToken: message.documentToken,
+      runtimeInstanceId: message.runtimeInstanceId,
+      authority: {},
+      core: {}
+    })
+  });
+  const background = loadBackground();
+
+  const result = await background.getHealth(63);
+  assert.equal(result.ok, false);
+  assert.equal(result.ready, false);
+  assert.equal(result.classification, 'DEGRADED_SAME_BUILD');
+  assert.equal(result.health.state, 'DEGRADED');
+  assert.equal(result.reason, 'settlement-acknowledgment-invalid');
+  assert.equal(result.health.readiness.coordinationPositive, false);
+});
+
+test('UT-B2-READY-011 lifecycle command responses never expose raw MAIN-world READY', async () => {
+  const commands = [
+    { name: 'boot', invoke: (background, request) => background.bootPage(request) },
+    { name: 'enable', invoke: (background, request) => background.setPageEnabled(request, true) },
+    { name: 'revalidate', invoke: (background, request) => background.revalidatePage(request) }
+  ];
+  for (const [index, command] of commands.entries()) {
+    const runtimeInstanceId = `runtime-command-ready-${command.name}-12345`;
+    const root = {
+      dataset: {
+        squarecoilCompanionRoot: 'rebuild',
+        runtimeInstanceId,
+        buildId: BUILD_ID,
+        documentToken: DOCUMENT_TOKEN
+      }
+    };
+    installChromeHarness({
+      timerEnabled: true,
+      roots: [root],
+      runtimeSnapshot: {
+        buildId: BUILD_ID,
+        packageVersion: '0.7.1',
+        runtimeInstanceId,
+        documentToken: DOCUMENT_TOKEN,
+        mode: 'ENABLED',
+        state: 'READY',
+        reason: 'ready',
+        teardownInProgress: false,
+        readiness: {
+          oneLifecycleOwner: true,
+          validRuntimeIdentity: true,
+          oneOwnedRoot: true,
+          interactionReady: true,
+          persistenceAvailable: true,
+          bridgeInitialized: true,
+          initialObservationAttempted: true,
+          featureRegistryInitialized: true,
+          teardownRegistered: true,
+          coordinationPositive: true
+        },
+        ui: { rootPresent: true, interactionReady: true }
+      }
+    });
+    const background = loadBackground();
+    const result = await command.invoke(background, {
+      tabId: 70 + index,
+      expectedDocumentId: DOCUMENT_ID,
+      documentToken: DOCUMENT_TOKEN,
+      source: 'content'
+    });
+    assert.equal(result.ok, true, command.name);
+    assert.equal(result.ready, false, command.name);
+    assert.equal(result.classification, 'DEGRADED_SAME_BUILD', command.name);
+    assert.equal(result.health.state, 'DEGRADED', command.name);
+    assert.equal(result.reason, 'b2-settlement-required', command.name);
+  }
+});
+
+test('UT-B2-READY-013 a missing settlement acknowledgment times out to non-READY', async () => {
+  const runtimeInstanceId = 'runtime-settlement-timeout-12345';
+  const root = {
+    dataset: {
+      squarecoilCompanionRoot: 'rebuild',
+      runtimeInstanceId,
+      buildId: BUILD_ID,
+      documentToken: DOCUMENT_TOKEN
+    }
+  };
+  installChromeHarness({
+    timerEnabled: true,
+    roots: [root],
+    runtimeSnapshot: {
+      buildId: BUILD_ID,
+      packageVersion: '0.7.1',
+      runtimeInstanceId,
+      documentToken: DOCUMENT_TOKEN,
+      mode: 'ENABLED',
+      state: 'READY',
+      reason: 'ready',
+      teardownInProgress: false,
+      readiness: {
+        oneLifecycleOwner: true,
+        validRuntimeIdentity: true,
+        oneOwnedRoot: true,
+        interactionReady: true,
+        persistenceAvailable: true,
+        bridgeInitialized: true,
+        initialObservationAttempted: true,
+        featureRegistryInitialized: true,
+        teardownRegistered: true,
+        coordinationPositive: true
+      },
+      ui: { rootPresent: true, interactionReady: true }
+    },
+    onTabMessage: () => new Promise(() => {})
+  });
+  const background = loadBackground();
+  assert.equal(background.B2_SETTLEMENT_CONTROL_TIMEOUT_MS, 20_000);
+  const originalSetTimeout = global.setTimeout;
+  const originalClearTimeout = global.clearTimeout;
+  const timeoutMarker = Object.freeze({ settlementTimeout: true });
+  global.setTimeout = (callback, delayMs, ...args) => {
+    if (delayMs === background.B2_SETTLEMENT_CONTROL_TIMEOUT_MS) {
+      queueMicrotask(() => callback(...args));
+      return timeoutMarker;
+    }
+    return originalSetTimeout(callback, delayMs, ...args);
+  };
+  global.clearTimeout = id => {
+    if (id !== timeoutMarker) originalClearTimeout(id);
+  };
+  try {
+    const result = await background.getHealth(79);
+    assert.equal(result.ok, false);
+    assert.equal(result.ready, false);
+    assert.equal(result.classification, 'DEGRADED_SAME_BUILD');
+    assert.equal(result.reason, 'settlement-health-timeout');
+    assert.equal(result.health.state, 'DEGRADED');
+  } finally {
+    global.setTimeout = originalSetTimeout;
+    global.clearTimeout = originalClearTimeout;
+  }
+});
+
 test('a stranded valid injection claim requires a reload boundary instead of reinjection', async () => {
   const harness = installChromeHarness({ timerEnabled: true });
   global.window.__squareCoilCompanionInjectionClaim = {
@@ -643,7 +1180,8 @@ test('a stale disable message cannot tear down a runtime after the authoritative
   }, false);
   assert.equal(result.staleRequestIgnored, true);
   assert.equal(result.enabled, true);
-  assert.equal(result.ready, true);
+  assert.equal(result.ready, false);
+  assert.equal(result.reason, 'b2-settlement-required');
   assert.equal(harness.enableCalls(), 0);
   assert.equal(global.window.__squareCoilCompanionRuntime.runtimeInstanceId, runtimeInstanceId);
 });
@@ -661,6 +1199,27 @@ test('content messages reject unsupported frames before any page operation', () 
     }
   );
   assert.equal(resolved.error, 'unsupported-frame');
+});
+
+test('an exact extension-origin popup page remains extension traffic when opened in a tab', () => {
+  installChromeHarness({ timerEnabled: true });
+  const background = loadBackground();
+  const resolved = background.requestFromMessage(
+    { type: 'SC_COMPANION_GET_HEALTH', tabId: 71 },
+    {
+      id: 'squarecoil-test-extension-id',
+      tab: { id: 72, url: 'chrome-extension://squarecoil-test-extension-id/popup/popup.html' },
+      url: 'chrome-extension://squarecoil-test-extension-id/popup/popup.html',
+      frameId: 0
+    }
+  );
+  assert.equal(resolved.error, undefined);
+  assert.deepEqual(resolved.request, {
+    tabId: 71,
+    expectedDocumentId: null,
+    documentToken: null,
+    source: 'extension'
+  });
 });
 
 test('content messages require the exact B1 package candidate identity', () => {

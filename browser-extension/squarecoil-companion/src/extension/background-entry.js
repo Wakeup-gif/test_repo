@@ -10,6 +10,7 @@ const {
   AUTHORITY_PROTOCOL_VERSION,
   AUTHORITY_MESSAGES,
   AUTHORITY_CONTROL_MESSAGES,
+  B2_SETTLEMENT_MODES,
   KERNEL_ONLY_DISPOSITION,
   isAuthorityMessageType,
   isB2SettlementAcknowledgment,
@@ -28,6 +29,7 @@ const REVALIDATE_MESSAGE = 'SC_COMPANION_REVALIDATE';
 const RETRY_TEARDOWN_MESSAGE = 'SC_COMPANION_RETRY_TEARDOWN';
 const PERSISTENCE_PROBE_KEY = '__scCompanionB1PersistenceProbe';
 const EXPECTED_B1_DEGRADED_REASON = 'coordination-not-implemented-b1';
+const B2_SETTLEMENT_CONTROL_TIMEOUT_MS = 20_000;
 const PACKAGE_VERSION = String(chrome.runtime.getManifest().version || '0.0.0');
 const tabOperationQueues = new Map();
 
@@ -75,24 +77,37 @@ async function prepareIsolatedAuthorityTeardown(request, runtimeInstanceId) {
   }
 }
 
-async function readB2Settlement(request, runtimeInstanceId) {
+async function readB2Settlement(request, runtimeInstanceId, settlementMode = B2_SETTLEMENT_MODES.REFRESH) {
   if (!chrome.tabs || typeof chrome.tabs.sendMessage !== 'function') {
     return { ok: false, reason: 'settlement-content-control-unavailable' };
   }
   const message = {
     type: AUTHORITY_CONTROL_MESSAGES.GET_B2_SETTLEMENT,
     protocolVersion: AUTHORITY_PROTOCOL_VERSION,
+    settlementId: randomId('settlement'),
+    settlementMode,
+    workerInstanceId: authorityRouter.workerInstanceId,
     documentToken: request.documentToken,
     runtimeInstanceId
   };
   const options = request.expectedDocumentId ? { documentId: request.expectedDocumentId } : { frameId: 0 };
+  const timeoutMarker = Object.freeze({ timeout: true });
+  let timeoutId = null;
   try {
-    const response = await chrome.tabs.sendMessage(request.tabId, message, options);
+    const response = await Promise.race([
+      chrome.tabs.sendMessage(request.tabId, message, options),
+      new Promise(resolve => {
+        timeoutId = setTimeout(() => resolve(timeoutMarker), B2_SETTLEMENT_CONTROL_TIMEOUT_MS);
+      })
+    ]);
+    if (response === timeoutMarker) return { ok: false, reason: 'settlement-health-timeout' };
     return isB2SettlementAcknowledgment(response, message)
       ? { ok: true, authority: response.authority, core: response.core }
       : { ok: false, reason: response?.reason || 'settlement-acknowledgment-invalid' };
   } catch (error) {
     return { ok: false, reason: String(error?.message || error || 'settlement-health-unavailable') };
+  } finally {
+    if (timeoutId !== null) clearTimeout(timeoutId);
   }
 }
 
@@ -653,37 +668,85 @@ function responseForProbe(classification, probe, extra = {}) {
   };
 }
 
+function isB2SettlementCandidate(classification, health) {
+  return classification === PROBE_RESULTS.HEALTHY_SAME_BUILD || (
+    classification === PROBE_RESULTS.DEGRADED_SAME_BUILD &&
+    health?.reason === EXPECTED_B1_DEGRADED_REASON &&
+    shellHealthyExceptCoordination(health)
+  );
+}
+
+function failB2Settlement(response, reason, health = response?.health) {
+  return {
+    ...response,
+    ok: false,
+    ready: false,
+    classification: PROBE_RESULTS.DEGRADED_SAME_BUILD,
+    expectedB1Degraded: false,
+    reason,
+    health: {
+      ...health,
+      state: 'DEGRADED',
+      reason,
+      readiness: {
+        ...health?.readiness,
+        coordinationPositive: false,
+        coordinationDisposition: 'UNAVAILABLE'
+      }
+    }
+  };
+}
+
 async function settleB2Response(request, probe, response) {
   const shellHealth = response?.health;
-  if (
-    response?.classification !== PROBE_RESULTS.DEGRADED_SAME_BUILD ||
-    shellHealth?.reason !== EXPECTED_B1_DEGRADED_REASON ||
-    !shellHealthyExceptCoordination(shellHealth)
-  ) return response;
+  if (!isB2SettlementCandidate(response?.classification, shellHealth)) return response;
 
   const runtimeInstanceId = shellHealth.runtimeInstanceId || probe.runtimeInstanceId;
-  const evidence = await readB2Settlement(request, runtimeInstanceId);
-  if (!evidence.ok) {
-    return {
-      ...response,
-      expectedB1Degraded: false,
-      reason: evidence.reason,
-      health: { ...shellHealth, reason: evidence.reason }
-    };
+  const refreshed = await readB2Settlement(request, runtimeInstanceId, B2_SETTLEMENT_MODES.REFRESH);
+  if (!refreshed.ok) return failB2Settlement(response, refreshed.reason, shellHealth);
+
+  let finalProbe;
+  try {
+    finalProbe = await collectPageProbe(request);
+  } catch (_) {
+    return failB2Settlement(response, 'settlement-final-page-inspection-failed', shellHealth);
   }
-  const settlement = evaluateB2ReadySettlement(shellHealth, evidence.authority, evidence.core);
+  const finalGuard = guardProbe(request, finalProbe);
+  if (finalGuard) {
+    return failB2Settlement(
+      { ...response, reloadRequired: finalGuard.reason !== 'unsupported-document' },
+      finalGuard.reason || 'settlement-final-document-unavailable',
+      finalProbe.runtimeSnapshot || shellHealth
+    );
+  }
+  const finalClassification = classifyPageProbe(finalProbe);
+  const finalShellHealth = finalProbe.runtimeSnapshot;
+  if (
+    finalProbe.runtimeInstanceId !== runtimeInstanceId ||
+    finalShellHealth?.runtimeInstanceId !== runtimeInstanceId ||
+    finalProbe.runtimeDocumentToken !== request.documentToken
+  ) {
+    return failB2Settlement(response, 'settlement-runtime-identity-changed', finalShellHealth || shellHealth);
+  }
+  if (!isB2SettlementCandidate(finalClassification, finalShellHealth)) {
+    return failB2Settlement(response, 'settlement-page-classification-changed', finalShellHealth || shellHealth);
+  }
+
+  const evidence = await readB2Settlement(request, runtimeInstanceId, B2_SETTLEMENT_MODES.CONFIRM);
+  if (!evidence.ok) return failB2Settlement(response, evidence.reason, finalShellHealth);
+  const settlement = evaluateB2ReadySettlement(finalShellHealth, evidence.authority, evidence.core);
   const health = {
-    ...shellHealth,
+    ...finalShellHealth,
     state: settlement.ready ? 'READY' : 'DEGRADED',
     reason: settlement.reason,
     readiness: {
-      ...shellHealth.readiness,
+      ...finalShellHealth.readiness,
       coordinationPositive: settlement.ready,
       coordinationDisposition: evidence.authority.disposition
     },
     authority: evidence.authority,
     trustedCore: evidence.core,
-    bridge: evidence.core.bridge || shellHealth.bridge
+    bridge: evidence.core.bridge || finalShellHealth.bridge
   };
   return {
     ...response,
@@ -694,6 +757,78 @@ async function settleB2Response(request, probe, response) {
     health,
     expectedB1Degraded: false,
     b2Settlement: settlement
+  };
+}
+
+async function settleOperationResponse(request, response) {
+  const shellHealth = response?.health;
+  if (!isB2SettlementCandidate(response?.classification, shellHealth)) return response;
+
+  let probe;
+  try {
+    probe = await collectPageProbe(request);
+  } catch (error) {
+    return settleB2Response(request, { runtimeInstanceId: shellHealth?.runtimeInstanceId }, {
+      ...response,
+      classification: PROBE_RESULTS.DEGRADED_SAME_BUILD,
+      ready: false,
+      health: { ...shellHealth, state: 'DEGRADED', reason: 'settlement-page-inspection-failed' },
+      reason: String(error?.message || error || 'settlement-page-inspection-failed')
+    });
+  }
+  const guard = guardProbe(request, probe);
+  if (guard) {
+    return {
+      ...response,
+      ...guard,
+      ok: false,
+      ready: false,
+      classification: PROBE_RESULTS.DEGRADED_SAME_BUILD,
+      reason: guard.reason || 'settlement-document-unavailable',
+      health: {
+        ...(probe.runtimeSnapshot || shellHealth),
+        state: 'DEGRADED',
+        reason: guard.reason || 'settlement-document-unavailable'
+      }
+    };
+  }
+  const currentClassification = classifyPageProbe(probe);
+  const currentResponse = {
+    ...response,
+    ...responseForProbe(currentClassification, probe),
+    expectedB1Degraded: currentClassification === PROBE_RESULTS.DEGRADED_SAME_BUILD &&
+      probe.runtimeSnapshot?.reason === EXPECTED_B1_DEGRADED_REASON &&
+      shellHealthyExceptCoordination(probe.runtimeSnapshot)
+  };
+  const currentRequest = {
+    ...request,
+    documentToken: probe.documentToken,
+    expectedDocumentId: request.expectedDocumentId || probe.browserDocumentId
+  };
+  return settleB2Response(currentRequest, probe, currentResponse);
+}
+
+function suppressUngatedReady(response) {
+  if (response?.ready !== true && response?.classification !== PROBE_RESULTS.HEALTHY_SAME_BUILD) {
+    return response;
+  }
+  const shellHealth = response?.health;
+  return {
+    ...response,
+    ready: false,
+    classification: PROBE_RESULTS.DEGRADED_SAME_BUILD,
+    reason: 'b2-settlement-required',
+    expectedB1Degraded: false,
+    health: {
+      ...shellHealth,
+      state: 'DEGRADED',
+      reason: 'b2-settlement-required',
+      readiness: {
+        ...shellHealth?.readiness,
+        coordinationPositive: false,
+        coordinationDisposition: 'UNAVAILABLE'
+      }
+    }
   };
 }
 
@@ -987,8 +1122,7 @@ async function getHealthUnsafe(request) {
   const guard = guardProbe(request, probe);
   if (guard) return { ...guard, health: probe.runtimeSnapshot || null, reloadRequired: guard.reason !== 'unsupported-document' };
   request = { ...request, documentToken: probe.documentToken, expectedDocumentId: request.expectedDocumentId || probe.browserDocumentId };
-  const response = responseForProbe(classifyPageProbe(probe), probe);
-  return settleB2Response(request, probe, response);
+  return responseForProbe(classifyPageProbe(probe), probe);
 }
 
 async function setPageEnabledUnsafe(request, enabled) {
@@ -1202,27 +1336,27 @@ async function revalidatePageUnsafe(request) {
 
 function bootPage(value, context) {
   const request = normalizeRequest(value, context);
-  return serializeTabOperation(request, () => bootPageUnsafe(request));
+  return serializeTabOperation(request, async () => suppressUngatedReady(await bootPageUnsafe(request)));
 }
 
 function getHealth(value, context) {
   const request = normalizeRequest(value, context);
-  return serializeTabOperation(request, () => getHealthUnsafe(request));
+  return serializeTabOperation(request, async () => settleOperationResponse(request, await getHealthUnsafe(request)));
 }
 
 function setPageEnabled(value, enabled, context) {
   const request = normalizeRequest(value, context);
-  return serializeTabOperation(request, () => setPageEnabledUnsafe(request, enabled));
+  return serializeTabOperation(request, async () => suppressUngatedReady(await setPageEnabledUnsafe(request, enabled)));
 }
 
 function retryTeardown(value, context) {
   const request = normalizeRequest(value, context);
-  return serializeTabOperation(request, () => retryTeardownUnsafe(request));
+  return serializeTabOperation(request, async () => suppressUngatedReady(await retryTeardownUnsafe(request)));
 }
 
 function revalidatePage(value, context) {
   const request = normalizeRequest(value, context);
-  return serializeTabOperation(request, () => revalidatePageUnsafe(request));
+  return serializeTabOperation(request, async () => suppressUngatedReady(await revalidatePageUnsafe(request)));
 }
 
 function authorityTeardownFailureResponse(probe, reason = 'authority-teardown-incomplete', enabled = false) {
@@ -1319,6 +1453,17 @@ async function handleAuthorityMessage(request, message) {
 }
 
 function requestFromMessage(message, sender = {}) {
+  const runtimeId = String(chrome.runtime?.id || '');
+  const senderUrl = String(sender.url || '');
+  const extensionOriginSender = Boolean(
+    runtimeId &&
+    sender.id === runtimeId &&
+    senderUrl.startsWith(`chrome-extension://${runtimeId}/`)
+  );
+  if (extensionOriginSender) {
+    const tabId = Number.isInteger(message?.tabId) ? message.tabId : null;
+    return { request: { tabId, expectedDocumentId: null, documentToken: null, source: 'extension' } };
+  }
   if (sender.tab && Number.isInteger(sender.tab.id)) {
     if (sender.frameId !== 0) return { error: 'unsupported-frame' };
     const senderUrl = sender.url || sender.tab.url || '';
@@ -1386,6 +1531,7 @@ module.exports = {
   ENABLE_MESSAGE,
   REVALIDATE_MESSAGE,
   RETRY_TEARDOWN_MESSAGE,
+  B2_SETTLEMENT_CONTROL_TIMEOUT_MS,
   AUTHORITY_MESSAGES,
   AUTHORITY_PROTOCOL_VERSION,
   authorityRouter,

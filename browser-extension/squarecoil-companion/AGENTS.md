@@ -3,9 +3,11 @@
 This file scopes only `browser-extension/squarecoil-companion/`.
 
 ## Current task
-Implement the explicitly authorized second B2-C engineering slice only: passive native action 2/3/4 completion observation, current-OWNER evidence routing, and safe verification fallback.
+Final B2-C is implemented on `codex/squarecoil-b2c-migration`: migration invocation, passive native action 2/3/4 observation, current-OWNER evidence routing, verification fallback, and the final READY settlement gate. Preserve that boundary and keep every B2 acceptance gate green.
 
-Read these before editing code:
+Do not begin B3, B4, or B5 without a new explicit authorization. Final B2 settlement does not promote this branch to production `main`.
+
+Read these before changing final B2 code:
 1. `docs/B2C-BUILDER-HANDOFF.md`
 2. `logic/B2C-COMPLETION-READINESS.md`
 3. `logic/B2C-IMPLEMENTATION-ENTRY-AUDIT.md`
@@ -30,6 +32,7 @@ Do not redesign settled behavior. If implementation exposes a true contradiction
 - Do not weaken revision/fencing checks.
 
 ## Primary files for this slice
+- `src/core/b2-ready-settlement.js`
 - `src/content/trusted-transition-core.js`
 - `src/extension/authority-client.js`
 - `src/extension/authority-protocol.js`
@@ -38,6 +41,8 @@ Do not redesign settled behavior. If implementation exposes a true contradiction
 - `src/extension/native-completion-observer.js`
 - `src/squarecoil/bridge-engine.js`
 - `src/squarecoil/bridge-service.js`
+- `src/popup/popup.js`
+- `popup/popup.html`
 
 Add or modify tests under `tests/b2/` and `tests/b2-integration/` as needed.
 
@@ -60,6 +65,8 @@ npm run check:b2-transition
 
 `check:b2-transition` runs the full build/unit/integration/validation path, so failures there are release-blocking for this task.
 
+For a final B2 candidate, also build one clean exact package and run `tests/b1-browser/run.js` independently in installed branded Chrome and Edge. Both runs must be acceptance-eligible PASS results against unchanged package/ZIP bytes and the exact candidate source SHA.
+
 Also confirm:
 
 ```bash
@@ -69,7 +76,7 @@ git status --short
 Do not finish with unrelated changes.
 
 ## Acceptance gate for this task
-The accepted migration slice and all existing B1/B2 behavior must remain green. The implementation must cover settled NAT-C01 through NAT-C09, including current fenced OWNER routing after takeover, duplicate/stale/superseded evidence rejection, mandatory post-state verification, verification-only observer hints, no Companion native mutation, and production-shaped Chrome message delivery.
+All accepted B1/B2 behavior must remain green. The implementation must continue to cover MIG-C01 through MIG-C07, NAT-C01 through NAT-C09, and READY-C01 through READY-C04. READY must be derived only from current-generation, exact-acknowledged authority evidence plus aligned trusted-core, migration, and Bridge state. Cached/stale authority, ownership mismatch, incomplete preflight, missing initial OWNER observation, unavailable Bridge, and blocked migration must remain non-READY.
 
 Do not proceed to B3, B4, or B5 in this task.
 
@@ -79,5 +86,8 @@ Do not proceed to B3, B4, or B5 in this task.
 - OWNER performs mandatory fresh verification before any Timer/Ledger mutation.
 - Duplicate, stale-generation, retired-runtime, and genuinely superseded evidence fails closed.
 - Missing native observation reports `VERIFICATION_FALLBACK`, never false `FULL`.
+- OWNER and OBSERVER effective health report READY only when their authority and Bridge roles agree.
+- Popup health uses the final settlement result and explains that incomplete/blocked prerequisites remain degraded.
+- Installed branded Chrome and Edge pass against one exact clean package; dirty development runs are non-acceptance only.
 - Existing accepted migration and B1/B2 behavior remains green.
 - Changes are committed on the provided Codex branch; do not create another branch.

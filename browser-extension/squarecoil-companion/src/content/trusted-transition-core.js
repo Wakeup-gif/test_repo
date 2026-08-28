@@ -36,6 +36,27 @@ function defaultId(prefix) {
   }
 }
 
+function normalizeAuthorityTenure(authority) {
+  const coordinationEpoch = Number.isSafeInteger(authority?.coordinationEpoch) &&
+    authority.coordinationEpoch >= 0
+    ? authority.coordinationEpoch
+    : null;
+  const workerInstanceId = typeof authority?.workerInstanceId === 'string' &&
+    authority.workerInstanceId.trim()
+    ? authority.workerInstanceId.trim()
+    : null;
+  return deepFreeze({ coordinationEpoch, workerInstanceId });
+}
+
+function sameAuthorityTenure(left, right) {
+  return Boolean(
+    left &&
+    right &&
+    left.coordinationEpoch === right.coordinationEpoch &&
+    left.workerInstanceId === right.workerInstanceId
+  );
+}
+
 function createTrustedTransitionCore(options = {}) {
   const authorityClient = options.authorityClient;
   const legacyStorage = options.legacyStorage;
@@ -55,11 +76,14 @@ function createTrustedTransitionCore(options = {}) {
   let preflight = null;
   let authorityDocument = null;
   let authorityOwner = false;
+  let authorityTenure = null;
   let bridge = null;
   let unsubscribe = null;
   let recoveryMode = null;
   let commandQueue = Promise.resolve();
+  let reconciliationQueue = Promise.resolve();
   let prepareDisablePromise = null;
+  let initializationPromise = null;
   let migrationInFlight = false;
   let lastStatus = 'not-initialized';
   let lastError = null;
@@ -116,6 +140,7 @@ function createTrustedTransitionCore(options = {}) {
       status: lastStatus,
       lastError,
       authorityOwner,
+      authorityTenure,
       revision: authorityDocument?.revision ?? null,
       ledgerSegmentCount: Array.isArray(authorityDocument?.ledger) ? authorityDocument.ledger.length : null,
       recoveryMode,
@@ -142,6 +167,12 @@ function createTrustedTransitionCore(options = {}) {
   function serialize(task) {
     const run = commandQueue.then(task, task);
     commandQueue = run.then(() => undefined, () => undefined);
+    return run;
+  }
+
+  function serializeReconciliation(task) {
+    const run = reconciliationQueue.then(task, task);
+    reconciliationQueue = run.then(() => undefined, () => undefined);
     return run;
   }
 
@@ -226,6 +257,10 @@ function createTrustedTransitionCore(options = {}) {
   }
 
   async function resolveMigrationAndBridge() {
+    if (migrationInFlight) {
+      publishStatus('legacy-migration-in-progress');
+      return snapshot();
+    }
     if (preflight && [
       MIGRATION_DISPOSITIONS.SOURCE_CHANGED_AFTER_COMPLETION,
       MIGRATION_DISPOSITIONS.UNAVAILABLE,
@@ -264,12 +299,14 @@ function createTrustedTransitionCore(options = {}) {
       publishStatus(preflight.reason);
       return snapshot();
     }
-    determineRecoveryMode();
     if (!bridge) {
+      // Recovery classification belongs to a fresh Bridge attachment (or an
+      // explicit authority reacquisition), not to ordinary health settlement.
+      determineRecoveryMode();
       bridge = createBridge(bridgeOptions());
-      await bridge.ensure({ owner: authorityOwner });
+      await bridge.ensure({ owner: authorityOwner, authorityTenure });
     } else {
-      await bridge.setOwner(authorityOwner);
+      await bridge.setOwner(authorityOwner, authorityTenure);
     }
     publishStatus(authorityOwner ? 'trusted-core-owner-active' : 'trusted-core-observer-active');
     return snapshot();
@@ -278,56 +315,94 @@ function createTrustedTransitionCore(options = {}) {
   async function ensure(connection = null) {
     if (disposed) throw new Error('trusted-transition-core-disposed');
     if (initialized) return snapshot();
-    unsubscribe = authorityClient.subscribe(event => {
-      if (event?.verificationHint && bridge && authorityOwner && !blocked) {
-        bridge.verifyNow('forwarded-passive-activity-hint').catch(error => publishStatus('bridge-degraded', error));
-        return;
-      }
-      if (event?.nativeEvidence && bridge && authorityOwner && !blocked) {
-        bridge.observeNativeCompletion(event.nativeEvidence).catch(error => publishStatus('bridge-evidence-rejected', error));
-        return;
-      }
-      if (!adopt(event)) return;
-      if (!initialized || disposed) {
-        publishStatus('authority-document-updated');
-        return;
-      }
-      if (migrationInFlight || (!blocked && bridge)) {
-        publishStatus('authority-document-updated');
-        return;
-      }
-      serialize(resolveMigrationAndBridge).catch(error => {
-        blocked = true;
-        publishStatus('legacy-preflight-failed', error);
+    if (initializationPromise) return initializationPromise;
+    const task = (async () => {
+      if (!unsubscribe) unsubscribe = authorityClient.subscribe(event => {
+        if (event?.verificationHint && bridge && authorityOwner && !blocked) {
+          bridge.verifyNow('forwarded-passive-activity-hint').catch(error => publishStatus('bridge-degraded', error));
+          return;
+        }
+        if (event?.nativeEvidence && bridge && authorityOwner && !blocked) {
+          bridge.observeNativeCompletion(event.nativeEvidence).catch(error => publishStatus('bridge-evidence-rejected', error));
+          return;
+        }
+        if (!adopt(event)) return;
+        if (!initialized || initializationPromise || disposed) {
+          publishStatus('authority-document-updated');
+          return;
+        }
+        if (migrationInFlight || (!blocked && bridge)) {
+          publishStatus('authority-document-updated');
+          return;
+        }
+        serializeReconciliation(resolveMigrationAndBridge).catch(error => {
+          blocked = true;
+          publishStatus('legacy-preflight-failed', error);
+        });
       });
-    });
-    const connected = connection || await authorityClient.ensure();
-    adopt(connected?.initialRead);
-    await refreshDocument();
-    const authority = authorityClient.snapshot();
-    authorityOwner = authority.healthy === true && authority.disposition === 'OWNER';
-    initialized = true;
-    return resolveMigrationAndBridge();
+      const connected = connection || await authorityClient.ensure();
+      adopt(connected?.initialRead);
+      await refreshDocument();
+      const authority = authorityClient.snapshot();
+      authorityOwner = authority.healthy === true && authority.disposition === 'OWNER';
+      authorityTenure = normalizeAuthorityTenure(authority);
+      await serializeReconciliation(resolveMigrationAndBridge);
+      initialized = true;
+      try { onStatusChange(snapshot()); } catch (_) {}
+      return snapshot();
+    })();
+    initializationPromise = task;
+    try { return await task; }
+    finally { if (initializationPromise === task) initializationPromise = null; }
   }
 
   async function handleAuthoritySnapshot(authority) {
+    if (initializationPromise) await initializationPromise;
     if (!initialized || disposed) return snapshot();
-    const nextOwner = authority?.healthy === true && authority.disposition === 'OWNER';
-    const acquired = !authorityOwner && nextOwner;
-    authorityOwner = nextOwner;
-    if (blocked || !bridge) {
-      return serialize(async () => {
+    return serializeReconciliation(async () => {
+      const nextOwner = authority?.healthy === true && authority.disposition === 'OWNER';
+      const nextTenure = normalizeAuthorityTenure(authority);
+      const tenureChanged = !sameAuthorityTenure(authorityTenure, nextTenure);
+      const changed = authorityOwner !== nextOwner || tenureChanged;
+      if (!changed) return snapshot();
+      const acquired = !authorityOwner && nextOwner;
+      const ownerTenureChanged = authorityOwner && nextOwner && tenureChanged;
+      authorityOwner = nextOwner;
+      authorityTenure = nextTenure;
+      if (blocked || !bridge) {
         await refreshDocument();
         return resolveMigrationAndBridge();
-      });
-    }
-    if (acquired) {
+      }
+      if (acquired || ownerTenureChanged) {
+        await refreshDocument();
+        determineRecoveryMode(true);
+      }
+      await bridge.setOwner(authorityOwner, authorityTenure);
+      publishStatus(authorityOwner ? 'trusted-core-owner-active' : 'trusted-core-observer-active');
+      return snapshot();
+    });
+  }
+
+  async function settle(connection = null) {
+    if (disposed) throw new Error('trusted-transition-core-disposed');
+    const connected = connection || await authorityClient.ensure();
+    await ensure(connected);
+    return serializeReconciliation(async () => {
+      // The connection read may have waited behind initialization or another
+      // reconciliation.  Re-read inside this critical section so settlement
+      // can never replace a newer subscribed document with that stale value.
       await refreshDocument();
-      determineRecoveryMode(true);
-    }
-    await bridge.setOwner(authorityOwner);
-    publishStatus(authorityOwner ? 'trusted-core-owner-active' : 'trusted-core-observer-active');
-    return snapshot();
+      const authority = authorityClient.snapshot();
+      const nextOwner = authority.healthy === true && authority.disposition === 'OWNER';
+      const nextTenure = normalizeAuthorityTenure(authority);
+      const tenureChanged = !sameAuthorityTenure(authorityTenure, nextTenure);
+      const acquired = !authorityOwner && nextOwner;
+      const ownerTenureChanged = authorityOwner && nextOwner && tenureChanged;
+      authorityOwner = nextOwner;
+      authorityTenure = nextTenure;
+      if (acquired || ownerTenureChanged) determineRecoveryMode(true);
+      return resolveMigrationAndBridge();
+    });
   }
 
   async function verifyNow(trigger = 'manual') {
@@ -405,6 +480,7 @@ function createTrustedTransitionCore(options = {}) {
 
   return Object.freeze({
     ensure,
+    settle,
     handleAuthoritySnapshot,
     verifyNow,
     userCommand,
