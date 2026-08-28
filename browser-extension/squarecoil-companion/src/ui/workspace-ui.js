@@ -1,6 +1,7 @@
 'use strict';
 
 const { TIMER_COMMANDS } = require('../timer/commands');
+const { DATA_COMMANDS } = require('../data/data-safety');
 const {
   MAX_VISIBLE_JOB_TABS,
   THRESHOLD_LABELS,
@@ -20,7 +21,7 @@ const UI_STORAGE_DEFAULTS = Object.freeze({
   b3WorkspaceRevision: 0
 });
 const WORKSPACE_STORAGE_KEYS = new Set(['protoUiHiddenTabs', 'b3WorkspaceOrder', 'b3WorkspaceRevision']);
-const VIEW_IDS = new Set(['main', 'recent', 'overview', 'by-day', 'by-context', 'history', 'context-detail', 'settings']);
+const VIEW_IDS = new Set(['main', 'recent', 'overview', 'by-day', 'by-context', 'history', 'context-detail', 'settings', 'data-tools']);
 const TIMER_ACTIONS = Object.freeze({
   pause: TIMER_COMMANDS.LOCAL_PAUSE,
   resume: TIMER_COMMANDS.RESUME,
@@ -127,6 +128,9 @@ function createWorkspaceUi(options = {}) {
   let selectionSerial = 0;
   let routeProtection = { dirty: false, inProgress: false };
   let draggedContextId = null;
+  let pendingFileMode = null;
+  let pendingImport = null;
+  let dataMessage = null;
 
   function coreHandle() { return getCoreHandle() || null; }
 
@@ -172,6 +176,7 @@ function createWorkspaceUi(options = {}) {
     root.addEventListener('dragstart', onDragStart);
     root.addEventListener('dragover', onDragOver);
     root.addEventListener('drop', onDrop);
+    root.addEventListener('change', onChange);
     return root;
   }
 
@@ -345,9 +350,9 @@ function createWorkspaceUi(options = {}) {
   function recentView(timer) {
     const rows = eligibleRows(timer);
     const workspace = deriveTabWorkspace(rows, { hiddenContextIds: [...hiddenTabs], durableOrder, selectedContextId, operationalContextId: timer.currentContextId });
-    return `<div class="sc-view">${viewHeader('Recent Jobs')}${rows.length ? rows.map(row => {
+    return `<div class="sc-view">${viewHeader('Recent Jobs')}<div class="sc-actions"><button data-action="data-simple" data-data-type="${DATA_COMMANDS.ARCHIVE_ELIGIBLE}">Archive eligible</button><button data-action="data-simple" data-data-type="${DATA_COMMANDS.CLEAR_RECENT}">Clear Recent</button></div><div class="sc-note">Clear Recent only removes inactive jobs from this workspace. It never deletes their Companion history.</div>${rows.length ? rows.map(row => {
       const disposition = workspace.dispositionByContextId[row.contextId] || 'OVERFLOW';
-      return `<div class="sc-row"><div><div class="sc-row-title">${escapeHtml(row.label)}</div><div class="sc-row-meta">Today ${formatDuration(row.todayMs, { compact: true })}${marker(row)} · Total ${formatDuration(row.totalMs, { compact: true })} · ${escapeHtml(statusLabel(row.status))}</div><div class="sc-row-meta">Last seen ${escapeHtml(formatDateTime(row.lastSeenAtMs))} · Last recorded ${escapeHtml(formatDateTime(row.lastRecordedActivityAtMs))} · ${escapeHtml(disposition.toLowerCase())}</div></div><div class="sc-row-actions"><button data-action="select" data-context="${escapeHtml(row.contextId)}">View</button>${disposition !== 'VISIBLE' ? `<button data-action="show-tab" data-context="${escapeHtml(row.contextId)}">Show in Tabs</button>` : ''}${openButton(row, 'Open')}</div></div>`;
+      return `<div class="sc-row"><div><div class="sc-row-title">${escapeHtml(row.label)}</div><div class="sc-row-meta">Today ${formatDuration(row.todayMs, { compact: true })}${marker(row)} · Total ${formatDuration(row.totalMs, { compact: true })} · ${escapeHtml(statusLabel(row.status))}</div><div class="sc-row-meta">Last seen ${escapeHtml(formatDateTime(row.lastSeenAtMs))} · Last recorded ${escapeHtml(formatDateTime(row.lastRecordedActivityAtMs))} · ${escapeHtml(disposition.toLowerCase())}</div></div><div class="sc-row-actions"><button data-action="select" data-context="${escapeHtml(row.contextId)}">View</button><button data-action="data-context" data-data-type="${DATA_COMMANDS.ARCHIVE_CONTEXT}" data-context="${escapeHtml(row.contextId)}" ${row.status !== 'NOT_RUNNING' ? 'disabled' : ''}>Archive</button>${disposition !== 'VISIBLE' ? `<button data-action="show-tab" data-context="${escapeHtml(row.contextId)}">Show in Tabs</button>` : ''}${openButton(row, 'Open')}</div></div>`;
     }).join('') : '<div class="sc-empty">No recent jobs in the workspace.</div>'}</div>`;
   }
 
@@ -379,10 +384,22 @@ function createWorkspaceUi(options = {}) {
   }
 
   function settingsView() {
-    return `<div class="sc-view">${viewHeader('Settings')}<div class="sc-eyebrow">Appearance</div><div class="sc-choice"><button data-action="theme" data-value="light" data-active="${theme === 'light'}">Light</button><button data-action="theme" data-value="dark" data-active="${theme === 'dark'}">Dark</button></div><div class="sc-choice"><button data-action="surface" data-value="solid" data-active="${surface === 'solid'}">Solid</button><button data-action="surface" data-value="glass" data-active="${surface === 'glass'}">Glass</button></div><div class="sc-note">This inherited appearance surface styles only the Companion widget. Full B5 settings are not part of B3.</div><div class="sc-eyebrow" style="margin-top:12px">Data tools</div><div class="sc-note">Archive, delete, CSV restore/export, and full-history wipe remain locked until their mutation safety layer is connected.</div></div>`;
+    return `<div class="sc-view">${viewHeader('Settings')}<div class="sc-eyebrow">Appearance</div><div class="sc-choice"><button data-action="theme" data-value="light" data-active="${theme === 'light'}">Light</button><button data-action="theme" data-value="dark" data-active="${theme === 'dark'}">Dark</button></div><div class="sc-choice"><button data-action="surface" data-value="solid" data-active="${surface === 'solid'}">Solid</button><button data-action="surface" data-value="glass" data-active="${surface === 'glass'}">Glass</button></div><div class="sc-note">This inherited appearance surface styles only the Companion widget. Full B5 settings follow after the B4 data gate.</div><div class="sc-eyebrow" style="margin-top:12px">Data tools</div><div class="sc-nav-grid"><button data-action="view" data-view="data-tools"><strong>Archives &amp; Backup</strong><small>Safe cleanup, backup, restore, and CSV</small></button></div></div>`;
   }
 
-  function bodyMarkup(timer) {
+  function conflictMarkup() {
+    if (!pendingImport?.plan?.conflicts?.length) return '';
+    return `<div class="sc-note"><strong>Import needs review.</strong> Nothing has been written.</div>${pendingImport.plan.conflicts.map(conflict => `<div class="sc-row"><div><div class="sc-row-title">${escapeHtml(conflict.code)}</div><div class="sc-row-meta">${escapeHtml(conflict.contextId || '')}${conflict.incomingSegmentId ? ` · incoming ${escapeHtml(conflict.incomingSegmentId)}` : ''}</div></div>${conflict.resolvable ? `<div class="sc-row-actions"><button data-action="resolve-conflict" data-conflict="${escapeHtml(conflict.id)}" data-resolution="KEEP_CURRENT">Keep Current</button><button data-action="resolve-conflict" data-conflict="${escapeHtml(conflict.id)}" data-resolution="USE_INCOMING">Use Incoming</button></div>` : '<span class="sc-status" data-tone="danger">Must fix file</span>'}</div>`).join('')}`;
+  }
+
+  function dataToolsView(core) {
+    const data = core?.data;
+    const archived = data?.archivedRows || [];
+    const readiness = data ? (data.quiescent ? 'Idle · global destructive operations available' : 'Timer/recovery state is not quiescent · Replace and Wipe are blocked') : 'Data safety read model unavailable';
+    return `<div class="sc-view">${viewHeader('Archives & Backup', 'settings')}${dataMessage ? `<div class="sc-note">${escapeHtml(dataMessage)}</div>` : ''}<div class="sc-eyebrow">Portable files</div><div class="sc-actions"><button data-action="data-export" data-export="FULL_BACKUP">Full Backup JSON</button><button data-action="data-export" data-export="HISTORY_CSV">History CSV</button><button data-action="data-export" data-export="TIME_REPORT_CSV">Time Report CSV</button></div><div class="sc-actions"><button data-action="pick-file" data-file-mode="BACKUP_MERGE">Restore Backup · Merge</button><button data-action="pick-file" data-file-mode="BACKUP_REPLACE" ${data?.quiescent ? '' : 'disabled'}>Restore Backup · Replace</button><button data-action="pick-file" data-file-mode="HISTORY_CSV">Import History CSV</button></div><input data-sc-data-file type="file" accept=".json,.csv,application/json,text/csv" hidden><div class="sc-note">Full Backup is disaster recovery. History CSV is portable finalized history. Time Report CSV is reporting-only and cannot be imported.</div>${conflictMarkup()}<div class="sc-eyebrow" style="margin-top:12px">Archived contexts</div>${archived.length ? archived.map(row => `<div class="sc-row"><div><div class="sc-row-title">${escapeHtml(row.label)}</div><div class="sc-row-meta">Total ${formatDuration(row.totalMs, { compact: true })} · archived ${escapeHtml(formatDateTime(row.archivedAtMs))}</div></div><div class="sc-row-actions"><button data-action="data-context" data-data-type="${DATA_COMMANDS.RESTORE_ARCHIVED}" data-context="${escapeHtml(row.contextId)}">Restore</button><button data-action="data-context" data-data-type="${DATA_COMMANDS.DELETE_CONTEXT}" data-context="${escapeHtml(row.contextId)}" data-label="${escapeHtml(row.label)}" ${row.protected ? 'disabled' : ''}>Delete Data</button></div></div>`).join('') : '<div class="sc-empty">No archived Contexts.</div>'}<div class="sc-eyebrow" style="margin-top:12px">High-impact cleanup</div><div class="sc-actions"><button data-action="data-simple" data-data-type="${DATA_COMMANDS.DELETE_ALL_ARCHIVED}" ${archived.length ? '' : 'disabled'}>Delete All Archived Data</button><button data-action="data-simple" data-data-type="${DATA_COMMANDS.WIPE_HISTORY}" ${data?.quiescent ? '' : 'disabled'}>Wipe All Time History</button></div><div class="sc-note">${escapeHtml(readiness)}. These tools only affect Companion data; SquareCoil official time is never changed.</div></div>`;
+  }
+
+  function bodyMarkup(timer, core) {
     if (!timer) return '<div class="sc-view"><div class="sc-empty">Connecting to the trusted Companion core…</div></div>';
     if (view === 'recent') return recentView(timer);
     if (view === 'overview') return overviewView(timer);
@@ -391,13 +408,14 @@ function createWorkspaceUi(options = {}) {
     if (view === 'history') return historyView(timer);
     if (view === 'context-detail') return contextDetailView(timer);
     if (view === 'settings') return settingsView();
+    if (view === 'data-tools') return dataToolsView(core);
     return mainView(timer);
   }
 
   function render({ allowInteractionDeferral = false } = {}) {
     if (disposed) return;
     const target = mountRoot(); if (!target) return;
-    if (allowInteractionDeferral && (collapsed || draggedContextId || target.querySelector?.('button:hover, input:hover, input:focus, button:focus-visible'))) return;
+    if (allowInteractionDeferral && (collapsed || draggedContextId || pendingFileMode || target.querySelector?.('button:hover, input:hover, input:focus, button:focus-visible'))) return;
     const previousScroll = target.querySelector?.('.sc-content')?.scrollTop || 0;
     const core = readCoreSnapshot();
     const timer = core?.timer || null;
@@ -408,7 +426,7 @@ function createWorkspaceUi(options = {}) {
     target.dataset.workspaceState = snapshotStale ? 'stale' : timer ? 'loaded' : 'loading';
     const status = core?.blocked ? 'Blocked by legacy data' : core?.status ? String(core.status).replace(/-/g, ' ') : 'Connecting';
     const basis = timer?.timeBasis?.disclosed ? timer.timeBasis.label : timer?.workdayZone || 'waiting for time basis';
-    target.innerHTML = `${styleBlock()}<div class="sc-proto-shell"><div class="sc-proto-topbar"><div class="sc-proto-brand"><strong>SquareCoil Companion</strong><small>B3 canonical workspace</small></div><span class="sc-proto-lifecycle" data-sc-status>${escapeHtml(status)}</span><button class="sc-icon-btn" data-action="sync" aria-label="Sync">↻</button><button class="sc-icon-btn" data-action="collapse" aria-label="${collapsed ? 'Expand' : 'Collapse'}">${collapsed ? '▣' : '–'}</button></div>${timer ? tabMarkup(timer) : ''}<div class="sc-content">${snapshotStale ? '<div class="sc-stale">Showing the last trusted revision while the workspace revalidates.</div>' : ''}${bodyMarkup(timer)}</div>${errorMessage ? `<div class="sc-error">${escapeHtml(errorMessage)}</div>` : ''}<div class="sc-foot">Revision ${timer?.revision ?? '—'} · preference ${timer?.sourcePreferenceRevision ?? '—'} · ${escapeHtml(basis)}</div></div>`;
+    target.innerHTML = `${styleBlock()}<div class="sc-proto-shell"><div class="sc-proto-topbar"><div class="sc-proto-brand"><strong>SquareCoil Companion</strong><small>B4 data safety</small></div><span class="sc-proto-lifecycle" data-sc-status>${escapeHtml(status)}</span><button class="sc-icon-btn" data-action="sync" aria-label="Sync">↻</button><button class="sc-icon-btn" data-action="collapse" aria-label="${collapsed ? 'Expand' : 'Collapse'}">${collapsed ? '▣' : '–'}</button></div>${timer ? tabMarkup(timer) : ''}<div class="sc-content">${snapshotStale ? '<div class="sc-stale">Showing the last trusted revision while the workspace revalidates.</div>' : ''}${bodyMarkup(timer, core)}</div>${errorMessage ? `<div class="sc-error">${escapeHtml(errorMessage)}</div>` : ''}<div class="sc-foot">Revision ${timer?.revision ?? '—'} · preference ${timer?.sourcePreferenceRevision ?? '—'} · ${escapeHtml(basis)}</div></div>`;
     const content = target.querySelector?.('.sc-content'); if (content) content.scrollTop = previousScroll;
   }
 
@@ -438,6 +456,117 @@ function createWorkspaceUi(options = {}) {
     savePreferences();
   }
 
+  function workspaceData() {
+    return {
+      workspace: { order: [...durableOrder], hiddenContextIds: [...hiddenTabs] },
+      preferences: { theme, surface }
+    };
+  }
+
+  function downloadArtifact(kind) {
+    const handle = coreHandle();
+    if (!handle || typeof handle.dataExport !== 'function') throw new Error('Trusted data export is not available yet.');
+    const exportedAtMs = Date.now();
+    const result = handle.dataExport(kind, {
+      ...workspaceData(),
+      exportedAtMs,
+      backupId: `backup-${exportedAtMs}-${Math.random().toString(36).slice(2)}`,
+      sourcePlatform: navigator.userAgent || 'browser-extension'
+    });
+    const isBackup = kind === 'FULL_BACKUP';
+    const text = isBackup ? `${JSON.stringify(result, null, 2)}\n` : result.text;
+    const filename = isBackup
+      ? `squarecoil-companion-backup-${new Date(exportedAtMs).toISOString().slice(0, 10)}.json`
+      : result.filename;
+    const blob = new Blob([text], { type: isBackup ? 'application/json;charset=utf-8' : result.mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+    dataMessage = `${isBackup ? 'Full Backup' : kind === 'HISTORY_CSV' ? 'History CSV' : 'Time Report CSV'} prepared from revision ${result.snapshotRevision ?? lastGoodCore?.timer?.revision ?? '—'}.`;
+    return result;
+  }
+
+  function destructiveDescription(type, values = {}) {
+    if (type === DATA_COMMANDS.DELETE_CONTEXT) return `Permanently delete ${values.label || values.contextId} Companion history, time, and Context metadata? SquareCoil official time is unaffected.`;
+    if (type === DATA_COMMANDS.DELETE_ALL_ARCHIVED) return 'Permanently delete every archived Companion Context and its recorded time? Non-archived data and SquareCoil official time are unaffected.';
+    if (type === DATA_COMMANDS.WIPE_HISTORY) return 'Permanently remove all Companion-recorded time history? Workspace Contexts remain and SquareCoil official time is unaffected.';
+    if (type === DATA_COMMANDS.RESTORE_BACKUP && values.mode === 'REPLACE') return 'Replace the current restorable Companion dataset with this validated backup? No live timer state will be restored.';
+    return null;
+  }
+
+  async function commitDataPlan(plan, values = {}) {
+    if (plan.blocked) {
+      errorMessage = `Nothing was changed. ${plan.conflicts.length} conflict${plan.conflicts.length === 1 ? '' : 's'} require review.`;
+      render();
+      return false;
+    }
+    const handle = coreHandle();
+    if (!handle || typeof handle.commitDataAction !== 'function') throw new Error('Trusted data mutation is not available yet.');
+    const confirmations = [...plan.requiredConfirmations];
+    let preBackupDisposition;
+    const globalDestructive = confirmations.some(token => ['DELETE_ALL_ARCHIVED', 'WIPE_ALL_TIME_HISTORY', 'RESTORE_REPLACE'].includes(token));
+    if (globalDestructive) {
+      const createBackup = window.confirm('Create a Full Backup before continuing? Choose OK to download it now, or Cancel to review the destructive action without a backup.');
+      if (createBackup) {
+        downloadArtifact('FULL_BACKUP');
+        preBackupDisposition = 'CREATED';
+      } else preBackupDisposition = 'DECLINED';
+    }
+    const description = values.description || (confirmations.includes('USE_INCOMING')
+      ? 'Use incoming data for the selected conflicts? Existing Companion historical records will be replaced and all overlap rules will be revalidated.'
+      : null);
+    if ((confirmations.length || values.confirm === true) && !window.confirm(description || 'Commit this Companion data operation?')) return false;
+    await handle.commitDataAction(plan.planId, { confirmationTokens: confirmations, preBackupDisposition });
+    pendingImport = null;
+    dataMessage = `Completed ${plan.operation.replace(/^DATA_/, '').replace(/_/g, ' ').toLowerCase()} at one authoritative revision.`;
+    return true;
+  }
+
+  async function runDataAction(type, values = {}) {
+    const handle = coreHandle();
+    if (!handle || typeof handle.stageDataAction !== 'function') throw new Error('Trusted data staging is not available yet.');
+    const request = { ...workspaceData(), ...values };
+    if ([DATA_COMMANDS.ARCHIVE_CONTEXT, DATA_COMMANDS.ARCHIVE_ELIGIBLE].includes(type)) request.atMs = Date.now();
+    const plan = await handle.stageDataAction(type, request);
+    await commitDataPlan(plan, {
+      confirm: type === DATA_COMMANDS.DELETE_CONTEXT,
+      description: destructiveDescription(type, values)
+    });
+  }
+
+  async function stageImport(type, values) {
+    const handle = coreHandle();
+    if (!handle || typeof handle.stageDataAction !== 'function') throw new Error('Trusted data staging is not available yet.');
+    const request = { ...workspaceData(), ...values };
+    const plan = await handle.stageDataAction(type, request);
+    pendingImport = { type, values: request, plan, resolutions: { ...(request.resolutions || {}) } };
+    if (plan.blocked) {
+      dataMessage = 'Import is staged only. Resolve every listed conflict before any write can occur.';
+      render();
+      return;
+    }
+    await commitDataPlan(plan, {
+      confirm: true,
+      description: destructiveDescription(type, values) || `Import ${plan.summary.segmentsAdded || 0} new finalized Segment${plan.summary.segmentsAdded === 1 ? '' : 's'}? Duplicate records add no time.`
+    });
+  }
+
+  async function withBusy(label, task) {
+    if (busyAction) return;
+    busyAction = label;
+    errorMessage = null;
+    dataMessage = null;
+    render();
+    try { await task(); }
+    catch (error) { errorMessage = String(error?.message || error); }
+    finally { busyAction = null; render(); }
+  }
+
   function onClick(event) {
     const button = event.target.closest?.('[data-action]'); if (!button || !root?.contains(button)) return;
     const action = button.dataset.action;
@@ -453,7 +582,47 @@ function createWorkspaceUi(options = {}) {
     if (action === 'open-job') { if (event.isTrusted === true) openJob(button.dataset.project); return; }
     if (action === 'theme') { theme = button.dataset.value === 'dark' ? 'dark' : 'light'; savePreferences(); render(); return; }
     if (action === 'surface') { surface = button.dataset.value === 'glass' ? 'glass' : 'solid'; savePreferences(); render(); return; }
+    if (action === 'data-export' && event.isTrusted === true) {
+      withBusy('data-export', async () => { downloadArtifact(button.dataset.export); });
+      return;
+    }
+    if (action === 'data-context' && event.isTrusted === true) {
+      const type = button.dataset.dataType;
+      withBusy('data-context', () => runDataAction(type, { contextId: button.dataset.context, label: button.dataset.label || button.dataset.context }));
+      return;
+    }
+    if (action === 'data-simple' && event.isTrusted === true) {
+      const type = button.dataset.dataType;
+      withBusy('data-simple', () => runDataAction(type, { description: destructiveDescription(type) }));
+      return;
+    }
+    if (action === 'pick-file' && event.isTrusted === true) {
+      pendingFileMode = button.dataset.fileMode;
+      root.querySelector?.('[data-sc-data-file]')?.click();
+      return;
+    }
+    if (action === 'resolve-conflict' && event.isTrusted === true && pendingImport) {
+      pendingImport.resolutions[button.dataset.conflict] = button.dataset.resolution;
+      withBusy('conflict-resolution', async () => {
+        await stageImport(pendingImport.type, { ...pendingImport.values, resolutions: pendingImport.resolutions });
+      });
+      return;
+    }
     if (action === 'sync' && event.isTrusted === true) { const handle = coreHandle(); if (handle && typeof handle.syncBridge === 'function') handle.syncBridge().then(render, error => { errorMessage = String(error?.message || error); render(); }); }
+  }
+
+  function onChange(event) {
+    const input = event.target?.closest?.('[data-sc-data-file]');
+    if (!input || !root?.contains(input) || !input.files?.[0] || !pendingFileMode) return;
+    const file = input.files[0];
+    const mode = pendingFileMode;
+    pendingFileMode = null;
+    withBusy('data-import', async () => {
+      const text = await file.text();
+      if (mode === 'HISTORY_CSV') await stageImport(DATA_COMMANDS.IMPORT_HISTORY_CSV, { input: text });
+      else await stageImport(DATA_COMMANDS.RESTORE_BACKUP, { input: text, mode: mode === 'BACKUP_REPLACE' ? 'REPLACE' : 'MERGE', importWorkspace: true, importPreferences: true });
+      input.value = '';
+    });
   }
 
   function onDoubleClick(event) {
@@ -514,6 +683,7 @@ function createWorkspaceUi(options = {}) {
       root.removeEventListener('click', onClick); root.removeEventListener('dblclick', onDoubleClick);
       root.removeEventListener('submit', onSubmit); root.removeEventListener('dragstart', onDragStart);
       root.removeEventListener('dragover', onDragOver); root.removeEventListener('drop', onDrop);
+      root.removeEventListener('change', onChange);
     }
     root = null;
   }

@@ -19,9 +19,9 @@ function assert(condition, message) {
 assert(manifest.manifest_version === 3, 'manifest_version must be 3');
 assert(manifest.version === release.latestVersion, `manifest version ${manifest.version} must match release metadata ${release.latestVersion}`);
 assert(manifest.version === packageMetadata.version, `manifest version ${manifest.version} must match package metadata ${packageMetadata.version}`);
-assert(BUILD_ID === 'rebuild-b3-canonical-workspace', 'B3 build ID must identify the canonical workspace gate');
-assert(BUILD_STAGE === 'B3', 'B3 workspace stage must remain explicit');
-assert(JSON.stringify(manifest.permissions || []) === JSON.stringify(['storage', 'scripting', 'webRequest']), 'B3 permissions must preserve storage + scripting + passive webRequest observation only');
+assert(BUILD_ID === 'rebuild-b4-data-safety', 'B4 build ID must identify the data-safety gate');
+assert(BUILD_STAGE === 'B4', 'B4 data-safety stage must remain explicit');
+assert(JSON.stringify(manifest.permissions || []) === JSON.stringify(['storage', 'scripting', 'webRequest']), 'B4 permissions must preserve storage + scripting + passive webRequest observation only');
 assert(JSON.stringify(manifest.host_permissions || []) === JSON.stringify(['https://ussignandmill.squarecoil.net/*']), 'Rebuild host permission must remain limited to the exact SquareCoil tenant');
 assert(JSON.stringify(Object.keys(manifest.background || {}).sort()) === JSON.stringify(['service_worker']), 'B1 background policy must contain only the service worker entry');
 assert(manifest.background?.service_worker === 'dist/background.js', 'B1 manifest must use generated dist/background.js');
@@ -139,6 +139,14 @@ const b3WorkspaceRequired = [
   'tests/b3-integration/workspace.integration.test.js'
 ];
 
+const b4DataSafetyRequired = [
+  'src/data/data-safety.js',
+  'src/data/data-safety-command.js',
+  'tests/b4/data-safety.test.js',
+  'tests/b4/workspace-data-ui.test.js',
+  'tests/b4-integration/data-safety.integration.test.js'
+];
+
 for (const file of required) {
   assert(fs.existsSync(path.join(root, file)), `Missing B1 file: ${file}`);
 }
@@ -150,6 +158,9 @@ for (const file of b2TransitionRequired) {
 }
 for (const file of b3WorkspaceRequired) {
   assert(fs.existsSync(path.join(root, file)), `Missing B3 canonical workspace file: ${file}`);
+}
+for (const file of b4DataSafetyRequired) {
+  assert(fs.existsSync(path.join(root, file)), `Missing B4 data-safety file: ${file}`);
 }
 
 const background = fs.readFileSync(path.join(root, 'dist/background.js'), 'utf8');
@@ -182,9 +193,9 @@ for (const reference of manifestReferences) {
 }
 
 const popupHtml = fs.readFileSync(path.join(root, 'popup/popup.html'), 'utf8');
-assert(popupHtml.includes('B3 · Canonical workspace'), 'Popup fallback stage must identify the B3 canonical workspace runtime');
+assert(popupHtml.includes('B4 · Data safety'), 'Popup fallback stage must identify the B4 data-safety runtime');
 assert(popupHtml.includes('READY still requires lifecycle, fenced authority, migration, trusted core, and Bridge settlement.'), 'Popup must preserve the fail-closed READY settlement prerequisites');
-assert(popupHtml.includes('cannot manufacture READY or write timing'), 'Popup must state that B3 presentation cannot manufacture runtime readiness or timing');
+assert(popupHtml.includes('cannot manufacture READY, restore live timer state, or modify SquareCoil official data'), 'Popup must state the B4 fail-closed data boundary');
 assert(!popupHtml.includes('B1 intentionally stays degraded'), 'Popup must not retain the obsolete pre-B2 degraded explanation');
 assert(!/<base\b/i.test(popupHtml), 'B1 popup must not redefine its local base URL');
 assert(!/<(?:iframe|object|embed)\b/i.test(popupHtml), 'B1 popup must not embed executable documents or plugins');
@@ -210,7 +221,7 @@ function listJavaScriptFiles(directory) {
   return files;
 }
 
-const fixtureDirectories = ['tests/b1', 'tests/b1-integration', 'tests/b1-browser', 'tests/b2', 'tests/b2-integration', 'tests/b3', 'tests/b3-integration'];
+const fixtureDirectories = ['tests/b1', 'tests/b1-integration', 'tests/b1-browser', 'tests/b2', 'tests/b2-integration', 'tests/b3', 'tests/b3-integration', 'tests/b4', 'tests/b4-integration'];
 const fixtureFiles = fixtureDirectories.flatMap(directory => listJavaScriptFiles(path.join(root, directory)));
 for (const file of fixtureFiles) {
   const source = fs.readFileSync(file, 'utf8');
@@ -273,6 +284,9 @@ for (const fixtureId of Array.from({ length: 3 }, (_, index) => `B2-READY-${Stri
 }
 for (const fixtureId of Array.from({ length: 4 }, (_, index) => `B3-WORKSPACE-${String(index + 1).padStart(3, '0')}`)) {
   assert(browserFixtureSource.includes(fixtureId), `B3 browser fixture register is missing ${fixtureId}`);
+}
+for (const fixtureId of Array.from({ length: 4 }, (_, index) => `B4-DATA-${String(index + 1).padStart(3, '0')}`)) {
+  assert(browserFixtureSource.includes(fixtureId), `B4 browser fixture register is missing ${fixtureId}`);
 }
 
 const b2FixtureFiles = fixtureFiles;
@@ -351,6 +365,34 @@ for (const family of ['UT-B3-READ-', 'UT-B3-WORKSPACE-', 'UT-B3-UI-', 'IT-B3-WOR
   assert([...b3FixtureIds.keys()].some(fixtureId => fixtureId.startsWith(family)), `B3 fixture register is missing family ${family}*`);
 }
 
+const b4FixtureFiles = fixtureFiles.filter(file => {
+  const relative = path.relative(root, file).split(path.sep).join('/');
+  return relative.startsWith('tests/b4/') || relative.startsWith('tests/b4-integration/');
+});
+const b4FixtureIdPattern = /\b(?:UT|IT)-B4-(?:[A-Z][A-Z0-9]*-)+\d{3}\b/g;
+const b4FixtureIds = new Map();
+let b4TestCount = 0;
+for (const file of b4FixtureFiles) {
+  const source = fs.readFileSync(file, 'utf8');
+  const relative = path.relative(root, file).split(path.sep).join('/');
+  const titles = [...source.matchAll(/\btest\s*\(\s*(['"])([^'"\r\n]+)\1/g)].map(match => match[2]);
+  for (const title of titles) {
+    const matches = [...title.matchAll(b4FixtureIdPattern)].map(match => match[0]);
+    assert(matches.length === 1 && title.startsWith(matches[0]), `B4 test title must start with exactly one stable fixture ID in ${relative}: ${title}`);
+    b4TestCount += 1;
+    const owners = b4FixtureIds.get(matches[0]) || [];
+    owners.push(relative);
+    b4FixtureIds.set(matches[0], owners);
+  }
+}
+for (const [fixtureId, owners] of b4FixtureIds) {
+  assert(owners.length === 1, `B4 fixture ID must be unique: ${fixtureId} appears in ${owners.join(', ')}`);
+}
+assert(b4FixtureIds.size === b4TestCount, `Every B4 test must own exactly one stable fixture ID (${b4FixtureIds.size} IDs for ${b4TestCount} tests)`);
+for (const family of ['UT-B4-DATA-', 'UT-B4-BACKUP-', 'UT-B4-CSV-', 'UT-B4-UI-', 'IT-B4-DATA-']) {
+  assert([...b4FixtureIds.keys()].some(fixtureId => fixtureId.startsWith(family)), `B4 fixture register is missing family ${family}*`);
+}
+
 const sourceFiles = listJavaScriptFiles(path.join(root, 'src'));
 const authorityStorageKey = 'squarecoilCompanionB2AuthorityV1';
 const authorityStorageKeyOwners = sourceFiles.filter(file => fs.readFileSync(file, 'utf8').includes(authorityStorageKey));
@@ -385,7 +427,10 @@ assert(background.includes('coordination-not-current'), 'Final B2 worker must fa
 assert(contentBundle.includes('B2_SETTLEMENT_ACK') && contentBundle.includes('AUTHORITY_MESSAGE_PREFIX'), 'Final B2 content controller must package the exact settlement acknowledgment');
 assert(contentBundle.includes('VERIFICATION_FALLBACK'), 'B2-C must report reduced capability when completion observation is unavailable');
 assert(contentBundle.includes('src/workspace/model.js'), 'B3 isolated bundle must package canonical workspace semantics');
-assert(contentBundle.includes('B3 canonical workspace'), 'B3 isolated bundle must package the canonical workspace surface');
+assert(contentBundle.includes('src/data/data-safety.js'), 'B4 isolated bundle must package pure data-safety staging and export semantics');
+assert(contentBundle.includes('B4 data safety'), 'B4 isolated bundle must package the data-safety workspace surface');
+assert(!contentBundle.includes('src/data/data-safety-command.js'), 'The isolated content bundle must not package the authoritative B4 data writer');
+assert(background.includes('src/data/data-safety-command.js'), 'The worker bundle must package the authoritative B4 data writer');
 assert(!/action=(?:2|3|4)(?:\D|$)/.test(contentBundle), 'B2.2 packaged Bridge must not issue native SquareCoil mutation actions');
 assert(!/localStorage\.(?:setItem|removeItem|clear)\s*\(/.test(contentBundle), 'B2.2 legacy preflight must remain read-only');
 assert(!contentBundle.includes('squarecoil-companion-authority-v1'), 'The isolated content bundle must not expose the retired page authority channel');
@@ -395,7 +440,7 @@ const serializedManifest = JSON.stringify(manifest);
 assert(!serializedManifest.includes('raw.githubusercontent.com'), 'B1 manifest should not request raw GitHub host permission');
 assert(!serializedManifest.includes('i.imgur.com'), 'B1 manifest should not request image host permission');
 
-console.log(`B3 canonical workspace validation passed for SquareCoil Companion v${manifest.version}`);
+console.log(`B4 data-safety validation passed for SquareCoil Companion v${manifest.version}`);
 console.log(`Canonical build identity: ${BUILD_ID} (${BUILD_STAGE}).`);
 console.log('The worker owns one fenced authority kernel; only the isolated content controller owns its versioned client transport.');
-console.log(`Fixture register validated: ${unitFixtureMappings.length} B1 A2 mappings, ${requiredIntegrationFixtures.length} B1 A3 IDs, ${requiredBrowserFixtures.length} B1 A4 IDs, 2 B2.1 A4 IDs, 5 B2.2 A4 IDs, 3 final-B2 READY A4 IDs, 4 B3 workspace A4 IDs, ${b2FixtureIds.size} B2 stable IDs, and ${b3FixtureIds.size} B3 stable IDs; no skipped/todo/focused fixtures.`);
+console.log(`Fixture register validated: ${unitFixtureMappings.length} B1 A2 mappings, ${requiredIntegrationFixtures.length} B1 A3 IDs, ${requiredBrowserFixtures.length} B1 A4 IDs, 2 B2.1 A4 IDs, 5 B2.2 A4 IDs, 3 final-B2 READY A4 IDs, 4 B3 workspace A4 IDs, 4 B4 data A4 IDs, ${b2FixtureIds.size} B2 stable IDs, ${b3FixtureIds.size} B3 stable IDs, and ${b4FixtureIds.size} B4 stable IDs; no skipped/todo/focused fixtures.`);

@@ -297,10 +297,14 @@ test('UT-B2-PROTOUI-010 a real operational Context change exits a nested menu an
   h.ui.teardown();
 });
 
-test('UT-B2-PROTOUI-011 destructive data functions remain visibly locked and have no callable UI action in the prototype', async () => {
+test('UT-B2-PROTOUI-011 B4 data controls cannot bypass an unavailable trusted data authority', async () => {
   const h = await createHarness();
   h.click({ action: 'view', view: 'settings' });
-  assert.match(h.root.innerHTML, /Archive, delete, CSV restore\/export, and full-history wipe remain locked/);
-  assert.doesNotMatch(h.root.innerHTML, /data-action="(?:archive|delete|restore|wipe|export)"/);
+  assert.match(h.root.innerHTML, /Archives &amp; Backup/);
+  h.click({ action: 'view', view: 'data-tools' });
+  h.click({ action: 'data-simple', dataType: 'DATA_WIPE_HISTORY' }, true);
+  await h.drain();
+  assert.match(h.root.innerHTML, /Trusted data staging is not available yet/);
+  assert.equal(h.timerActions.length, 0);
   h.ui.teardown();
 });

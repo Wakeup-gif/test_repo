@@ -6,8 +6,8 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const zlib = require('node:zlib');
 
-const CANONICAL_BUILD_ID = 'rebuild-b3-canonical-workspace';
-const CANONICAL_STAGE = 'B3';
+const CANONICAL_BUILD_ID = 'rebuild-b4-data-safety';
+const CANONICAL_STAGE = 'B4';
 const FIXTURE_ORIGIN = 'https://ussignandmill.squarecoil.net';
 const FIXTURE_PATH = '/__b1_fixture__/a4.html';
 const FRAME_PATH = '/__b1_fixture__/frame.html';
@@ -59,6 +59,12 @@ const REQUIRED_B3_WORKSPACE_A4_FIXTURE_IDS = Object.freeze([
   'B3-WORKSPACE-002',
   'B3-WORKSPACE-003',
   'B3-WORKSPACE-004'
+]);
+const REQUIRED_B4_DATA_A4_FIXTURE_IDS = Object.freeze([
+  'B4-DATA-001',
+  'B4-DATA-002',
+  'B4-DATA-003',
+  'B4-DATA-004'
 ]);
 const REQUIRED_PACKAGE_FILES = Object.freeze([
   'dist/background.js',
@@ -709,6 +715,24 @@ class ContentBridge {
     return this.run(() => `globalThis.__squareCoilCompanionAuthorityHealth.timerAction(${serialized})`);
   }
 
+  async dataExport(kind, values = {}) {
+    const serializedKind = JSON.stringify(kind);
+    const serializedValues = JSON.stringify(values);
+    return this.run(() => `globalThis.__squareCoilCompanionAuthorityHealth.dataExport(${serializedKind}, ${serializedValues})`);
+  }
+
+  async stageDataAction(type, values = {}) {
+    const serializedType = JSON.stringify(type);
+    const serializedValues = JSON.stringify(values);
+    return this.run(() => `globalThis.__squareCoilCompanionAuthorityHealth.stageDataAction(${serializedType}, ${serializedValues})`);
+  }
+
+  async commitDataAction(planId, values = {}) {
+    const serializedPlanId = JSON.stringify(planId);
+    const serializedValues = JSON.stringify(values);
+    return this.run(() => `globalThis.__squareCoilCompanionAuthorityHealth.commitDataAction(${serializedPlanId}, ${serializedValues})`);
+  }
+
   async setLegacyValue(key, value) {
     const serializedKey = JSON.stringify(key);
     const serializedValue = JSON.stringify(value);
@@ -892,6 +916,7 @@ function runB2KernelBrowserCase(cases, family, b2KernelFixtureIds, stableFixture
   for (const fixtureId of stableFixtureIds) {
     if (!REQUIRED_A4_STABLE_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown B1 A4 stable fixture ID: ${fixtureId}`);
   }
+
   for (const fixtureId of extraMetadata.b2ReadyFixtureIds || []) {
     if (!REQUIRED_B2_READY_A4_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown final B2 READY A4 fixture ID: ${fixtureId}`);
   }
@@ -939,6 +964,18 @@ function runB3WorkspaceBrowserCase(cases, family, fixtureIds, slug, name, task) 
   return runCase(cases, `A4-B3-${browserCode}-${fixtureCode}-${slug}`, name, task, {
     b3WorkspaceFixtureIds: fixtureIds,
     b3Scope: 'CANONICAL_TIME_VIEWS_WORKSPACE'
+  });
+}
+
+function runB4DataBrowserCase(cases, family, fixtureIds, slug, name, task) {
+  for (const fixtureId of fixtureIds) {
+    if (!REQUIRED_B4_DATA_A4_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown B4 data A4 fixture ID: ${fixtureId}`);
+  }
+  const browserCode = family === 'chrome' ? 'CH' : 'ED';
+  const fixtureCode = fixtureIds.map(value => value.replace('B4-DATA-', '')).join('-');
+  return runCase(cases, `A4-B4-${browserCode}-${fixtureCode}-${slug}`, name, task, {
+    b4DataFixtureIds: fixtureIds,
+    b4Scope: 'DATA_SAFETY_BACKUP_RESTORE_CSV'
   });
 }
 
@@ -1096,7 +1133,15 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
     const setupPage = await context.newPage();
     try {
       await setupPage.goto(`chrome-extension://${extensionId}/popup/popup.html`, { waitUntil: 'domcontentloaded', timeout: options.timeoutMs });
+      await waitFor(async () => setupPage.evaluate(async () => {
+        const value = await chrome.storage.local.get('timerEnabled');
+        return typeof value.timerEnabled === 'boolean' ? value.timerEnabled : null;
+      }), 'the installation default setting', options.timeoutMs);
       await setupPage.evaluate(() => chrome.storage.local.set({ timerEnabled: false }));
+      await waitFor(async () => setupPage.evaluate(async () => {
+        const value = await chrome.storage.local.get('timerEnabled');
+        return value.timerEnabled === false ? true : null;
+      }), 'the disabled setup setting', options.timeoutMs);
     } finally {
       await setupPage.close().catch(() => {});
     }
@@ -1437,7 +1482,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
             mainText: root.querySelector('.sc-content')?.textContent || ''
           } : null;
         }, ROOT_ID), 'B3 canonical workspace initial render', options.timeoutMs);
-        assert(main.brand === 'B3 canonical workspace', 'B3 workspace brand was not canonical', main);
+        assert(main.brand === 'B4 data safety', 'B4 workspace brand did not identify the active data-safety gate', main);
         assert(main.selectedContextId === 'job:260701', 'Initial B3 selection did not reflect current Context truth', main);
         assert(main.selectedAria.includes('Today') && main.selectedAria.includes('timer limit') && main.selectedAria.includes('Running'), 'Compact tab omitted Today, threshold, or operational semantics', main);
 
@@ -1455,6 +1500,41 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
         assert(after.revision === before.revision && after.ledgerSegmentCount === before.ledgerSegmentCount, 'B3 view navigation mutated authoritative Timer/Ledger state', { before, after });
         assert(result.network.nativeMutationAttempts.length === 0, 'B3 view navigation attempted a native SquareCoil mutation', result.network.nativeMutationAttempts);
         return { beforeRevision: before.revision, afterRevision: after.revision, main, overview, history };
+      }
+    );
+
+    await runB4DataBrowserCase(
+      result.cases,
+      family,
+      ['B4-DATA-001'],
+      'PRODUCTS-SURFACE',
+      'B4 data products expose one count-consistent revision without live-state authority',
+      async () => {
+        const before = await bridge.coreSnapshot();
+        await page.locator(`#${ROOT_ID} [data-action="view"][data-view="settings"]`).click();
+        await page.locator(`#${ROOT_ID} [data-action="view"][data-view="data-tools"]`).click();
+        const surface = await page.locator(`#${ROOT_ID} .sc-content`).innerText();
+        assert(surface.includes('Full Backup JSON') && surface.includes('History CSV') && surface.includes('Time Report CSV'), 'B4 data product surface was incomplete', surface);
+        assert(surface.includes('SquareCoil official time is never changed'), 'B4 data surface omitted its native-data boundary', surface);
+        const backup = await bridge.dataExport('FULL_BACKUP', {
+          backupId: `a4-b4-${family}-backup`,
+          exportedAtMs: Date.now(),
+          sourcePlatform: `${family}-a4`
+        });
+        const history = await bridge.dataExport('HISTORY_CSV');
+        const report = await bridge.dataExport('TIME_REPORT_CSV');
+        await page.locator(`#${ROOT_ID} [data-action="view"][data-view="settings"]`).click();
+        await page.locator(`#${ROOT_ID} [data-action="view"][data-view="main"]`).click();
+        assert(backup.format === 'squarecoil-companion-backup' && backup.schemaVersion === 1, 'Full Backup identity was invalid', backup);
+        assert(backup.snapshotRevision === before.revision, 'Full Backup was not captured from the observed authoritative revision', { before, backup });
+        assert(backup.recordCounts.contexts === backup.contexts.length && backup.recordCounts.ledgerSegments === backup.ledgerSegments.length && backup.recordCounts.recoveryEvidence === backup.recoveryEvidence.length, 'Full Backup record counts were inconsistent', backup.recordCounts);
+        assert(!Object.hasOwn(backup, 'timer') && !Object.hasOwn(backup, 'lease') && !Object.hasOwn(backup, 'bridge'), 'Full Backup exposed live authority state', Object.keys(backup));
+        assert(history.filename.includes('squarecoil-companion-history-') && history.text.includes('schema_version,record_type'), 'History CSV was not canonical and importable', history);
+        assert(report.filename.includes('squarecoil-companion-time-report-') && report.text.includes('schema,Date,Job Number'), 'Time Report CSV was not identified as reporting output', report);
+        const after = await bridge.coreSnapshot();
+        assert(after.revision === before.revision && after.ledgerSegmentCount === before.ledgerSegmentCount, 'B4 exports mutated Timer/Ledger authority', { before, after });
+        assert(result.network.nativeMutationAttempts.length === 0, 'B4 exports attempted a native SquareCoil mutation', result.network.nativeMutationAttempts);
+        return { revision: before.revision, counts: backup.recordCounts, surface, historyFilename: history.filename, reportFilename: report.filename };
       }
     );
 
@@ -1505,10 +1585,10 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
             error.details = { popupTarget, popupUrl: popupPage.url(), lastPopupHealth };
             throw error;
           }
-          assert(popupHealth.stage === 'B3 · Canonical workspace', 'Popup stage did not identify the B3 canonical workspace runtime', popupHealth);
+          assert(popupHealth.stage === 'B4 · Data safety', 'Popup stage did not identify the B4 data-safety runtime', popupHealth);
           assert(popupHealth.classification === 'HEALTHY_SAME_BUILD', 'Popup did not display healthy same-build classification', popupHealth);
           assert(popupHealth.reason === 'ready' && popupHealth.healthTone === 'ok', 'Popup did not render positive READY health', popupHealth);
-          assert(popupHealth.explanation.includes('cannot manufacture READY or write timing'), 'Popup did not retain fail-closed B3 settlement guidance', popupHealth);
+          assert(popupHealth.explanation.includes('cannot manufacture READY, restore live timer state, or modify SquareCoil official data'), 'Popup did not retain the fail-closed B4 data boundary', popupHealth);
           return { settledHealth, popupTarget, popupHealth };
         } finally {
           await popupPage.close().catch(() => {});
@@ -1757,6 +1837,79 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
         }
       },
       { b3WorkspaceFixtureIds: ['B3-WORKSPACE-003', 'B3-WORKSPACE-004'] }
+    );
+
+    await runB4DataBrowserCase(
+      result.cases,
+      family,
+      ['B4-DATA-002', 'B4-DATA-003', 'B4-DATA-004'],
+      'ARCHIVE-RESTORE-FAIL-CLOSED',
+      'B4 archive, restore, duplicate merge, and invalid replace preserve authoritative time',
+      async () => {
+        const before = await bridge.coreSnapshot();
+        const jobABefore = before.timer.contextRows.find(row => row.contextId === 'job:260701');
+        assert(jobABefore && jobABefore.status === 'NOT_RUNNING', 'B4 archive fixture did not have an inactive Context', before.timer.contextRows);
+
+        let malformedError = null;
+        try {
+          await bridge.stageDataAction('DATA_RESTORE_BACKUP', { input: '{not-json', mode: 'MERGE' });
+        } catch (error) { malformedError = String(error?.message || error); }
+        const afterMalformed = await bridge.coreSnapshot();
+        assert(malformedError && /json|backup/i.test(malformedError), 'Malformed restore did not fail closed', malformedError);
+        assert(afterMalformed.revision === before.revision && afterMalformed.ledgerSegmentCount === before.ledgerSegmentCount, 'Malformed restore changed authoritative state', { before, afterMalformed });
+
+        await page.locator(`#${ROOT_ID} [data-action="view"][data-view="main"]`).click({ force: true });
+        await page.locator(`#${ROOT_ID} [data-action="view"][data-view="recent"]`).click({ force: true });
+        await page.locator(`#${ROOT_ID} [data-action="data-context"][data-data-type="DATA_ARCHIVE_CONTEXT"][data-context="job:260701"]`).click({ force: true });
+        const archived = await waitFor(async () => {
+          const snapshot = await bridge.coreSnapshot();
+          return snapshot?.data?.archivedRows?.some(row => row.contextId === 'job:260701') ? snapshot : null;
+        }, 'B4 archived Context commit', options.timeoutMs);
+        const archivedRow = archived.data.archivedRows.find(row => row.contextId === 'job:260701');
+        assert(archivedRow.totalMs === jobABefore.totalMs, 'Archive changed the Context total', { jobABefore, archivedRow });
+
+        await page.locator(`#${ROOT_ID} [data-action="view"][data-view="main"]`).click({ force: true });
+        await page.locator(`#${ROOT_ID} [data-action="view"][data-view="settings"]`).click({ force: true });
+        await page.locator(`#${ROOT_ID} [data-action="view"][data-view="data-tools"]`).click({ force: true });
+        await page.locator(`#${ROOT_ID} [data-action="data-context"][data-data-type="DATA_RESTORE_ARCHIVED"][data-context="job:260701"]`).click({ force: true });
+        const restored = await waitFor(async () => {
+          const snapshot = await bridge.coreSnapshot();
+          return snapshot?.data?.recentRows?.some(row => row.contextId === 'job:260701') && !snapshot.data.archivedRows.some(row => row.contextId === 'job:260701') ? snapshot : null;
+        }, 'B4 restored Context commit', options.timeoutMs);
+        const restoredRow = restored.data.recentRows.find(row => row.contextId === 'job:260701');
+        assert(restoredRow.totalMs === jobABefore.totalMs, 'Restore changed the Context total', { jobABefore, restoredRow });
+
+        const backup = await bridge.dataExport('FULL_BACKUP', {
+          backupId: `a4-b4-${family}-dedupe`,
+          exportedAtMs: Date.now(),
+          sourcePlatform: `${family}-a4`
+        });
+        const historyCsv = await bridge.dataExport('HISTORY_CSV');
+        const duplicatePlan = await bridge.stageDataAction('DATA_IMPORT_HISTORY_CSV', { input: historyCsv.text });
+        assert(duplicatePlan.blocked === false && duplicatePlan.summary.segmentsAdded === 0 && duplicatePlan.summary.duplicates >= historyCsv.recordCount, 'Exact History CSV import did not dedupe existing history', duplicatePlan);
+        await bridge.commitDataAction(duplicatePlan.planId, { confirmationTokens: [] });
+        const afterDedupe = await bridge.coreSnapshot();
+        assert(afterDedupe.ledgerSegmentCount === restored.ledgerSegmentCount, 'Duplicate merge double-counted ledger history', { restored, afterDedupe, duplicatePlan });
+
+        let replaceError = null;
+        try {
+          await bridge.stageDataAction('DATA_RESTORE_BACKUP', { input: backup, mode: 'REPLACE', importWorkspace: true, importPreferences: true });
+        } catch (error) { replaceError = String(error?.message || error); }
+        const afterReplaceAttempt = await bridge.coreSnapshot();
+        assert(replaceError && /quiescence/i.test(replaceError), 'Active-state Replace was not rejected', replaceError);
+        assert(afterReplaceAttempt.revision === afterDedupe.revision && afterReplaceAttempt.ledgerSegmentCount === afterDedupe.ledgerSegmentCount, 'Rejected Replace changed authoritative state', { afterDedupe, afterReplaceAttempt });
+        assert(result.network.nativeMutationAttempts.length === 0, 'B4 data operations attempted a native SquareCoil mutation', result.network.nativeMutationAttempts);
+        await page.locator(`#${ROOT_ID} [data-action="view"][data-view="settings"]`).click({ force: true });
+        await page.locator(`#${ROOT_ID} [data-action="view"][data-view="main"]`).click({ force: true });
+        return {
+          malformedError,
+          archivedRevision: archived.revision,
+          restoredRevision: restored.revision,
+          duplicateSummary: duplicatePlan.summary,
+          replaceError,
+          ledgerSegmentCount: afterReplaceAttempt.ledgerSegmentCount
+        };
+      }
     );
 
     await runBrowserCase(result.cases, family, ['B1-LC-003', 'B1-LC-014'], 'RECOVERY', 'Dead interaction and removed root recover in place', async () => {
@@ -2251,6 +2404,22 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
         b3Scope: 'CANONICAL_TIME_VIEWS_WORKSPACE',
         status: 'FAIL',
         error: `Missing B3 workspace fixture IDs: ${result.b3WorkspaceFixtureCoverage.missing.join(', ')}`
+      });
+    }
+    const observedB4DataFixtureIds = [...new Set(result.cases.flatMap(testCase => testCase.b4DataFixtureIds || []))].sort();
+    result.b4DataFixtureCoverage = {
+      scope: 'B4_DATA_SAFETY_BACKUP_RESTORE_CSV_A4',
+      required: [...REQUIRED_B4_DATA_A4_FIXTURE_IDS],
+      observed: observedB4DataFixtureIds,
+      missing: REQUIRED_B4_DATA_A4_FIXTURE_IDS.filter(fixtureId => !observedB4DataFixtureIds.includes(fixtureId))
+    };
+    if (result.b4DataFixtureCoverage.missing.length) {
+      result.cases.push({
+        id: `A4-B4-${family === 'chrome' ? 'CH' : 'ED'}-FIXTURE-COVERAGE`,
+        name: 'Mandatory B4 data-safety fixture coverage',
+        b4Scope: 'DATA_SAFETY_BACKUP_RESTORE_CSV',
+        status: 'FAIL',
+        error: `Missing B4 data fixture IDs: ${result.b4DataFixtureCoverage.missing.join(', ')}`
       });
     }
     const failedCases = result.cases.filter(testCase => testCase.status === 'FAIL');

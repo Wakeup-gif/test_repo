@@ -153,6 +153,7 @@ function createAuthorityRecord(options) {
   const nowMs = requireTimestamp(options.nowMs, 'kernel-now');
   const document = createEmptyDocument({
     nowMs,
+    datasetId: requireText(options.makeId('dataset'), 'data-safety-dataset-id'),
     workdayZone: options.workdayZone,
     workdayZoneSource: options.workdayZoneDisposition?.source,
     workdayZoneFallback: options.workdayZoneDisposition?.fallback,

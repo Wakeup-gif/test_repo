@@ -42,7 +42,8 @@ function createDefaultAuthorityKernel(options = {}) {
       clockSkewMs: options.clockSkewMs,
       buildVersion: options.buildVersion,
       migrationHandler: options.migrationHandler,
-      timerHandler: options.timerHandler
+      timerHandler: options.timerHandler,
+      dataSafetyHandler: options.dataSafetyHandler
     })
   });
 }

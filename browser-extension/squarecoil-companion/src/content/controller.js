@@ -183,6 +183,18 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
         if (!trustedCore) throw new Error('trusted-transition-core-unavailable');
         return trustedCore.userCommand(type);
       },
+      dataExport: (kind, values) => {
+        if (!trustedCore) throw new Error('trusted-transition-core-unavailable');
+        return trustedCore.dataExport(kind, values);
+      },
+      stageDataAction: async (type, values) => {
+        if (!trustedCore) throw new Error('trusted-transition-core-unavailable');
+        return trustedCore.stageDataAction(type, values);
+      },
+      commitDataAction: async (planId, values) => {
+        if (!trustedCore) throw new Error('trusted-transition-core-unavailable');
+        return trustedCore.commitDataAction(planId, values);
+      },
       teardown: () => teardownAuthority({ controlled: true })
     })
   });
@@ -477,6 +489,7 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
           fetch: (...args) => fetch(...args),
           timers: globalThis
         },
+        appVersion: PACKAGE_VERSION,
         onStatusChange: renderCore
       });
     }

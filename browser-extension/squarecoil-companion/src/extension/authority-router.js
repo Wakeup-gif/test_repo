@@ -9,7 +9,7 @@ const {
 const {
   COMMAND_ACCESS,
   commandAccess,
-  isPublicTimerCommandType,
+  isPublicAuthorityCommandType,
   isOwnerOnlyTimerCommandType
 } = require('../data/command-dispatcher');
 
@@ -375,7 +375,7 @@ function createAuthorityRouter(options = {}) {
       return fail(message, 'authority-private-command-field-rejected');
     }
     const directOwner = commandAccess(message.command.type) === COMMAND_ACCESS.DIRECT_OWNER;
-    if (!isPublicTimerCommandType(message.command.type) && !(directOwner && message.directOwner === true)) {
+    if (!isPublicAuthorityCommandType(message.command.type) && !(directOwner && message.directOwner === true)) {
       return fail(message, 'authority-command-not-public');
     }
     if (

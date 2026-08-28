@@ -1,6 +1,6 @@
-# B1/B2 regression and B3 canonical workspace browser harness
+# B1-B4 installed-browser acceptance harness
 
-This harness loads one exact unpacked package into installed, branded Google Chrome and Microsoft Edge. It retains the settled B1 lifecycle, B2.1 authority-kernel, B2.2 trusted transition-core, and final B2 READY gates while exercising the canonical B3 workspace against the exact packaged bytes. It serves only synthetic fixture HTML in memory. No request reaches SquareCoil or customer data.
+This harness loads one exact unpacked package into installed, branded Google Chrome and Microsoft Edge. It retains the settled B1 lifecycle, B2.1 authority-kernel, B2.2 trusted transition-core, final B2 READY, and B3 workspace gates while exercising B4 data safety against the exact packaged bytes. It serves only synthetic fixture HTML in memory. No request reaches SquareCoil or customer data.
 
 ## Required package
 
@@ -19,8 +19,8 @@ The `--package` directory must contain exactly the eight allowlisted release fil
 
 `dist/build-info.json` must contain:
 
-- `buildId: "rebuild-b3-canonical-workspace"`;
-- `stage: "B3"`;
+- `buildId: "rebuild-b4-data-safety"`;
+- `stage: "B4"`;
 - a lowercase 64-character `candidateFingerprint` embedded exactly in `dist/background.js`, `dist/companion-app.js`, and `dist/content-controller.js`;
 - a lowercase 40-character `sourceSha` exactly matching `--expected-source-sha`;
 - boolean `sourceDirty`, which must be `false` for acceptance.
@@ -86,7 +86,11 @@ Every message the harness sends directly from the content-script execution world
 - Overview and finalized History navigation do not mutate Timer/Ledger state;
 - real A -> B focus reaches OWNER and OBSERVER, while a same-Context heartbeat preserves manual selection/collapse;
 - B3 hidden/show and drag-order preferences synchronize across tabs without native or Timer mutations.
+- B4 Full Backup JSON, History CSV, and reporting-only Time Report CSV come from one trusted revision and exports contain no live authority state;
+- malformed restore inputs and active-state Replace fail closed without mutation;
+- Archive and Restore preserve Context totals while passing through the fenced authoritative writer;
+- an exact backup merge dedupes existing history and cannot double-count ledger time.
 
 Each browser result carries the canonical stable IDs it proves: `B1-LC-001` through `B1-LC-010` and `B1-LC-012` through `B1-LC-018`. `B1-LC-011` is intentionally an A2/A3-only persistence-concurrency fixture. The B2.1 cases carry `B2-KERNEL-001` (multi-tab OWNER/OBSERVER) and `B2-KERNEL-002` (worker-restart reconnection). The B2.2 cases carry `B2-TRANSITION-001` through `B2-TRANSITION-005` for action 7 start, owner/observer synchronization, atomic job switch, exactly-once disable, and legacy fail-closed behavior. Final settlement cases carry `B2-READY-001` through `B2-READY-003` for OWNER plus popup READY, non-writing OBSERVER READY, and migration-blocked degradation.
 
-The B3 cases carry `B3-WORKSPACE-001` through `B3-WORKSPACE-004`. Passing the suite proves the installed-browser A4 portion of B3 while preserving every earlier B1/B2 gate. READY-C04 verification-fallback behavior remains covered by mandatory unit/integration fixtures because the installed candidate has `chrome.webRequest`; A4 does not alter the candidate to manufacture an unavailable hook. Final B3 acceptance requires this A4 pass together with the repository's unit, integration, prototype-compatibility, package, and CI gates.
+The B3 cases carry `B3-WORKSPACE-001` through `B3-WORKSPACE-004`. The B4 cases carry `B4-DATA-001` through `B4-DATA-004`. Passing the suite proves the installed-browser A4 portion of B4 while preserving every earlier gate. READY-C04 verification-fallback behavior remains covered by mandatory unit/integration fixtures because the installed candidate has `chrome.webRequest`; A4 does not alter the candidate to manufacture an unavailable hook. Final B4 acceptance requires this A4 pass together with the repository's unit, integration, prototype-compatibility, package, and CI gates.

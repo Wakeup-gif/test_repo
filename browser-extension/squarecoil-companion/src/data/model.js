@@ -43,6 +43,8 @@ const WORKDAY_ZONE_SOURCES = Object.freeze([
 ]);
 const MAX_DATE_TIMESTAMP_MS = 8_640_000_000_000_000;
 const MAX_COMMAND_RECEIPTS = 4096;
+const DATA_SAFETY_SCHEMA_VERSION = 1;
+const DATA_ACTIVITY_LIMIT = 500;
 
 function deepClone(value) {
   if (typeof structuredClone === 'function') return structuredClone(value);
@@ -426,6 +428,61 @@ function validateMigrationMetadata(migration) {
   }
 }
 
+function validateDataSafety(dataSafety, contexts) {
+  // B2/B3 documents created before the B4 upgrade do not contain this layer.
+  // B4 normalizes it inside the first fenced data command, so absence remains
+  // a valid upgrade state while a present layer is always validated strictly.
+  if (dataSafety === undefined) return true;
+  if (!isRecord(dataSafety) || dataSafety.schemaVersion !== DATA_SAFETY_SCHEMA_VERSION) {
+    throw new Error('data-safety-schema-invalid');
+  }
+  requireText(dataSafety.datasetId, 'dataSafety.datasetId');
+  if (!isRecord(dataSafety.workspace) || !Array.isArray(dataSafety.workspace.order) ||
+      !Array.isArray(dataSafety.workspace.hiddenContextIds)) {
+    throw new Error('data-safety-workspace-invalid');
+  }
+  for (const [name, values] of [
+    ['order', dataSafety.workspace.order],
+    ['hiddenContextIds', dataSafety.workspace.hiddenContextIds]
+  ]) {
+    if (values.some(value => typeof value !== 'string' || !value.trim()) || new Set(values).size !== values.length) {
+      throw new Error(`data-safety-workspace-${name}-invalid`);
+    }
+  }
+  if (!isRecord(dataSafety.preferences)) throw new Error('data-safety-preferences-invalid');
+  if (!Array.isArray(dataSafety.activityLog) || dataSafety.activityLog.length > DATA_ACTIVITY_LIMIT) {
+    throw new Error('data-safety-activity-invalid');
+  }
+  for (const entry of dataSafety.activityLog) {
+    if (!isRecord(entry)) throw new Error('data-safety-activity-entry-invalid');
+    requireText(entry.eventId, 'dataSafety.activity.eventId');
+    requireText(entry.type, 'dataSafety.activity.type');
+    if (!isTimestamp(entry.atMs)) throw new Error('data-safety-activity-time-invalid');
+  }
+  if (!isRecord(dataSafety.legacyBalanceLineages)) {
+    throw new Error('data-safety-legacy-lineages-invalid');
+  }
+  for (const [contextId, lineage] of Object.entries(dataSafety.legacyBalanceLineages)) {
+    if (!contexts[contextId] || !isRecord(lineage)) {
+      throw new Error('data-safety-legacy-lineage-context-invalid:' + contextId);
+    }
+    requireText(lineage.lineageId, 'dataSafety.legacyLineage.lineageId');
+    if (!isNonNegativeInteger(lineage.durationMs) ||
+        lineage.durationMs !== Math.max(0, Number(contexts[contextId].legacyUnattributedMs) || 0)) {
+      throw new Error('data-safety-legacy-lineage-duration-invalid:' + contextId);
+    }
+  }
+  if (dataSafety.lastMutation !== null) {
+    if (!isRecord(dataSafety.lastMutation)) throw new Error('data-safety-last-mutation-invalid');
+    requireText(dataSafety.lastMutation.operationId, 'dataSafety.lastMutation.operationId');
+    requireText(dataSafety.lastMutation.type, 'dataSafety.lastMutation.type');
+    if (!isTimestamp(dataSafety.lastMutation.committedAtMs)) {
+      throw new Error('data-safety-last-mutation-time-invalid');
+    }
+  }
+  return true;
+}
+
 function validateDocument(document) {
   if (!isRecord(document)) throw new Error('data-document-invalid');
   if (document.schemaVersion !== DATA_SCHEMA_VERSION) throw new Error('data-schema-unsupported');
@@ -479,6 +536,7 @@ function validateDocument(document) {
   if (kind === TIMER_STATES.LOCAL_PAUSED) validateLocalPause(document.timer.localPause, document.contexts);
   validateCheckpoint(document.checkpoint);
   validateMigrationMetadata(document.migration);
+  validateDataSafety(document.dataSafety, document.contexts);
   validateCommandReceipts(document);
   validateCommitFence(document);
   return true;
@@ -523,6 +581,15 @@ function createEmptyDocument(options = {}) {
       completedSources: {},
       diagnostics: []
     },
+    dataSafety: {
+      schemaVersion: DATA_SAFETY_SCHEMA_VERSION,
+      datasetId: String(options.datasetId || `dataset-${nowMs}`),
+      workspace: { order: [], hiddenContextIds: [] },
+      preferences: {},
+      activityLog: [],
+      legacyBalanceLineages: {},
+      lastMutation: null
+    },
     commandReceipts: {},
     commandReceiptOrder: []
   };
@@ -536,6 +603,8 @@ module.exports = {
   CHECKPOINT_CLEAN_TERMINATION_DISPOSITIONS,
   CHECKPOINT_OWNERSHIP_DISPOSITIONS,
   WORKDAY_ZONE_SOURCES,
+  DATA_SAFETY_SCHEMA_VERSION,
+  DATA_ACTIVITY_LIMIT,
   MAX_COMMAND_RECEIPTS,
   deepClone,
   deepFreeze,
@@ -552,6 +621,7 @@ module.exports = {
   validateCheckpoint,
   validateCommandReceipts,
   validateMigrationMetadata,
+  validateDataSafety,
   validateDocument,
   createEmptyDocument
 };

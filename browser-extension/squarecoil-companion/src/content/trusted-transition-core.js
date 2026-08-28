@@ -6,6 +6,14 @@ const { timerKind, deepClone, deepFreeze } = require('../data/model');
 const { TIMER_COMMANDS } = require('../timer/commands');
 const { createTimerReadModel } = require('../timer/read-model');
 const { createSquareCoilBridgeService } = require('../squarecoil/bridge-service');
+const {
+  DATA_COMMAND_TYPES,
+  createDataSafetyReadModel,
+  createFullBackup,
+  createHistoryCsv,
+  createTimeReportCsv,
+  stageDataOperation
+} = require('../data/data-safety');
 
 const RECOVERY_MODES = Object.freeze({
   CONTROLLED: 'CONTROLLED_RELOAD',
@@ -87,11 +95,14 @@ function createTrustedTransitionCore(options = {}) {
   let migrationInFlight = false;
   let lastStatus = 'not-initialized';
   let lastError = null;
+  const stagedDataPlans = new Map();
 
   function adopt(value) {
     const documentValue = value?.document || null;
     if (documentValue && typeof documentValue === 'object') {
+      const priorRevision = authorityDocument?.revision;
       authorityDocument = deepFreeze(deepClone(documentValue));
+      if (Number.isSafeInteger(priorRevision) && authorityDocument.revision !== priorRevision) stagedDataPlans.clear();
       return true;
     }
     return false;
@@ -133,6 +144,10 @@ function createTrustedTransitionCore(options = {}) {
     let readModelError = null;
     try { readModel = timerView(view); }
     catch (error) { readModelError = String(error?.message || error); }
+    let data = null;
+    let dataReadModelError = null;
+    try { if (authorityDocument) data = createDataSafetyReadModel(viewDocument()); }
+    catch (error) { dataReadModelError = String(error?.message || error); }
     return deepFreeze({
       initialized,
       disposed,
@@ -154,7 +169,9 @@ function createTrustedTransitionCore(options = {}) {
       } : null,
       bridge: bridge ? bridge.snapshot() : null,
       timer: readModel,
-      readModelError
+      readModelError,
+      data,
+      dataReadModelError
     });
   }
 
@@ -427,6 +444,58 @@ function createTrustedTransitionCore(options = {}) {
     });
   }
 
+  function dataExport(kind, values = {}) {
+    if (!authorityDocument) throw new Error('trusted-transition-document-unavailable');
+    const document = viewDocument();
+    if (kind === 'FULL_BACKUP') return createFullBackup(document, {
+      ...values,
+      appVersion: options.appVersion || options.buildVersion || 'unknown'
+    });
+    if (kind === 'HISTORY_CSV') return createHistoryCsv(document);
+    if (kind === 'TIME_REPORT_CSV') return createTimeReportCsv(document, { ...values, atMs: now() });
+    throw new Error('trusted-transition-data-export-unsupported');
+  }
+
+  async function stageDataAction(type, values = {}) {
+    if (!DATA_COMMAND_TYPES.has(type)) throw new Error('trusted-transition-data-command-unsupported');
+    return serialize(async () => {
+      if (!authorityDocument) await refreshDocument();
+      const request = deepClone({ type, ...values });
+      const staged = stageDataOperation(authorityDocument, request, { nowMs: now() });
+      stagedDataPlans.set(staged.plan.planId, { request, plan: staged.plan });
+      while (stagedDataPlans.size > 8) stagedDataPlans.delete(stagedDataPlans.keys().next().value);
+      return staged.plan;
+    });
+  }
+
+  async function commitDataAction(planId, values = {}) {
+    return serialize(async () => {
+      const staged = stagedDataPlans.get(String(planId || ''));
+      if (!staged) throw new Error('trusted-transition-data-plan-unavailable');
+      const envelope = commandEnvelope(staged.request.type, {
+        operationId: randomId('data-operation'),
+        stagedRevision: staged.plan.stagedRevision,
+        planId: staged.plan.planId,
+        request: staged.request,
+        confirmationTokens: Array.isArray(values.confirmationTokens) ? values.confirmationTokens.map(String) : [],
+        preBackupDisposition: values.preBackupDisposition
+      });
+      try {
+        const result = await authorityClient.command(envelope);
+        await refreshDocument();
+        stagedDataPlans.clear();
+        if (bridge && ['DATA_RESTORE_BACKUP', 'DATA_WIPE_HISTORY'].includes(staged.request.type)) {
+          await bridge.verifyNow('post-data-mutation-verification');
+        }
+        publishStatus('data-operation-committed');
+        return result;
+      } catch (error) {
+        try { await refreshDocument(); } catch (_) {}
+        throw error;
+      }
+    });
+  }
+
   async function prepareDisable() {
     if (prepareDisablePromise) return prepareDisablePromise;
     const task = serialize(async () => {
@@ -474,6 +543,7 @@ function createTrustedTransitionCore(options = {}) {
     if (bridge) await bridge.teardown();
     if (unsubscribe) unsubscribe();
     unsubscribe = null;
+    stagedDataPlans.clear();
     publishStatus('trusted-core-torn-down');
     return snapshot();
   }
@@ -488,7 +558,10 @@ function createTrustedTransitionCore(options = {}) {
     prepareControlledTeardown,
     teardown,
     snapshot,
-    acceptBridgeEvents
+    acceptBridgeEvents,
+    dataExport,
+    stageDataAction,
+    commitDataAction
   });
 }
 

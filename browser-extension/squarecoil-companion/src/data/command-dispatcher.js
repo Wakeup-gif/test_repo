@@ -8,6 +8,8 @@ const {
   TIMER_COMMANDS,
   createTimerCommandHandler
 } = require('../timer/service');
+const { DATA_COMMAND_TYPES } = require('./data-safety');
+const { createDataSafetyCommandHandler } = require('./data-safety-command');
 
 const COMMAND_ACCESS = Object.freeze({
   DIRECT_OWNER: 'DIRECT_OWNER',
@@ -35,12 +37,17 @@ const PUBLIC_OWNER_TYPES = new Set(PUBLIC_OWNER_TIMER_COMMANDS);
 
 function commandAccess(type) {
   if (type === AUTHORITY_COMMANDS.MIGRATE_V07) return COMMAND_ACCESS.DIRECT_OWNER;
+  if (DATA_COMMAND_TYPES.has(type)) return COMMAND_ACCESS.PUBLIC_REQUESTER;
   if (PUBLIC_OWNER_TYPES.has(type)) return COMMAND_ACCESS.PUBLIC_OWNER;
   if (PUBLIC_REQUESTER_TYPES.has(type)) return COMMAND_ACCESS.PUBLIC_REQUESTER;
   return null;
 }
 
 function isPublicTimerCommandType(type) {
+  return PUBLIC_OWNER_TYPES.has(type) || PUBLIC_REQUESTER_TYPES.has(type);
+}
+
+function isPublicAuthorityCommandType(type) {
   const access = commandAccess(type);
   return access === COMMAND_ACCESS.PUBLIC_OWNER || access === COMMAND_ACCESS.PUBLIC_REQUESTER;
 }
@@ -62,8 +69,10 @@ function requireTrustedContext(context) {
 function createAuthorityCommandDispatcher(options = {}) {
   const migrationHandler = options.migrationHandler || createMigrationCommandHandler(options);
   const timerHandler = options.timerHandler || createTimerCommandHandler(options);
+  const dataSafetyHandler = options.dataSafetyHandler || createDataSafetyCommandHandler(options);
   if (typeof migrationHandler !== 'function') throw new Error('migration-command-handler-invalid');
   if (typeof timerHandler !== 'function') throw new Error('timer-command-handler-invalid');
+  if (typeof dataSafetyHandler !== 'function') throw new Error('data-safety-command-handler-invalid');
 
   return async function dispatchAuthorityCommand(document, command, trustedContext) {
     if (!command || typeof command !== 'object' || Array.isArray(command)) {
@@ -83,6 +92,9 @@ function createAuthorityCommandDispatcher(options = {}) {
     if (access === COMMAND_ACCESS.DIRECT_OWNER) {
       return migrationHandler(document, command, context);
     }
+    if (DATA_COMMAND_TYPES.has(command.type)) {
+      return dataSafetyHandler(document, command, context);
+    }
     return timerHandler(document, command, context);
   };
 }
@@ -93,6 +105,7 @@ module.exports = {
   PUBLIC_OWNER_TIMER_COMMANDS,
   commandAccess,
   isPublicTimerCommandType,
+  isPublicAuthorityCommandType,
   isOwnerOnlyTimerCommandType,
   createAuthorityCommandDispatcher
 };
