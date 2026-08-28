@@ -401,3 +401,41 @@ test('UT-B2-BRIDGE-024 Bridge state and events are immutable and contain no Time
   assert.equal('ledger' in event, false);
   assert.throws(() => { event.context.contextId = 'job:evil'; }, TypeError);
 });
+
+test('UT-B2-BRIDGE-031 delayed native evidence is rejected only after a genuine newer transition', () => {
+  const initial = confirmJob(createBridgeEngineState(), '260701', '260701 - Prior', 1_000);
+  const transitioned = confirmJob(initial.state, '260702', '260702 - Current', 2_000);
+  assert.equal(transitioned.events[0].type, EVENT_TYPES.CONTEXT_CHANGED);
+  assert.equal(transitioned.state.lastTransitionAtMs, 2_000);
+  for (const nativeAction of [NATIVE_ACTIONS.FULL_CLOCK_OUT, NATIVE_ACTIONS.CHANGE_CONTEXT, NATIVE_ACTIONS.LEAVE_CONTEXT]) {
+    const delayed = nativeCandidate(transitioned.state, nativeAction, 1_999, {
+      requestProjectId: nativeAction === NATIVE_ACTIONS.CHANGE_CONTEXT ? '260703' : null,
+      completionKey: `delayed-${nativeAction}`
+    });
+    assert.equal(delayed.accepted, false);
+    assert.equal(delayed.reason, 'NATIVE_COMPLETION_SUPERSEDED');
+    assert.equal(delayed.state.candidates.length, 0);
+  }
+});
+
+test('UT-B2-BRIDGE-033 same-context verification does not supersede delayed action-2 evidence', () => {
+  const initial = confirmJob(createBridgeEngineState(), '260701', '260701 - Current', 1_000);
+  const verified = confirmJob(initial.state, '260701', '260701 - Current', 2_000);
+  assert.equal(verified.events[0].type, EVENT_TYPES.CONTEXT_VERIFIED);
+  assert.equal(verified.state.lastTransitionAtMs, 1_000);
+
+  const delayed = nativeCandidate(verified.state, NATIVE_ACTIONS.FULL_CLOCK_OUT, 1_500, {
+    completionKey: 'delayed-action-two-after-verification'
+  });
+  assert.equal(delayed.accepted, true);
+  assert.equal(delayed.state.candidates.length, 1);
+  const postState = verify(
+    delayed.state,
+    jobEvidence('260701', '260701 - Current', 2_002),
+    2_001
+  );
+  assert.equal(postState.events[0].type, EVENT_TYPES.STATE_CONFLICT);
+  assert.equal(postState.events[0].strongUnconfirmedTransition.boundaryAtMs, 1_500);
+  assert.equal(postState.state.candidates[0].verificationStatus, 'STRONG_UNCONFIRMED');
+  assert.equal(postState.needsVerification, true);
+});

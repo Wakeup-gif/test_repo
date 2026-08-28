@@ -8,6 +8,7 @@ const {
   createBridgeEngineState,
   beginVerification,
   acceptVerification,
+  recordNativeCompletion,
   teardownBridge
 } = require('./bridge-engine');
 
@@ -18,6 +19,7 @@ const DEFAULT_HEARTBEAT_MS = 60_000;
 const DEFAULT_MUTATION_DEBOUNCE_MS = 180;
 const DEFAULT_CLICK_VERIFY_DELAY_MS = 900;
 const DEFAULT_FOLLOW_UP_MS = 300;
+const NATIVE_ACTIONS = new Set([2, 3, 4]);
 
 function defaultId(prefix) {
   try {
@@ -80,6 +82,7 @@ function createSquareCoilBridgeService(options = {}) {
   const randomId = options.randomId || defaultId;
   const onEvents = typeof options.onEvents === 'function' ? options.onEvents : async () => {};
   const onHealthChange = typeof options.onHealthChange === 'function' ? options.onHealthChange : () => {};
+  const onVerificationHint = typeof options.onVerificationHint === 'function' ? options.onVerificationHint : async () => {};
   const sourceRuntimeId = String(options.sourceRuntimeId || '');
   const heartbeatMs = options.heartbeatMs ?? DEFAULT_HEARTBEAT_MS;
   const mutationDebounceMs = options.mutationDebounceMs ?? DEFAULT_MUTATION_DEBOUNCE_MS;
@@ -92,7 +95,10 @@ function createSquareCoilBridgeService(options = {}) {
     if (!Number.isSafeInteger(value) || value < 0) throw new Error('bridge-timing-invalid');
   }
 
-  let engineState = createBridgeEngineState(options.engineOptions);
+  let engineState = createBridgeEngineState({
+    ...(options.engineOptions || {}),
+    observationStreamId: sourceRuntimeId
+  });
   let initialized = false;
   let owner = false;
   let disposed = false;
@@ -115,7 +121,7 @@ function createSquareCoilBridgeService(options = {}) {
     if (serverAvailable === false && domAvailable === false) return 'UNAVAILABLE';
     if (serverAvailable === false && domAvailable !== false) return 'DOM_FALLBACK';
     if (domAvailable === false && serverAvailable !== false) return 'SERVER_FALLBACK';
-    return 'FULL_NO_NATIVE_COMPLETION_HOOK';
+    return options.completionObservationAvailable === true ? 'FULL' : 'VERIFICATION_FALLBACK';
   }
 
   function snapshot() {
@@ -182,6 +188,24 @@ function createSquareCoilBridgeService(options = {}) {
     const target = event?.target;
     if (!target?.closest?.('.clock-actions')) return;
     schedule('click', clickVerifyDelayMs, 'passive-clock-action-hint');
+    if (!owner) onVerificationHint({ kind: 'PASSIVE_ACTIVITY_HINT' }).catch(() => {});
+  }
+
+  async function observeNativeCompletion(values = {}) {
+    if (disposed || values.successful !== true) return { accepted: false, reason: 'NATIVE_COMPLETION_UNSUCCESSFUL' };
+    const nativeAction = Number(values.nativeAction);
+    if (!NATIVE_ACTIONS.has(nativeAction)) return { accepted: false, reason: 'UNSUPPORTED_NATIVE_ACTION' };
+    const completedAtMs = Number.isSafeInteger(values.completedAtMs) ? values.completedAtMs : now();
+    const completionKey = String(values.completionKey || randomId('native-completion'));
+    const evidence = Object.freeze({ kind: 'NATIVE_MUTATION_COMPLETION', successful: true, nativeAction,
+      completedAtMs, completionKey, requestProjectId: values.requestProjectId || null,
+      requestDepartment: values.requestDepartment || null, sourceRuntimeId,
+      documentToken: String(options.documentToken || ''), provenance: 'AUDITED_SQUARECOIL_COMPLETION_HOOK' });
+    if (!owner) return { accepted: false, reason: 'OBSERVER_EVIDENCE_ROUTED_BY_WORKER' };
+    const recorded = recordNativeCompletion(engineState, { ...evidence, bridgeGeneration: engineState.bridgeGeneration });
+    engineState = recorded.state;
+    if (recorded.needsVerification) await verifyNow('native-mutation-completion');
+    return recorded;
   }
 
   function onFocus() {
@@ -354,7 +378,7 @@ function createSquareCoilBridgeService(options = {}) {
     return snapshot();
   }
 
-  return Object.freeze({ ensure, setOwner, verifyNow, teardown, snapshot });
+  return Object.freeze({ ensure, setOwner, verifyNow, observeNativeCompletion, teardown, snapshot });
 }
 
 module.exports = {

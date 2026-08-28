@@ -16,6 +16,8 @@ const {
 } = require('./authority-protocol');
 const { createAuthorityRouter } = require('./authority-router');
 const { createDefaultAuthorityKernel } = require('./authority-kernel');
+const { createNativeCompletionObserver } = require('./native-completion-observer');
+const { createAuthorityUpdateTransport } = require('./authority-update-transport');
 
 const BOOT_MESSAGE = 'SC_COMPANION_BOOT';
 const HEALTH_MESSAGE = 'SC_COMPANION_GET_HEALTH';
@@ -27,27 +29,9 @@ const EXPECTED_B1_DEGRADED_REASON = 'coordination-not-implemented-b1';
 const PACKAGE_VERSION = String(chrome.runtime.getManifest().version || '0.0.0');
 const tabOperationQueues = new Map();
 
-async function publishAuthorityUpdate(update) {
-  if (!chrome.tabs || typeof chrome.tabs.sendMessage !== 'function') return false;
-  const options = update.expectedDocumentId
-    ? { documentId: update.expectedDocumentId }
-    : { frameId: 0 };
-  try {
-    await chrome.tabs.sendMessage(update.tabId, {
-      type: AUTHORITY_MESSAGES.UPDATE,
-      protocolVersion: AUTHORITY_PROTOCOL_VERSION,
-      documentToken: update.documentToken,
-      runtimeInstanceId: update.runtimeInstanceId,
-      sessionId: update.sessionId,
-      workerInstanceId: update.workerInstanceId,
-      sequence: update.sequence,
-      event: update.event
-    }, options);
-    return true;
-  } catch (_) {
-    return false;
-  }
-}
+const authorityUpdateTransport = createAuthorityUpdateTransport({ tabs: chrome.tabs });
+
+function publishAuthorityUpdate(update) { return authorityUpdateTransport.publish(update); }
 
 async function prepareIsolatedAuthorityTeardown(request, runtimeInstanceId) {
   if (!chrome.tabs || typeof chrome.tabs.sendMessage !== 'function') {
@@ -93,6 +77,11 @@ async function prepareIsolatedAuthorityTeardown(request, runtimeInstanceId) {
 // coordination install one adapter here; page and content code never import or
 // call an authoritative store directly.
 const authorityRouter = createAuthorityRouter({ publish: publishAuthorityUpdate });
+const nativeCompletionObserver = createNativeCompletionObserver({
+  webRequest: chrome.webRequest,
+  onCompletion: evidence => authorityRouter.observeNativeCompletion(evidence)
+});
+authorityRouter.setNativeObservationAvailable(nativeCompletionObserver.available);
 
 function installAuthorityAdapter(adapter) {
   return authorityRouter.installAdapter(adapter);
@@ -1235,7 +1224,8 @@ async function handleAuthorityMessage(request, message) {
   }
   if (
     message.type === AUTHORITY_MESSAGES.CONNECT ||
-    message.type === AUTHORITY_MESSAGES.COMMAND
+    message.type === AUTHORITY_MESSAGES.COMMAND ||
+    message.type === AUTHORITY_MESSAGES.FORWARD_NATIVE_EVIDENCE
   ) {
     const verified = await verifyAuthorityRuntime(request, message);
     if (!verified.ok) {

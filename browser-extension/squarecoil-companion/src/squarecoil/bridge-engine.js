@@ -41,6 +41,12 @@ const DEFAULT_CANDIDATE_WINDOW_MS = 15_000;
 const DEFAULT_NEGATIVE_CONFIRMATION_MIN_MS = 250;
 const DEFAULT_NEGATIVE_CONFIRMATION_WINDOW_MS = 5_000;
 const MAX_RECENT_COMPLETION_KEYS = 64;
+const TRANSITION_EVENT_TYPES = new Set([
+  EVENT_TYPES.CONTEXT_DETECTED,
+  EVENT_TYPES.CONTEXT_CHANGED,
+  EVENT_TYPES.CONTEXT_LEFT,
+  EVENT_TYPES.CLOCKED_OUT
+]);
 
 function clone(value) {
   if (Array.isArray(value)) return value.map(clone);
@@ -96,6 +102,7 @@ function normalizeOptionalText(value) {
 function freezeState(value) {
   return frozenClone({
     active: value.active,
+    observationStreamId: value.observationStreamId,
     bridgeGeneration: value.bridgeGeneration,
     bridgeSeq: value.bridgeSeq,
     stateSequence: value.stateSequence,
@@ -108,6 +115,7 @@ function freezeState(value) {
     activeRequest: value.activeRequest,
     verificationQueued: value.verificationQueued,
     lastConfirmed: value.lastConfirmed,
+    lastTransitionAtMs: value.lastTransitionAtMs,
     pendingNegative: value.pendingNegative,
     recentCompletionKeys: value.recentCompletionKeys
   });
@@ -116,6 +124,7 @@ function freezeState(value) {
 function assertState(state) {
   if (!state || typeof state !== 'object') throw new Error('bridge state is required');
   if (typeof state.active !== 'boolean') throw new Error('bridge active flag is invalid');
+  requireText(state.observationStreamId, 'observationStreamId');
   assertSafeCounter(state.bridgeGeneration, 'bridgeGeneration', 1);
   assertSafeCounter(state.bridgeSeq, 'bridgeSeq');
   assertSafeCounter(state.stateSequence, 'stateSequence');
@@ -129,6 +138,9 @@ function assertState(state) {
   }
   if (!Array.isArray(state.candidates) || !Array.isArray(state.recentCompletionKeys)) {
     throw new Error('bridge queue state is invalid');
+  }
+  if (state.lastTransitionAtMs !== null) {
+    assertTimestamp(state.lastTransitionAtMs, 'lastTransitionAtMs');
   }
   return state;
 }
@@ -147,8 +159,10 @@ function createBridgeEngineState(options = {}) {
   }
   const bridgeGeneration = options.bridgeGeneration ?? 1;
   assertSafeCounter(bridgeGeneration, 'bridgeGeneration', 1);
+  const observationStreamId = requireText(options.observationStreamId || 'bridge', 'observationStreamId');
   return freezeState({
     active: true,
+    observationStreamId,
     bridgeGeneration,
     bridgeSeq: 0,
     stateSequence: 0,
@@ -161,6 +175,7 @@ function createBridgeEngineState(options = {}) {
     activeRequest: null,
     verificationQueued: false,
     lastConfirmed: null,
+    lastTransitionAtMs: null,
     pendingNegative: null,
     recentCompletionKeys: []
   });
@@ -216,6 +231,9 @@ function recordNativeCompletion(inputState, options = {}) {
     return reject(state, 'UNSUPPORTED_NATIVE_ACTION');
   }
   const completedAtMs = assertTimestamp(options.completedAtMs, 'completedAtMs');
+  if (state.lastTransitionAtMs !== null && completedAtMs < state.lastTransitionAtMs) {
+    return reject(state, 'NATIVE_COMPLETION_SUPERSEDED');
+  }
   const sourceRuntimeId = requireText(options.sourceRuntimeId, 'sourceRuntimeId');
   const completionKey = normalizeOptionalText(options.completionKey);
   if (completionKey) {
@@ -311,7 +329,7 @@ function nextBridgeEvent(state, type, evidence, fields = {}) {
     type,
     bridgeGeneration: state.bridgeGeneration,
     bridgeSeq,
-    observationId: `observation:${state.bridgeGeneration}:${bridgeSeq}`,
+    observationId: `observation:${state.observationStreamId}:${state.bridgeGeneration}:${bridgeSeq}`,
     observedAtMs: evidence.observedAtMs,
     source: evidence.source,
     stateCertainty: evidence.stateCertainty,
@@ -324,7 +342,16 @@ function nextBridgeEvent(state, type, evidence, fields = {}) {
 }
 
 function withEvent(state, event, changes = {}) {
-  return freezeState({ ...state, bridgeSeq: event.bridgeSeq, ...changes });
+  const transitionAtMs = TRANSITION_EVENT_TYPES.has(event.type) &&
+    Number.isSafeInteger(event.boundaryAtMs)
+    ? event.boundaryAtMs
+    : null;
+  const lastTransitionAtMs = transitionAtMs === null
+    ? state.lastTransitionAtMs
+    : state.lastTransitionAtMs === null
+      ? transitionAtMs
+      : Math.max(state.lastTransitionAtMs, transitionAtMs);
+  return freezeState({ ...state, bridgeSeq: event.bridgeSeq, ...changes, lastTransitionAtMs });
 }
 
 function removeCandidate(candidates, candidateId) {

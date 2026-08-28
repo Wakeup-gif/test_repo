@@ -10,6 +10,7 @@ const AUTHORITY_MESSAGES = Object.freeze({
   COMMAND: `${AUTHORITY_MESSAGE_PREFIX}COMMAND`,
   SUBSCRIBE: `${AUTHORITY_MESSAGE_PREFIX}SUBSCRIBE`,
   HEARTBEAT: `${AUTHORITY_MESSAGE_PREFIX}HEARTBEAT`,
+  FORWARD_NATIVE_EVIDENCE: `${AUTHORITY_MESSAGE_PREFIX}FORWARD_NATIVE_EVIDENCE`,
   DISCONNECT: `${AUTHORITY_MESSAGE_PREFIX}DISCONNECT`,
   UPDATE: `${AUTHORITY_MESSAGE_PREFIX}UPDATE`
 });
@@ -18,12 +19,15 @@ const AUTHORITY_CONTROL_MESSAGES = Object.freeze({
   PREPARE_DISABLE: `${AUTHORITY_MESSAGE_PREFIX}PREPARE_DISABLE`
 });
 
+const AUTHORITY_UPDATE_ACK = `${AUTHORITY_MESSAGE_PREFIX}UPDATE_ACK`;
+
 const REQUEST_TYPES = new Set([
   AUTHORITY_MESSAGES.CONNECT,
   AUTHORITY_MESSAGES.READ,
   AUTHORITY_MESSAGES.COMMAND,
   AUTHORITY_MESSAGES.SUBSCRIBE,
   AUTHORITY_MESSAGES.HEARTBEAT,
+  AUTHORITY_MESSAGES.FORWARD_NATIVE_EVIDENCE,
   AUTHORITY_MESSAGES.DISCONNECT
 ]);
 
@@ -43,6 +47,27 @@ function isPlainObject(value) {
 
 function isAuthorityMessageType(value) {
   return REQUEST_TYPES.has(value);
+}
+
+function createAuthorityUpdateAcknowledgment(message) {
+  return Object.freeze({
+    ok: true,
+    type: AUTHORITY_UPDATE_ACK,
+    protocolVersion: AUTHORITY_PROTOCOL_VERSION,
+    sessionId: message.sessionId,
+    workerInstanceId: message.workerInstanceId,
+    sequence: message.sequence
+  });
+}
+
+function isAuthorityUpdateAcknowledgment(value, message) {
+  if (!isPlainObject(value) || !isPlainObject(message)) return false;
+  const expected = createAuthorityUpdateAcknowledgment(message);
+  const keys = Object.keys(value).sort();
+  const expectedKeys = Object.keys(expected).sort();
+  return keys.length === expectedKeys.length &&
+    keys.every((key, index) => key === expectedKeys[index]) &&
+    expectedKeys.every(key => value[key] === expected[key]);
 }
 
 function validateAuthorityRequest(message) {
@@ -80,6 +105,9 @@ function validateAuthorityRequest(message) {
       return { ok: false, reason: 'authority-command-origin-runtime-invalid' };
     }
   }
+  if (message.type === AUTHORITY_MESSAGES.FORWARD_NATIVE_EVIDENCE && !isPlainObject(message.evidence)) {
+    return { ok: false, reason: 'authority-native-evidence-invalid' };
+  }
   return { ok: true };
 }
 
@@ -87,9 +115,12 @@ module.exports = {
   AUTHORITY_PROTOCOL_VERSION,
   AUTHORITY_MESSAGES,
   AUTHORITY_CONTROL_MESSAGES,
+  AUTHORITY_UPDATE_ACK,
   KERNEL_ONLY_DISPOSITION,
   isConcreteId,
   isPlainObject,
   isAuthorityMessageType,
+  createAuthorityUpdateAcknowledgment,
+  isAuthorityUpdateAcknowledgment,
   validateAuthorityRequest
 };

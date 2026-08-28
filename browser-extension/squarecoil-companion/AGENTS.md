@@ -3,7 +3,7 @@
 This file scopes only `browser-extension/squarecoil-companion/`.
 
 ## Current task
-Implement the first B2-C engineering slice only: production v0.7 migration invocation and marker-aware preflight.
+Implement the explicitly authorized second B2-C engineering slice only: passive native action 2/3/4 completion observation, current-OWNER evidence routing, and safe verification fallback.
 
 Read these before editing code:
 1. `docs/B2C-BUILDER-HANDOFF.md`
@@ -11,7 +11,8 @@ Read these before editing code:
 3. `logic/B2C-IMPLEMENTATION-ENTRY-AUDIT.md`
 4. `logic/L2-STATE-TIME-MIGRATION.md`
 5. `logic/L1-LIFECYCLE.md`
-6. `logic/L8-ACCEPTANCE-TEST-MATRIX.md`
+6. `logic/L3-SQUARECOIL-BRIDGE.md`
+7. `logic/L8-ACCEPTANCE-HANDOFF.md`
 
 Do not redesign settled behavior. If implementation exposes a true contradiction, stop and report it rather than inventing new product behavior.
 
@@ -30,13 +31,13 @@ Do not redesign settled behavior. If implementation exposes a true contradiction
 
 ## Primary files for this slice
 - `src/content/trusted-transition-core.js`
-- `src/data/legacy-preflight.js`
-- `src/data/migration-command.js`
-- `src/data/migration.js`
-- `src/data/command-dispatcher.js`
+- `src/extension/authority-client.js`
+- `src/extension/authority-protocol.js`
 - `src/extension/authority-router.js`
-- `src/extension/authority-kernel.js`
-- `src/data/store.js`
+- `src/extension/background-entry.js`
+- `src/extension/native-completion-observer.js`
+- `src/squarecoil/bridge-engine.js`
+- `src/squarecoil/bridge-service.js`
 
 Add or modify tests under `tests/b2/` and `tests/b2-integration/` as needed.
 
@@ -68,24 +69,15 @@ git status --short
 Do not finish with unrelated changes.
 
 ## Acceptance gate for this task
-The implementation must cover the settled cases:
-- MIG-C01 automatic OWNER migration
-- MIG-C02 observer does not migrate
-- MIG-C03 retained legacy keys do not block forever
-- MIG-C04 production-path migration idempotency
-- MIG-C05 migration failure remains atomic/fail-closed
-- MIG-C06 CURRENT/ARCHIVE change after completion blocks automatic re-import
-- MIG-C07 ACTIVITY-only change does not block timing
-- READY-C03 unresolved/conflicted migration prevents false READY
+The accepted migration slice and all existing B1/B2 behavior must remain green. The implementation must cover settled NAT-C01 through NAT-C09, including current fenced OWNER routing after takeover, duplicate/stale/superseded evidence rejection, mandatory post-state verification, verification-only observer hints, no Companion native mutation, and production-shaped Chrome message delivery.
 
-Do not proceed to the native action 2/3/4 completion-hook slice in the same task unless explicitly instructed.
+Do not proceed to B3, B4, or B5 in this task.
 
 ## Definition of done
-- The migration flow is wired into production boot.
-- OWNER performs at most one authoritative migration when REQUIRED.
-- Matching retained legacy keys resolve COMPLETE_MATCH and normal boot continues.
-- CURRENT/ARCHIVE source changes after completion fail closed without re-import.
-- ACTIVITY-only change is nonblocking.
-- Bridge starts only after migration resolves safely.
-- Existing accepted B1/B2 behavior remains green.
+- Actions 2/3/4 are observed passively only after successful completion.
+- Sanitized evidence reaches exactly one current fenced OWNER.
+- OWNER performs mandatory fresh verification before any Timer/Ledger mutation.
+- Duplicate, stale-generation, retired-runtime, and genuinely superseded evidence fails closed.
+- Missing native observation reports `VERIFICATION_FALLBACK`, never false `FULL`.
+- Existing accepted migration and B1/B2 behavior remains green.
 - Changes are committed on the provided Codex branch; do not create another branch.

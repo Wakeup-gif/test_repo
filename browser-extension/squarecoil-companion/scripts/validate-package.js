@@ -15,7 +15,7 @@ const ALLOWLIST = Object.freeze([
   'popup/popup.css',
   'popup/popup.html'
 ]);
-const EXPECTED_PERMISSIONS = Object.freeze(['storage', 'scripting']);
+const EXPECTED_PERMISSIONS = Object.freeze(['storage', 'scripting', 'webRequest']);
 const EXPECTED_HOST_PERMISSIONS = Object.freeze(['https://ussignandmill.squarecoil.net/*']);
 const EXPECTED_CONTENT_SCRIPT_KEYS = Object.freeze(['all_frames', 'js', 'match_about_blank', 'matches', 'run_at']);
 
@@ -110,7 +110,7 @@ function validatePopupHtml(html) {
 
 function validateManifestPolicy(manifest) {
   assert(manifest.manifest_version === 3, 'Packaged manifest must be MV3');
-  assert(JSON.stringify(manifest.permissions || []) === JSON.stringify(EXPECTED_PERMISSIONS), 'Packaged permissions must remain storage + scripting only');
+  assert(JSON.stringify(manifest.permissions || []) === JSON.stringify(EXPECTED_PERMISSIONS), 'Packaged permissions must remain storage + scripting + passive webRequest observation only');
   assert(JSON.stringify(manifest.host_permissions || []) === JSON.stringify(EXPECTED_HOST_PERMISSIONS), 'Packaged host permission must remain limited to the exact SquareCoil tenant');
   assert(JSON.stringify(Object.keys(manifest.background || {}).sort()) === JSON.stringify(['service_worker']), 'Packaged background policy must contain only the service worker entry');
   assert(manifest.background.service_worker === 'dist/background.js', 'Packaged service worker reference is invalid');

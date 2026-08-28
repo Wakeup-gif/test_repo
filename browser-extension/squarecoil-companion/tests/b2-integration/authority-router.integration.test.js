@@ -187,6 +187,145 @@ test('IT-B2-PLATFORM-005 platform boundary routes OWNER and OBSERVER through one
   assert.equal(router.snapshot().sessionCount, 2);
 });
 
+test('IT-B2-PLATFORM-025 NAT-C06/C07/C08 observer completion is sanitized, routed only to OWNER, and invalid evidence is rejected', async () => {
+  const adapter = createKernelAdapter();
+  const published = [];
+  const router = createAuthorityRouter({ adapter, workerInstanceId: 'worker-native-evidence-01',
+    randomId: createIdFactory('native'), publish: async update => { published.push(update); return true; } });
+  const ownerRuntime = 'runtime-native-owner-001';
+  const observerRuntime = 'runtime-native-observer-01';
+  const ownerContext = context(81, 'document-native-owner-01');
+  const observerContext = context(82, 'document-native-observer-01');
+  const owner = await router.route(ownerContext, request(AUTHORITY_MESSAGES.CONNECT, ownerRuntime));
+  const observer = await router.route(observerContext, request(AUTHORITY_MESSAGES.CONNECT, observerRuntime));
+  await router.route(ownerContext, request(AUTHORITY_MESSAGES.SUBSCRIBE, ownerRuntime, { sessionId: owner.sessionId }));
+  const evidence = { kind: 'NATIVE_MUTATION_COMPLETION', successful: true, nativeAction: 4,
+    completedAtMs: Date.now(), completionKey: 'completion-native-0001', sourceRuntimeId: observerRuntime,
+    documentToken: observerContext.documentToken, provenance: 'AUDITED_SQUARECOIL_COMPLETION_HOOK' };
+  const valid = await router.route(observerContext, request(AUTHORITY_MESSAGES.FORWARD_NATIVE_EVIDENCE,
+    observerRuntime, { sessionId: observer.sessionId, evidence }));
+  assert.equal(valid.ok, false);
+  assert.equal(valid.reason, 'authority-native-evidence-rejected');
+  assert.equal(published.length, 0);
+  assert.equal(adapter.calls.command.length, 0);
+
+  for (const invalid of [
+    { ...evidence, completedAtMs: Date.now() - 20_000, completionKey: 'completion-stale-0001' },
+    { ...evidence, nativeAction: 7, completionKey: 'completion-action-0001' },
+    { ...evidence, successful: false, completionKey: 'completion-failed-001' },
+    { ...evidence, documentToken: 'document-wrong-generation', completionKey: 'completion-wrong-001' },
+    { ...evidence, provenance: 'CLICK', completionKey: 'completion-click-0001' }
+  ]) {
+    const rejected = await router.route(observerContext, request(AUTHORITY_MESSAGES.FORWARD_NATIVE_EVIDENCE,
+      observerRuntime, { sessionId: observer.sessionId, evidence: invalid }));
+    assert.equal(rejected.ok, false);
+    assert.equal(rejected.reason, 'authority-native-evidence-rejected');
+  }
+  assert.equal(published.length, 0);
+});
+
+test('IT-B2-PLATFORM-026 webRequest completion uses stable identity, coalesces, and rejects retired generations', async () => {
+  const adapter = createKernelAdapter();
+  const published = [];
+  const router = createAuthorityRouter({ adapter, workerInstanceId: 'worker-webrequest-native',
+    randomId: createIdFactory('webrequest'), publish: async update => { published.push(update); return true; } });
+  router.setNativeObservationAvailable(true);
+  const ownerRuntime = 'runtime-webrequest-owner';
+  const observerRuntime = 'runtime-webrequest-observer';
+  const ownerContext = context(91, 'document-webrequest-owner');
+  const observerContext = context(92, 'document-webrequest-observer');
+  const owner = await router.route(ownerContext, request(AUTHORITY_MESSAGES.CONNECT, ownerRuntime));
+  const observer = await router.route(observerContext, request(AUTHORITY_MESSAGES.CONNECT, observerRuntime));
+  await router.route(ownerContext, request(AUTHORITY_MESSAGES.SUBSCRIBE, ownerRuntime, { sessionId: owner.sessionId }));
+  await router.route(observerContext, request(AUTHORITY_MESSAGES.SUBSCRIBE, observerRuntime, { sessionId: observer.sessionId }));
+  const completion = { requestId: 'chrome-request-stable-001', tabId: observerContext.tabId,
+    documentId: observerContext.expectedDocumentId, nativeAction: 2, completedAtMs: Date.now() };
+  assert.equal((await router.observeNativeCompletion(completion)).changed, true);
+  assert.equal((await router.observeNativeCompletion(completion)).changed, false);
+  assert.equal(published.length, 1);
+  assert.equal(published[0].event.nativeEvidence.completionKey,
+    'webrequest:worker-webrequest-native:chrome-request-stable-001');
+  assert.equal(published[0].event.nativeEvidence.provenance, 'EXTENSION_WEBREQUEST_COMPLETION');
+  await router.route(observerContext, request(AUTHORITY_MESSAGES.DISCONNECT, observerRuntime,
+    { sessionId: observer.sessionId }));
+  const late = await router.observeNativeCompletion({ ...completion, requestId: 'chrome-request-late-002' });
+  assert.equal(late.accepted, false);
+  assert.equal(late.reason, 'native-observation-runtime-invalid');
+  assert.equal(published.length, 1);
+});
+
+test('IT-B2-PLATFORM-027 lease takeover reconciles cached OWNER and routes native evidence only to the current owner', async () => {
+  const values = {};
+  const storageArea = {
+    async get(key) { return { [key]: values[key] === undefined ? undefined : structuredClone(values[key]) }; },
+    async set(patch) { Object.assign(values, structuredClone(patch)); }
+  };
+  let lockQueue = Promise.resolve();
+  const lockManager = {
+    request(_name, _options, callback) {
+      const run = lockQueue.then(callback, callback);
+      lockQueue = run.then(() => undefined, () => undefined);
+      return run;
+    }
+  };
+  let nowMs = 1_000;
+  let idSequence = 0;
+  const kernel = createAuthoritativeKernel({
+    adapter: createChromeAuthorityAdapter({ area: storageArea, key: 'takeover-authority', lockManager }),
+    now: () => nowMs,
+    makeId: prefix => `${prefix}-${++idSequence}`,
+    leaseDurationMs: 100,
+    workdayZone: 'UTC',
+    workdayZoneDisposition: { source: 'CONFIGURED', fallback: false, diagnostic: null },
+    applyCommand: async () => ({ applied: true })
+  });
+  const published = [];
+  const router = createAuthorityRouter({ adapter: kernel, workerInstanceId: 'worker-takeover-native',
+    randomId: createIdFactory('takeover-native'),
+    publish: async update => { published.push(update); return true; } });
+  router.setNativeObservationAvailable(true);
+  const runtimeA = 'runtime-takeover-owner-a';
+  const runtimeB = 'runtime-takeover-owner-b';
+  const contextA = context(101, 'document-takeover-owner-a');
+  const contextB = context(102, 'document-takeover-owner-b');
+  const connectionA = await router.route(contextA, request(AUTHORITY_MESSAGES.CONNECT, runtimeA));
+  const connectionB = await router.route(contextB, request(AUTHORITY_MESSAGES.CONNECT, runtimeB));
+  await router.route(contextA, request(AUTHORITY_MESSAGES.SUBSCRIBE, runtimeA,
+    { sessionId: connectionA.sessionId }));
+  await router.route(contextB, request(AUTHORITY_MESSAGES.SUBSCRIBE, runtimeB,
+    { sessionId: connectionB.sessionId }));
+
+  nowMs = 1_101;
+  const takeover = await router.route(contextB, request(AUTHORITY_MESSAGES.HEARTBEAT, runtimeB,
+    { sessionId: connectionB.sessionId }));
+  assert.equal(takeover.disposition, 'OWNER');
+  const afterTakeover = router.snapshot();
+  assert.equal(afterTakeover.currentOwnerSessionId, connectionB.sessionId);
+  assert.deepEqual(afterTakeover.sessions.map(session => [session.runtimeInstanceId, session.disposition]), [
+    [runtimeA, 'OBSERVER_CONNECTED'],
+    [runtimeB, 'OWNER']
+  ]);
+  published.length = 0;
+
+  const completion = { requestId: 'request-after-owner-takeover', tabId: contextA.tabId,
+    documentId: contextA.expectedDocumentId, nativeAction: 2, completedAtMs: Date.now() };
+  assert.equal((await router.observeNativeCompletion(completion)).changed, true);
+  assert.equal((await router.observeNativeCompletion(completion)).changed, false);
+  const hint = await router.route(contextA, request(AUTHORITY_MESSAGES.FORWARD_NATIVE_EVIDENCE, runtimeA, {
+    sessionId: connectionA.sessionId,
+    evidence: { kind: 'PASSIVE_ACTIVITY_HINT', sourceRuntimeId: runtimeA,
+      documentToken: contextA.documentToken }
+  }));
+
+  assert.equal(hint.ok, true);
+  assert.equal(hint.result.verificationOnly, true);
+  assert.equal(published.length, 2);
+  assert.ok(published.every(update => update.runtimeInstanceId === runtimeB));
+  assert.equal(published.filter(update => update.event.nativeEvidence).length, 1);
+  assert.equal(published.filter(update => update.event.verificationHint).length, 1);
+  assert.equal(published.some(update => update.runtimeInstanceId === runtimeA), false);
+});
+
 test('IT-B2-PLATFORM-006 teardown retains exact authority ownership until a failed disconnect succeeds', async () => {
   const adapter = createKernelAdapter();
   const router = createAuthorityRouter({

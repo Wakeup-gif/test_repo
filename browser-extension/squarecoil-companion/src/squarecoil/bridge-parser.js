@@ -558,6 +558,12 @@ function reconcileEvidence(items, options = {}) {
   }
   const negatives = fresh.filter(item => item.kind === EVIDENCE_KINDS.NEGATIVE_CANDIDATE);
   const negativeKinds = [...new Set(negatives.map(item => item.negativeKind))];
+  if (negativeKinds.length === 2 && negativeKinds.includes(NEGATIVE_KINDS.NO_CONTEXT)) {
+    const specificKind = negativeKinds.find(kind => kind !== NEGATIVE_KINDS.NO_CONTEXT);
+    return frozenClone([...negatives].filter(item => item.negativeKind === specificKind)
+      .sort((left, right) => evidencePriority(right) - evidencePriority(left) ||
+        right.observedAtMs - left.observedAtMs)[0]);
+  }
   if (negativeKinds.length > 1) {
     return conflict(EVIDENCE_SOURCES.RECONCILED, newestAtMs, 'FRESH_NEGATIVE_STATE_CONFLICT', {
       negativeKinds: negativeKinds.sort()
