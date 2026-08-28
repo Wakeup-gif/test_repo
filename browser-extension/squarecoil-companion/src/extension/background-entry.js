@@ -21,17 +21,25 @@ const { createAuthorityRouter } = require('./authority-router');
 const { createDefaultAuthorityKernel } = require('./authority-kernel');
 const { createNativeCompletionObserver } = require('./native-completion-observer');
 const { createAuthorityUpdateTransport } = require('./authority-update-transport');
+const { createWallpaperProvider } = require('./wallpaper-provider');
 
 const BOOT_MESSAGE = 'SC_COMPANION_BOOT';
 const HEALTH_MESSAGE = 'SC_COMPANION_GET_HEALTH';
 const ENABLE_MESSAGE = 'SC_COMPANION_SET_ENABLED';
 const REVALIDATE_MESSAGE = 'SC_COMPANION_REVALIDATE';
 const RETRY_TEARDOWN_MESSAGE = 'SC_COMPANION_RETRY_TEARDOWN';
+const B5B_PERMISSION_MESSAGE = 'SC_COMPANION_B5B_REQUEST_PERMISSION';
+const B5B_REMOVE_PERMISSION_MESSAGE = 'SC_COMPANION_B5B_REMOVE_PERMISSION';
+const B5B_WALLPAPER_MESSAGE = 'SC_COMPANION_B5B_GET_WALLPAPER';
+const B5B_ACK_MESSAGE = 'SC_COMPANION_B5B_ACK';
 const PERSISTENCE_PROBE_KEY = '__scCompanionB1PersistenceProbe';
 const EXPECTED_B1_DEGRADED_REASON = 'coordination-not-implemented-b1';
 const B2_SETTLEMENT_CONTROL_TIMEOUT_MS = 20_000;
 const PACKAGE_VERSION = String(chrome.runtime.getManifest().version || '0.0.0');
 const tabOperationQueues = new Map();
+const wallpaperProvider = chrome.permissions && chrome.storage?.local && typeof globalThis.fetch === 'function'
+  ? createWallpaperProvider({ permissions: chrome.permissions, storage: chrome.storage.local, fetch: globalThis.fetch.bind(globalThis) })
+  : null;
 
 const authorityUpdateTransport = createAuthorityUpdateTransport({ tabs: chrome.tabs });
 
@@ -1493,6 +1501,29 @@ function requestFromMessage(message, sender = {}) {
   return { request: { tabId, expectedDocumentId: null, documentToken: null, source: 'extension' } };
 }
 
+function b5bAcknowledgment(message, result) {
+  return Object.freeze({
+    type: B5B_ACK_MESSAGE,
+    requestId: message.requestId,
+    buildId: BUILD_ID,
+    packageVersion: PACKAGE_VERSION,
+    candidateFingerprint: CANDIDATE_FINGERPRINT,
+    ...result
+  });
+}
+
+async function handleB5BPresentation(request, message) {
+  if (request.source !== 'content') return b5bAcknowledgment(message, { ok: false, reason: 'content-origin-required' });
+  if (!/^[A-Za-z0-9._:-]{8,200}$/.test(String(message.requestId || ''))) {
+    return b5bAcknowledgment(message, { ok: false, reason: 'request-id-invalid' });
+  }
+  if (!wallpaperProvider) return b5bAcknowledgment(message, { ok: false, reason: 'wallpaper-provider-unavailable' });
+  if (message.type === B5B_PERMISSION_MESSAGE) return b5bAcknowledgment(message, await wallpaperProvider.requestPermission());
+  if (message.type === B5B_REMOVE_PERMISSION_MESSAGE) return b5bAcknowledgment(message, await wallpaperProvider.removePermission());
+  if (message.type === B5B_WALLPAPER_MESSAGE) return b5bAcknowledgment(message, await wallpaperProvider.getWallpaper());
+  return b5bAcknowledgment(message, { ok: false, reason: 'message-type-unsupported' });
+}
+
 chrome.runtime.onInstalled.addListener(async () => {
   try {
     const current = await chrome.storage.local.get('timerEnabled');
@@ -1518,6 +1549,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === ENABLE_MESSAGE) task = setPageEnabled(request, message.enabled !== false);
   if (message?.type === REVALIDATE_MESSAGE) task = revalidatePage(request);
   if (message?.type === RETRY_TEARDOWN_MESSAGE) task = retryTeardown(request);
+  if ([B5B_PERMISSION_MESSAGE, B5B_REMOVE_PERMISSION_MESSAGE, B5B_WALLPAPER_MESSAGE].includes(message?.type)) {
+    task = handleB5BPresentation(request, message);
+  }
   if (isAuthorityMessageType(message?.type)) task = handleAuthorityMessage(request, message);
   if (!task) return undefined;
   task.then(sendResponse).catch(error => sendResponse({ ok: false, reason: String(error?.message || error) }));
@@ -1531,6 +1565,10 @@ module.exports = {
   ENABLE_MESSAGE,
   REVALIDATE_MESSAGE,
   RETRY_TEARDOWN_MESSAGE,
+  B5B_PERMISSION_MESSAGE,
+  B5B_REMOVE_PERMISSION_MESSAGE,
+  B5B_WALLPAPER_MESSAGE,
+  B5B_ACK_MESSAGE,
   B2_SETTLEMENT_CONTROL_TIMEOUT_MS,
   AUTHORITY_MESSAGES,
   AUTHORITY_PROTOCOL_VERSION,

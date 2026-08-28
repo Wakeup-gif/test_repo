@@ -16,11 +16,17 @@ const {
 const { createAuthorityClient } = require('../extension/authority-client');
 const { createTrustedTransitionCore } = require('./trusted-transition-core');
 const { createThemeService } = require('../presentation/theme-service');
+const { createCinematicBackground } = require('../presentation/cinematic-background');
+const { createDashboardProfile } = require('../presentation/dashboard-profile');
 
 const DEFAULTS = Object.freeze({ timerEnabled: true });
 const BOOT_MESSAGE = 'SC_COMPANION_BOOT';
 const ENABLE_MESSAGE = 'SC_COMPANION_SET_ENABLED';
 const REVALIDATE_MESSAGE = 'SC_COMPANION_REVALIDATE';
+const B5B_PERMISSION_MESSAGE = 'SC_COMPANION_B5B_REQUEST_PERMISSION';
+const B5B_REMOVE_PERMISSION_MESSAGE = 'SC_COMPANION_B5B_REMOVE_PERMISSION';
+const B5B_WALLPAPER_MESSAGE = 'SC_COMPANION_B5B_GET_WALLPAPER';
+const B5B_ACK_MESSAGE = 'SC_COMPANION_B5B_ACK';
 const TRANSPORT_RETRY_DELAYS_MS = Object.freeze([250, 1000, 3000]);
 const B2_SETTLEMENT_REFRESH_RESPONSE_BUDGET_MS = 15_000;
 const PACKAGE_VERSION = String(chrome.runtime.getManifest().version || '0.0.0');
@@ -37,6 +43,8 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
   let authorityRuntimeInstanceId = null;
   let trustedCore = null;
   let themeService = null;
+  let cinematicService = null;
+  let dashboardProfile = null;
   let authorityCoreSync = Promise.resolve();
   let b2SettlementRefresh = null;
   let settingChangeQueue = Promise.resolve();
@@ -99,10 +107,48 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
     return themeService;
   }
 
+  function b5bRequestId(prefix) {
+    const suffix = globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function'
+      ? globalThis.crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    return `${prefix}-${suffix}`;
+  }
+
+  async function sendB5B(type) {
+    const requestId = b5bRequestId('b5b');
+    const response = await send({ type, requestId });
+    if (response?.type !== B5B_ACK_MESSAGE || response?.requestId !== requestId ||
+        response?.buildId !== BUILD_ID || response?.packageVersion !== PACKAGE_VERSION ||
+        response?.candidateFingerprint !== CANDIDATE_FINGERPRINT) {
+      return { ok: false, reason: 'b5b-acknowledgment-invalid' };
+    }
+    return response;
+  }
+
+  function ensureOptionalPresentation() {
+    if (!cinematicService) cinematicService = createCinematicBackground({
+      document,
+      window,
+      fetchWallpaper: () => sendB5B(B5B_WALLPAPER_MESSAGE),
+      onChange: value => setDataset('squarecoilCompanionCinematic', value.state)
+    });
+    if (!dashboardProfile) dashboardProfile = createDashboardProfile({ document, window });
+    return Object.freeze({
+      apply(preferences, basePresentation) {
+        return Object.freeze({
+          cinematic: cinematicService.apply(preferences, basePresentation),
+          dashboard: dashboardProfile.apply(preferences, basePresentation)
+        });
+      }
+    });
+  }
+
   function withPresentation(current) {
     if (!trustedCore || !current?.preferences) return { ...current, presentation: null };
     let presentation = null;
-    try { presentation = ensureThemeService().apply(current.preferences); }
+    try {
+      const base = ensureThemeService().apply(current.preferences);
+      presentation = { ...base, optional: ensureOptionalPresentation().apply(current.preferences, base) };
+    }
     catch (_) { presentation = null; }
     return { ...current, presentation };
   }
@@ -213,6 +259,8 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
         if (!trustedCore) throw new Error('trusted-transition-core-unavailable');
         return trustedCore.preferenceCommand(patch, expectedPreferenceRevision);
       },
+      requestCinematicAccess: async () => sendB5B(B5B_PERMISSION_MESSAGE),
+      removeCinematicAccess: async () => sendB5B(B5B_REMOVE_PERMISSION_MESSAGE),
       initializePreferences: async legacyPreferences => {
         if (!trustedCore) throw new Error('trusted-transition-core-unavailable');
         return trustedCore.initializePreferences(legacyPreferences);
@@ -548,9 +596,14 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
     }
     if (themeService) themeService.teardown();
     themeService = null;
+    if (cinematicService) cinematicService.teardown();
+    cinematicService = null;
+    if (dashboardProfile) dashboardProfile.teardown();
+    dashboardProfile = null;
     setDataset('squarecoilCompanionTimerAppearance', null);
     setDataset('squarecoilCompanionPanelFinish', null);
     setDataset('squarecoilCompanionWebsiteTheme', null);
+    setDataset('squarecoilCompanionCinematic', null);
     if (!authorityClient) {
       setDataset('squarecoilCompanionAuthorityCleanup', null);
       return { disconnected: true, absent: true };

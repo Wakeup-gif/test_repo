@@ -80,3 +80,25 @@ test('IT-B5-PREF-003 persistence failure leaves the committed preference snapsho
   assert.deepEqual(after.document.timer, before.document.timer);
   assert.deepEqual(after.document.ledger, before.document.ledger);
 });
+
+test('IT-B5-PREF-004 optional presentation enable and disable settle cross-tab without authority mutation', async () => {
+  const { kernel } = fixture();
+  const owner = await kernel.connect({ runtimeId: 'runtime-b5-owner-004', documentToken: 'document-b5-owner-004', tabId: 1 });
+  const observer = await kernel.connect({ runtimeId: 'runtime-b5-observer-004', documentToken: 'document-b5-observer-004', tabId: 2 });
+  await kernel.command(owner.session, command(PREFERENCE_COMMANDS.INITIALIZE, 'preference-init-004', 0, 0, { legacyPreferences: {} }));
+  const baseline = await kernel.read(owner.session);
+  await kernel.command(observer.session, command(PREFERENCE_COMMANDS.COMMIT, 'preference-enable-004', 1, 1,
+    { patch: { websiteTheme: 'SLEEK_DARK', cinematicBackground: 'CINEMATIC', dashboardProfile: 'ON' } }));
+  const enabled = await kernel.read(owner.session);
+  assert.deepEqual(normalizePreferenceSnapshot(enabled.document.dataSafety.preferences),
+    normalizePreferenceSnapshot((await kernel.read(observer.session)).document.dataSafety.preferences));
+  assert.deepEqual([enabled.document.dataSafety.preferences.cinematicBackground, enabled.document.dataSafety.preferences.dashboardProfile],
+    ['CINEMATIC', 'ON']);
+  await kernel.command(owner.session, command(PREFERENCE_COMMANDS.COMMIT, 'preference-disable-004', 2, 2,
+    { patch: { websiteTheme: 'ORIGINAL', cinematicBackground: 'NONE', dashboardProfile: 'OFF' } }));
+  const disabled = await kernel.read(observer.session);
+  assert.deepEqual([disabled.document.dataSafety.preferences.websiteTheme, disabled.document.dataSafety.preferences.cinematicBackground,
+    disabled.document.dataSafety.preferences.dashboardProfile], ['ORIGINAL', 'NONE', 'OFF']);
+  assert.deepEqual(disabled.document.timer, baseline.document.timer);
+  assert.deepEqual(disabled.document.ledger, baseline.document.ledger);
+});

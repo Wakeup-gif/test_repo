@@ -35,11 +35,11 @@ const WORKSPACE_STORAGE_KEYS = new Set(['protoUiHiddenTabs', 'b3WorkspaceOrder',
 const VIEW_IDS = new Set([
   'main', 'recent', 'overview', 'by-day', 'by-context', 'history', 'context-detail',
   'settings', 'timer-appearance', 'website-theme', 'timer-limits', 'submit-ticket',
-  'send-feedback', 'developer-support', 'data-tools'
+  'presentation-packs', 'send-feedback', 'developer-support', 'data-tools'
 ]);
 const SETTINGS_VIEW_IDS = new Set([
   'settings', 'timer-appearance', 'website-theme', 'timer-limits', 'submit-ticket',
-  'send-feedback', 'developer-support', 'data-tools'
+  'presentation-packs', 'send-feedback', 'developer-support', 'data-tools'
 ]);
 const TIMER_ACTIONS = Object.freeze({
   pause: TIMER_COMMANDS.LOCAL_PAUSE,
@@ -135,6 +135,8 @@ function createWorkspaceUi(options = {}) {
   let theme = 'LIGHT';
   let surface = 'SOLID';
   let websiteTheme = 'ORIGINAL';
+  let cinematicBackground = 'NONE';
+  let dashboardProfile = 'OFF';
   let preferenceRevision = 0;
   let preferenceInitialized = false;
   let presentation = null;
@@ -269,6 +271,8 @@ function createWorkspaceUi(options = {}) {
     theme = next.timerAppearance || DEFAULT_PREFERENCES.timerAppearance;
     surface = next.panelFinish || DEFAULT_PREFERENCES.panelFinish;
     websiteTheme = next.websiteTheme || DEFAULT_PREFERENCES.websiteTheme;
+    cinematicBackground = next.cinematicBackground || DEFAULT_PREFERENCES.cinematicBackground;
+    dashboardProfile = next.dashboardProfile || DEFAULT_PREFERENCES.dashboardProfile;
     preferenceRevision = Number.isSafeInteger(next.preferenceRevision) ? next.preferenceRevision : 0;
     preferenceInitialized = next.initialized === true;
     presentation = core.presentation || presentation;
@@ -483,7 +487,7 @@ function createWorkspaceUi(options = {}) {
   }
 
   function settingsView() {
-    return `<div class="sc-view">${viewHeader('Settings')}<div class="sc-eyebrow">Timer</div><div class="sc-nav-grid">${settingsNav('timer-appearance', 'Appearance & Finish', `${theme} · ${surface}`)}${settingsNav('timer-limits', 'Timer Limits', `${limitDraft?.yellowMinutes ?? 60} / ${limitDraft?.orangeMinutes ?? 120} / ${limitDraft?.redMinutes ?? 240} min`)}</div><div class="sc-eyebrow sc-section-label">Library</div><div class="sc-nav-grid">${settingsNav('recent', 'Recent Jobs', 'Visibility and archive actions')}${settingsNav('overview', 'Time Overview', 'Today, week, day, context')}${settingsNav('history', 'History', 'Finalized Companion sessions')}${settingsNav('data-tools', 'Archives & Backup', 'Data tools: backup, restore, CSV, cleanup')}</div><div class="sc-eyebrow sc-section-label">SquareCoil</div><div class="sc-nav-grid">${settingsNav('website-theme', 'Website Theme', websiteTheme.replace(/_/g, ' '))}</div><div class="sc-eyebrow sc-section-label">Support</div><div class="sc-nav-grid">${settingsNav('submit-ticket', 'Submit a Ticket', `Email ${SUPPORT_EMAIL}`)}${settingsNav('send-feedback', 'Send Feedback', 'Suggestion, UI / UX, feature idea')}</div><div class="sc-eyebrow sc-section-label">About</div><div class="sc-nav-grid">${settingsNav('developer-support', 'Support the Developer', 'Free app · optional tips')}</div></div>`;
+    return `<div class="sc-view">${viewHeader('Settings')}<div class="sc-eyebrow">Timer</div><div class="sc-nav-grid">${settingsNav('timer-appearance', 'Appearance & Finish', `${theme} · ${surface}`)}${settingsNav('timer-limits', 'Timer Limits', `${limitDraft?.yellowMinutes ?? 60} / ${limitDraft?.orangeMinutes ?? 120} / ${limitDraft?.redMinutes ?? 240} min`)}</div><div class="sc-eyebrow sc-section-label">Library</div><div class="sc-nav-grid">${settingsNav('recent', 'Recent Jobs', 'Visibility and archive actions')}${settingsNav('overview', 'Time Overview', 'Today, week, day, context')}${settingsNav('history', 'History', 'Finalized Companion sessions')}${settingsNav('data-tools', 'Archives & Backup', 'Data tools: backup, restore, CSV, cleanup')}</div><div class="sc-eyebrow sc-section-label">SquareCoil</div><div class="sc-nav-grid">${settingsNav('website-theme', 'Website Theme', websiteTheme.replace(/_/g, ' '))}${settingsNav('presentation-packs', 'Optional Presentation', `${cinematicBackground} · dashboard ${dashboardProfile}`)}</div><div class="sc-eyebrow sc-section-label">Support</div><div class="sc-nav-grid">${settingsNav('submit-ticket', 'Submit a Ticket', `Email ${SUPPORT_EMAIL}`)}${settingsNav('send-feedback', 'Send Feedback', 'Suggestion, UI / UX, feature idea')}</div><div class="sc-eyebrow sc-section-label">About</div><div class="sc-nav-grid">${settingsNav('developer-support', 'Support the Developer', 'Free app · optional tips')}</div></div>`;
   }
 
   function choiceMarkup(action, values, current) {
@@ -502,6 +506,15 @@ function createWorkspaceUi(options = {}) {
     const effective = presentation?.websiteThemeEffective || websiteTheme;
     const logo = presentation?.logoStatus || 'native-logo';
     return `<div class="sc-view">${viewHeader('SquareCoil Website Theme', 'settings')}${choiceMarkup('preference-site', [['ORIGINAL', 'Original'], ['REFINED_LIGHT', 'Refined Light'], ['SLEEK_DARK', 'Sleek Dark']], websiteTheme)}<div class="sc-note">Preference ${escapeHtml(websiteTheme.replace(/_/g, ' '))} · effective ${escapeHtml(effective.replace(/_/g, ' '))}. Styling is presentation-only and never changes native controls or clock actions.</div>${websiteTheme === 'SLEEK_DARK' && !String(logo).startsWith('configured') ? '<div class="sc-note">The approved dark logo is unavailable, so the native logo remains visible.</div>' : ''}</div>`;
+  }
+
+  function presentationPacksView() {
+    const optional = presentation?.optional || {};
+    const cinematic = optional.cinematic || {};
+    const dashboard = optional.dashboard || {};
+    const eligibilityNote = websiteTheme !== 'SLEEK_DARK'
+      ? '<div class="sc-note">These first-release packs are dark-system treatments. Their saved choices stay suspended until Sleek Dark is effective.</div>' : '';
+    return `<div class="sc-view">${viewHeader('Optional Presentation', 'settings')}<div class="sc-eyebrow">Fresh Bing Cinematic Background</div>${choiceMarkup('preference-cinematic', [['NONE', 'Off'], ['CINEMATIC', 'On']], cinematicBackground)}<div class="sc-note">Saved ${escapeHtml(cinematicBackground)} · effective ${escapeHtml(cinematic.state || 'DISABLED')}. Enabling asks for optional access to www.bing.com. Requests contain only fixed image-feed parameters—never job, timer, page, or user content.</div><div class="sc-eyebrow sc-section-label">Design Dashboard profile</div>${choiceMarkup('preference-dashboard', [['OFF', 'Off'], ['ON', 'On']], dashboardProfile)}<div class="sc-note">Saved ${escapeHtml(dashboardProfile)} · effective ${escapeHtml(dashboard.state || 'INACTIVE_PAGE')}. It can apply only to the exact /dashboard.php?show=2 page and changes presentation only.</div>${eligibilityNote}<div class="sc-actions"><button data-action="restore-native">Restore Native SquareCoil</button></div><div class="sc-note">Restore Native selects Original, disables both optional packs, removes Companion-owned presentation, and leaves every native control and business value untouched.</div></div>`;
   }
 
   function timerLimitsView() {
@@ -548,6 +561,7 @@ function createWorkspaceUi(options = {}) {
     if (view === 'settings') return settingsView();
     if (view === 'timer-appearance') return timerAppearanceView();
     if (view === 'website-theme') return websiteThemeView();
+    if (view === 'presentation-packs') return presentationPacksView();
     if (view === 'timer-limits') return timerLimitsView();
     if (view === 'submit-ticket') return supportView('ticket');
     if (view === 'send-feedback') return supportView('feedback');
@@ -570,7 +584,7 @@ function createWorkspaceUi(options = {}) {
     target.dataset.workspaceState = snapshotStale ? 'stale' : timer ? 'loaded' : 'loading';
     const status = core?.blocked ? 'Blocked by legacy data' : core?.status ? String(core.status).replace(/-/g, ' ') : 'Connecting';
     const basis = timer?.timeBasis?.disclosed ? timer.timeBasis.label : timer?.workdayZone || 'waiting for time basis';
-    target.innerHTML = `${styleBlock()}<div class="sc-proto-shell"><div class="sc-proto-topbar"><div class="sc-proto-brand"><strong>SquareCoil Companion</strong><small>B5-A settings &amp; presentation</small></div><span class="sc-proto-lifecycle" data-sc-status>${escapeHtml(status)}</span><button class="sc-icon-btn" data-action="sync" aria-label="Sync">↻</button><button class="sc-icon-btn" data-action="collapse" aria-label="${collapsed ? 'Expand' : 'Collapse'}">${collapsed ? '▣' : '–'}</button></div>${timer ? tabMarkup(timer) : ''}<div class="sc-content">${snapshotStale ? '<div class="sc-stale">Showing the last trusted revision while the workspace revalidates.</div>' : ''}${bodyMarkup(timer, core)}</div>${errorMessage ? `<div class="sc-error">${escapeHtml(errorMessage)}</div>` : ''}<div class="sc-foot">Revision ${timer?.revision ?? '—'} · preference ${preferenceRevision} · ${escapeHtml(basis)}</div></div>`;
+    target.innerHTML = `${styleBlock()}<div class="sc-proto-shell"><div class="sc-proto-topbar"><div class="sc-proto-brand"><strong>SquareCoil Companion</strong><small>B5-B optional presentation</small></div><span class="sc-proto-lifecycle" data-sc-status>${escapeHtml(status)}</span><button class="sc-icon-btn" data-action="sync" aria-label="Sync">↻</button><button class="sc-icon-btn" data-action="collapse" aria-label="${collapsed ? 'Expand' : 'Collapse'}">${collapsed ? '▣' : '–'}</button></div>${timer ? tabMarkup(timer) : ''}<div class="sc-content">${snapshotStale ? '<div class="sc-stale">Showing the last trusted revision while the workspace revalidates.</div>' : ''}${bodyMarkup(timer, core)}</div>${errorMessage ? `<div class="sc-error">${escapeHtml(errorMessage)}</div>` : ''}<div class="sc-foot">Revision ${timer?.revision ?? '—'} · preference ${preferenceRevision} · ${escapeHtml(basis)}</div></div>`;
     const content = target.querySelector?.('.sc-content'); if (content) content.scrollTop = previousScroll;
     if (focusTarget) {
       const selector = focusTarget;
@@ -843,6 +857,31 @@ function createWorkspaceUi(options = {}) {
     }
     if (action === 'preference-site' && event.isTrusted === true) {
       withBusy('preference', () => commitPreferencePatch({ websiteTheme: button.dataset.value })); return;
+    }
+    if (action === 'preference-cinematic' && event.isTrusted === true) {
+      const value = button.dataset.value;
+      withBusy('cinematic-preference', async () => {
+        const handle = coreHandle();
+        if (value === 'CINEMATIC') {
+          if (!handle || typeof handle.requestCinematicAccess !== 'function') throw new Error('Optional wallpaper permission service is unavailable.');
+          const permission = await handle.requestCinematicAccess();
+          if (permission?.granted !== true) throw new Error('Fresh Bing access was not granted; Cinematic remains off.');
+        }
+        await commitPreferencePatch({ cinematicBackground: value });
+        if (value === 'NONE' && typeof handle?.removeCinematicAccess === 'function') await handle.removeCinematicAccess();
+      });
+      return;
+    }
+    if (action === 'preference-dashboard' && event.isTrusted === true) {
+      withBusy('dashboard-preference', () => commitPreferencePatch({ dashboardProfile: button.dataset.value })); return;
+    }
+    if (action === 'restore-native' && event.isTrusted === true) {
+      withBusy('restore-native', async () => {
+        await commitPreferencePatch({ websiteTheme: 'ORIGINAL', cinematicBackground: 'NONE', dashboardProfile: 'OFF' });
+        const handle = coreHandle();
+        if (typeof handle?.removeCinematicAccess === 'function') await handle.removeCinematicAccess();
+      });
+      return;
     }
     if (action === 'reset-limits' && event.isTrusted === true) {
       if (!window.confirm('Reset Timer Limits to 60 / 120 / 240 minutes?')) return;

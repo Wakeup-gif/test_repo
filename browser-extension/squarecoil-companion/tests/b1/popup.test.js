@@ -516,9 +516,9 @@ test('UT-B2-READY-019 popup settlement retry policy is exactly bounded to three 
   assert.match(source, /SETTLEMENT_RETRY_DELAYS_MS\s*=\s*Object\.freeze\(\[50, 150, 450\]\)/);
 });
 
-test('UT-B2-READY-022 popup static copy preserves the final fail-closed B2 settlement gate in B5-A', () => {
+test('UT-B2-READY-022 popup static copy preserves the final fail-closed B2 settlement gate in B5-B', () => {
   const html = fs.readFileSync(path.resolve(__dirname, '../../popup/popup.html'), 'utf8');
-  assert.match(html, /B5-A · Settings &amp; presentation/);
+  assert.match(html, /B5-B · Optional presentation/);
   assert.match(html, /READY still requires lifecycle, fenced authority, migration, trusted core, and Bridge settlement\./);
   assert.match(html, /cannot manufacture READY, restore live timer state, or modify SquareCoil official data/);
   assert.doesNotMatch(html, /B1 intentionally stays degraded/);

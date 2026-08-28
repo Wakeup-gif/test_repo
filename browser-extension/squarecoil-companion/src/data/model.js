@@ -452,13 +452,18 @@ function validateDataSafety(dataSafety, contexts) {
   if (!isRecord(dataSafety.preferences)) throw new Error('data-safety-preferences-invalid');
   if (dataSafety.preferences.preferencesSchemaVersion !== undefined) {
     const preferences = dataSafety.preferences;
-    if (preferences.preferencesSchemaVersion !== 1 || !isNonNegativeInteger(preferences.preferenceRevision)) {
+    if (![1, 2].includes(preferences.preferencesSchemaVersion) || !isNonNegativeInteger(preferences.preferenceRevision)) {
       throw new Error('preferences-schema-invalid');
     }
     if (!['LIGHT', 'DARK', 'AUTO'].includes(preferences.timerAppearance) ||
         !['SOLID', 'GLASS'].includes(preferences.panelFinish) ||
         !['ORIGINAL', 'REFINED_LIGHT', 'SLEEK_DARK'].includes(preferences.websiteTheme)) {
       throw new Error('preferences-appearance-invalid');
+    }
+    if (preferences.preferencesSchemaVersion >= 2 &&
+        (!['NONE', 'CINEMATIC'].includes(preferences.cinematicBackground) ||
+         !['OFF', 'ON'].includes(preferences.dashboardProfile))) {
+      throw new Error('preferences-optional-presentation-invalid');
     }
     if (!isFiniteInteger(preferences.yellowMinutes) || !isFiniteInteger(preferences.orangeMinutes) ||
         !isFiniteInteger(preferences.redMinutes) || preferences.yellowMinutes < 1 ||

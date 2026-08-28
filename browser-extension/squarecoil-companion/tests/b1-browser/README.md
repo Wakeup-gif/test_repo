@@ -1,6 +1,6 @@
-# B1-B5-A installed-browser acceptance harness
+# B1-B5-B installed-browser acceptance harness
 
-This harness loads one exact unpacked package into installed, branded Google Chrome and Microsoft Edge. It retains the settled B1 lifecycle, B2 authority/transition/READY, B3 workspace, and B4 data-safety gates while exercising B5-A settings and presentation against the exact packaged bytes. It serves only synthetic fixture HTML in memory. No request reaches SquareCoil or customer data.
+This harness loads one exact unpacked package into installed, branded Google Chrome and Microsoft Edge. It retains the settled B1 lifecycle, B2 authority/transition/READY, B3 workspace, B4 data-safety, and B5-A core-presentation gates while exercising B5-B optional presentation against the exact packaged bytes. It serves only synthetic fixture HTML in memory. No request reaches SquareCoil or customer data.
 
 ## Required package
 
@@ -19,8 +19,8 @@ The `--package` directory must contain exactly the eight allowlisted release fil
 
 `dist/build-info.json` must contain:
 
-- `buildId: "rebuild-b5a-settings-presentation"`;
-- `stage: "B5-A"`;
+- `buildId: "rebuild-b5b-optional-presentation"`;
+- `stage: "B5-B"`;
 - a lowercase 64-character `candidateFingerprint` embedded exactly in `dist/background.js`, `dist/companion-app.js`, and `dist/content-controller.js`;
 - a lowercase 40-character `sourceSha` exactly matching `--expected-source-sha`;
 - boolean `sourceDirty`, which must be `false` for acceptance.
@@ -95,7 +95,11 @@ Every message the harness sends directly from the content-script execution world
 - one revisioned Preferences service synchronizes owner/observer tabs and rejects a stale Timer Limits form before allowing one coherent replacement batch;
 - Support diagnostics are opt-in and frozen, expose only coarse allowlisted state, and delivery remains an explicit user action;
 - dirty Settings drafts require confirmation, missing Developer Support configuration stays unavailable, and no settings action mutates Timer/Ledger or native SquareCoil state.
+- optional presentation is off by default and makes no Bing request without the optional host permission;
+- Cinematic owns one bounded host/style, settles safely to cache/fallback/base presentation, and Restore Native removes its resources;
+- the Design Dashboard profile applies only to exact `/dashboard.php?show=2`, preserves native KPI text, row order/targets, selects, disabled controls, and warnings, and does not leak to another dashboard mode;
+- optional presentation changes no Timer/Ledger/native-clock authority and attempts no native SquareCoil mutation.
 
 Each browser result carries the canonical stable IDs it proves: `B1-LC-001` through `B1-LC-010` and `B1-LC-012` through `B1-LC-018`. `B1-LC-011` is intentionally an A2/A3-only persistence-concurrency fixture. The B2.1 cases carry `B2-KERNEL-001` (multi-tab OWNER/OBSERVER) and `B2-KERNEL-002` (worker-restart reconnection). The B2.2 cases carry `B2-TRANSITION-001` through `B2-TRANSITION-005` for action 7 start, owner/observer synchronization, atomic job switch, exactly-once disable, and legacy fail-closed behavior. Final settlement cases carry `B2-READY-001` through `B2-READY-003` for OWNER plus popup READY, non-writing OBSERVER READY, and migration-blocked degradation.
 
-The B3 cases carry `B3-WORKSPACE-001` through `B3-WORKSPACE-004`. The B4 cases carry `B4-DATA-001` through `B4-DATA-004`. The B5-A cases carry `B5-SETTINGS-001` through `B5-SETTINGS-005`. Passing the suite proves the installed-browser A4 portion of B5-A while preserving every earlier gate. READY-C04 verification-fallback behavior remains covered by mandatory unit/integration fixtures because the installed candidate has `chrome.webRequest`; A4 does not alter the candidate to manufacture an unavailable hook. Final B5-A acceptance requires this A4 pass together with the repository's unit, integration, prototype-compatibility, package, and CI gates.
+The B3 cases carry `B3-WORKSPACE-001` through `B3-WORKSPACE-004`. The B4 cases carry `B4-DATA-001` through `B4-DATA-004`. The B5-A cases carry `B5-SETTINGS-001` through `B5-SETTINGS-005`. B5-B carries `B5B-CINE-001`, `B5B-CINE-002`, `B5B-DASH-001`, `B5B-DASH-002`, and `B5B-SAFETY-001`. Passing the suite proves the installed-browser A4 portion of B5-B while preserving every earlier gate. READY-C04 verification-fallback behavior remains covered by mandatory unit/integration fixtures because the installed candidate has `chrome.webRequest`; A4 does not alter the candidate to manufacture an unavailable hook. Final B5-B acceptance requires this A4 pass together with the repository's unit, integration, prototype-compatibility, package, and CI gates.

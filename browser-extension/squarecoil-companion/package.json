@@ -25,6 +25,7 @@
     "check:b2-transition": "npm test && npm run validate",
     "check:b3-workspace": "npm test && npm run validate",
     "check:b4-data": "npm test && npm run validate",
-    "check:b5-settings": "npm test && npm run validate"
+    "check:b5-settings": "npm test && npm run validate",
+    "check:b5-optional": "npm test && npm run test:proto-ui && npm run validate"
   }
 }

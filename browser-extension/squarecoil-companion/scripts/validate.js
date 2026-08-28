@@ -19,10 +19,11 @@ function assert(condition, message) {
 assert(manifest.manifest_version === 3, 'manifest_version must be 3');
 assert(manifest.version === release.latestVersion, `manifest version ${manifest.version} must match release metadata ${release.latestVersion}`);
 assert(manifest.version === packageMetadata.version, `manifest version ${manifest.version} must match package metadata ${packageMetadata.version}`);
-assert(BUILD_ID === 'rebuild-b5a-settings-presentation', 'B5-A build ID must identify the settings/presentation gate');
-assert(BUILD_STAGE === 'B5-A', 'B5-A settings/presentation stage must remain explicit');
-assert(JSON.stringify(manifest.permissions || []) === JSON.stringify(['storage', 'scripting', 'webRequest']), 'B5-A permissions must preserve storage + scripting + passive webRequest observation only');
+assert(BUILD_ID === 'rebuild-b5b-optional-presentation', 'B5-B build ID must identify the optional-presentation gate');
+assert(BUILD_STAGE === 'B5-B', 'B5-B optional-presentation stage must remain explicit');
+assert(JSON.stringify(manifest.permissions || []) === JSON.stringify(['storage', 'scripting', 'webRequest']), 'B5-B core permissions must preserve storage + scripting + passive webRequest observation only');
 assert(JSON.stringify(manifest.host_permissions || []) === JSON.stringify(['https://ussignandmill.squarecoil.net/*']), 'Rebuild host permission must remain limited to the exact SquareCoil tenant');
+assert(JSON.stringify(manifest.optional_host_permissions || []) === JSON.stringify(['https://www.bing.com/*']), 'B5-B may request only the exact optional Bing image origin');
 assert(JSON.stringify(Object.keys(manifest.background || {}).sort()) === JSON.stringify(['service_worker']), 'B1 background policy must contain only the service worker entry');
 assert(manifest.background?.service_worker === 'dist/background.js', 'B1 manifest must use generated dist/background.js');
 assert(manifest.action?.default_popup === 'popup/popup.html', 'B1 popup path must be explicit');
@@ -159,6 +160,16 @@ const b5SettingsRequired = [
   'tests/b5-integration/settings.integration.test.js'
 ];
 
+const b5OptionalPresentationRequired = [
+  'src/presentation/optional-feature-registry.js',
+  'src/presentation/cinematic-background.js',
+  'src/presentation/dashboard-profile.js',
+  'src/extension/wallpaper-provider.js',
+  'tests/b5/cinematic-background.test.js',
+  'tests/b5/dashboard-profile.test.js',
+  'tests/b5/wallpaper-provider.test.js'
+];
+
 for (const file of required) {
   assert(fs.existsSync(path.join(root, file)), `Missing B1 file: ${file}`);
 }
@@ -176,6 +187,9 @@ for (const file of b4DataSafetyRequired) {
 }
 for (const file of b5SettingsRequired) {
   assert(fs.existsSync(path.join(root, file)), `Missing B5-A settings/presentation file: ${file}`);
+}
+for (const file of b5OptionalPresentationRequired) {
+  assert(fs.existsSync(path.join(root, file)), `Missing B5-B optional-presentation file: ${file}`);
 }
 
 const background = fs.readFileSync(path.join(root, 'dist/background.js'), 'utf8');
@@ -208,7 +222,7 @@ for (const reference of manifestReferences) {
 }
 
 const popupHtml = fs.readFileSync(path.join(root, 'popup/popup.html'), 'utf8');
-assert(popupHtml.includes('B5-A · Settings &amp; presentation'), 'Popup fallback stage must identify the B5-A settings/presentation runtime');
+assert(popupHtml.includes('B5-B · Optional presentation'), 'Popup fallback stage must identify the B5-B optional-presentation runtime');
 assert(popupHtml.includes('READY still requires lifecycle, fenced authority, migration, trusted core, and Bridge settlement.'), 'Popup must preserve the fail-closed READY settlement prerequisites');
 assert(popupHtml.includes('cannot manufacture READY, restore live timer state, or modify SquareCoil official data'), 'Popup must state the B5-A fail-closed authority boundary');
 assert(!popupHtml.includes('B1 intentionally stays degraded'), 'Popup must not retain the obsolete pre-B2 degraded explanation');
@@ -305,6 +319,9 @@ for (const fixtureId of Array.from({ length: 4 }, (_, index) => `B4-DATA-${Strin
 }
 for (const fixtureId of Array.from({ length: 5 }, (_, index) => `B5-SETTINGS-${String(index + 1).padStart(3, '0')}`)) {
   assert(browserFixtureSource.includes(fixtureId), `B5-A browser fixture register is missing ${fixtureId}`);
+}
+for (const fixtureId of ['B5B-CINE-001', 'B5B-CINE-002', 'B5B-DASH-001', 'B5B-DASH-002', 'B5B-SAFETY-001']) {
+  assert(browserFixtureSource.includes(fixtureId), `B5-B browser fixture register is missing ${fixtureId}`);
 }
 
 const b2FixtureFiles = fixtureFiles;
@@ -424,7 +441,7 @@ for (const file of b5FixtureFiles) {
   const titles = [...source.matchAll(/\btest\s*\(\s*(['"])([^'"\r\n]+)\1/g)].map(match => match[2]);
   for (const title of titles) {
     const matches = [...title.matchAll(b5FixtureIdPattern)].map(match => match[0]);
-    assert(matches.length === 1 && title.startsWith(matches[0]), `B5-A test title must start with exactly one stable fixture ID in ${relative}: ${title}`);
+    assert(matches.length === 1 && title.startsWith(matches[0]), `B5 test title must start with exactly one stable fixture ID in ${relative}: ${title}`);
     b5TestCount += 1;
     const owners = b5FixtureIds.get(matches[0]) || [];
     owners.push(relative);
@@ -432,11 +449,11 @@ for (const file of b5FixtureFiles) {
   }
 }
 for (const [fixtureId, owners] of b5FixtureIds) {
-  assert(owners.length === 1, `B5-A fixture ID must be unique: ${fixtureId} appears in ${owners.join(', ')}`);
+  assert(owners.length === 1, `B5 fixture ID must be unique: ${fixtureId} appears in ${owners.join(', ')}`);
 }
-assert(b5FixtureIds.size === b5TestCount, `Every B5-A test must own exactly one stable fixture ID (${b5FixtureIds.size} IDs for ${b5TestCount} tests)`);
-for (const family of ['UT-B5-PREF-', 'UT-B5-UI-', 'UT-B5-SUPPORT-', 'UT-B5-THEME-', 'IT-B5-PREF-']) {
-  assert([...b5FixtureIds.keys()].some(fixtureId => fixtureId.startsWith(family)), `B5-A fixture register is missing family ${family}*`);
+assert(b5FixtureIds.size === b5TestCount, `Every B5 test must own exactly one stable fixture ID (${b5FixtureIds.size} IDs for ${b5TestCount} tests)`);
+for (const family of ['UT-B5-PREF-', 'UT-B5-UI-', 'UT-B5-SUPPORT-', 'UT-B5-THEME-', 'UT-B5-CINE-', 'UT-B5-DASH-', 'IT-B5-PREF-']) {
+  assert([...b5FixtureIds.keys()].some(fixtureId => fixtureId.startsWith(family)), `B5 fixture register is missing family ${family}*`);
 }
 
 const sourceFiles = listJavaScriptFiles(path.join(root, 'src'));
@@ -480,7 +497,10 @@ assert(background.includes('src/data/data-safety-command.js'), 'The worker bundl
 assert(contentBundle.includes('src/preferences/preferences.js'), 'B5-A isolated bundle must package the preference schema and migration adapters');
 assert(contentBundle.includes('src/presentation/theme-service.js'), 'B5-A isolated bundle must package the owned presentation service');
 assert(contentBundle.includes('src/support/support-service.js'), 'B5-A isolated bundle must package privacy-safe Support composition');
-assert(contentBundle.includes('B5-A settings &amp; presentation'), 'B5-A isolated bundle must package the settings workspace surface');
+assert(contentBundle.includes('B5-B optional presentation'), 'B5-B isolated bundle must package the optional-presentation workspace surface');
+assert(contentBundle.includes('src/presentation/cinematic-background.js'), 'B5-B isolated bundle must package the fenced cinematic service');
+assert(contentBundle.includes('src/presentation/dashboard-profile.js'), 'B5-B isolated bundle must package the exact-route dashboard profile');
+assert(background.includes('src/extension/wallpaper-provider.js'), 'B5-B worker must package the privacy-bounded wallpaper provider');
 assert(!contentBundle.includes('src/preferences/preferences-command.js'), 'The isolated content bundle must not package the authoritative preference writer');
 assert(background.includes('src/preferences/preferences-command.js'), 'The worker bundle must package the authoritative preference writer');
 assert(!/action=(?:2|3|4)(?:\D|$)/.test(contentBundle), 'B2.2 packaged Bridge must not issue native SquareCoil mutation actions');
@@ -491,8 +511,9 @@ assert(companionBundle.includes('coordination-not-implemented-b1'), 'Final B2 mu
 const serializedManifest = JSON.stringify(manifest);
 assert(!serializedManifest.includes('raw.githubusercontent.com'), 'B1 manifest should not request raw GitHub host permission');
 assert(!serializedManifest.includes('i.imgur.com'), 'B1 manifest should not request image host permission');
+assert(!JSON.stringify(manifest.host_permissions || []).includes('bing.com'), 'B5-B Bing access must never be a mandatory host permission');
 
-console.log(`B5-A settings/presentation validation passed for SquareCoil Companion v${manifest.version}`);
+console.log(`B5-B optional-presentation validation passed for SquareCoil Companion v${manifest.version}`);
 console.log(`Canonical build identity: ${BUILD_ID} (${BUILD_STAGE}).`);
 console.log('The worker owns one fenced authority kernel; only the isolated content controller owns its versioned client transport.');
-console.log(`Fixture register validated: ${unitFixtureMappings.length} B1 A2 mappings, ${requiredIntegrationFixtures.length} B1 A3 IDs, ${requiredBrowserFixtures.length} B1 A4 IDs, 2 B2.1 A4 IDs, 5 B2.2 A4 IDs, 3 final-B2 READY A4 IDs, 4 B3 workspace A4 IDs, 4 B4 data A4 IDs, 5 B5-A settings A4 IDs, ${b2FixtureIds.size} B2 stable IDs, ${b3FixtureIds.size} B3 stable IDs, ${b4FixtureIds.size} B4 stable IDs, and ${b5FixtureIds.size} B5-A stable IDs; no skipped/todo/focused fixtures.`);
+console.log(`Fixture register validated: ${unitFixtureMappings.length} B1 A2 mappings, ${requiredIntegrationFixtures.length} B1 A3 IDs, ${requiredBrowserFixtures.length} B1 A4 IDs, 2 B2.1 A4 IDs, 5 B2.2 A4 IDs, 3 final-B2 READY A4 IDs, 4 B3 workspace A4 IDs, 4 B4 data A4 IDs, 5 B5-A settings A4 IDs, 5 B5-B optional A4 IDs, ${b2FixtureIds.size} B2 stable IDs, ${b3FixtureIds.size} B3 stable IDs, ${b4FixtureIds.size} B4 stable IDs, and ${b5FixtureIds.size} B5 stable IDs; no skipped/todo/focused fixtures.`);

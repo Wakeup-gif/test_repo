@@ -6,11 +6,12 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const zlib = require('node:zlib');
 
-const CANONICAL_BUILD_ID = 'rebuild-b5a-settings-presentation';
-const CANONICAL_STAGE = 'B5-A';
+const CANONICAL_BUILD_ID = 'rebuild-b5b-optional-presentation';
+const CANONICAL_STAGE = 'B5-B';
 const FIXTURE_ORIGIN = 'https://ussignandmill.squarecoil.net';
 const FIXTURE_PATH = '/__b1_fixture__/a4.html';
 const FRAME_PATH = '/__b1_fixture__/frame.html';
+const DASHBOARD_PATH = '/dashboard.php';
 const UNSUPPORTED_URL = 'data:text/html,<meta charset="utf-8"><title>A4 unsupported document</title><p>Synthetic unsupported document</p>';
 const ROOT_ID = 'ussign-job-timer';
 const RUNTIME_KEY = '__squareCoilCompanionRuntime';
@@ -73,6 +74,13 @@ const REQUIRED_B5_SETTINGS_A4_FIXTURE_IDS = Object.freeze([
   'B5-SETTINGS-004',
   'B5-SETTINGS-005'
 ]);
+const REQUIRED_B5B_A4_FIXTURE_IDS = Object.freeze([
+  'B5B-CINE-001',
+  'B5B-CINE-002',
+  'B5B-DASH-001',
+  'B5B-DASH-002',
+  'B5B-SAFETY-001'
+]);
 const REQUIRED_PACKAGE_FILES = Object.freeze([
   'dist/background.js',
   'dist/build-info.json',
@@ -93,7 +101,8 @@ const MESSAGES = Object.freeze({
   HEALTH: 'SC_COMPANION_GET_HEALTH',
   ENABLE: 'SC_COMPANION_SET_ENABLED',
   REVALIDATE: 'SC_COMPANION_REVALIDATE',
-  RETRY: 'SC_COMPANION_RETRY_TEARDOWN'
+  RETRY: 'SC_COMPANION_RETRY_TEARDOWN',
+  B5B_WALLPAPER: 'SC_COMPANION_B5B_GET_WALLPAPER'
 });
 const BROWSER_DEFAULTS = Object.freeze({
   chrome: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
@@ -234,6 +243,8 @@ function validatePackageIdentity(inventory, options) {
   const { manifest, buildInfo } = inventory;
   if (manifest.manifest_version !== 3) throw new Error('A4 requires a Manifest V3 package');
   if (manifest.background?.service_worker !== 'dist/background.js') throw new Error('A4 requires dist/background.js as the service worker');
+  if (JSON.stringify(manifest.host_permissions || []) !== JSON.stringify([`${FIXTURE_ORIGIN}/*`])) throw new Error('A4 requires only the exact SquareCoil mandatory host permission');
+  if (JSON.stringify(manifest.optional_host_permissions || []) !== JSON.stringify(['https://www.bing.com/*'])) throw new Error('A4 requires only the exact optional Bing host permission');
   if (buildInfo.buildId !== CANONICAL_BUILD_ID) throw new Error(`A4 requires canonical buildId ${CANONICAL_BUILD_ID}`);
   if (buildInfo.stage !== CANONICAL_STAGE) throw new Error(`A4 requires canonical stage ${CANONICAL_STAGE}`);
   if (!/^[0-9a-f]{64}$/.test(String(buildInfo.candidateFingerprint || ''))) {
@@ -856,6 +867,11 @@ function frameHtml() {
   return '<!doctype html><html><head><meta charset="utf-8"><title>A4 child frame</title><link rel="icon" href="data:,"></head><body><p>Synthetic child frame</p></body></html>';
 }
 
+function dashboardFixtureHtml() {
+  const clock = clockContextHtml({ projectId: '260701', label: '260701 - Design' });
+  return '<!doctype html><html><head><meta charset="utf-8"><title>SquareCoil Design Dashboard Fixture</title><link rel="icon" href="data:,"></head><body><main><div id="content"><div class="mw1000 center-block demo-block mt30"><section id="widget-tasks"><div><h2>17</h2><h5>Tasks</h5></div></section><section id="widget-designs"><div><h2>8</h2><h5>Designs</h5></div></section><section id="widget-estimates"><div><h2>3</h2><h5>Estimates</h5></div></section><div id="page-content"><div class="panel heading-border panel-primary"><div class="panel-body bg-light"><select id="multiple_location_id"><option value="shop-2" selected>Shop 2</option></select><div id="db-designs"><div id="inProgress" class="design-list-container"><a class="clickableRowx" href="/project.php?id=260701">A</a><a class="clickableRowx" href="/project.php?id=260702">B</a></div><div id="nextJob" class="design-list-container"><button disabled>Native disabled</button></div><div id="onHold" class="design-list-container"><span class="text-warning">Native warning</span></div></div></div></div></div></div><div id="description-modal"><div class="modal-content"><button>Close</button></div></div><section class="timeclock-container"><button id="clockin" hidden>Clock in</button><button id="clockout">Clock out</button><span id="clockin-debug"></span><span id="clockin-remaining-time">' + clock + '</span><div class="clock-actions"></div></section></main></body></html>';
+}
+
 async function installSyntheticRouting(context, networkEvidence, transitionFixture) {
   await context.route('**/*', async route => {
     const request = route.request();
@@ -869,6 +885,10 @@ async function installSyntheticRouting(context, networkEvidence, transitionFixtu
       networkEvidence.fulfilled.push(url.href);
       return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: frameHtml() });
     }
+    if (url.origin === FIXTURE_ORIGIN && url.pathname === DASHBOARD_PATH) {
+      networkEvidence.fulfilled.push(url.href);
+      return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: dashboardFixtureHtml() });
+    }
     if (url.origin === FIXTURE_ORIGIN && url.pathname === '/ajax_time_clock.php') {
       const body = request.postData() || '';
       const record = { url: url.href, method: request.method(), body };
@@ -878,6 +898,20 @@ async function installSyntheticRouting(context, networkEvidence, transitionFixtu
       }
       networkEvidence.nativeMutationAttempts.push(record);
       return route.abort('blockedbyclient');
+    }
+    if (url.origin === 'https://www.bing.com' && url.pathname === '/HPImageArchive.aspx' &&
+        url.search === '?format=js&idx=0&n=1&mkt=en-US&uhd=1&uhdwidth=3840&uhdheight=2160') {
+      networkEvidence.bing.push({ url: url.href, resourceType: request.resourceType(), kind: 'metadata' });
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ images: [{
+        url: '/th?id=OHR.SquareCoilAcceptance_UHD.jpg', title: 'Synthetic acceptance wallpaper', startdate: '20260828'
+      }] }) });
+    }
+    if (url.origin === 'https://www.bing.com' && url.pathname === '/th' &&
+        url.searchParams.get('id') === 'OHR.SquareCoilAcceptance_UHD.jpg' &&
+        [...url.searchParams.keys()].every(key => ['id', 'rf', 'pid'].includes(key))) {
+      networkEvidence.bing.push({ url: url.href, resourceType: request.resourceType(), kind: 'image' });
+      return route.fulfill({ status: 200, contentType: 'image/png',
+        body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64') });
     }
     if (url.protocol === 'http:' || url.protocol === 'https:') {
       networkEvidence.blockedUnexpected.push({ url: url.href, resourceType: request.resourceType() });
@@ -1004,6 +1038,18 @@ function runB5SettingsBrowserCase(cases, family, fixtureIds, slug, name, task) {
   });
 }
 
+function runB5OptionalBrowserCase(cases, family, fixtureIds, slug, name, task) {
+  for (const fixtureId of fixtureIds) {
+    if (!REQUIRED_B5B_A4_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown B5-B A4 fixture ID: ${fixtureId}`);
+  }
+  const browserCode = family === 'chrome' ? 'CH' : 'ED';
+  const fixtureCode = fixtureIds.map(value => value.replace('B5B-', '')).join('-');
+  return runCase(cases, `A4-B5-B-${browserCode}-${fixtureCode}-${slug}`, name, task, {
+    b5OptionalFixtureIds: fixtureIds,
+    b5OptionalScope: 'OPTIONAL_PRESENTATION_PACKS'
+  });
+}
+
 async function ensureWorkspaceExpanded(page, timeoutMs) {
   const content = page.locator(`#${ROOT_ID} .sc-content`);
   if (!await content.isVisible().catch(() => false)) {
@@ -1083,7 +1129,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
     browserIdentity: null,
     extension: null,
     candidateIdentity,
-    network: { fulfilled: [], action7: [], nativeMutationAttempts: [], blockedUnexpected: [] },
+    network: { fulfilled: [], action7: [], bing: [], nativeMutationAttempts: [], blockedUnexpected: [] },
     console: { errors: [], pageErrors: [] },
     stableFixtureCoverage: null,
     b2KernelFixtureCoverage: null,
@@ -1536,7 +1582,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
             mainText: root.querySelector('.sc-content')?.textContent || ''
           } : null;
         }, ROOT_ID), 'B3 canonical workspace initial render', options.timeoutMs);
-        assert(main.brand === 'B5-A settings & presentation', 'B5-A workspace brand did not identify the active settings/presentation gate', main);
+        assert(main.brand === 'B5-B optional presentation', 'B5-B workspace brand did not identify the active optional-presentation gate', main);
         assert(main.selectedContextId === 'job:260701', 'Initial B3 selection did not reflect current Context truth', main);
         assert(main.selectedAria.includes('Today') && main.selectedAria.includes('timer limit') && main.selectedAria.includes('Running'), 'Compact tab omitted Today, threshold, or operational semantics', main);
 
@@ -1639,7 +1685,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
             error.details = { popupTarget, popupUrl: popupPage.url(), lastPopupHealth };
             throw error;
           }
-          assert(popupHealth.stage === 'B5-A · Settings & presentation', 'Popup stage did not identify the B5-A settings/presentation runtime', popupHealth);
+          assert(popupHealth.stage === 'B5-B · Optional presentation', 'Popup stage did not identify the B5-B optional-presentation runtime', popupHealth);
           assert(popupHealth.classification === 'HEALTHY_SAME_BUILD', 'Popup did not display healthy same-build classification', popupHealth);
           assert(popupHealth.reason === 'ready' && popupHealth.healthTone === 'ok', 'Popup did not render positive READY health', popupHealth);
           assert(popupHealth.explanation.includes('cannot manufacture READY, restore live timer state, or modify SquareCoil official data'), 'Popup did not retain the fail-closed B5-A authority boundary', popupHealth);
@@ -1988,7 +2034,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
 
           await openSettingsHome(page, options.timeoutMs);
           const settingsHome = await page.locator(`#${ROOT_ID} .sc-content`).innerText();
-          assert(settingsHome.includes('Appearance & Finish') && settingsHome.includes('Timer Limits') && settingsHome.includes('Website Theme') && settingsHome.includes('Submit a Ticket') && settingsHome.includes('Send Feedback'), 'B5-A Settings Home was incomplete', settingsHome);
+          assert(settingsHome.includes('Appearance & Finish') && settingsHome.includes('Timer Limits') && settingsHome.includes('Website Theme') && settingsHome.includes('Optional Presentation') && settingsHome.includes('Submit a Ticket') && settingsHome.includes('Send Feedback'), 'B5-A Settings Home was incomplete', settingsHome);
 
           await clickWorkspaceControl(page, `[data-action="settings-route"][data-view="timer-appearance"]`, options.timeoutMs);
           await clickWorkspaceControl(page, `[data-action="preference"][data-value="AUTO"]`, options.timeoutMs);
@@ -2108,6 +2154,122 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
             const health = await bridge.send({ type: MESSAGES.HEALTH });
             return health?.ready === true && health?.health?.state === 'READY' ? health : null;
           }, 'B5-A post-observer READY settlement', options.timeoutMs);
+        }
+      }
+    );
+
+    await runB5OptionalBrowserCase(
+      result.cases,
+      family,
+      ['B5B-CINE-001', 'B5B-CINE-002', 'B5B-DASH-001', 'B5B-DASH-002', 'B5B-SAFETY-001'],
+      'OPTIONAL-PRESENTATION-PACKS',
+      'B5-B optional presentation remains off by default and applies only within fenced theme route and accessibility policy',
+      async () => {
+        const before = await bridge.coreSnapshot();
+        const defaultDom = await page.evaluate(() => ({
+          cinematicHosts: document.querySelectorAll('#squarecoil-companion-cinematic-host').length,
+          dashboardLayers: document.querySelectorAll('#squarecoil-companion-design-dashboard-profile').length
+        }));
+        assert(before.preferences.cinematicBackground === 'NONE' && before.preferences.dashboardProfile === 'OFF', 'B5-B optional packs were not off by default', before.preferences);
+        assert(defaultDom.cinematicHosts === 0 && defaultDom.dashboardLayers === 0, 'B5-B default allocated optional presentation artifacts', defaultDom);
+
+        await openSettingsHome(page, options.timeoutMs);
+        await clickWorkspaceControl(page, `[data-action="settings-route"][data-view="presentation-packs"]`, options.timeoutMs);
+        const optionalSurface = await page.locator(`#${ROOT_ID} .sc-content`).innerText();
+        assert(/Fresh Bing Cinematic Background/i.test(optionalSurface) && /Design Dashboard Profile/i.test(optionalSurface) &&
+          optionalSurface.includes('Restore Native SquareCoil') && optionalSurface.includes('never job, timer, page, or user content'),
+        'B5-B Settings surface did not disclose permission privacy and restoration behavior', optionalSurface);
+        await bridge.preferenceAction({ websiteTheme: 'SLEEK_DARK',
+          cinematicBackground: 'CINEMATIC', dashboardProfile: 'ON' },
+        before.preferences.preferenceRevision);
+        const cinematic = await waitFor(async () => {
+          const snapshot = await bridge.coreSnapshot();
+          return snapshot?.preferences?.cinematicBackground === 'CINEMATIC' &&
+            ['DEGRADED_FALLBACK', 'DEGRADED_CACHE', 'SHOWING'].includes(snapshot?.presentation?.optional?.cinematic?.state)
+            ? snapshot : null;
+        }, 'B5-B cinematic fallback settlement', options.timeoutMs);
+        const cinematicDom = await page.evaluate(() => ({
+          hosts: document.querySelectorAll('#squarecoil-companion-cinematic-host').length,
+          styles: document.querySelectorAll('#squarecoil-companion-cinematic-style').length,
+          state: document.documentElement.dataset.squarecoilCompanionCinematic || null
+        }));
+        assert(cinematicDom.hosts === 1 && cinematicDom.styles === 1, 'B5-B cinematic did not own exactly one host and style', cinematicDom);
+        assert(result.network.bing.length === 0, 'B5-B reached Bing without installed optional permission', result.network.bing);
+        assert(result.network.blockedUnexpected.every(entry => !entry.url.startsWith('https://www.bing.com/')), 'B5-B made a wallpaper request without optional permission', result.network.blockedUnexpected);
+        await clickWorkspaceControl(page, `[data-action="settings-close"]`, options.timeoutMs);
+
+        const dashboardPage = await context.newPage();
+        const wrongDashboardPage = await context.newPage();
+        let dashboardBridge = null;
+        let wrongDashboardBridge = null;
+        try {
+          await dashboardPage.goto(`${FIXTURE_ORIGIN}${DASHBOARD_PATH}?show=2`, { waitUntil: 'domcontentloaded', timeout: options.timeoutMs });
+          await waitFor(async () => (await pageState(dashboardPage)).documentToken, 'B5-B exact dashboard document identity', options.timeoutMs);
+          dashboardBridge = new ContentBridge(context, dashboardPage, extensionId, options.timeoutMs, candidateIdentity);
+          await dashboardBridge.initialize();
+          const exact = await waitFor(async () => {
+            const snapshot = await dashboardBridge.coreSnapshot();
+            return snapshot?.presentation?.optional?.dashboard?.state === 'APPLIED' ? snapshot : null;
+          }, 'B5-B exact dashboard profile', options.timeoutMs);
+          const exactDom = await dashboardPage.evaluate(() => ({
+            attribute: document.documentElement.getAttribute('data-squarecoil-companion-dashboard-profile'),
+            layers: document.querySelectorAll('#squarecoil-companion-design-dashboard-profile').length,
+            kpis: ['widget-tasks', 'widget-designs', 'widget-estimates'].map(id => document.getElementById(id)?.textContent.trim()),
+            rows: [...document.querySelectorAll('#inProgress .clickableRowx')].map(node => ({ text: node.textContent, href: node.getAttribute('href') })),
+            selected: document.getElementById('multiple_location_id')?.value,
+            disabled: document.querySelector('#nextJob button')?.disabled,
+            warning: document.querySelector('#onHold .text-warning')?.textContent
+          }));
+          assert(exactDom.attribute === 'active' && exactDom.layers === 1, 'B5-B exact dashboard did not own one profile layer', exactDom);
+          assert(JSON.stringify(exactDom.kpis) === JSON.stringify(['17Tasks', '8Designs', '3Estimates']), 'B5-B dashboard changed KPI text', exactDom);
+          assert(JSON.stringify(exactDom.rows) === JSON.stringify([{ text: 'A', href: '/project.php?id=260701' }, { text: 'B', href: '/project.php?id=260702' }]), 'B5-B dashboard changed native row order or targets', exactDom);
+          assert(exactDom.selected === 'shop-2' && exactDom.disabled === true && exactDom.warning === 'Native warning', 'B5-B dashboard changed native control or warning state', exactDom);
+
+          await wrongDashboardPage.goto(`${FIXTURE_ORIGIN}${DASHBOARD_PATH}?show=1`, { waitUntil: 'domcontentloaded', timeout: options.timeoutMs });
+          await waitFor(async () => (await pageState(wrongDashboardPage)).documentToken, 'B5-B non-design dashboard document identity', options.timeoutMs);
+          wrongDashboardBridge = new ContentBridge(context, wrongDashboardPage, extensionId, options.timeoutMs, candidateIdentity);
+          await wrongDashboardBridge.initialize();
+          const wrong = await waitFor(async () => {
+            const snapshot = await wrongDashboardBridge.coreSnapshot();
+            return snapshot?.preferences?.dashboardProfile === 'ON' ? snapshot : null;
+          }, 'B5-B non-design dashboard preference settlement', options.timeoutMs);
+          const wrongLayers = await wrongDashboardPage.evaluate(() => document.querySelectorAll('#squarecoil-companion-design-dashboard-profile').length);
+          assert(wrong.presentation.optional.dashboard.state === 'INACTIVE_PAGE' && wrongLayers === 0, 'B5-B selector accident applied to a different dashboard mode', { wrong: wrong.presentation.optional.dashboard, wrongLayers });
+
+          await openSettingsHome(page, options.timeoutMs);
+          await clickWorkspaceControl(page, `[data-action="settings-route"][data-view="presentation-packs"]`, options.timeoutMs);
+          await clickWorkspaceControl(page, `[data-action="restore-native"]`, options.timeoutMs);
+          const restored = await waitFor(async () => {
+            const snapshot = await bridge.coreSnapshot();
+            return snapshot?.preferences?.websiteTheme === 'ORIGINAL' && snapshot.preferences.cinematicBackground === 'NONE' &&
+              snapshot.preferences.dashboardProfile === 'OFF' && snapshot.presentation.optional.cinematic.state === 'DISABLED' ? snapshot : null;
+          }, 'B5-B native presentation restoration', options.timeoutMs);
+          const restoredDom = await page.evaluate(() => ({
+            themeLayers: document.querySelectorAll('#squarecoil-companion-site-theme').length,
+            cinematicHosts: document.querySelectorAll('#squarecoil-companion-cinematic-host').length,
+            cinematicStyles: document.querySelectorAll('#squarecoil-companion-cinematic-style').length
+          }));
+          assert(Object.values(restoredDom).every(value => value === 0), 'B5-B Restore Native left owned presentation artifacts', restoredDom);
+          const permissionProbe = await bridge.send({ type: MESSAGES.B5B_WALLPAPER, requestId: 'b5b-a4-after-restore' });
+          assert(permissionProbe?.ok === false && permissionProbe?.reason === 'optional-origin-permission-required',
+            'B5-B Restore Native did not remove optional Bing access and its cache', permissionProbe);
+          assert(restored.ledgerSegmentCount === before.ledgerSegmentCount && restored.timer.timerState === before.timer.timerState &&
+            restored.timer.currentContextId === before.timer.currentContextId, 'B5-B presentation changed Timer or Ledger authority', { before, restored });
+          assert(result.network.nativeMutationAttempts.length === 0, 'B5-B presentation attempted a native SquareCoil mutation', result.network.nativeMutationAttempts);
+          return { defaultDom, installedOptionalPermission: 'not-granted', bingRequests: result.network.bing,
+            cinematic: cinematic.presentation.optional.cinematic, cinematicDom,
+            exactDashboard: exact.presentation.optional.dashboard, exactDom, wrongDashboard: wrong.presentation.optional.dashboard,
+            restoredDom, permissionProbe: { ok: permissionProbe.ok, reason: permissionProbe.reason },
+            nativeMutationAttempts: result.network.nativeMutationAttempts.length };
+        } finally {
+          if (wrongDashboardBridge) { await wrongDashboardBridge.authorityTeardown().catch(() => {}); await wrongDashboardBridge.detach(); }
+          await wrongDashboardPage.close().catch(() => {});
+          if (dashboardBridge) { await dashboardBridge.authorityTeardown().catch(() => {}); await dashboardBridge.detach(); }
+          await dashboardPage.close().catch(() => {});
+          await waitFor(async () => {
+            const snapshot = await bridge.authoritySnapshot();
+            return snapshot?.healthy === true && snapshot.disposition === 'OWNER' ? snapshot : null;
+          }, 'B5-B primary OWNER after optional-page cleanup', options.timeoutMs);
         }
       }
     );
@@ -2636,6 +2798,22 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
         b5Scope: 'SETTINGS_PRESENTATION_READINESS',
         status: 'FAIL',
         error: `Missing B5-A settings fixture IDs: ${result.b5SettingsFixtureCoverage.missing.join(', ')}`
+      });
+    }
+    const observedB5OptionalFixtureIds = [...new Set(result.cases.flatMap(testCase => testCase.b5OptionalFixtureIds || []))].sort();
+    result.b5OptionalFixtureCoverage = {
+      scope: 'B5_B_OPTIONAL_PRESENTATION_PACKS_A4',
+      required: [...REQUIRED_B5B_A4_FIXTURE_IDS],
+      observed: observedB5OptionalFixtureIds,
+      missing: REQUIRED_B5B_A4_FIXTURE_IDS.filter(fixtureId => !observedB5OptionalFixtureIds.includes(fixtureId))
+    };
+    if (result.b5OptionalFixtureCoverage.missing.length) {
+      result.cases.push({
+        id: `A4-B5-B-${family === 'chrome' ? 'CH' : 'ED'}-FIXTURE-COVERAGE`,
+        name: 'Mandatory B5-B optional-presentation fixture coverage',
+        b5OptionalScope: 'OPTIONAL_PRESENTATION_PACKS',
+        status: 'FAIL',
+        error: `Missing B5-B optional fixture IDs: ${result.b5OptionalFixtureCoverage.missing.join(', ')}`
       });
     }
     const failedCases = result.cases.filter(testCase => testCase.status === 'FAIL');

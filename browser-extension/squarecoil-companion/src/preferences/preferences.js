@@ -2,11 +2,14 @@
 
 const { DATA_SAFETY_SCHEMA_VERSION, deepClone, isRecord } = require('../data/model');
 
-const PREFERENCE_SCHEMA_VERSION = 1;
+const PREFERENCE_SCHEMA_VERSION = 2;
+const COMPATIBLE_PREFERENCE_SCHEMA_VERSIONS = new Set([1, PREFERENCE_SCHEMA_VERSION]);
 const DEFAULT_PREFERENCES = Object.freeze({
   timerAppearance: 'LIGHT',
   panelFinish: 'SOLID',
   websiteTheme: 'ORIGINAL',
+  cinematicBackground: 'NONE',
+  dashboardProfile: 'OFF',
   yellowMinutes: 60,
   orangeMinutes: 120,
   redMinutes: 240
@@ -45,10 +48,14 @@ function preferenceCandidates(raw) {
     ['SOLID', 'GLASS'], { GLASS_BLUR: 'GLASS', BLUR: 'GLASS' });
   const websiteTheme = enumValue(first(source, ['websiteTheme', 'squareCoilTheme']),
     ['ORIGINAL', 'REFINED_LIGHT', 'SLEEK_DARK'], { LIGHT: 'REFINED_LIGHT', DARK: 'SLEEK_DARK', REFINED: 'REFINED_LIGHT', SLEEK: 'SLEEK_DARK' });
+  const cinematicBackground = enumValue(first(source, ['cinematicBackground']), ['NONE', 'CINEMATIC'],
+    { OFF: 'NONE', ON: 'CINEMATIC' });
+  const dashboardProfile = enumValue(first(source, ['dashboardProfile']), ['OFF', 'ON']);
   const yellowMinutes = integer(first(source, ['yellowMinutes', 'timerYellowMinutes', 'yellow']) ?? nested.yellow);
   const orangeMinutes = integer(first(source, ['orangeMinutes', 'timerOrangeMinutes', 'orange']) ?? nested.orange);
   const redMinutes = integer(first(source, ['redMinutes', 'timerRedMinutes', 'red']) ?? nested.red);
-  return { timerAppearance, panelFinish, websiteTheme, yellowMinutes, orangeMinutes, redMinutes };
+  return { timerAppearance, panelFinish, websiteTheme, cinematicBackground, dashboardProfile,
+    yellowMinutes, orangeMinutes, redMinutes };
 }
 
 function validLimits(values) {
@@ -66,12 +73,14 @@ function normalizePreferenceSnapshot(raw, options = {}) {
     timerAppearance: candidates.timerAppearance || fallback.timerAppearance || DEFAULT_PREFERENCES.timerAppearance,
     panelFinish: candidates.panelFinish || fallback.panelFinish || DEFAULT_PREFERENCES.panelFinish,
     websiteTheme: candidates.websiteTheme || fallback.websiteTheme || DEFAULT_PREFERENCES.websiteTheme,
+    cinematicBackground: candidates.cinematicBackground || fallback.cinematicBackground || DEFAULT_PREFERENCES.cinematicBackground,
+    dashboardProfile: candidates.dashboardProfile || fallback.dashboardProfile || DEFAULT_PREFERENCES.dashboardProfile,
     yellowMinutes: limits.yellowMinutes ?? DEFAULT_PREFERENCES.yellowMinutes,
     orangeMinutes: limits.orangeMinutes ?? DEFAULT_PREFERENCES.orangeMinutes,
     redMinutes: limits.redMinutes ?? DEFAULT_PREFERENCES.redMinutes
   };
-  const initialized = source.preferencesSchemaVersion === PREFERENCE_SCHEMA_VERSION ||
-    (source.schemaVersion === PREFERENCE_SCHEMA_VERSION && source.initialized === true);
+  const initialized = COMPATIBLE_PREFERENCE_SCHEMA_VERSIONS.has(source.preferencesSchemaVersion) ||
+    (COMPATIBLE_PREFERENCE_SCHEMA_VERSIONS.has(source.schemaVersion) && source.initialized === true);
   const preferenceRevision = initialized && Number.isSafeInteger(source.preferenceRevision) && source.preferenceRevision >= 0
     ? source.preferenceRevision : 0;
   return Object.freeze({
@@ -123,6 +132,8 @@ function preferenceStorage(snapshot, revision = snapshot.preferenceRevision) {
     timerAppearance: snapshot.timerAppearance,
     panelFinish: snapshot.panelFinish,
     websiteTheme: snapshot.websiteTheme,
+    cinematicBackground: snapshot.cinematicBackground,
+    dashboardProfile: snapshot.dashboardProfile,
     yellowMinutes: snapshot.yellowMinutes,
     orangeMinutes: snapshot.orangeMinutes,
     redMinutes: snapshot.redMinutes

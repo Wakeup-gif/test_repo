@@ -21,7 +21,7 @@ function documentFixture() {
 
 test('UT-B5-PREF-001 first-install snapshot resolves the settled Light Solid Original and 60 120 240 defaults', () => {
   assert.deepEqual(normalizePreferenceSnapshot({}), {
-    schemaVersion: 1,
+    schemaVersion: 2,
     initialized: false,
     preferenceRevision: 0,
     ...DEFAULT_PREFERENCES
@@ -102,7 +102,8 @@ test('UT-B5-PREF-007 invalid restored values fall back to the current compatible
     websiteTheme: 'REFINED_LIGHT', yellowMinutes: 20, orangeMinutes: 40, redMinutes: 80 };
   const restored = restoredPreferenceStorage(current, { timerAppearance: 'invalid', yellowMinutes: 100, orangeMinutes: 10, redMinutes: 5 });
   assert.equal(restored.preferenceRevision, 4);
-  assert.deepEqual(restored, { ...current, preferenceRevision: 4 });
+  assert.deepEqual(restored, { ...current, preferencesSchemaVersion: 2, preferenceRevision: 4,
+    cinematicBackground: 'NONE', dashboardProfile: 'OFF' });
 });
 
 test('UT-B5-PREF-008 canonical threshold presentation reads the committed preference revision and exact Today value', () => {
@@ -124,4 +125,30 @@ test('UT-B5-PREF-009 unsupported preference fields and duplicate initialization 
   assert.throws(() => applyPreferenceCommand(document, { type: PREFERENCE_COMMANDS.INITIALIZE,
     expectedPreferenceRevision: 1, legacyPreferences: {} }), /preferences-already-initialized/);
   assert.throws(() => validatePreferencePatch({ secretFeature: true }), /preference-patch-field-unsupported/);
+});
+
+test('UT-B5-PREF-010 v1 preference storage migrates to v2 with optional packs off by default', () => {
+  const legacy = { preferencesSchemaVersion: 1, preferenceRevision: 7, timerAppearance: 'DARK', panelFinish: 'GLASS',
+    websiteTheme: 'SLEEK_DARK', yellowMinutes: 15, orangeMinutes: 30, redMinutes: 60 };
+  const normalized = normalizePreferenceSnapshot(legacy);
+  assert.equal(normalized.initialized, true);
+  assert.equal(normalized.preferenceRevision, 7);
+  assert.equal(normalized.cinematicBackground, 'NONE');
+  assert.equal(normalized.dashboardProfile, 'OFF');
+  const restored = restoredPreferenceStorage(legacy, legacy);
+  assert.equal(restored.preferencesSchemaVersion, 2);
+  assert.equal(restored.preferenceRevision, 8);
+});
+
+test('UT-B5-PREF-011 optional presentation choices commit together without Timer or Ledger mutation', () => {
+  const document = documentFixture();
+  applyPreferenceCommand(document, { type: PREFERENCE_COMMANDS.INITIALIZE, expectedPreferenceRevision: 0, legacyPreferences: {} });
+  const before = { timer: structuredClone(document.timer), ledger: structuredClone(document.ledger) };
+  const result = applyPreferenceCommand(document, { type: PREFERENCE_COMMANDS.COMMIT, expectedPreferenceRevision: 1,
+    patch: { websiteTheme: 'SLEEK_DARK', cinematicBackground: 'CINEMATIC', dashboardProfile: 'ON' } });
+  assert.deepEqual([result.preferences.websiteTheme, result.preferences.cinematicBackground, result.preferences.dashboardProfile],
+    ['SLEEK_DARK', 'CINEMATIC', 'ON']);
+  assert.deepEqual(document.timer, before.timer);
+  assert.deepEqual(document.ledger, before.ledger);
+  assert.equal(validateDocument(document), true);
 });
