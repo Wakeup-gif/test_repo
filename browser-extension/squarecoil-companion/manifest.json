@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "US Sign SquareCoil Companion",
   "version": "0.7.1",
-  "version_name": "0.7.1 B5-B Optional Presentation Candidate",
-  "description": "SquareCoil Companion B5-B candidate with opt-in cinematic and exact Design Dashboard presentation packs. Development testing only.",
+  "version_name": "0.7.1 B6 Release Candidate",
+  "description": "SquareCoil Companion B6 release candidate. Exact-package acceptance testing only; not a published production release.",
   "permissions": ["storage", "scripting", "webRequest"],
   "host_permissions": [
     "https://ussignandmill.squarecoil.net/*"

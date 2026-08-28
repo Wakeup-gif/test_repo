@@ -1,8 +1,9 @@
 'use strict';
 
 const { inspectLegacyMigration, MIGRATION_DISPOSITIONS } = require('../data/legacy-preflight');
+const { LEGACY_SOURCE_KEYS } = require('../data/migration-schema');
 const AUTHORITY_COMMANDS = Object.freeze({ MIGRATE_V07: 'MIGRATE_V07' });
-const { timerKind, deepClone, deepFreeze } = require('../data/model');
+const { timerKind, deepClone, deepFreeze, isRecord } = require('../data/model');
 const { TIMER_COMMANDS } = require('../timer/commands');
 const { createTimerReadModel } = require('../timer/read-model');
 const { createSquareCoilBridgeService } = require('../squarecoil/bridge-service');
@@ -67,6 +68,18 @@ function sameAuthorityTenure(left, right) {
     left.coordinationEpoch === right.coordinationEpoch &&
     left.workerInstanceId === right.workerInstanceId
   );
+}
+
+function legacyPreferencesFromSources(legacySources) {
+  const raw = legacySources?.[LEGACY_SOURCE_KEYS.CURRENT];
+  if (typeof raw !== 'string') return null;
+  try {
+    const value = JSON.parse(raw);
+    if (!isRecord(value) || !isRecord(value.settings)) return null;
+    return deepFreeze({ settings: deepClone(value.settings) });
+  } catch (_) {
+    return null;
+  }
 }
 
 function createTrustedTransitionCore(options = {}) {
@@ -295,6 +308,7 @@ function createTrustedTransitionCore(options = {}) {
     preflight = inspectLegacyMigration(legacyStorage, authorityDocument);
     if (preflight.disposition === MIGRATION_DISPOSITIONS.REQUIRED && authorityOwner) {
       const legacySources = preflight.sources;
+      const legacyPreferences = legacyPreferencesFromSources(legacySources);
       migrationInFlight = true;
       publishStatus('legacy-migration-in-progress');
       try {
@@ -304,6 +318,13 @@ function createTrustedTransitionCore(options = {}) {
         }
         await authorityClient.migrationCommand(envelope);
         await refreshDocument();
+        const preferenceSnapshot = normalizePreferenceSnapshot(authorityDocument?.dataSafety?.preferences);
+        if (legacyPreferences && !preferenceSnapshot.initialized) {
+          await commit(PREFERENCE_COMMANDS.INITIALIZE, {
+            legacyPreferences,
+            expectedPreferenceRevision: preferenceSnapshot.preferenceRevision
+          });
+        }
         preflight = inspectLegacyMigration(legacyStorage, authorityDocument);
         migrationInFlight = false;
       } catch (error) {
@@ -598,5 +619,6 @@ function createTrustedTransitionCore(options = {}) {
 module.exports = {
   RECOVERY_MODES,
   RECOVERY_ELIGIBLE_EVENTS,
+  legacyPreferencesFromSources,
   createTrustedTransitionCore
 };

@@ -1,6 +1,6 @@
-# B1-B5-B installed-browser acceptance harness
+# B1-B6 installed-browser acceptance harness
 
-This harness loads one exact unpacked package into installed, branded Google Chrome and Microsoft Edge. It retains the settled B1 lifecycle, B2 authority/transition/READY, B3 workspace, B4 data-safety, and B5-A core-presentation gates while exercising B5-B optional presentation against the exact packaged bytes. It serves only synthetic fixture HTML in memory. No request reaches SquareCoil or customer data.
+This harness loads one exact unpacked package into installed, branded Google Chrome and Microsoft Edge. For each browser it runs a fresh `PROFILE-CLEAN` and a separate `PROFILE-UPGRADE-V07` against the same immutable package and ZIP. It retains every accepted B1 through B5-B gate and adds the B6 release-candidate/profile matrix. It serves only synthetic fixture HTML in memory. No request reaches SquareCoil or customer data.
 
 ## Required package
 
@@ -19,8 +19,8 @@ The `--package` directory must contain exactly the eight allowlisted release fil
 
 `dist/build-info.json` must contain:
 
-- `buildId: "rebuild-b5b-optional-presentation"`;
-- `stage: "B5-B"`;
+- `buildId: "rebuild-b6-release-candidate"`;
+- `stage: "B6"`;
 - a lowercase 64-character `candidateFingerprint` embedded exactly in `dist/background.js`, `dist/companion-app.js`, and `dist/content-controller.js`;
 - a lowercase 40-character `sourceSha` exactly matching `--expected-source-sha`;
 - boolean `sourceDirty`, which must be `false` for acceptance.
@@ -43,6 +43,8 @@ The harness also locates the bundled Codex Playwright runtime automatically when
 
 Use `--headed` only when visible browser windows are useful. Browser executables default to the standard Windows Chrome and Edge locations and can be overridden with `--chrome-executable` and `--edge-executable`.
 
+The default `--profile all` is mandatory for acceptance. `--profile clean` and `--profile upgrade` are diagnostic subsets and are always labeled `NON_ACCEPTANCE`, even with clean package bytes.
+
 `--allow-dirty-development` permits a temporary dirty build for harness development. Such a run is always labeled `NON_ACCEPTANCE`; it cannot produce an acceptance pass.
 
 ## Exit and evidence rules
@@ -52,7 +54,7 @@ Use `--headed` only when visible browser windows are useful. Browser executables
 - Exit `1`, status `FAIL`: a browser assertion, package check, or byte-integrity check failed.
 - Exit `2`, status `UNSUPPORTED`: a required browser/control capability could not be exercised. This is not a pass.
 
-The JSON evidence records browser/CDP identity, executable hash, extension ID/path/version, exact build/package/candidate identity, candidate embedding counts for all three runtime bundles, commanded and packaged source SHA, ZIP filename/hash, exact ZIP/extracted inventory binding, synthetic-network ledger, test results, lifecycle/root snapshots, and isolated-world authority snapshots. Evidence output must be outside the tested package and cannot overwrite the ZIP. A browser launch or extension load never counts as a gate pass by itself.
+The JSON evidence records browser/CDP identity, profile class, executable hash, extension ID/path/version, exact build/package/candidate identity, candidate embedding counts for all three runtime bundles, commanded and packaged source SHA, ZIP filename/hash, exact ZIP/extracted inventory binding, synthetic-network ledger, test results, lifecycle/root snapshots, and isolated-world authority snapshots. Evidence output must be outside the tested package and cannot overwrite the ZIP. A browser launch or extension load never counts as a gate pass by itself.
 
 Every message the harness sends directly from the content-script execution world carries the exact packaged `buildId`, `packageVersion`, and `candidateFingerprint` plus the live document token. Popup messages originate from an extension page and remain extension-origin messages; the harness does not mislabel them as content-origin traffic.
 
@@ -99,7 +101,10 @@ Every message the harness sends directly from the content-script execution world
 - Cinematic owns one bounded host/style, settles safely to cache/fallback/base presentation, and Restore Native removes its resources;
 - the Design Dashboard profile applies only to exact `/dashboard.php?show=2`, preserves native KPI text, row order/targets, selects, disabled controls, and warnings, and does not leak to another dashboard mode;
 - optional presentation changes no Timer/Ledger/native-clock authority and attempts no native SquareCoil mutation.
+- a fresh clean profile contains no inherited authority document or runtime before the B6 candidate begins its inherited gates;
+- a separate valid v0.7 upgrade profile migrates two dated sessions plus the undated accumulated remainder exactly once, retains the legacy source byte-for-byte, imports compatible preferences with optional presentation still off, never revives legacy live state, and reaches READY only after the full settled B2 gate;
+- revalidation preserves the completed migration identity and cannot duplicate or rewrite imported Ledger evidence.
 
 Each browser result carries the canonical stable IDs it proves: `B1-LC-001` through `B1-LC-010` and `B1-LC-012` through `B1-LC-018`. `B1-LC-011` is intentionally an A2/A3-only persistence-concurrency fixture. The B2.1 cases carry `B2-KERNEL-001` (multi-tab OWNER/OBSERVER) and `B2-KERNEL-002` (worker-restart reconnection). The B2.2 cases carry `B2-TRANSITION-001` through `B2-TRANSITION-005` for action 7 start, owner/observer synchronization, atomic job switch, exactly-once disable, and legacy fail-closed behavior. Final settlement cases carry `B2-READY-001` through `B2-READY-003` for OWNER plus popup READY, non-writing OBSERVER READY, and migration-blocked degradation.
 
-The B3 cases carry `B3-WORKSPACE-001` through `B3-WORKSPACE-004`. The B4 cases carry `B4-DATA-001` through `B4-DATA-004`. The B5-A cases carry `B5-SETTINGS-001` through `B5-SETTINGS-005`. B5-B carries `B5B-CINE-001`, `B5B-CINE-002`, `B5B-DASH-001`, `B5B-DASH-002`, and `B5B-SAFETY-001`. Passing the suite proves the installed-browser A4 portion of B5-B while preserving every earlier gate. READY-C04 verification-fallback behavior remains covered by mandatory unit/integration fixtures because the installed candidate has `chrome.webRequest`; A4 does not alter the candidate to manufacture an unavailable hook. Final B5-B acceptance requires this A4 pass together with the repository's unit, integration, prototype-compatibility, package, and CI gates.
+The B3 cases carry `B3-WORKSPACE-001` through `B3-WORKSPACE-004`. The B4 cases carry `B4-DATA-001` through `B4-DATA-004`. The B5-A cases carry `B5-SETTINGS-001` through `B5-SETTINGS-005`. B5-B carries `B5B-CINE-001`, `B5B-CINE-002`, `B5B-DASH-001`, `B5B-DASH-002`, and `B5B-SAFETY-001`. B6 carries `B6-CANDIDATE-001`, `B6-PROFILE-001`, and `B6-PROFILE-002`; all three must be observed per browser across the clean and upgrade suites. Passing the harness proves the installed-browser A4 portion of B6 while preserving every earlier gate. READY-C04 verification-fallback behavior remains covered by mandatory unit/integration fixtures because the installed candidate has `chrome.webRequest`; A4 does not alter the candidate to manufacture an unavailable hook. Final B6 acceptance requires this A4 pass together with the repository's unit, integration, prototype-compatibility, package, and CI gates.

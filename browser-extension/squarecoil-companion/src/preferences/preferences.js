@@ -42,15 +42,17 @@ function first(source, keys) {
 function preferenceCandidates(raw) {
   const source = isRecord(raw) ? raw : {};
   const nested = isRecord(source.settings) ? source.settings : {};
-  const timerAppearance = enumValue(first(source, ['timerAppearance', 'themePreference', 'protoUiTheme', 'theme']),
+  const timerAppearance = enumValue(first(source, ['timerAppearance', 'themePreference', 'protoUiTheme', 'theme']) ??
+    first(nested, ['timerAppearance', 'themePreference', 'protoUiTheme', 'theme']),
     ['LIGHT', 'DARK', 'AUTO']);
-  const panelFinish = enumValue(first(source, ['panelFinish', 'timerSurface', 'protoUiSurface', 'surface']),
+  const panelFinish = enumValue(first(source, ['panelFinish', 'timerSurface', 'protoUiSurface', 'surface']) ??
+    first(nested, ['panelFinish', 'timerSurface', 'protoUiSurface', 'surface']),
     ['SOLID', 'GLASS'], { GLASS_BLUR: 'GLASS', BLUR: 'GLASS' });
-  const websiteTheme = enumValue(first(source, ['websiteTheme', 'squareCoilTheme']),
+  const websiteTheme = enumValue(first(source, ['websiteTheme', 'squareCoilTheme']) ?? first(nested, ['websiteTheme', 'squareCoilTheme']),
     ['ORIGINAL', 'REFINED_LIGHT', 'SLEEK_DARK'], { LIGHT: 'REFINED_LIGHT', DARK: 'SLEEK_DARK', REFINED: 'REFINED_LIGHT', SLEEK: 'SLEEK_DARK' });
-  const cinematicBackground = enumValue(first(source, ['cinematicBackground']), ['NONE', 'CINEMATIC'],
+  const cinematicBackground = enumValue(first(source, ['cinematicBackground']) ?? first(nested, ['cinematicBackground']), ['NONE', 'CINEMATIC'],
     { OFF: 'NONE', ON: 'CINEMATIC' });
-  const dashboardProfile = enumValue(first(source, ['dashboardProfile']), ['OFF', 'ON']);
+  const dashboardProfile = enumValue(first(source, ['dashboardProfile']) ?? first(nested, ['dashboardProfile']), ['OFF', 'ON']);
   const yellowMinutes = integer(first(source, ['yellowMinutes', 'timerYellowMinutes', 'yellow']) ?? nested.yellow);
   const orangeMinutes = integer(first(source, ['orangeMinutes', 'timerOrangeMinutes', 'orange']) ?? nested.orange);
   const redMinutes = integer(first(source, ['redMinutes', 'timerRedMinutes', 'red']) ?? nested.red);

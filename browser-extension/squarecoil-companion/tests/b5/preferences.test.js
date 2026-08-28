@@ -12,6 +12,7 @@ const {
   applyPreferenceCommand,
   restoredPreferenceStorage
 } = require('../../src/preferences/preferences');
+const { legacyPreferencesFromSources } = require('../../src/content/trusted-transition-core');
 
 const NOW = Date.parse('2026-08-28T15:00:00Z');
 
@@ -50,6 +51,36 @@ test('UT-B5-PREF-002 initialization preserves valid v0.7 appearance and Timer Li
   assert.deepEqual(document.timer, timerBefore);
   assert.deepEqual(document.ledger, ledgerBefore);
   assert.equal(validateDocument(document), true);
+});
+
+test('UT-B5-PREF-012 page-local v0.7 settings preserve nested appearance and limits with optional packs still off', () => {
+  const raw = JSON.stringify({
+    settings: {
+      themePreference: 'auto',
+      timerSurface: 'glass',
+      squareCoilTheme: 'dark',
+      yellow: 15,
+      orange: 45,
+      red: 90
+    }
+  });
+  const captured = legacyPreferencesFromSources({ 'ussign-squarecoil-job-timer-v1': raw });
+  const normalized = normalizePreferenceSnapshot(captured);
+  assert.deepEqual(normalized, {
+    schemaVersion: 2,
+    initialized: false,
+    preferenceRevision: 0,
+    timerAppearance: 'AUTO',
+    panelFinish: 'GLASS',
+    websiteTheme: 'SLEEK_DARK',
+    cinematicBackground: 'NONE',
+    dashboardProfile: 'OFF',
+    yellowMinutes: 15,
+    orangeMinutes: 45,
+    redMinutes: 90
+  });
+  assert.equal(JSON.stringify(JSON.parse(raw)), raw);
+  assert.equal(legacyPreferencesFromSources({ 'ussign-squarecoil-job-timer-v1': '{invalid' }), null);
 });
 
 test('UT-B5-PREF-003 immediate appearance commits increment one preference revision without timing mutation', () => {

@@ -40,10 +40,10 @@ function assertExpectedB1Shell(health) {
   assert.equal(health.readiness.coordinationPositive, false);
 }
 
-test('A3 B1 regression guard executes the three real B5-B dist bundles', () => {
+test('A3 B1 regression guard executes the three real B6 candidate dist bundles', () => {
   const harness = createA3Harness();
-  assert.equal(harness.buildInfo.stage, 'B5-B');
-  assert.match(harness.buildInfo.buildId, /b5b-optional-presentation/i);
+  assert.equal(harness.buildInfo.stage, 'B6');
+  assert.match(harness.buildInfo.buildId, /b6-release-candidate/i);
   assert.deepEqual(Object.keys(harness.bundleEvidence).sort(), [
     'background.js',
     'companion-app.js',

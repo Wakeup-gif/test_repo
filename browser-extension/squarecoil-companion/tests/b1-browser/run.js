@@ -6,8 +6,8 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const zlib = require('node:zlib');
 
-const CANONICAL_BUILD_ID = 'rebuild-b5b-optional-presentation';
-const CANONICAL_STAGE = 'B5-B';
+const CANONICAL_BUILD_ID = 'rebuild-b6-release-candidate';
+const CANONICAL_STAGE = 'B6';
 const FIXTURE_ORIGIN = 'https://ussignandmill.squarecoil.net';
 const FIXTURE_PATH = '/__b1_fixture__/a4.html';
 const FRAME_PATH = '/__b1_fixture__/frame.html';
@@ -81,6 +81,11 @@ const REQUIRED_B5B_A4_FIXTURE_IDS = Object.freeze([
   'B5B-DASH-002',
   'B5B-SAFETY-001'
 ]);
+const REQUIRED_B6_A4_FIXTURE_IDS = Object.freeze([
+  'B6-CANDIDATE-001',
+  'B6-PROFILE-001',
+  'B6-PROFILE-002'
+]);
 const REQUIRED_PACKAGE_FILES = Object.freeze([
   'dist/background.js',
   'dist/build-info.json',
@@ -122,10 +127,11 @@ function parseArguments(argv) {
     archivePath: null,
     expectedSourceSha: null,
     browsers: ['chrome', 'edge'],
+    profiles: ['clean', 'upgrade'],
     evidencePath: null,
     headed: false,
     allowDirtyDevelopment: false,
-    timeoutMs: 20000,
+    timeoutMs: 30000,
     executables: { ...BROWSER_DEFAULTS }
   };
   for (let index = 0; index < argv.length; index += 1) {
@@ -142,6 +148,9 @@ function parseArguments(argv) {
     else if (argument === '--browser') {
       const selected = value().toLowerCase();
       options.browsers = selected === 'all' ? ['chrome', 'edge'] : [selected];
+    } else if (argument === '--profile') {
+      const selected = value().toLowerCase();
+      options.profiles = selected === 'all' ? ['clean', 'upgrade'] : [selected];
     } else if (argument === '--evidence') options.evidencePath = path.resolve(value());
     else if (argument === '--chrome-executable') options.executables.chrome = path.resolve(value());
     else if (argument === '--edge-executable') options.executables.edge = path.resolve(value());
@@ -160,6 +169,9 @@ function parseArguments(argv) {
   if (!options.browsers.every(browser => ['chrome', 'edge'].includes(browser))) {
     throw new Error('--browser must be chrome, edge, or all');
   }
+  if (!options.profiles.every(profile => ['clean', 'upgrade'].includes(profile))) {
+    throw new Error('--profile must be clean, upgrade, or all');
+  }
   if (!Number.isFinite(options.timeoutMs) || options.timeoutMs < 1000 || options.timeoutMs > 120000) {
     throw new Error('--timeout must be between 1000 and 120000 milliseconds');
   }
@@ -173,11 +185,12 @@ function usage() {
     '',
     'Options:',
     '  --browser chrome|edge|all       Default: all',
+    '  --profile clean|upgrade|all     Diagnostic subset or default full matrix',
     '  --archive <zip-path>             ZIP whose file bytes must equal the extracted package',
     '  --expected-source-sha <sha>      Required exact lowercase commit identity',
     '  --evidence <json-path>          Also write the complete JSON result',
     '  --headed                        Show browser windows',
-    '  --timeout <milliseconds>         Per-condition timeout (default 20000)',
+    '  --timeout <milliseconds>         Per-condition timeout (default 30000)',
     '  --chrome-executable <path>       Override branded Chrome executable',
     '  --edge-executable <path>         Override branded Edge executable',
     '  --allow-dirty-development        Permit dirty bytes and label the run NON_ACCEPTANCE'
@@ -1050,6 +1063,19 @@ function runB5OptionalBrowserCase(cases, family, fixtureIds, slug, name, task) {
   });
 }
 
+function runB6CandidateBrowserCase(cases, family, fixtureIds, slug, name, task, extraMetadata = {}) {
+  for (const fixtureId of fixtureIds) {
+    if (!REQUIRED_B6_A4_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown B6 A4 fixture ID: ${fixtureId}`);
+  }
+  const browserCode = family === 'chrome' ? 'CH' : 'ED';
+  const fixtureCode = fixtureIds.map(value => value.replace('B6-', '')).join('-');
+  return runCase(cases, `A4-B6-${browserCode}-${fixtureCode}-${slug}`, name, task, {
+    b6CandidateFixtureIds: fixtureIds,
+    b6Scope: 'EXACT_RELEASE_CANDIDATE_ACCEPTANCE',
+    ...extraMetadata
+  });
+}
+
 async function ensureWorkspaceExpanded(page, timeoutMs) {
   const content = page.locator(`#${ROOT_ID} .sc-content`);
   if (!await content.isVisible().catch(() => false)) {
@@ -1124,6 +1150,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
   });
   const result = {
     family,
+    profile: 'PROFILE-CLEAN',
     status: 'RUNNING',
     executablePath,
     browserIdentity: null,
@@ -1134,6 +1161,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
     stableFixtureCoverage: null,
     b2KernelFixtureCoverage: null,
     b3WorkspaceFixtureCoverage: null,
+    b6CandidateFixtureCoverage: null,
     cases: [],
     durationMs: null,
     cleanupWarning: null
@@ -1272,6 +1300,32 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
       assert(storage?.timerEnabled === false, 'Disabled setting was not authoritative', storage);
       return { state, companionBundleParses: tracker.companionCount(), storage };
     });
+
+    await runB6CandidateBrowserCase(
+      result.cases,
+      family,
+      ['B6-CANDIDATE-001', 'B6-PROFILE-001'],
+      'CLEAN-CANDIDATE',
+      'Fresh isolated profile loads the exact B6 candidate without inherited authority or runtime state',
+      async () => {
+        const state = await pageState(page);
+        const storage = await bridge.getStorage(['timerEnabled', AUTHORITY_STORAGE_KEY]);
+        assert(packageInventory.buildInfo.buildId === CANONICAL_BUILD_ID && packageInventory.buildInfo.stage === CANONICAL_STAGE,
+          'Fresh-profile package identity is not the B6 candidate', packageInventory.buildInfo);
+        assert(storage.timerEnabled === false, 'Fresh-profile setup did not remain disabled', storage);
+        assert(storage[AUTHORITY_STORAGE_KEY] === undefined, 'Fresh profile inherited an authority document', storage[AUTHORITY_STORAGE_KEY]);
+        assert(state.runtimeGlobalPresent === false && state.rootCount === 0, 'Fresh disabled profile allocated runtime state', state);
+        assert(result.network.nativeMutationAttempts.length === 0, 'Fresh-profile candidate check attempted a native mutation', result.network.nativeMutationAttempts);
+        return {
+          profile: 'PROFILE-CLEAN',
+          candidateIdentity,
+          authorityDocumentPresent: false,
+          runtimePresent: false,
+          ownedRootCount: state.rootCount
+        };
+      },
+      { profile: 'PROFILE-CLEAN' }
+    );
 
     await runBrowserCase(result.cases, family, ['B1-LC-004'], 'ORPHAN', 'Clearly owned rebuild-marker orphan recovers while ambiguous ownership is retained', async () => {
       const parseBaseline = tracker.companionCount();
@@ -1582,7 +1636,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
             mainText: root.querySelector('.sc-content')?.textContent || ''
           } : null;
         }, ROOT_ID), 'B3 canonical workspace initial render', options.timeoutMs);
-        assert(main.brand === 'B5-B optional presentation', 'B5-B workspace brand did not identify the active optional-presentation gate', main);
+        assert(main.brand === 'B6 release candidate', 'B6 workspace brand did not identify the active release-candidate gate', main);
         assert(main.selectedContextId === 'job:260701', 'Initial B3 selection did not reflect current Context truth', main);
         assert(main.selectedAria.includes('Today') && main.selectedAria.includes('timer limit') && main.selectedAria.includes('Running'), 'Compact tab omitted Today, threshold, or operational semantics', main);
 
@@ -1685,10 +1739,10 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
             error.details = { popupTarget, popupUrl: popupPage.url(), lastPopupHealth };
             throw error;
           }
-          assert(popupHealth.stage === 'B5-B · Optional presentation', 'Popup stage did not identify the B5-B optional-presentation runtime', popupHealth);
+          assert(popupHealth.stage === 'B6 · Release candidate', 'Popup stage did not identify the B6 release-candidate runtime', popupHealth);
           assert(popupHealth.classification === 'HEALTHY_SAME_BUILD', 'Popup did not display healthy same-build classification', popupHealth);
           assert(popupHealth.reason === 'ready' && popupHealth.healthTone === 'ok', 'Popup did not render positive READY health', popupHealth);
-          assert(popupHealth.explanation.includes('cannot manufacture READY, restore live timer state, or modify SquareCoil official data'), 'Popup did not retain the fail-closed B5-A authority boundary', popupHealth);
+          assert(popupHealth.explanation.includes('never bypasses those checks, restores live timer state, or modifies SquareCoil official data'), 'Popup did not retain the fail-closed B6 authority boundary', popupHealth);
           return { settledHealth, popupTarget, popupHealth };
         } finally {
           await popupPage.close().catch(() => {});
@@ -2096,12 +2150,20 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
           await page.locator(`#${ROOT_ID} [data-sc-limits-form] input[name="orangeMinutes"]`).fill('60', { force: true });
           await page.locator(`#${ROOT_ID} [data-sc-limits-form] input[name="redMinutes"]`).fill('120', { force: true });
           await clickWorkspaceControl(page, `[data-sc-limits-form] button[type="submit"]`, options.timeoutMs);
-          const committedLimits = await waitFor(async () => {
-            const owner = await bridge.coreSnapshot();
-            const observer = await observerBridge.coreSnapshot();
-            return owner?.preferences?.yellowMinutes === 30 && owner.preferences.orangeMinutes === 60 && owner.preferences.redMinutes === 120 &&
-              owner.preferences.preferenceRevision === observer?.preferences?.preferenceRevision ? owner : null;
-          }, 'B5-A coherent Timer Limits commit', options.timeoutMs);
+          let lastLimits = null;
+          let committedLimits;
+          try {
+            committedLimits = await waitFor(async () => {
+              const owner = await bridge.coreSnapshot();
+              const observer = await observerBridge.coreSnapshot();
+              lastLimits = { owner: owner?.preferences || null, observer: observer?.preferences || null };
+              return owner?.preferences?.yellowMinutes === 30 && owner.preferences.orangeMinutes === 60 && owner.preferences.redMinutes === 120 &&
+                owner.preferences.preferenceRevision === observer?.preferences?.preferenceRevision ? owner : null;
+            }, 'B5-A coherent Timer Limits commit', options.timeoutMs);
+          } catch (error) {
+            error.details = { lastLimits };
+            throw error;
+          }
 
           await clickWorkspaceControl(page, `[data-action="settings-back"][data-view="settings"]`, options.timeoutMs);
           await clickWorkspaceControl(page, `[data-action="settings-route"][data-view="send-feedback"]`, options.timeoutMs);
@@ -2816,6 +2878,23 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
         error: `Missing B5-B optional fixture IDs: ${result.b5OptionalFixtureCoverage.missing.join(', ')}`
       });
     }
+    const observedB6CandidateFixtureIds = [...new Set(result.cases.flatMap(testCase => testCase.b6CandidateFixtureIds || []))].sort();
+    const requiredCleanB6FixtureIds = ['B6-CANDIDATE-001', 'B6-PROFILE-001'];
+    result.b6CandidateFixtureCoverage = {
+      scope: 'B6_EXACT_RELEASE_CANDIDATE_CLEAN_PROFILE_A4',
+      required: requiredCleanB6FixtureIds,
+      observed: observedB6CandidateFixtureIds,
+      missing: requiredCleanB6FixtureIds.filter(fixtureId => !observedB6CandidateFixtureIds.includes(fixtureId))
+    };
+    if (result.b6CandidateFixtureCoverage.missing.length) {
+      result.cases.push({
+        id: `A4-B6-${family === 'chrome' ? 'CH' : 'ED'}-CLEAN-FIXTURE-COVERAGE`,
+        name: 'Mandatory B6 clean-profile candidate fixture coverage',
+        b6Scope: 'EXACT_RELEASE_CANDIDATE_ACCEPTANCE',
+        status: 'FAIL',
+        error: `Missing B6 clean-profile fixture IDs: ${result.b6CandidateFixtureCoverage.missing.join(', ')}`
+      });
+    }
     const failedCases = result.cases.filter(testCase => testCase.status === 'FAIL');
     const unsupportedCases = result.cases.filter(testCase => testCase.status === 'UNSUPPORTED');
     result.status = failedCases.length ? 'FAIL' : unsupportedCases.length ? 'UNSUPPORTED' : 'PASS';
@@ -2841,6 +2920,326 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
       catch (error) { result.cleanupWarning = `Temporary profile retained at ${resolvedProfile}: ${error.message}`; }
     } else {
       result.cleanupWarning = `Refused to remove unexpected profile path: ${resolvedProfile}`;
+    }
+    result.durationMs = Date.now() - suiteStarted;
+  }
+  return result;
+}
+
+async function runUpgradeProfileSuite({ playwright, family, executablePath, packageDirectory, packageInventory, archiveInventory, options }) {
+  const suiteStarted = Date.now();
+  const candidateIdentity = Object.freeze({
+    buildId: packageInventory.buildInfo.buildId,
+    packageVersion: packageInventory.manifest.version,
+    candidateFingerprint: packageInventory.buildInfo.candidateFingerprint
+  });
+  const result = {
+    family,
+    profile: 'PROFILE-UPGRADE-V07',
+    status: 'RUNNING',
+    executablePath,
+    browserIdentity: null,
+    extension: null,
+    candidateIdentity,
+    network: { fulfilled: [], action7: [], bing: [], nativeMutationAttempts: [], blockedUnexpected: [] },
+    console: { errors: [], pageErrors: [] },
+    b6CandidateFixtureCoverage: null,
+    cases: [],
+    durationMs: null,
+    cleanupWarning: null
+  };
+  if (!fs.existsSync(executablePath)) {
+    result.status = 'UNSUPPORTED';
+    result.cases.push({ id: 'A4-ENV', name: 'Installed branded browser', status: 'UNSUPPORTED', error: `Executable not found: ${executablePath}` });
+    result.durationMs = Date.now() - suiteStarted;
+    return result;
+  }
+
+  const profileDirectory = fs.mkdtempSync(path.join(os.tmpdir(), `squarecoil-b6-upgrade-a4-${family}-`));
+  let context = null;
+  let browserCdp = null;
+  let bridge = null;
+  try {
+    context = await playwright.chromium.launchPersistentContext(profileDirectory, {
+      executablePath,
+      headless: !options.headed,
+      ignoreDefaultArgs: ['--disable-extensions', '--disable-back-forward-cache'],
+      viewport: { width: 1280, height: 900 },
+      args: [
+        '--enable-unsafe-extension-debugging',
+        '--disable-background-networking',
+        '--disable-component-update',
+        '--disable-default-apps',
+        '--disable-sync',
+        '--host-resolver-rules=MAP * ~NOTFOUND',
+        '--metrics-recording-only',
+        '--no-default-browser-check',
+        '--no-first-run'
+      ]
+    });
+    const browser = context.browser();
+    if (!browser || typeof browser.newBrowserCDPSession !== 'function') {
+      throw new UnsupportedCase('Browser-level CDP is unavailable for the persistent upgrade profile');
+    }
+    browserCdp = await browser.newBrowserCDPSession();
+    const protocolVersion = await browserCdp.send('Browser.getVersion');
+    result.browserIdentity = {
+      ...protocolVersion,
+      playwrightReportedVersion: browser.version(),
+      executableRealPath: fs.realpathSync(executablePath),
+      executableSha256: sha256(fs.readFileSync(executablePath))
+    };
+
+    let loadResult;
+    try {
+      loadResult = await browserCdp.send('Extensions.loadUnpacked', { path: packageDirectory, enableInIncognito: false });
+    } catch (error) {
+      throw new UnsupportedCase(`Extensions.loadUnpacked is unavailable: ${error.message}`);
+    }
+    const extensionId = loadResult?.id;
+    assert(isConcreteIdentity(extensionId), 'Extensions.loadUnpacked did not return a concrete extension ID for the upgrade profile', loadResult);
+    const extensionInfo = await waitFor(async () => {
+      const extensionList = await browserCdp.send('Extensions.getExtensions');
+      return extensionList.extensions?.find(extension => extension.id === extensionId) || null;
+    }, 'the upgrade-profile extension registry entry', options.timeoutMs);
+    assert(extensionInfo?.enabled === true, 'Upgrade-profile extension is not enabled', extensionInfo);
+    assert(fs.realpathSync(extensionInfo.path).toLowerCase() === fs.realpathSync(packageDirectory).toLowerCase(), 'Upgrade profile loaded a different extension path', extensionInfo);
+    assert(extensionInfo.version === packageInventory.manifest.version, 'Upgrade profile loaded a different extension version', extensionInfo);
+    assert(packageInventory.buildInfo.buildId === CANONICAL_BUILD_ID && packageInventory.buildInfo.stage === CANONICAL_STAGE,
+      'Upgrade profile did not load the exact B6 candidate identity', packageInventory.buildInfo);
+    assert(archiveInventory.inventoryDigest === packageInventory.inventoryDigest, 'Upgrade-profile archive/extracted identity differs', archiveInventory);
+    result.extension = { ...extensionInfo, id: extensionId, loadResult, registryVerified: true };
+
+    const setupPage = await context.newPage();
+    try {
+      setupPage.on('console', message => {
+        if (message.type() === 'error' || message.type() === 'warning') result.console.errors.push({ page: 'setup', type: message.type(), text: message.text() });
+      });
+      setupPage.on('pageerror', error => result.console.pageErrors.push({ page: 'setup', text: String(error?.message || error) }));
+      await setupPage.goto(`chrome-extension://${extensionId}/popup/popup.html`, { waitUntil: 'domcontentloaded', timeout: options.timeoutMs });
+      await waitFor(async () => setupPage.evaluate(async () => {
+        const value = await chrome.storage.local.get('timerEnabled');
+        return typeof value.timerEnabled === 'boolean' ? value.timerEnabled : null;
+      }), 'the upgrade-profile installation default setting', options.timeoutMs);
+      await setupPage.evaluate(() => chrome.storage.local.set({ timerEnabled: false }));
+      await waitFor(async () => setupPage.evaluate(async () => {
+        const value = await chrome.storage.local.get('timerEnabled');
+        return value.timerEnabled === false ? true : null;
+      }), 'the disabled upgrade-profile setup setting', options.timeoutMs);
+    } finally {
+      await setupPage.close().catch(() => {});
+    }
+
+    const transitionFixture = { clockContext: { projectId: '260701', label: '260701 - Design' } };
+    await installSyntheticRouting(context, result.network, transitionFixture);
+    const existingPages = context.pages();
+    const page = existingPages[0] || await context.newPage();
+    for (const extra of existingPages.slice(1)) await extra.close().catch(() => {});
+    page.on('console', message => {
+      if (message.type() === 'error' || message.type() === 'warning') result.console.errors.push({ page: 'fixture', type: message.type(), text: message.text() });
+    });
+    page.on('pageerror', error => result.console.pageErrors.push({ page: 'fixture', text: String(error?.message || error) }));
+    await page.goto(`${FIXTURE_ORIGIN}${FIXTURE_PATH}`, { waitUntil: 'domcontentloaded', timeout: options.timeoutMs });
+    await waitFor(async () => (await pageState(page)).documentToken, 'upgrade-profile content-controller document identity', options.timeoutMs);
+    bridge = new ContentBridge(context, page, extensionId, options.timeoutMs, candidateIdentity);
+    await bridge.initialize();
+
+    await runB6CandidateBrowserCase(
+      result.cases,
+      family,
+      ['B6-PROFILE-002'],
+      'UPGRADE-V07',
+      'Valid v0.7 data migrates once, remains read-only at source, and settles READY without restoring legacy live state',
+      async () => {
+        const legacyKey = 'ussign-squarecoil-job-timer-v1';
+        const hourMs = 60 * 60 * 1000;
+        const baseMs = Date.parse('2026-01-12T10:00:00.000Z');
+        const legacy = {
+          schema: 3,
+          version: '0.7.1',
+          settings: {
+            themePreference: 'auto',
+            timerSurface: 'glass',
+            squareCoilTheme: 'dark',
+            yellow: 15,
+            orange: 45,
+            red: 90
+          },
+          contexts: {
+            'job:123456': {
+              key: 'job:123456',
+              type: 'job',
+              projectId: '123456',
+              label: '123456 - Upgrade Fixture',
+              shortLabel: '123456',
+              accumulatedMs: 2.5 * hourMs,
+              sessions: [
+                { id: 'legacy-session-1', cycleId: 'cycle-legacy-upgrade', startAt: baseMs, endAt: baseMs + hourMs, durationMs: hourMs, reason: 'legacy-stop' },
+                { id: 'legacy-session-2', cycleId: 'cycle-legacy-upgrade', startAt: baseMs + hourMs, endAt: baseMs + (2 * hourMs), durationMs: hourMs, reason: 'legacy-stop' }
+              ],
+              cycleId: 'cycle-legacy-upgrade',
+              createdAt: baseMs - hourMs,
+              lastTouchedAt: baseMs + (2 * hourMs)
+            }
+          }
+        };
+        const rawLegacy = JSON.stringify(legacy);
+        const stateBefore = await pageState(page);
+        const storageBefore = await bridge.getStorage(['timerEnabled', AUTHORITY_STORAGE_KEY]);
+        assert(storageBefore.timerEnabled === false, 'Upgrade-profile precondition was not disabled', storageBefore);
+        assert(storageBefore[AUTHORITY_STORAGE_KEY] === undefined, 'Upgrade profile inherited an authority document', storageBefore[AUTHORITY_STORAGE_KEY]);
+        assert(stateBefore.runtimeGlobalPresent === false && stateBefore.rootCount === 0, 'Upgrade profile inherited an active runtime', stateBefore);
+        const seeded = await bridge.setLegacyValue(legacyKey, rawLegacy);
+        assert(seeded === rawLegacy, 'Valid v0.7 source was not seeded byte-for-byte');
+
+        const enabledResponse = await bridge.setEnabled(true);
+        let lastCore = null;
+        let settledCore;
+        try {
+          settledCore = await waitFor(async () => {
+            const snapshot = await bridge.coreSnapshot();
+            lastCore = snapshot;
+            const preferences = snapshot?.preferences;
+            return snapshot?.initialized === true && snapshot.blocked === false &&
+              snapshot.preflight?.disposition === 'COMPLETE_MATCH' &&
+              preferences?.initialized === true && preferences.timerAppearance === 'AUTO' &&
+              preferences.panelFinish === 'GLASS' && preferences.websiteTheme === 'SLEEK_DARK'
+              ? snapshot
+              : null;
+          }, 'valid v0.7 migration, preference adoption, and trusted-core initialization', options.timeoutMs);
+        } catch (error) {
+          error.details = { enabledResponse, lastCore };
+          throw error;
+        }
+        const settledHealth = await waitFor(async () => {
+          const health = await bridge.send({ type: MESSAGES.HEALTH });
+          return health?.ready === true && health?.health?.state === 'READY' &&
+            health?.b2Settlement?.migrationDisposition === 'COMPLETE_MATCH' ? health : null;
+        }, 'valid v0.7 B2 READY settlement', options.timeoutMs);
+
+        const authorityBefore = (await bridge.getStorage([AUTHORITY_STORAGE_KEY]))?.[AUTHORITY_STORAGE_KEY]?.document;
+        const legacyContextBefore = authorityBefore?.contexts?.['job:123456'];
+        const importedLedgerBefore = (authorityBefore?.ledger || []).filter(row => row.contextId === 'job:123456');
+        const importedHistoryBefore = (settledCore.timer?.historyRows || []).filter(row => row.contextId === 'job:123456');
+        const importedContextBefore = (settledCore.timer?.byContextRows || []).find(row => row.contextId === 'job:123456');
+        const importedDataBefore = (settledCore.data?.recentRows || []).find(row => row.contextId === 'job:123456');
+        const sourceAfterMigration = await bridge.run(() => `localStorage.getItem(${JSON.stringify(legacyKey)})`);
+        const markerBefore = authorityBefore?.migration?.completedSources?.['squarecoil-v07-localstorage-v1'];
+
+        assert(markerBefore?.completionState === 'COMPLETE', 'Valid v0.7 migration completion marker is missing', markerBefore);
+        assert(sourceAfterMigration === rawLegacy, 'Migration modified or removed the legacy source');
+        assert(importedLedgerBefore.length === 2, 'Valid v0.7 sessions did not become exactly two Ledger segments', importedLedgerBefore);
+        assert(importedLedgerBefore.reduce((sum, row) => sum + row.durationMs, 0) === 2 * hourMs, 'Imported Ledger duration is not exactly two hours', importedLedgerBefore);
+        assert(legacyContextBefore?.legacyUnattributedMs === 0.5 * hourMs, 'Accumulated legacy remainder was not preserved as undated time', legacyContextBefore);
+        assert(importedHistoryBefore.length === 2 && importedHistoryBefore.reduce((sum, row) => sum + row.durationMs, 0) === 2 * hourMs,
+          'Canonical History did not expose exactly the two dated legacy sessions', importedHistoryBefore);
+        assert(importedContextBefore?.totalMs === 2.5 * hourMs && importedContextBefore?.legacyUnattributedMs === 0.5 * hourMs,
+          'Canonical By Context totals did not preserve dated plus undated legacy time', importedContextBefore);
+        assert(importedDataBefore?.totalMs === 2.5 * hourMs, 'Data-safety read model did not preserve the imported Context total', importedDataBefore);
+        assert(settledCore.timer?.running?.contextId !== 'job:123456', 'Legacy running state was restored as live Timer truth', settledCore.timer?.running);
+        assert(settledCore.timer?.pending?.contextId !== 'job:123456', 'Legacy pending state was restored as live Timer truth', settledCore.timer?.pending);
+        assert(settledCore.timer?.localPause?.contextId !== 'job:123456', 'Legacy local-pause state was restored as live Timer truth', settledCore.timer?.localPause);
+        assert(settledCore.preferences.cinematicBackground === 'NONE' && settledCore.preferences.dashboardProfile === 'OFF',
+          'Optional presentation did not remain safely disabled after migration', settledCore.preferences);
+        assert(settledCore.preferences.yellowMinutes === 15 && settledCore.preferences.orangeMinutes === 45 && settledCore.preferences.redMinutes === 90,
+          'Legacy Timer limits were not migrated exactly', settledCore.preferences);
+
+        const revalidated = await bridge.send({ type: MESSAGES.REVALIDATE });
+        const settledAgain = await waitFor(async () => {
+          const health = await bridge.send({ type: MESSAGES.HEALTH });
+          return health?.ready === true && health?.b2Settlement?.migrationDisposition === 'COMPLETE_MATCH' ? health : null;
+        }, 'idempotent v0.7 revalidation', options.timeoutMs);
+        const authorityAfter = (await bridge.getStorage([AUTHORITY_STORAGE_KEY]))?.[AUTHORITY_STORAGE_KEY]?.document;
+        const importedLedgerAfter = (authorityAfter?.ledger || []).filter(row => row.contextId === 'job:123456');
+        const sourceAfterRevalidation = await bridge.run(() => `localStorage.getItem(${JSON.stringify(legacyKey)})`);
+        assert(sourceAfterRevalidation === rawLegacy, 'Revalidation modified or removed the legacy source');
+        assert(JSON.stringify(importedLedgerAfter) === JSON.stringify(importedLedgerBefore), 'Revalidation duplicated or rewrote imported Ledger evidence', {
+          before: importedLedgerBefore,
+          after: importedLedgerAfter
+        });
+        assert(authorityAfter?.contexts?.['job:123456']?.legacyUnattributedMs === 0.5 * hourMs,
+          'Revalidation changed the undated legacy balance', authorityAfter?.contexts?.['job:123456']);
+        assert(authorityAfter?.migration?.completedSources?.['squarecoil-v07-localstorage-v1']?.sourceDigest === markerBefore.sourceDigest,
+          'Revalidation changed the completed-source identity', authorityAfter?.migration?.completedSources?.['squarecoil-v07-localstorage-v1']);
+        assert(result.network.nativeMutationAttempts.length === 0, 'Upgrade-profile acceptance attempted a native SquareCoil mutation', result.network.nativeMutationAttempts);
+
+        await bridge.setEnabled(false);
+        await waitFor(async () => {
+          const state = await pageState(page);
+          return !state.runtimeGlobalPresent && state.rootCount === 0 ? state : null;
+        }, 'upgrade-profile teardown', options.timeoutMs);
+        return {
+          profile: 'PROFILE-UPGRADE-V07',
+          candidateIdentity,
+          enabledResponse,
+          settledHealth,
+          revalidated,
+          settledAgain,
+          migrationDisposition: settledCore.preflight.disposition,
+          migrationMarker: markerBefore,
+          importedLedgerSegmentCount: importedLedgerBefore.length,
+          importedDatedMs: importedLedgerBefore.reduce((sum, row) => sum + row.durationMs, 0),
+          importedUndatedMs: legacyContextBefore.legacyUnattributedMs,
+          importedTotalMs: importedContextBefore.totalMs,
+          preferences: settledCore.preferences,
+          legacySourceUnchanged: sourceAfterRevalidation === rawLegacy,
+          legacyLiveStateRestored: false,
+          nativeMutationAttempts: result.network.nativeMutationAttempts.length
+        };
+      },
+      { profile: 'PROFILE-UPGRADE-V07' }
+    );
+
+    await runCase(result.cases, `A4-B6-${family === 'chrome' ? 'CH' : 'ED'}-UPGRADE-EVIDENCE-HEALTH`, 'Upgrade-profile synthetic network and browser console remain clean', async () => {
+      assert(result.network.blockedUnexpected.length === 0, 'Upgrade profile attempted unexpected network requests', result.network.blockedUnexpected);
+      assert(result.network.nativeMutationAttempts.length === 0, 'Upgrade profile attempted native SquareCoil mutations', result.network.nativeMutationAttempts);
+      assert(result.network.bing.length === 0, 'Upgrade profile contacted optional Bing routes without permission', result.network.bing);
+      assert(result.console.errors.length === 0, 'Upgrade-profile browser console emitted warnings or errors', result.console.errors);
+      assert(result.console.pageErrors.length === 0, 'Upgrade-profile page emitted uncaught errors', result.console.pageErrors);
+      return { network: result.network, console: result.console };
+    });
+
+    const observedB6CandidateFixtureIds = [...new Set(result.cases.flatMap(testCase => testCase.b6CandidateFixtureIds || []))].sort();
+    result.b6CandidateFixtureCoverage = {
+      scope: 'B6_VALID_V07_UPGRADE_PROFILE_A4',
+      required: ['B6-PROFILE-002'],
+      observed: observedB6CandidateFixtureIds,
+      missing: ['B6-PROFILE-002'].filter(fixtureId => !observedB6CandidateFixtureIds.includes(fixtureId))
+    };
+    if (result.b6CandidateFixtureCoverage.missing.length) {
+      result.cases.push({
+        id: `A4-B6-${family === 'chrome' ? 'CH' : 'ED'}-UPGRADE-FIXTURE-COVERAGE`,
+        name: 'Mandatory B6 valid v0.7 upgrade-profile fixture coverage',
+        b6Scope: 'EXACT_RELEASE_CANDIDATE_ACCEPTANCE',
+        status: 'FAIL',
+        error: `Missing B6 upgrade-profile fixture IDs: ${result.b6CandidateFixtureCoverage.missing.join(', ')}`
+      });
+    }
+    const failedCases = result.cases.filter(testCase => testCase.status === 'FAIL');
+    const unsupportedCases = result.cases.filter(testCase => testCase.status === 'UNSUPPORTED');
+    result.status = failedCases.length ? 'FAIL' : unsupportedCases.length ? 'UNSUPPORTED' : 'PASS';
+  } catch (error) {
+    result.cases.push({
+      id: 'A4-B6-UPGRADE-HARNESS',
+      name: 'B6 valid v0.7 upgrade-profile harness setup and control',
+      status: error instanceof UnsupportedCase ? 'UNSUPPORTED' : 'FAIL',
+      error: error.message,
+      details: error.details || null
+    });
+    result.status = error instanceof UnsupportedCase ? 'UNSUPPORTED' : 'FAIL';
+  } finally {
+    if (bridge) await bridge.detach();
+    if (browserCdp) await browserCdp.detach().catch(() => {});
+    if (context) await context.close().catch(() => {});
+    const tempRoot = path.resolve(os.tmpdir());
+    const resolvedProfile = path.resolve(profileDirectory);
+    const safeProfile = resolvedProfile.toLowerCase().startsWith(`${tempRoot.toLowerCase()}${path.sep}`) &&
+      path.basename(resolvedProfile).startsWith(`squarecoil-b6-upgrade-a4-${family}-`);
+    if (safeProfile) {
+      try { fs.rmSync(resolvedProfile, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 }); }
+      catch (error) { result.cleanupWarning = `Temporary upgrade profile retained at ${resolvedProfile}: ${error.message}`; }
+    } else {
+      result.cleanupWarning = `Refused to remove unexpected upgrade profile path: ${resolvedProfile}`;
     }
     result.durationMs = Date.now() - suiteStarted;
   }
@@ -2907,16 +3306,30 @@ async function main() {
 
   const suites = [];
   for (const family of options.browsers) {
-    process.stderr.write(`A4 ${family}: running exact-package lifecycle checks\n`);
-    suites.push(await runBrowserSuite({
-      playwright,
-      family,
-      executablePath: options.executables[family],
-      packageDirectory: options.packageDirectory,
-      packageInventory: packageBefore,
-      archiveInventory: archiveBefore,
-      options
-    }));
+    if (options.profiles.includes('clean')) {
+      process.stderr.write(`A4 ${family}: running exact-package clean-profile lifecycle checks\n`);
+      suites.push(await runBrowserSuite({
+        playwright,
+        family,
+        executablePath: options.executables[family],
+        packageDirectory: options.packageDirectory,
+        packageInventory: packageBefore,
+        archiveInventory: archiveBefore,
+        options
+      }));
+    }
+    if (options.profiles.includes('upgrade')) {
+      process.stderr.write(`A4 ${family}: running exact-package valid v0.7 upgrade-profile checks\n`);
+      suites.push(await runUpgradeProfileSuite({
+        playwright,
+        family,
+        executablePath: options.executables[family],
+        packageDirectory: options.packageDirectory,
+        packageInventory: packageBefore,
+        archiveInventory: archiveBefore,
+        options
+      }));
+    }
   }
 
   const packageAfter = inventoryPackage(options.packageDirectory);
@@ -2936,20 +3349,50 @@ async function main() {
       }]
     });
   }
+  const b6CandidateFixtureCoverage = {};
+  for (const family of options.browsers) {
+    const browserSuites = suites.filter(suite => suite.family === family);
+    const observed = [...new Set(browserSuites.flatMap(suite =>
+      (suite.cases || []).flatMap(testCase => testCase.b6CandidateFixtureIds || [])))].sort();
+    const requiredForRun = REQUIRED_B6_A4_FIXTURE_IDS.filter(fixtureId =>
+      fixtureId === 'B6-PROFILE-002' ? options.profiles.includes('upgrade') : options.profiles.includes('clean'));
+    const missing = requiredForRun.filter(fixtureId => !observed.includes(fixtureId));
+    b6CandidateFixtureCoverage[family] = {
+      required: requiredForRun,
+      observed,
+      missing,
+      profiles: [...new Set(browserSuites.map(suite => suite.profile).filter(Boolean))].sort()
+    };
+    if (missing.length) {
+      suites.push({
+        family,
+        profile: 'B6-AGGREGATE-COVERAGE',
+        status: 'FAIL',
+        cases: [{
+          id: `A4-B6-${family === 'chrome' ? 'CH' : 'ED'}-AGGREGATE-FIXTURE-COVERAGE`,
+          name: 'Mandatory B6 candidate and profile matrix fixture coverage',
+          status: 'FAIL',
+          error: `Missing B6 fixture IDs: ${missing.join(', ')}`
+        }]
+      });
+    }
+  }
   const hasFailure = suites.some(suite => suite.status === 'FAIL');
   const hasUnsupported = suites.some(suite => suite.status === 'UNSUPPORTED');
   const dirtyDevelopment = packageBefore.buildInfo.sourceDirty === true;
-  const status = hasFailure ? 'FAIL' : hasUnsupported ? 'UNSUPPORTED' : dirtyDevelopment ? 'NON_ACCEPTANCE' : 'PASS';
+  const profileSubset = options.profiles.length !== 2;
+  const status = hasFailure ? 'FAIL' : hasUnsupported ? 'UNSUPPORTED' : dirtyDevelopment || profileSubset ? 'NON_ACCEPTANCE' : 'PASS';
   const evidence = {
     schemaVersion: 1,
     gate: 'A4',
     status,
-    acceptanceEligible: status === 'PASS' && packageUnchanged && archiveUnchanged && !dirtyDevelopment,
+    acceptanceEligible: status === 'PASS' && packageUnchanged && archiveUnchanged && !dirtyDevelopment && !profileSubset,
     startedAt,
     finishedAt: new Date().toISOString(),
     host: { platform: process.platform, release: os.release(), arch: process.arch, node: process.version },
     playwright: { version: require(path.join(path.dirname(playwrightResolvedFrom), 'package.json')).version, resolvedFrom: playwrightResolvedFrom },
-    mode: dirtyDevelopment ? 'NON_ACCEPTANCE_DIRTY_DEVELOPMENT' : 'ACCEPTANCE_CANDIDATE',
+    mode: dirtyDevelopment ? 'NON_ACCEPTANCE_DIRTY_DEVELOPMENT' : profileSubset ? 'NON_ACCEPTANCE_PROFILE_SUBSET' : 'ACCEPTANCE_CANDIDATE',
+    requestedProfiles: options.profiles,
     expectedSourceSha: options.expectedSourceSha,
     archive: {
       path: archiveBefore.path,
@@ -2976,6 +3419,7 @@ async function main() {
       unchanged: packageUnchanged,
       files: packageBefore.files
     },
+    b6CandidateFixtureCoverage,
     browsers: suites
   };
   const serialized = `${JSON.stringify(evidence, null, 2)}\n`;
