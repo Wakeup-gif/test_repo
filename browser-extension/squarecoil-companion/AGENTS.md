@@ -4,7 +4,7 @@ This file scopes only `browser-extension/squarecoil-companion/`.
 
 ## Current task
 
-B2-C, B3, B4, and B5-A are accepted on `codex/squarecoil-b2c-migration`. B5-B Optional Presentation is the current authorized task. The user has explicitly authorized sequential continuation through B6 after B5-B passes.
+B2-C, B3, B4, B5-A, and B5-B are accepted on `codex/squarecoil-b2c-migration`. B6 Full Acceptance / Candidate Packaging is the current authorized task.
 
 Do not merge or promote to `main`, publish a release/store build, or add a new live SquareCoil mutation without separate exact approval.
 
@@ -26,6 +26,8 @@ Before B4 changes, read all of B3's preserved contracts plus:
 4. the B4 acceptance requirements in `logic/L8-ACCEPTANCE-HANDOFF.md`
 
 Before B5-A/B5-B changes, read `logic/L7-SETTINGS-SUPPORT-THEMES.md`, the applicable B5 readiness audit, the feature reconciliation/ledger, and every source/audit artifact explicitly required there.
+
+Before B6 changes, read the complete `logic/L8-ACCEPTANCE-HANDOFF.md`, every accepted stage evidence document, the current feature ledger/reconciliation, and the actual build/package/browser harnesses.
 
 Do not redesign settled behavior. If implementation exposes a true contradiction, stop and report it.
 
@@ -98,6 +100,15 @@ Do not finish with unrelated changes.
 - Missing Developer Support configuration stays unavailable without fabricated links, payment state, or QR content.
 - Exact candidate `117b81604c66d57a3cbf356d6d974bef4a887242` passed aggregate, prototype, installed Chrome/Edge, package-integrity, and CI gates with no native mutation attempts.
 
+## Accepted B5-B gate
+
+- Cinematic and Design Dashboard are independently versioned optional presentation features, off by default, and subordinate to Sleek Dark plus accessibility/lifecycle gates.
+- Bing access is an optional exact-origin permission; fixed public requests contain no SquareCoil, job, timer, page, identity, or user content.
+- Cinematic uses validated/cache/fallback inputs, generation fencing, single-flight retrieval, reduced-motion handling, and exact owned-resource teardown.
+- The Dashboard profile is CSS-only and exact-route-gated to `/dashboard.php?show=2`; native values, ordering, links, forms, disabled states, warnings, and business handlers remain native.
+- Restore Native selects Original/NONE/OFF and removes optional presentation ownership, cache, and host access without Timer/Ledger/native-clock mutation.
+- Exact candidate `fff15682dd605c52264176a2a8282d897c6cb98b` passed 477 aggregate tests, 13 prototype tests, package validation, 25/25 installed cases in Chrome and Edge, and CI run `33162812787`.
+
 ## Stage boundary
 
-Implement only the settled, explicitly activated B5-B optional-presentation behavior, update its evidence/current-state documents, commit and push the coherent gate, and require exact acceptance before continuing to B6. Keep optional features off by default and fail closed when source, route, permission, accessibility, lifecycle, or teardown evidence is incomplete. Promotion, publication, and new live mutations remain out of scope.
+Implement only the B6 full-acceptance, candidate-packaging, and handoff gate defined by L8. Reconcile every accepted stage against exact packaged bytes and installed Chrome/Edge evidence; do not redesign settled behavior or add new features. Production promotion, publication/store submission, merge to `main`, and new live mutations remain out of scope without separate exact approval.

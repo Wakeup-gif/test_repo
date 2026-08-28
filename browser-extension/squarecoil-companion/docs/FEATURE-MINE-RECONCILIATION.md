@@ -550,6 +550,8 @@ These are implementation/readiness facts, not reasons to reopen settled core arc
 
 **2026-08-28 B5-A acceptance addendum:** one revisioned Preferences service now drives Settings, Timer Limits, Light/Dark/Auto, Solid/Glass, Original/Refined Light/Sleek Dark, Support/Feedback, privacy-safe diagnostics, and fail-closed Developer Support. Exact candidate `117b81604c66d57a3cbf356d6d974bef4a887242` passed 437 aggregate tests, 13 prototype tests, 24/24 installed cases in both Chrome and Edge, exact package identity, and CI with no native mutation attempt. B5-B optional presentation remains off and separately gated.
 
+**2026-08-28 B5-B acceptance addendum:** the two explicitly activated optional packs are now implemented without importing userscript runtime code. Cinematic is off by default, exact-permission/privacy bounded, readiness/cache/fallback/generation fenced, and removable. The CSS-only Dashboard profile is exact-route gated and preserves native business state. Exact candidate `fff15682dd605c52264176a2a8282d897c6cb98b` passed 477 aggregate tests, 13 prototype tests, 25/25 installed cases in Chrome and Edge, exact package identity, and CI with no native mutation attempt. Every other inventoried userscript feature remains deferred, excluded, superseded, or evidence-only.
+
 ---
 
 # 12. Build Path From the Current Checkpoint
@@ -655,6 +657,8 @@ Only after the core is stable:
 
 These may ship later than the core release without structural debt.
 
+**Completion addendum:** the two activated packs are accepted at exact candidate `fff15682dd605c52264176a2a8282d897c6cb98b`. This does not promote any other mined feature or authorize publication.
+
 ## Phase B6 - Browser acceptance / candidate
 
 - installed Chrome acceptance;
@@ -705,6 +709,8 @@ Pass when themes/settings cannot destabilize the core and installed-browser inte
 ## Gate G5-OPT - Optional visual packs
 
 Independent opt-in gate for Cinematic Background / page profiles. Failure here must not block a core build that does not include the pack.
+
+**Current result: PASS.**
 
 ## Gate G6 - Candidate/release
 
