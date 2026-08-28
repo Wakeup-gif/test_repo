@@ -73,18 +73,26 @@
     </aside>
     <div id="content_wrapper"><main id="content"></main></div>
   </div>
-  <nav class="preview-switcher">
-    <a href="?view=leads">Leads</a>
-    <a href="?view=editor">Editor</a>
-    <a href="?view=calendar">Calendar</a>
+  <nav class="preview-switcher" aria-label="Theme regression views">
+    <a data-view="leads">Leads</a>
+    <a data-view="editor">Editor</a>
+    <a data-view="calendar">Calendar</a>
+    <a data-theme="dark">Dark</a>
+    <a data-theme="light">Light</a>
   </nav>
   <script>
-    const view = new URLSearchParams(location.search).get("view") || "leads";
+    const params = new URLSearchParams(location.search);
+    const view = params.get("view") || "leads";
+    const theme = params.get("theme") === "light" ? "light" : "dark";
     const root = document.documentElement;
     const content = document.getElementById("content");
 
-    root.classList.add("us-sign-v230", "us-sign-theme-dark-glass");
-    root.dataset.usSignV230Route = view === "calendar" ? "install-calendar" : view === "leads" ? "leads" : "generic";
+    document.querySelectorAll("[data-view]").forEach(link => {
+      link.href = `?theme=${theme}&view=${link.dataset.view}`;
+    });
+    document.querySelectorAll("[data-theme]").forEach(link => {
+      link.href = `?theme=${link.dataset.theme}&view=${view}`;
+    });
 
     const views = {
       leads: `
@@ -121,10 +129,10 @@
               <select class="form-control"><option>Standard priority</option></select>
             </div>
           </section>
-          <section class="cke cke_chrome">
+          <section class="cke cke_chrome" aria-label="Rich text editor preview">
             <div class="cke_inner">
               <div class="cke_top"><span class="cke_toolgroup"><a class="cke_button"><span class="cke_button_icon"></span></a><a class="cke_button"><span class="cke_button_icon"></span></a><a class="cke_button cke_button_disabled"><span class="cke_button_icon"></span></a></span><a class="cke_combo_button"><span class="cke_combo_text">Styles</span><span class="cke_combo_arrow">▾</span></a></div>
-              <div class="cke_contents"><iframe class="cke_wysiwyg_frame" srcdoc="<!doctype html><html><head></head><body class='cke_editable cke_editable_themed'><h2>Scope of Work</h2><p>Readable editor copy should belong to the dark workspace.</p><p><strong>Important:</strong> semantic <span style='color: red'>red</span>, <span style='color: blue'>blue</span>, and <span style='color: green'>green</span> remain distinguishable.</p></body></html>"></iframe></div>
+              <div class="cke_contents"><iframe class="cke_wysiwyg_frame" srcdoc="<!doctype html><html><head></head><body class='cke_editable cke_editable_themed'><h2>Scope of Work</h2><p>Readable editor copy should belong to the active workspace.</p><p><strong>Important:</strong> semantic <span style='color: red'>red</span>, <span style='color: blue'>blue</span>, and <span style='color: green'>green</span> remain distinguishable.</p></body></html>"></iframe></div>
             </div>
           </section>
         </div>`,
@@ -147,11 +155,17 @@
     window.GM_setValue = () => {};
     window.GM_registerMenuCommand = () => {};
 
-    fetch("./US-Sign-Full-UI-Theme-v2.3.3.user.js")
+    const themeScript = theme === "light"
+      ? "./US-Sign-Full-UI-Light-Theme-v1.0.0.user.js"
+      : "./US-Sign-Full-UI-Theme-v2.3.3.user.js";
+
+    fetch(themeScript)
       .then(response => response.text())
       .then(source => {
         (0, eval)(source);
-        root.dataset.usSignV230Route = view === "calendar" ? "install-calendar" : view === "leads" ? "leads" : "generic";
+        const route = view === "calendar" ? "install-calendar" : view === "leads" ? "leads" : "generic";
+        if (theme === "light") root.dataset.usSignV240Route = route;
+        else root.dataset.usSignV230Route = route;
       })
       .catch(error => {
         const message = document.createElement("pre");

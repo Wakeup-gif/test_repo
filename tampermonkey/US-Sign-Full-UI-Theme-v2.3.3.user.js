@@ -58,7 +58,12 @@
   })();
 
   root.dataset.usSignV230Route = routeName;
-  if (enabled) root.classList.add("us-sign-v230");
+  if (enabled && root.dataset.usSignActiveSkin !== "light") {
+    root.classList.add("us-sign-v230");
+    root.dataset.usSignActiveSkin = "dark";
+  } else if (root.dataset.usSignActiveSkin === "light") {
+    root.classList.remove("us-sign-v230", "us-sign-theme-dark-glass");
+  }
 
   if (typeof GM_registerMenuCommand === "function") {
     GM_registerMenuCommand(
@@ -976,4 +981,3 @@
   window.addEventListener("pageshow", scanEditorFrames);
   window.addEventListener("us-sign-location-change", () => window.setTimeout(scanEditorFrames, 100));
 })();
-

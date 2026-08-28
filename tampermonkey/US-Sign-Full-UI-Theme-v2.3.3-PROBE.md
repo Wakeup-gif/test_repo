@@ -1,7 +1,7 @@
 # SquareCoil Full UI Theme v2.3.3 — Read-Only Live Probe
 
-Date: 2026-08-28  
-Mode: signed-in browser inspection, read-only  
+Date: 2026-08-28
+Mode: signed-in browser inspection, read-only
 Business-data mutations: none
 
 ## Scope
@@ -73,4 +73,3 @@ Event border colors are semantic schedule data. v2.3.3 therefore:
 - Verify Dashboard, Leads, Design editor, Scope editor, Install Calendar, and both top-right menus.
 - Verify keyboard focus, reduced motion, forced colors, print, and narrow viewport behavior.
 - Confirm disabling v2.3.3 restores the underlying v2.2.6/v2.2.7 presentation without leftover editor-document styles after reload.
-
