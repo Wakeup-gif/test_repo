@@ -4,7 +4,9 @@ This file scopes only `browser-extension/squarecoil-companion/`.
 
 ## Current task
 
-B2-C, B3, B4, B5-A, and B5-B are accepted on `codex/squarecoil-b2c-migration`. B6 Full Acceptance / Candidate Packaging is the current authorized task.
+B2-C, B3, B4, B5-A, and B5-B are accepted on `codex/squarecoil-b2c-migration`. The user has authorized one bounded B5-C light theme delta before B6 resumes.
+
+B5-C may port only the v2.3.3 read-only probe findings for persistent top-right dropdowns, exact `/leads.php` filters, and exact `/calendar.php` FullCalendar surfaces. It must remain CSS-only after bounded route classification. CKEditor iframe work and broader vendor/route parity are deferred to B5-D and must not enter this slice.
 
 Do not merge or promote to `main`, publish a release/store build, or add a new live SquareCoil mutation without separate exact approval.
 
@@ -111,4 +113,4 @@ Do not finish with unrelated changes.
 
 ## Stage boundary
 
-Implement only the B6 full-acceptance, candidate-packaging, and handoff gate defined by L8. Reconcile every accepted stage against exact packaged bytes and installed Chrome/Edge evidence; do not redesign settled behavior or add new features. Production promotion, publication/store submission, merge to `main`, and new live mutations remain out of scope without separate exact approval.
+Implement and accept only the bounded B5-C light theme delta defined in `logic/B5C-PROBE-THEME-DELTA.md`, then return to the B6 full-acceptance, candidate-packaging, and handoff gate defined by L8. Do not import the Tampermonkey runtime, add broad vendor takeover, or claim the deferred B5-D parity is complete. Production promotion, publication/store submission, merge to `main`, and new live mutations remain out of scope without separate exact approval.

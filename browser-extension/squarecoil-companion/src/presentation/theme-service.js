@@ -4,6 +4,7 @@ const { normalizePreferenceSnapshot } = require('../preferences/preferences');
 
 const STYLE_ID = 'squarecoil-companion-site-theme';
 const ROOT_THEME_ATTRIBUTE = 'data-squarecoil-companion-site-theme';
+const ROOT_ROUTE_ATTRIBUTE = 'data-squarecoil-companion-site-route';
 const REFINED_LIGHT_CSS = `
 html[${ROOT_THEME_ATTRIBUTE}="REFINED_LIGHT"] body{background:#f4f6f8;color:#18212b}
 html[${ROOT_THEME_ATTRIBUTE}="REFINED_LIGHT"] header.navbar,
@@ -40,7 +41,35 @@ html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"] .text-warning{color:#ffd48b}
 html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"] .alert-success,
 html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"] .text-success{color:#8ed8af}
 html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"] :focus-visible{outline:3px solid #8fc4e5;outline-offset:2px}
+
+/* Read-only live-probe adapters. Keep these CSS-only and narrowly scoped. */
+html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"] .navbar .dropdown-menu.list-group.dropdown-persist,
+html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"] .navbar .dropdown-menu.list-group.dropdown-persist>li,
+html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"] .navbar .dropdown-menu.list-group.dropdown-persist>.list-group-item,
+html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"] .navbar .dropdown-menu.list-group.dropdown-persist>.dropdown-footer{color:#cbd7e2!important;background:#07101a!important;border-color:#39434d!important}
+html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"] .navbar .dropdown-menu.list-group.dropdown-persist :is(a,button){color:#cbd7e2!important;background:transparent!important;border-color:transparent!important;text-shadow:none!important}
+html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"] .navbar .dropdown-menu.list-group.dropdown-persist :is(a,button):is(:hover,:focus-visible){color:#fff!important;background:rgba(143,196,229,.16)!important}
+
+html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"][${ROOT_ROUTE_ATTRIBUTE}="LEADS"] .admin-form :is(.gui-input,.gui-textarea,select.input-sm),
+html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"][${ROOT_ROUTE_ATTRIBUTE}="LEADS"] .admin-form .panel :is(input,select,textarea){color:#f1f5f8!important;background:#0b141d!important;border:1px solid #56616c!important;border-radius:8px!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.025)!important;color-scheme:dark!important}
+html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"][${ROOT_ROUTE_ATTRIBUTE}="LEADS"] .admin-form select option{color:#f1f5f8!important;background:#0b141d!important}
+
+html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"][${ROOT_ROUTE_ATTRIBUTE}="INSTALL_CALENDAR"] .fc .fc-day,
+html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"][${ROOT_ROUTE_ATTRIBUTE}="INSTALL_CALENDAR"] .fc .fc-widget-content,
+html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"][${ROOT_ROUTE_ATTRIBUTE}="INSTALL_CALENDAR"] .fc .fc-widget-header{color:#cbd7e2!important;background-color:rgba(7,16,24,.92)!important;border-color:#39434d!important}
+html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"][${ROOT_ROUTE_ATTRIBUTE}="INSTALL_CALENDAR"] .fc .fc-other-month{color:rgba(203,215,226,.48)!important;background-color:#081018!important}
+html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"][${ROOT_ROUTE_ATTRIBUTE}="INSTALL_CALENDAR"] .fc .fc-today{background-color:rgba(48,118,177,.28)!important;box-shadow:inset 0 0 0 1px rgba(143,196,229,.24)!important}
+html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"][${ROOT_ROUTE_ATTRIBUTE}="INSTALL_CALENDAR"] .fc .fc-event{color:#f1f5f8!important;background:#111c26!important;border-width:2px!important;border-style:solid!important;border-radius:7px!important;box-shadow:0 4px 12px rgba(0,0,0,.28),inset 0 1px 0 rgba(255,255,255,.035)!important}
+html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"][${ROOT_ROUTE_ATTRIBUTE}="INSTALL_CALENDAR"] .fc .fc-event :is(.fc-content,.fc-title,.event-title){background:transparent!important;text-shadow:none!important}
+html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"][${ROOT_ROUTE_ATTRIBUTE}="INSTALL_CALENDAR"] .fc .fc-event .cp{height:6px!important;background:rgba(255,255,255,.075)!important;border:1px solid rgba(192,221,244,.20)!important;border-radius:999px!important;box-shadow:inset 0 1px 2px rgba(0,0,0,.32)!important}
 `;
+
+function classifyWebsiteRoute(location) {
+  const pathname = String(location?.pathname || '').toLowerCase();
+  if (pathname === '/leads.php') return 'LEADS';
+  if (pathname === '/calendar.php') return 'INSTALL_CALENDAR';
+  return 'GENERIC';
+}
 
 function mediaListener(media, listener, enabled) {
   if (!media) return;
@@ -115,6 +144,7 @@ function createThemeService(options = {}) {
     const styles = Array.from(document.querySelectorAll?.(`#${STYLE_ID}`) || []);
     for (const style of styles) style.remove?.();
     document.documentElement?.removeAttribute?.(ROOT_THEME_ATTRIBUTE);
+    document.documentElement?.removeAttribute?.(ROOT_ROUTE_ATTRIBUTE);
   }
 
   function applyOwnedTheme(websiteTheme) {
@@ -127,6 +157,7 @@ function createThemeService(options = {}) {
     style.textContent = websiteTheme === 'SLEEK_DARK' ? SLEEK_DARK_CSS : REFINED_LIGHT_CSS;
     (document.head || document.documentElement)?.appendChild?.(style);
     document.documentElement?.setAttribute?.(ROOT_THEME_ATTRIBUTE, websiteTheme);
+    document.documentElement?.setAttribute?.(ROOT_ROUTE_ATTRIBUTE, classifyWebsiteRoute(window.location));
     const duplicateLayers = Array.from(document.querySelectorAll?.(`#${STYLE_ID}`) || []);
     for (const duplicate of duplicateLayers.slice(1)) duplicate.remove?.();
     return { layerCount: Math.min(1, duplicateLayers.length || 1), status: 'applied' };
@@ -236,4 +267,4 @@ function createThemeService(options = {}) {
   return Object.freeze({ apply, snapshot, teardown });
 }
 
-module.exports = { STYLE_ID, ROOT_THEME_ATTRIBUTE, createThemeService };
+module.exports = { STYLE_ID, ROOT_THEME_ATTRIBUTE, ROOT_ROUTE_ATTRIBUTE, classifyWebsiteRoute, createThemeService };

@@ -2,7 +2,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { STYLE_ID, ROOT_THEME_ATTRIBUTE, createThemeService } = require('../../src/presentation/theme-service');
+const { STYLE_ID, ROOT_THEME_ATTRIBUTE, ROOT_ROUTE_ATTRIBUTE,
+  classifyWebsiteRoute, createThemeService } = require('../../src/presentation/theme-service');
 
 class FakeElement {
   constructor(tag = 'div') {
@@ -31,7 +32,8 @@ function media(matches = false) {
   };
 }
 
-function harness({ glass = true, darkLogoUrl = '', logoInitiallyAvailable = true } = {}) {
+function harness({ glass = true, darkLogoUrl = '', logoInitiallyAvailable = true,
+  pathname = '/dashboard.php' } = {}) {
   const root = new FakeElement('html');
   const head = new FakeElement('head');
   const logo = new FakeElement('img');
@@ -52,6 +54,7 @@ function harness({ glass = true, darkLogoUrl = '', logoInitiallyAvailable = true
     removeEventListener(type, listener) { if (documentListeners.get(type) === listener) documentListeners.delete(type); }
   };
   const window = {
+    location: { pathname },
     matchMedia(query) {
       if (query.includes('forced-colors')) return forced;
       if (query.includes('reduced-transparency')) return reducedTransparency;
@@ -62,7 +65,7 @@ function harness({ glass = true, darkLogoUrl = '', logoInitiallyAvailable = true
     removeEventListener(type, listener) { if (windowListeners.get(type) === listener) windowListeners.delete(type); }
   };
   const service = createThemeService({ document, window, darkLogoUrl });
-  return { service, document, root, head, logo, dark, forced, reducedTransparency, documentListeners, windowListeners,
+  return { service, document, window, root, head, logo, dark, forced, reducedTransparency, documentListeners, windowListeners,
     showLogo() { logoAvailable = true; } };
 }
 
@@ -116,6 +119,7 @@ test('UT-B5-THEME-004 forced colors yields native website presentation without r
   assert.equal(snapshot.websiteThemeEffective, 'ORIGINAL');
   assert.equal(snapshot.panelFinishEffective, 'SOLID_FALLBACK');
   assert.equal(h.document.querySelectorAll(`#${STYLE_ID}`).length, 0);
+  assert.equal(h.root.getAttribute(ROOT_ROUTE_ATTRIBUTE), null);
 });
 
 test('UT-B5-THEME-005 missing approved dark logo degrades locally to the untouched native logo', () => {
@@ -139,6 +143,7 @@ test('UT-B5-THEME-006 teardown removes listeners and Companion-owned presentatio
   assert.equal(h.documentListeners.size, 0);
   assert.equal(h.windowListeners.size, 0);
   assert.equal(h.document.querySelectorAll(`#${STYLE_ID}`).length, 0);
+  assert.equal(h.root.getAttribute(ROOT_ROUTE_ATTRIBUTE), null);
 });
 
 test('UT-B5-THEME-007 reduced transparency keeps Glass durable but resolves it to Solid fallback', () => {
@@ -168,4 +173,42 @@ test('UT-B5-THEME-009 canonical preference read-model identity retains its revis
   const snapshot = h.service.apply({ ...preferences({ preferenceRevision: 12 }), preferencesSchemaVersion: undefined,
     schemaVersion: 1, initialized: true });
   assert.equal(snapshot.preferenceRevision, 12);
+});
+
+test('UT-B5-THEME-010 probe-backed route classification is exact and bounded', () => {
+  assert.equal(classifyWebsiteRoute({ pathname: '/leads.php' }), 'LEADS');
+  assert.equal(classifyWebsiteRoute({ pathname: '/calendar.php' }), 'INSTALL_CALENDAR');
+  assert.equal(classifyWebsiteRoute({ pathname: '/project.php' }), 'GENERIC');
+  assert.equal(classifyWebsiteRoute({ pathname: '/folder/leads.php' }), 'GENERIC');
+});
+
+test('UT-B5-THEME-011 Sleek Dark applies the probe-backed Leads adapter and Original removes route ownership', () => {
+  const h = harness({ pathname: '/leads.php' });
+  h.service.apply(preferences({ websiteTheme: 'SLEEK_DARK' }));
+  assert.equal(h.root.getAttribute(ROOT_ROUTE_ATTRIBUTE), 'LEADS');
+  assert.match(h.document.querySelectorAll(`#${STYLE_ID}`)[0].textContent,
+    /admin-form :is\(\.gui-input,\.gui-textarea,select\.input-sm\)/);
+  h.service.apply(preferences({ websiteTheme: 'ORIGINAL', preferenceRevision: 2 }));
+  assert.equal(h.root.getAttribute(ROOT_ROUTE_ATTRIBUTE), null);
+});
+
+test('UT-B5-THEME-012 Install Calendar adapter preserves native semantic event border colors', () => {
+  const h = harness({ pathname: '/calendar.php' });
+  h.service.apply(preferences({ websiteTheme: 'SLEEK_DARK' }));
+  assert.equal(h.root.getAttribute(ROOT_ROUTE_ATTRIBUTE), 'INSTALL_CALENDAR');
+  const css = h.document.querySelectorAll(`#${STYLE_ID}`)[0].textContent;
+  assert.match(css, /dropdown-menu\.list-group\.dropdown-persist/);
+  assert.match(css, /fc \.fc-event \.cp/);
+  const eventRule = css.match(/\.fc \.fc-event\{([^}]*)\}/)?.[1] || '';
+  assert.match(eventRule, /border-width:2px/);
+  assert.doesNotMatch(eventRule, /border-color/);
+});
+
+test('UT-B5-THEME-013 pageshow reclassifies an eligible SquareCoil route without stacking styles', () => {
+  const h = harness({ pathname: '/leads.php' });
+  h.service.apply(preferences({ websiteTheme: 'SLEEK_DARK' }));
+  h.window.location.pathname = '/calendar.php';
+  h.windowListeners.get('pageshow')();
+  assert.equal(h.root.getAttribute(ROOT_ROUTE_ATTRIBUTE), 'INSTALL_CALENDAR');
+  assert.equal(h.document.querySelectorAll(`#${STYLE_ID}`).length, 1);
 });
