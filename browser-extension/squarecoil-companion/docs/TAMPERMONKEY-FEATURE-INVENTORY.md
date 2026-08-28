@@ -56,7 +56,7 @@ The isolated v2.3.2 reskin preview was useful for identifying the missing-icon c
 
 ## B5-C light probe addendum
 
-The user separately authorized a small extension-owned follow-up based on the read-only v2.3.3 probe at commit `0e6e6ef36534b33383358b4223ae1ae9054848aa`. B5-C may port only the persistent top-right dropdown, exact Leads filter, and exact Install Calendar CSS repairs into Sleek Dark. No userscript runtime is imported.
+The user separately authorized and the branch accepted a small extension-owned follow-up based on the read-only v2.3.3 probe at commit `0e6e6ef36534b33383358b4223ae1ae9054848aa`. B5-C ports only the persistent top-right dropdown, exact Leads filter, and exact Install Calendar CSS repairs into Sleek Dark. No userscript runtime is imported.
 
 CKEditor iframe-document repair and every broader route/vendor adapter remain the deferred B5-D milestone documented in `logic/B5C-PROBE-THEME-DELTA.md`. B5-C does not change the inventory's no-broad-reskin conclusion.
 

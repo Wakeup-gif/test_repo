@@ -552,7 +552,7 @@ These are implementation/readiness facts, not reasons to reopen settled core arc
 
 **2026-08-28 B5-B acceptance addendum:** the two explicitly activated optional packs are now implemented without importing userscript runtime code. Cinematic is off by default, exact-permission/privacy bounded, readiness/cache/fallback/generation fenced, and removable. The CSS-only Dashboard profile is exact-route gated and preserves native business state. Exact candidate `fff15682dd605c52264176a2a8282d897c6cb98b` passed 477 aggregate tests, 13 prototype tests, 25/25 installed cases in Chrome and Edge, exact package identity, and CI with no native mutation attempt. Every other inventoried userscript feature remains deferred, excluded, superseded, or evidence-only.
 
-**2026-08-28 B5-C authorization addendum:** a light probe-backed theme delta is authorized before B6 resumes. It is limited to CSS-only repairs for persistent top-right dropdowns, exact Leads filters, and exact Install Calendar surfaces. CKEditor iframe work and broad route/vendor parity remain a separately gated future B5-D milestone.
+**2026-08-28 B5-C acceptance addendum:** the light probe-backed theme delta is accepted at `aeac7fe52a2e723106340bc6d283d2eb49521573`. It is limited to CSS-only repairs for persistent top-right dropdowns, exact Leads filters, and exact Install Calendar surfaces. CKEditor iframe work and broad route/vendor parity remain a separately gated future B5-D milestone.
 
 ---
 

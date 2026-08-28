@@ -4,9 +4,7 @@ This file scopes only `browser-extension/squarecoil-companion/`.
 
 ## Current task
 
-B2-C, B3, B4, B5-A, and B5-B are accepted on `codex/squarecoil-b2c-migration`. The user has authorized one bounded B5-C light theme delta before B6 resumes.
-
-B5-C may port only the v2.3.3 read-only probe findings for persistent top-right dropdowns, exact `/leads.php` filters, and exact `/calendar.php` FullCalendar surfaces. It must remain CSS-only after bounded route classification. CKEditor iframe work and broader vendor/route parity are deferred to B5-D and must not enter this slice.
+B2-C, B3, B4, B5-A, B5-B, B5-C, and B6 are accepted on `codex/squarecoil-b2c-migration`. The exact post-B5-C B6 candidate source is `aeac7fe52a2e723106340bc6d283d2eb49521573`.
 
 Do not merge or promote to `main`, publish a release/store build, or add a new live SquareCoil mutation without separate exact approval.
 
@@ -113,6 +111,19 @@ Do not finish with unrelated changes.
 - Restore Native selects Original/NONE/OFF and removes optional presentation ownership, cache, and host access without Timer/Ledger/native-clock mutation.
 - Exact candidate `fff15682dd605c52264176a2a8282d897c6cb98b` passed 477 aggregate tests, 13 prototype tests, package validation, 25/25 installed cases in Chrome and Edge, and CI run `33162812787`.
 
+## Accepted B5-C gate
+
+- Only the probe-backed persistent dropdown, exact `/leads.php`, and exact `/calendar.php` CSS adapters were added; B5-D remains deferred.
+- Original, forced colors, and teardown remove both theme and route ownership; native FullCalendar event border colors remain intact.
+- Exact source `aeac7fe52a2e723106340bc6d283d2eb49521573` passed all four `B5C-THEME-*` fixtures in installed Chrome and Edge with no native mutation attempts.
+
+## Accepted B6 gate
+
+- Exact source `aeac7fe52a2e723106340bc6d283d2eb49521573` produced one 8-file package and immutable ZIP with embedded source/fingerprint identity.
+- The 482-test aggregate gate, 13-test prototype suite, package validation, and CI run `33185826761` passed.
+- The same bytes passed clean 27/27 and v0.7-upgrade 2/2 in installed Chrome 151 and Edge 151.
+- See `implementation/B6-RELEASE-CANDIDATE-EVIDENCE.md` for exact hashes and proof boundaries.
+
 ## Stage boundary
 
-Implement and accept only the bounded B5-C light theme delta defined in `logic/B5C-PROBE-THEME-DELTA.md`, then return to the B6 full-acceptance, candidate-packaging, and handoff gate defined by L8. Do not import the Tampermonkey runtime, add broad vendor takeover, or claim the deferred B5-D parity is complete. Production promotion, publication/store submission, merge to `main`, and new live mutations remain out of scope without separate exact approval.
+B6 is complete. No B5-D or later implementation, production promotion, publication/store submission, merge to `main`, rollout, or new live mutation is authorized. Preserve the accepted branch and wait for a separate exact instruction.

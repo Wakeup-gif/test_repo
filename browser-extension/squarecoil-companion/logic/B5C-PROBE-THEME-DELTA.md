@@ -1,7 +1,7 @@
 # SquareCoil Companion Rebuild
 ## B5-C Probe-Backed Theme Delta
 
-**Status:** Authorized light slice, implementation and acceptance pending
+**Status:** Accepted at exact source `aeac7fe52a2e723106340bc6d283d2eb49521573`; see `implementation/B5C-PROBE-THEME-EVIDENCE.md`
 **Source evidence:** `codex/squarecoil-theme-v2.3.3` at `0e6e6ef36534b33383358b4223ae1ae9054848aa`
 **Production dependency:** None. The Tampermonkey userscript is evidence only.
 **Purpose:** Port a small set of read-only live-probe findings into the extension-owned Sleek Dark theme without reopening broad site-reskin ownership.

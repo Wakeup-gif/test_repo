@@ -18,7 +18,7 @@ If chat context is lost or implementation direction becomes unclear, start here 
 
 **Logic status:** L0-L8 settled + post-mine L5A tab/focus delta settled
 
-**Implementation status:** B1 through B5-B accepted; bounded B5-C probe-backed theme delta is current
+**Implementation status:** B1 through B6 accepted; exact post-B5-C candidate source `aeac7fe52a2e723106340bc6d283d2eb49521573`
 
 **Workspace UI:** canonical B3 Main/Recent/Overview/By Day/By Context/Context Detail/History implementation present
 
@@ -26,7 +26,7 @@ If chat context is lost or implementation direction becomes unclear, start here 
 
 **Logic delta authority:** `logic/L5A-TAB-PARITY-FOCUS-DELTA.md`
 
-**Next canonical build action:** accept B5-C, then rerun B6 from the resulting exact clean source
+**Next canonical build action:** none authorized; preserve the accepted candidate pending a separate promotion/publication decision
 
 The user explicitly authorized sequential B3 through B6 work on this existing branch. That authorization does not promote the branch to production, authorize a release/store upload, or authorize new live SquareCoil mutations.
 
@@ -182,7 +182,7 @@ Settlement remains acceptance-gated: all required automated checks, clean exact-
 
 ## Next action
 
-Complete the bounded B5-C CSS-only route adapters and installed Chrome/Edge acceptance defined in `logic/B5C-PROBE-THEME-DELTA.md`. Then rerun B6 against the exact post-B5-C package. The prior `a6b4eb55ef4ea411c92430ef11440e5ab6d00729` run is rehearsal evidence only.
+B5-C and B6 are complete. Preserve exact source `aeac7fe52a2e723106340bc6d283d2eb49521573`, its package/ZIP identities, and the B5-C/B6 evidence documents. No B5-D or later implementation, merge to `main`, production promotion, release/store publication, rollout, or new live mutation is authorized without a separate exact instruction.
 
 ---
 
@@ -230,6 +230,6 @@ Optional presentation must never block a core build that does not include it.
 
 ## Logic readiness
 
-**Ready for the bounded B5-C acceptance gate, followed by B6.**
+**Accepted through B6; no later gate is authorized.**
 
-There are no open framework or Logic blockers for this sequence. Promotion and publication remain separate decisions.
+There are no open framework or Logic blockers in the accepted candidate. Promotion and publication remain separate decisions.
