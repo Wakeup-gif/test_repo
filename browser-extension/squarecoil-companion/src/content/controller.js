@@ -15,6 +15,7 @@ const {
 } = require('../extension/authority-protocol');
 const { createAuthorityClient } = require('../extension/authority-client');
 const { createTrustedTransitionCore } = require('./trusted-transition-core');
+const { createThemeService } = require('../presentation/theme-service');
 
 const DEFAULTS = Object.freeze({ timerEnabled: true });
 const BOOT_MESSAGE = 'SC_COMPANION_BOOT';
@@ -35,6 +36,7 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
   let authorityClient = null;
   let authorityRuntimeInstanceId = null;
   let trustedCore = null;
+  let themeService = null;
   let authorityCoreSync = Promise.resolve();
   let b2SettlementRefresh = null;
   let settingChangeQueue = Promise.resolve();
@@ -83,8 +85,30 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
     return authorityClient ? authorityClient.snapshot() : unavailableAuthoritySnapshot();
   }
 
+  function ensureThemeService() {
+    if (themeService) return themeService;
+    themeService = createThemeService({
+      document,
+      window,
+      onChange: value => {
+        setDataset('squarecoilCompanionTimerAppearance', value.timerAppearanceEffective);
+        setDataset('squarecoilCompanionPanelFinish', value.panelFinishEffective);
+        setDataset('squarecoilCompanionWebsiteTheme', value.websiteThemeEffective);
+      }
+    });
+    return themeService;
+  }
+
+  function withPresentation(current) {
+    if (!trustedCore || !current?.preferences) return { ...current, presentation: null };
+    let presentation = null;
+    try { presentation = ensureThemeService().apply(current.preferences); }
+    catch (_) { presentation = null; }
+    return { ...current, presentation };
+  }
+
   function coreSnapshot(view = {}) {
-    return trustedCore ? trustedCore.snapshot(view) : {
+    const current = trustedCore ? trustedCore.snapshot(view) : {
       initialized: false,
       disposed: false,
       blocked: false,
@@ -95,8 +119,10 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
       preflight: null,
       bridge: null,
       timer: null,
-      readModelError: null
+      readModelError: null,
+      preferences: null
     };
+    return withPresentation(current);
   }
 
   function settlementAuthoritySnapshot(current = authoritySnapshot(), capturedAtMs = Date.now()) {
@@ -183,6 +209,14 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
         if (!trustedCore) throw new Error('trusted-transition-core-unavailable');
         return trustedCore.userCommand(type);
       },
+      preferenceAction: async (patch, expectedPreferenceRevision) => {
+        if (!trustedCore) throw new Error('trusted-transition-core-unavailable');
+        return trustedCore.preferenceCommand(patch, expectedPreferenceRevision);
+      },
+      initializePreferences: async legacyPreferences => {
+        if (!trustedCore) throw new Error('trusted-transition-core-unavailable');
+        return trustedCore.initializePreferences(legacyPreferences);
+      },
       dataExport: (kind, values) => {
         if (!trustedCore) throw new Error('trusted-transition-core-unavailable');
         return trustedCore.dataExport(kind, values);
@@ -230,7 +264,7 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
   }
 
   function renderCore(snapshot, error = null) {
-    const current = snapshot || coreSnapshot();
+    const current = snapshot ? withPresentation(snapshot) : coreSnapshot();
     setDataset('squarecoilCompanionTrustedCore', current.blocked
       ? 'blocked'
       : current.initialized && !current.disposed
@@ -477,6 +511,7 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
       });
     }
     const connected = await authorityClient.ensure();
+    ensureThemeService();
     if (!trustedCore) {
       trustedCore = createTrustedTransitionCore({
         authorityClient,
@@ -511,6 +546,11 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
       if (trustedCore === core) trustedCore = null;
       renderCore(coreSnapshot());
     }
+    if (themeService) themeService.teardown();
+    themeService = null;
+    setDataset('squarecoilCompanionTimerAppearance', null);
+    setDataset('squarecoilCompanionPanelFinish', null);
+    setDataset('squarecoilCompanionWebsiteTheme', null);
     if (!authorityClient) {
       setDataset('squarecoilCompanionAuthorityCleanup', null);
       return { disconnected: true, absent: true };

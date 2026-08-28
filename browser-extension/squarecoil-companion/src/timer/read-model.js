@@ -23,6 +23,7 @@ const {
   thresholdLevel,
   focusIntentFromTimer
 } = require('../workspace/model');
+const { normalizePreferenceSnapshot } = require('../preferences/preferences');
 
 const DEFAULT_VERIFICATION_GRACE_MS = 90 * 1000;
 const DEFAULT_HISTORY_LIMIT = 100;
@@ -163,14 +164,21 @@ function createTimerReadModel(getDocument, options = {}) {
   const now = options.now || (() => Date.now());
   const verificationGraceMs = options.verificationGraceMs ?? DEFAULT_VERIFICATION_GRACE_MS;
   if (!isNonNegativeInteger(verificationGraceMs)) throw new Error('timer-read-model-verification-grace-invalid');
-  const timerLimits = normalizeTimerLimits(options.timerLimits || DEFAULT_TIMER_LIMITS_MS);
-  const sourcePreferenceRevision = isNonNegativeInteger(options.sourcePreferenceRevision) ? options.sourcePreferenceRevision : 0;
+  const configuredTimerLimits = options.timerLimits ? normalizeTimerLimits(options.timerLimits) : null;
+  const configuredPreferenceRevision = isNonNegativeInteger(options.sourcePreferenceRevision) ? options.sourcePreferenceRevision : null;
 
   function snapshot(view = {}) {
     const source = getDocument();
     if (!source) throw new Error('data-document-unavailable');
     const document = readableDocument(source);
     validateDocument(document);
+    const preferences = normalizePreferenceSnapshot(document.dataSafety?.preferences);
+    const timerLimits = configuredTimerLimits || normalizeTimerLimits({
+      yellow: preferences.yellowMinutes * 60_000,
+      orange: preferences.orangeMinutes * 60_000,
+      red: preferences.redMinutes * 60_000
+    });
+    const sourcePreferenceRevision = configuredPreferenceRevision ?? preferences.preferenceRevision;
     const atMs = view.atMs === undefined ? now() : view.atMs;
     if (!isTimestamp(atMs)) throw new Error('timer-read-model-at-invalid');
     const historyLimit = resolveHistoryLimit(view.historyLimit);

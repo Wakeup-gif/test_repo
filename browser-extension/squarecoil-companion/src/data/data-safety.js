@@ -20,6 +20,7 @@ const {
   virtualActiveSegments,
   createQueryService
 } = require('./ledger');
+const { restoredPreferenceStorage } = require('../preferences/preferences');
 
 const BACKUP_FORMAT = 'squarecoil-companion-backup';
 const BACKUP_SCHEMA_VERSION = 1;
@@ -898,7 +899,9 @@ function mergeIncoming(document, incoming, request, summary) {
     }
     candidate.dataSafety.workspace = normalizeWorkspace(incoming.workspace, candidate.contexts);
   }
-  if (request.importPreferences === true) candidate.dataSafety.preferences = sanitizePreferences(incoming.preferences);
+  if (request.importPreferences === true) {
+    candidate.dataSafety.preferences = restoredPreferenceStorage(candidate.dataSafety.preferences, incoming.preferences);
+  }
   return { candidate, conflicts, requiredConfirmations };
 }
 
@@ -925,7 +928,7 @@ function replaceIncoming(document, incoming, request, summary) {
     schemaVersion: DATA_SAFETY_SCHEMA_VERSION,
     datasetId: incoming.sourceDatasetId,
     workspace: { order: [], hiddenContextIds: [] },
-    preferences: request.keepCurrentZone ? deepClone(document.dataSafety?.preferences || {}) : sanitizePreferences(incoming.preferences),
+    preferences: deepClone(document.dataSafety?.preferences || {}),
     activityLog: request.restoreActivity === true ? incoming.activityLog.slice(-DATA_ACTIVITY_LIMIT) : deepClone(document.dataSafety?.activityLog || []),
     legacyBalanceLineages: {},
     lastMutation: null

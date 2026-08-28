@@ -3,6 +3,7 @@
 const POSITIVE_AUTHORITY = new Set(['OWNER', 'OBSERVER_CONNECTED']);
 const SETTLED_MIGRATION = new Set(['NOT_REQUIRED', 'COMPLETE_MATCH']);
 const USABLE_BRIDGE = new Set(['FULL', 'VERIFICATION_FALLBACK', 'DOM_FALLBACK', 'SERVER_FALLBACK']);
+const MAX_COORDINATION_CLOCK_SKEW_MS = 1_000;
 
 const SHELL_REQUIREMENTS = Object.freeze([
   'oneLifecycleOwner',
@@ -54,7 +55,7 @@ function evaluateB2ReadySettlement(shellHealth, authority, core, options = {}) {
     authority.errorFree !== true ||
     !Number.isSafeInteger(authority.capturedAtMs) ||
     !Number.isSafeInteger(authority.leaseExpiry) ||
-    authority.capturedAtMs > decisionAtMs ||
+    authority.capturedAtMs - decisionAtMs > MAX_COORDINATION_CLOCK_SKEW_MS ||
     authority.leaseExpiry <= authority.capturedAtMs ||
     decisionAtMs >= authority.leaseExpiry
   ) {
@@ -117,6 +118,7 @@ module.exports = {
   POSITIVE_AUTHORITY,
   SETTLED_MIGRATION,
   USABLE_BRIDGE,
+  MAX_COORDINATION_CLOCK_SKEW_MS,
   SHELL_REQUIREMENTS,
   validAuthorityTenure,
   sameAuthorityTenure,

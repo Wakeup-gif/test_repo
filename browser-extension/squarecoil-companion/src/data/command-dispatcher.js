@@ -10,6 +10,8 @@ const {
 } = require('../timer/service');
 const { DATA_COMMAND_TYPES } = require('./data-safety');
 const { createDataSafetyCommandHandler } = require('./data-safety-command');
+const { PREFERENCE_COMMAND_TYPES } = require('../preferences/preferences');
+const { createPreferenceCommandHandler } = require('../preferences/preferences-command');
 
 const COMMAND_ACCESS = Object.freeze({
   DIRECT_OWNER: 'DIRECT_OWNER',
@@ -38,6 +40,7 @@ const PUBLIC_OWNER_TYPES = new Set(PUBLIC_OWNER_TIMER_COMMANDS);
 function commandAccess(type) {
   if (type === AUTHORITY_COMMANDS.MIGRATE_V07) return COMMAND_ACCESS.DIRECT_OWNER;
   if (DATA_COMMAND_TYPES.has(type)) return COMMAND_ACCESS.PUBLIC_REQUESTER;
+  if (PREFERENCE_COMMAND_TYPES.has(type)) return COMMAND_ACCESS.PUBLIC_REQUESTER;
   if (PUBLIC_OWNER_TYPES.has(type)) return COMMAND_ACCESS.PUBLIC_OWNER;
   if (PUBLIC_REQUESTER_TYPES.has(type)) return COMMAND_ACCESS.PUBLIC_REQUESTER;
   return null;
@@ -70,9 +73,11 @@ function createAuthorityCommandDispatcher(options = {}) {
   const migrationHandler = options.migrationHandler || createMigrationCommandHandler(options);
   const timerHandler = options.timerHandler || createTimerCommandHandler(options);
   const dataSafetyHandler = options.dataSafetyHandler || createDataSafetyCommandHandler(options);
+  const preferenceHandler = options.preferenceHandler || createPreferenceCommandHandler(options);
   if (typeof migrationHandler !== 'function') throw new Error('migration-command-handler-invalid');
   if (typeof timerHandler !== 'function') throw new Error('timer-command-handler-invalid');
   if (typeof dataSafetyHandler !== 'function') throw new Error('data-safety-command-handler-invalid');
+  if (typeof preferenceHandler !== 'function') throw new Error('preference-command-handler-invalid');
 
   return async function dispatchAuthorityCommand(document, command, trustedContext) {
     if (!command || typeof command !== 'object' || Array.isArray(command)) {
@@ -94,6 +99,9 @@ function createAuthorityCommandDispatcher(options = {}) {
     }
     if (DATA_COMMAND_TYPES.has(command.type)) {
       return dataSafetyHandler(document, command, context);
+    }
+    if (PREFERENCE_COMMAND_TYPES.has(command.type)) {
+      return preferenceHandler(document, command, context);
     }
     return timerHandler(document, command, context);
   };

@@ -1,0 +1,188 @@
+'use strict';
+
+const { DATA_SAFETY_SCHEMA_VERSION, deepClone, isRecord } = require('../data/model');
+
+const PREFERENCE_SCHEMA_VERSION = 1;
+const DEFAULT_PREFERENCES = Object.freeze({
+  timerAppearance: 'LIGHT',
+  panelFinish: 'SOLID',
+  websiteTheme: 'ORIGINAL',
+  yellowMinutes: 60,
+  orangeMinutes: 120,
+  redMinutes: 240
+});
+const PREFERENCE_COMMANDS = Object.freeze({
+  INITIALIZE: 'PREFERENCES_INITIALIZE',
+  COMMIT: 'PREFERENCES_COMMIT'
+});
+const PREFERENCE_COMMAND_TYPES = new Set(Object.values(PREFERENCE_COMMANDS));
+const VALUE_KEYS = Object.freeze(Object.keys(DEFAULT_PREFERENCES));
+
+function enumValue(value, allowed, aliases = {}) {
+  const key = String(value ?? '').trim().toUpperCase().replace(/[\s-]+/g, '_');
+  const resolved = aliases[key] || key;
+  return allowed.includes(resolved) ? resolved : null;
+}
+
+function integer(value) {
+  const parsed = typeof value === 'string' && /^\d+$/.test(value.trim()) ? Number(value) : value;
+  return Number.isSafeInteger(parsed) ? parsed : null;
+}
+
+function first(source, keys) {
+  for (const key of keys) {
+    if (source[key] !== undefined && source[key] !== null) return source[key];
+  }
+  return undefined;
+}
+
+function preferenceCandidates(raw) {
+  const source = isRecord(raw) ? raw : {};
+  const nested = isRecord(source.settings) ? source.settings : {};
+  const timerAppearance = enumValue(first(source, ['timerAppearance', 'themePreference', 'protoUiTheme', 'theme']),
+    ['LIGHT', 'DARK', 'AUTO']);
+  const panelFinish = enumValue(first(source, ['panelFinish', 'timerSurface', 'protoUiSurface', 'surface']),
+    ['SOLID', 'GLASS'], { GLASS_BLUR: 'GLASS', BLUR: 'GLASS' });
+  const websiteTheme = enumValue(first(source, ['websiteTheme', 'squareCoilTheme']),
+    ['ORIGINAL', 'REFINED_LIGHT', 'SLEEK_DARK'], { LIGHT: 'REFINED_LIGHT', DARK: 'SLEEK_DARK', REFINED: 'REFINED_LIGHT', SLEEK: 'SLEEK_DARK' });
+  const yellowMinutes = integer(first(source, ['yellowMinutes', 'timerYellowMinutes', 'yellow']) ?? nested.yellow);
+  const orangeMinutes = integer(first(source, ['orangeMinutes', 'timerOrangeMinutes', 'orange']) ?? nested.orange);
+  const redMinutes = integer(first(source, ['redMinutes', 'timerRedMinutes', 'red']) ?? nested.red);
+  return { timerAppearance, panelFinish, websiteTheme, yellowMinutes, orangeMinutes, redMinutes };
+}
+
+function validLimits(values) {
+  return Number.isSafeInteger(values.yellowMinutes) && Number.isSafeInteger(values.orangeMinutes) &&
+    Number.isSafeInteger(values.redMinutes) && values.yellowMinutes >= 1 &&
+    values.yellowMinutes <= values.orangeMinutes && values.orangeMinutes <= values.redMinutes;
+}
+
+function normalizePreferenceSnapshot(raw, options = {}) {
+  const source = isRecord(raw) ? raw : {};
+  const fallback = isRecord(options.fallback) ? options.fallback : DEFAULT_PREFERENCES;
+  const candidates = preferenceCandidates(source);
+  const limits = validLimits(candidates) ? candidates : fallback;
+  const values = {
+    timerAppearance: candidates.timerAppearance || fallback.timerAppearance || DEFAULT_PREFERENCES.timerAppearance,
+    panelFinish: candidates.panelFinish || fallback.panelFinish || DEFAULT_PREFERENCES.panelFinish,
+    websiteTheme: candidates.websiteTheme || fallback.websiteTheme || DEFAULT_PREFERENCES.websiteTheme,
+    yellowMinutes: limits.yellowMinutes ?? DEFAULT_PREFERENCES.yellowMinutes,
+    orangeMinutes: limits.orangeMinutes ?? DEFAULT_PREFERENCES.orangeMinutes,
+    redMinutes: limits.redMinutes ?? DEFAULT_PREFERENCES.redMinutes
+  };
+  const initialized = source.preferencesSchemaVersion === PREFERENCE_SCHEMA_VERSION ||
+    (source.schemaVersion === PREFERENCE_SCHEMA_VERSION && source.initialized === true);
+  const preferenceRevision = initialized && Number.isSafeInteger(source.preferenceRevision) && source.preferenceRevision >= 0
+    ? source.preferenceRevision : 0;
+  return Object.freeze({
+    schemaVersion: PREFERENCE_SCHEMA_VERSION,
+    initialized,
+    preferenceRevision,
+    ...values
+  });
+}
+
+function validatePreferencePatch(patch) {
+  if (!isRecord(patch)) throw new Error('preference-patch-invalid');
+  const keys = Object.keys(patch);
+  if (!keys.length || keys.some(key => !VALUE_KEYS.includes(key))) throw new Error('preference-patch-field-unsupported');
+  const result = {};
+  for (const key of keys) {
+    const candidate = preferenceCandidates({ [key]: patch[key] })[key];
+    if (candidate === null) throw new Error(`preference-value-invalid:${key}`);
+    result[key] = candidate;
+  }
+  const limitKeys = ['yellowMinutes', 'orangeMinutes', 'redMinutes'];
+  if (limitKeys.some(key => Object.hasOwn(result, key)) && !limitKeys.every(key => Object.hasOwn(result, key))) {
+    throw new Error('preference-limits-batch-required');
+  }
+  if (limitKeys.every(key => Object.hasOwn(result, key)) && !validLimits(result)) {
+    throw new Error('preference-limits-order-invalid');
+  }
+  return Object.freeze(result);
+}
+
+function mergeLegacyPreferences(current, legacy) {
+  const candidates = preferenceCandidates(legacy);
+  const merged = { ...current };
+  for (const key of ['timerAppearance', 'panelFinish', 'websiteTheme']) {
+    if (candidates[key] !== null) merged[key] = candidates[key];
+  }
+  if (validLimits(candidates)) {
+    merged.yellowMinutes = candidates.yellowMinutes;
+    merged.orangeMinutes = candidates.orangeMinutes;
+    merged.redMinutes = candidates.redMinutes;
+  }
+  return merged;
+}
+
+function preferenceStorage(snapshot, revision = snapshot.preferenceRevision) {
+  return {
+    preferencesSchemaVersion: PREFERENCE_SCHEMA_VERSION,
+    preferenceRevision: revision,
+    timerAppearance: snapshot.timerAppearance,
+    panelFinish: snapshot.panelFinish,
+    websiteTheme: snapshot.websiteTheme,
+    yellowMinutes: snapshot.yellowMinutes,
+    orangeMinutes: snapshot.orangeMinutes,
+    redMinutes: snapshot.redMinutes
+  };
+}
+
+function ensurePreferenceContainer(document, options = {}) {
+  if (!isRecord(document.dataSafety)) {
+    document.dataSafety = {
+      schemaVersion: DATA_SAFETY_SCHEMA_VERSION,
+      datasetId: String(options.datasetId || `dataset-${document.updatedAtMs}`),
+      workspace: { order: [], hiddenContextIds: [] },
+      preferences: {},
+      activityLog: [],
+      legacyBalanceLineages: {},
+      lastMutation: null
+    };
+  }
+  if (!isRecord(document.dataSafety.preferences)) document.dataSafety.preferences = {};
+  return document.dataSafety.preferences;
+}
+
+function applyPreferenceCommand(document, command, options = {}) {
+  if (!isRecord(command) || !PREFERENCE_COMMAND_TYPES.has(command.type)) throw new Error('preference-command-invalid');
+  const raw = ensurePreferenceContainer(document, options);
+  const current = normalizePreferenceSnapshot(raw);
+  if (!Number.isSafeInteger(command.expectedPreferenceRevision) || command.expectedPreferenceRevision !== current.preferenceRevision) {
+    throw new Error('preference-revision-conflict');
+  }
+  if (command.type === PREFERENCE_COMMANDS.INITIALIZE && current.initialized) {
+    throw new Error('preferences-already-initialized');
+  }
+  let next = { ...current };
+  if (command.type === PREFERENCE_COMMANDS.INITIALIZE) next = mergeLegacyPreferences(next, command.legacyPreferences);
+  else Object.assign(next, validatePreferencePatch(command.patch));
+  const revision = current.preferenceRevision + 1;
+  document.dataSafety.preferences = preferenceStorage(next, revision);
+  return Object.freeze({
+    command: command.type,
+    preferences: deepClone(normalizePreferenceSnapshot(document.dataSafety.preferences))
+  });
+}
+
+function restoredPreferenceStorage(currentRaw, incomingRaw) {
+  const current = normalizePreferenceSnapshot(currentRaw);
+  const incoming = normalizePreferenceSnapshot(incomingRaw, { fallback: current });
+  return preferenceStorage(incoming, current.preferenceRevision + 1);
+}
+
+module.exports = {
+  PREFERENCE_SCHEMA_VERSION,
+  DEFAULT_PREFERENCES,
+  PREFERENCE_COMMANDS,
+  PREFERENCE_COMMAND_TYPES,
+  VALUE_KEYS,
+  validLimits,
+  preferenceCandidates,
+  normalizePreferenceSnapshot,
+  validatePreferencePatch,
+  preferenceStorage,
+  applyPreferenceCommand,
+  restoredPreferenceStorage
+};

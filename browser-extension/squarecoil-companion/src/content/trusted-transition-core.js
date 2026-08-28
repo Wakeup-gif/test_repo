@@ -14,6 +14,10 @@ const {
   createTimeReportCsv,
   stageDataOperation
 } = require('../data/data-safety');
+const {
+  PREFERENCE_COMMANDS,
+  normalizePreferenceSnapshot
+} = require('../preferences/preferences');
 
 const RECOVERY_MODES = Object.freeze({
   CONTROLLED: 'CONTROLLED_RELOAD',
@@ -171,7 +175,8 @@ function createTrustedTransitionCore(options = {}) {
       timer: readModel,
       readModelError,
       data,
-      dataReadModelError
+      dataReadModelError,
+      preferences: normalizePreferenceSnapshot(authorityDocument?.dataSafety?.preferences)
     });
   }
 
@@ -444,6 +449,29 @@ function createTrustedTransitionCore(options = {}) {
     });
   }
 
+  async function preferenceCommand(patch, expectedPreferenceRevision) {
+    return serialize(async () => {
+      if (!authorityDocument) await refreshDocument();
+      const result = await commit(PREFERENCE_COMMANDS.COMMIT, { patch, expectedPreferenceRevision });
+      publishStatus('preferences-committed');
+      return result;
+    });
+  }
+
+  async function initializePreferences(legacyPreferences = {}) {
+    return serialize(async () => {
+      if (!authorityDocument) await refreshDocument();
+      const current = normalizePreferenceSnapshot(authorityDocument.dataSafety?.preferences);
+      if (current.initialized) return { initialized: true, alreadyInitialized: true, preferences: current };
+      const result = await commit(PREFERENCE_COMMANDS.INITIALIZE, {
+        legacyPreferences,
+        expectedPreferenceRevision: current.preferenceRevision
+      });
+      publishStatus('preferences-initialized');
+      return result;
+    });
+  }
+
   function dataExport(kind, values = {}) {
     if (!authorityDocument) throw new Error('trusted-transition-document-unavailable');
     const document = viewDocument();
@@ -554,6 +582,8 @@ function createTrustedTransitionCore(options = {}) {
     handleAuthoritySnapshot,
     verifyNow,
     userCommand,
+    preferenceCommand,
+    initializePreferences,
     prepareDisable,
     prepareControlledTeardown,
     teardown,

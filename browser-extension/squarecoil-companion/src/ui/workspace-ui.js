@@ -2,6 +2,14 @@
 
 const { TIMER_COMMANDS } = require('../timer/commands');
 const { DATA_COMMANDS } = require('../data/data-safety');
+const { DEFAULT_PREFERENCES, validLimits } = require('../preferences/preferences');
+const {
+  SUPPORT_EMAIL,
+  TICKET_TYPES,
+  FEEDBACK_CATEGORIES,
+  createDiagnosticSnapshot,
+  composeSupportMessage
+} = require('../support/support-service');
 const {
   MAX_VISIBLE_JOB_TABS,
   THRESHOLD_LABELS,
@@ -14,6 +22,9 @@ const ROOT_ID = 'ussign-job-timer';
 const UI_STORAGE_DEFAULTS = Object.freeze({
   protoUiTheme: 'light',
   protoUiSurface: 'solid',
+  themePreference: null,
+  timerSurface: null,
+  squareCoilTheme: null,
   protoUiCollapsed: false,
   protoUiHiddenTabs: [],
   b3WorkspaceOrder: [],
@@ -21,7 +32,15 @@ const UI_STORAGE_DEFAULTS = Object.freeze({
   b3WorkspaceRevision: 0
 });
 const WORKSPACE_STORAGE_KEYS = new Set(['protoUiHiddenTabs', 'b3WorkspaceOrder', 'b3WorkspaceRevision']);
-const VIEW_IDS = new Set(['main', 'recent', 'overview', 'by-day', 'by-context', 'history', 'context-detail', 'settings', 'data-tools']);
+const VIEW_IDS = new Set([
+  'main', 'recent', 'overview', 'by-day', 'by-context', 'history', 'context-detail',
+  'settings', 'timer-appearance', 'website-theme', 'timer-limits', 'submit-ticket',
+  'send-feedback', 'developer-support', 'data-tools'
+]);
+const SETTINGS_VIEW_IDS = new Set([
+  'settings', 'timer-appearance', 'website-theme', 'timer-limits', 'submit-ticket',
+  'send-feedback', 'developer-support', 'data-tools'
+]);
 const TIMER_ACTIONS = Object.freeze({
   pause: TIMER_COMMANDS.LOCAL_PAUSE,
   resume: TIMER_COMMANDS.RESUME,
@@ -102,6 +121,8 @@ function createWorkspaceUi(options = {}) {
   const storage = options.storage;
   const storageChanges = options.storageChanges || null;
   const getCoreHandle = options.getCoreHandle;
+  const packageVersion = String(options.packageVersion || '0.7.1');
+  const userAgent = String(options.userAgent || window?.navigator?.userAgent || '');
   if (!document || !window || !storage || typeof getCoreHandle !== 'function') throw new Error('workspace-ui-options-required');
 
   let started = false;
@@ -111,8 +132,12 @@ function createWorkspaceUi(options = {}) {
   let selectedContextId = null;
   let lastOperationalContextId = null;
   let view = 'main';
-  let theme = 'light';
-  let surface = 'solid';
+  let theme = 'LIGHT';
+  let surface = 'SOLID';
+  let websiteTheme = 'ORIGINAL';
+  let preferenceRevision = 0;
+  let preferenceInitialized = false;
+  let presentation = null;
   let collapsed = false;
   let hiddenTabs = new Set();
   let durableOrder = [];
@@ -131,6 +156,17 @@ function createWorkspaceUi(options = {}) {
   let pendingFileMode = null;
   let pendingImport = null;
   let dataMessage = null;
+  let legacyPreferenceCandidates = {};
+  let preferenceInitializationInFlight = false;
+  let settingsReturnView = null;
+  let focusTarget = null;
+  let limitDraft = null;
+  let supportMessage = null;
+  let supportManualCopy = null;
+  const supportDrafts = {
+    ticket: { category: 'Bug', subject: '', description: '', includeDiagnostics: false, diagnostics: null, dirty: false },
+    feedback: { category: 'Suggestion', subject: '', description: '', includeDiagnostics: false, diagnostics: null, dirty: false }
+  };
 
   function coreHandle() { return getCoreHandle() || null; }
 
@@ -156,6 +192,8 @@ function createWorkspaceUi(options = {}) {
         return lastGoodCore;
       }
       lastGoodCore = candidate;
+      adoptPreferenceState(candidate);
+      maybeInitializePreferences(candidate);
       snapshotStale = false;
       return candidate;
     } catch (_) {
@@ -168,6 +206,16 @@ function createWorkspaceUi(options = {}) {
     const candidate = document.getElementById(ROOT_ID);
     if (!candidate) return null;
     if (root === candidate) return root;
+    if (root && root !== candidate && SETTINGS_VIEW_IDS.has(view)) {
+      view = 'settings';
+      settingsReturnView = null;
+      pendingImport = null;
+      limitDraft = null;
+      supportDrafts.ticket = { category: 'Bug', subject: '', description: '', includeDiagnostics: false, diagnostics: null, dirty: false };
+      supportDrafts.feedback = { category: 'Suggestion', subject: '', description: '', includeDiagnostics: false, diagnostics: null, dirty: false };
+      supportMessage = null;
+      supportManualCopy = null;
+    }
     root = candidate;
     root.classList.add('sc-proto-root');
     root.addEventListener('click', onClick);
@@ -177,6 +225,8 @@ function createWorkspaceUi(options = {}) {
     root.addEventListener('dragover', onDragOver);
     root.addEventListener('drop', onDrop);
     root.addEventListener('change', onChange);
+    root.addEventListener('input', onInput);
+    root.addEventListener('keydown', onKeyDown);
     return root;
   }
 
@@ -185,27 +235,67 @@ function createWorkspaceUi(options = {}) {
     preferencesLoaded = true;
     try {
       const value = await storage.get(UI_STORAGE_DEFAULTS);
-      theme = ['light', 'dark'].includes(value.protoUiTheme) ? value.protoUiTheme : 'light';
-      surface = ['solid', 'glass'].includes(value.protoUiSurface) ? value.protoUiSurface : 'solid';
       collapsed = value.protoUiCollapsed === true;
       hiddenTabs = new Set(Array.isArray(value.protoUiHiddenTabs) ? value.protoUiHiddenTabs.map(String) : []);
       durableOrder = Array.isArray(value.b3WorkspaceOrder) ? value.b3WorkspaceOrder.map(String) : [];
       selectedContextId = value.b3LastSelectedContextId ? String(value.b3LastSelectedContextId) : null;
       workspaceRevision = Number.isSafeInteger(value.b3WorkspaceRevision) ? value.b3WorkspaceRevision : 0;
+      legacyPreferenceCandidates = {
+        themePreference: value.themePreference || value.protoUiTheme,
+        timerSurface: value.timerSurface || value.protoUiSurface,
+        squareCoilTheme: value.squareCoilTheme
+      };
+      try {
+        const legacy = JSON.parse(window.localStorage?.getItem?.('ussign-squarecoil-job-timer-v1') || 'null');
+        if (legacy?.settings) legacyPreferenceCandidates.settings = legacy.settings;
+      } catch (_) {}
     } catch (_) {}
   }
 
   function savePreferences() {
     workspaceRevision = Math.max(workspaceRevision + 1, Date.now());
     storage.set({
-      protoUiTheme: theme,
-      protoUiSurface: surface,
       protoUiCollapsed: collapsed,
       protoUiHiddenTabs: [...hiddenTabs],
       b3WorkspaceOrder: [...durableOrder],
       b3LastSelectedContextId: selectedContextId,
       b3WorkspaceRevision: workspaceRevision
     }).catch(() => {});
+  }
+
+  function adoptPreferenceState(core) {
+    const next = core?.preferences;
+    if (!next) return;
+    theme = next.timerAppearance || DEFAULT_PREFERENCES.timerAppearance;
+    surface = next.panelFinish || DEFAULT_PREFERENCES.panelFinish;
+    websiteTheme = next.websiteTheme || DEFAULT_PREFERENCES.websiteTheme;
+    preferenceRevision = Number.isSafeInteger(next.preferenceRevision) ? next.preferenceRevision : 0;
+    preferenceInitialized = next.initialized === true;
+    presentation = core.presentation || presentation;
+    if (!limitDraft || limitDraft.dirty !== true) {
+      limitDraft = {
+        yellowMinutes: next.yellowMinutes,
+        orangeMinutes: next.orangeMinutes,
+        redMinutes: next.redMinutes,
+        baseRevision: preferenceRevision,
+        dirty: false
+      };
+    }
+  }
+
+  function maybeInitializePreferences(core) {
+    if (preferenceInitialized || preferenceInitializationInFlight || !core?.initialized) return;
+    const handle = coreHandle();
+    if (!handle || typeof handle.initializePreferences !== 'function') return;
+    preferenceInitializationInFlight = true;
+    handle.initializePreferences(legacyPreferenceCandidates).catch(error => {
+      if (!/already-initialized|revision-conflict/.test(String(error?.message || error))) {
+        errorMessage = 'Preferences could not be initialized; safe defaults remain effective.';
+      }
+    }).finally(() => {
+      preferenceInitializationInFlight = false;
+      render();
+    });
   }
 
   function onStorageChanged(changes, areaName) {
@@ -258,7 +348,7 @@ function createWorkspaceUi(options = {}) {
     if (firstSnapshot) {
       processedFocusIntentId = intent?.intentId || '__baseline__';
     } else if (intent && intent.intentId !== processedFocusIntentId && focusIntentIsCurrent(intent, timer)) {
-      if (routeProtection.dirty || routeProtection.inProgress) {
+      if (routeProtection.dirty || currentDraftKind() || routeProtection.inProgress || busyAction) {
         if (!pendingFocusIntent || intent.sourceStateRevision >= pendingFocusIntent.intent.sourceStateRevision) {
           pendingFocusIntent = { intent, selectionSerialAtDeferral: selectionSerial };
         }
@@ -276,7 +366,7 @@ function createWorkspaceUi(options = {}) {
   }
 
   function flushDeferredFocus(timer) {
-    if (!pendingFocusIntent || routeProtection.dirty || routeProtection.inProgress) return false;
+    if (!pendingFocusIntent || routeProtection.dirty || currentDraftKind() || routeProtection.inProgress || busyAction) return false;
     const pending = pendingFocusIntent;
     pendingFocusIntent = null;
     if (selectionSerial !== pending.selectionSerialAtDeferral) return false;
@@ -293,6 +383,7 @@ function createWorkspaceUi(options = {}) {
 #${ROOT_ID} .sc-content{max-height:540px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}#${ROOT_ID} .sc-view{padding:12px}#${ROOT_ID} .sc-current-strip{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;margin-bottom:9px;border:1px solid var(--sc-border);background:var(--sc-panel);border-radius:9px}#${ROOT_ID} .sc-eyebrow{color:var(--sc-muted);font-size:10px;text-transform:uppercase;letter-spacing:.06em}#${ROOT_ID} .sc-title{margin-top:2px;font-size:15px;font-weight:680;overflow-wrap:anywhere}#${ROOT_ID} .sc-status{display:inline-flex;align-items:center;gap:6px;margin-top:6px;border-radius:999px;padding:3px 7px;font-size:10.5px;font-weight:650;background:var(--sc-panel-2);color:var(--sc-muted)}#${ROOT_ID} .sc-status[data-tone="positive"]{background:var(--sc-positive-soft);color:var(--sc-positive)}#${ROOT_ID} .sc-status[data-tone="warning"]{background:var(--sc-warning-soft);color:var(--sc-warning)}#${ROOT_ID} .sc-status[data-tone="danger"]{background:var(--sc-danger-soft);color:var(--sc-danger)}
 #${ROOT_ID} .sc-timer-card{padding:13px;border:1px solid var(--sc-border);border-radius:11px;background:var(--sc-panel)}#${ROOT_ID} .sc-metrics,#${ROOT_ID} .sc-summary-grid{display:grid;grid-template-columns:1.25fr 1fr;gap:9px;margin-top:12px}#${ROOT_ID} .sc-metric,#${ROOT_ID} .sc-summary{padding:10px;border:1px solid var(--sc-border);border-radius:9px;background:var(--sc-panel-2)}#${ROOT_ID} .sc-metric strong,#${ROOT_ID} .sc-summary strong{display:block;margin-top:2px;font-size:18px;font-weight:700}#${ROOT_ID} .sc-session{margin-top:10px;color:var(--sc-muted);font-size:11px;display:flex;justify-content:space-between}#${ROOT_ID} .sc-actions,#${ROOT_ID} .sc-row-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}#${ROOT_ID} .sc-actions .sc-primary{background:var(--sc-accent);border-color:var(--sc-accent);color:var(--sc-bg);font-weight:650}#${ROOT_ID} .sc-nav-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}#${ROOT_ID} .sc-nav-grid button{text-align:left;min-height:44px}#${ROOT_ID} .sc-nav-grid strong{display:block;font-size:11.5px;font-weight:650}#${ROOT_ID} .sc-nav-grid small{display:block;color:var(--sc-muted);font-size:9.5px;margin-top:2px}#${ROOT_ID} .sc-search{display:flex;gap:7px;margin-top:10px}#${ROOT_ID} .sc-search input{min-width:0;flex:1;border:1px solid var(--sc-border);border-radius:8px;background:var(--sc-panel);padding:7px 9px}
 #${ROOT_ID} .sc-view-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}#${ROOT_ID} .sc-view-head strong{flex:1;font-size:14px;font-weight:680}#${ROOT_ID} .sc-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--sc-border)}#${ROOT_ID} .sc-row-title{font-weight:620;font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#${ROOT_ID} .sc-row-meta{color:var(--sc-muted);font-size:10px;margin-top:2px}#${ROOT_ID} .sc-row-actions{margin-top:0;justify-content:flex-end}#${ROOT_ID} .sc-row-actions button{padding:4px 7px;font-size:10px}#${ROOT_ID} .sc-choice{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:7px}#${ROOT_ID} .sc-choice button[data-active="true"]{border-color:var(--sc-accent);background:var(--sc-accent-soft);color:var(--sc-accent);font-weight:650}#${ROOT_ID} .sc-note,#${ROOT_ID} .sc-stale{margin-top:9px;padding:8px 9px;border-radius:8px;background:var(--sc-panel-2);color:var(--sc-muted);font-size:10px}#${ROOT_ID} .sc-stale{background:var(--sc-warning-soft);color:var(--sc-warning)}#${ROOT_ID} .sc-error{margin:0 12px 10px;padding:8px 9px;border-radius:8px;background:var(--sc-danger-soft);color:var(--sc-danger);font-size:10px}#${ROOT_ID} .sc-empty{padding:18px 8px;text-align:center;color:var(--sc-muted);font-size:11px}#${ROOT_ID} .sc-foot{padding:7px 10px;border-top:1px solid var(--sc-border);background:var(--sc-panel);color:var(--sc-muted);font-size:9.5px}#${ROOT_ID}[data-proto-collapsed="true"]{width:292px!important}#${ROOT_ID}[data-proto-collapsed="true"] .sc-tabs,#${ROOT_ID}[data-proto-collapsed="true"] .sc-content,#${ROOT_ID}[data-proto-collapsed="true"] .sc-foot{display:none}@media(max-width:460px){#${ROOT_ID}.sc-proto-root{right:8px!important;bottom:8px!important;width:calc(100vw - 16px)!important}}
+#${ROOT_ID} .sc-section-label{margin-top:14px}#${ROOT_ID} .sc-choice-three{grid-template-columns:repeat(3,1fr)}#${ROOT_ID} label{display:block;margin-top:9px;color:var(--sc-muted);font-size:10px}#${ROOT_ID} label input,#${ROOT_ID} label select,#${ROOT_ID} label textarea{display:block;width:100%;margin-top:4px;padding:7px 8px;border:1px solid var(--sc-border);border-radius:8px;background:var(--sc-panel);color:var(--sc-text)}#${ROOT_ID} label textarea{resize:vertical;min-height:86px}#${ROOT_ID} .sc-field-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}#${ROOT_ID} .sc-check{display:flex;align-items:center;gap:7px}#${ROOT_ID} .sc-check input{display:inline-block;width:auto;margin:0}#${ROOT_ID} .sc-diagnostics{max-height:170px;overflow:auto;white-space:pre-wrap;word-break:break-word;margin:9px 0 0;padding:8px;border:1px solid var(--sc-border);border-radius:8px;background:var(--sc-panel-2);color:var(--sc-text);font:10px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace!important}@media(forced-colors:active){#${ROOT_ID}.sc-proto-root{forced-color-adjust:auto}#${ROOT_ID} .sc-proto-shell,#${ROOT_ID} button,#${ROOT_ID} input,#${ROOT_ID} select,#${ROOT_ID} textarea{border:1px solid ButtonText;box-shadow:none;background:Canvas;color:CanvasText}#${ROOT_ID}[data-proto-surface="glass"] .sc-proto-shell{backdrop-filter:none}}
 </style>`;
   }
 
@@ -317,7 +408,11 @@ function createWorkspaceUi(options = {}) {
     }).join('')}</div>`;
   }
 
-  function viewHeader(title, backView = 'main') { return `<div class="sc-view-head"><button class="sc-icon-btn" data-action="view" data-view="${escapeHtml(backView)}" aria-label="Back">‹</button><strong>${escapeHtml(title)}</strong></div>`; }
+  function viewHeader(title, backView = 'main') {
+    const settingsRoute = SETTINGS_VIEW_IDS.has(view);
+    const effectiveBack = settingsReturnView === view ? 'settings' : backView;
+    return `<div class="sc-view-head"><button class="sc-icon-btn" data-action="${settingsRoute ? 'settings-back' : 'view'}" data-view="${escapeHtml(effectiveBack)}" aria-label="Back">‹</button><strong tabindex="-1" data-sc-view-heading>${escapeHtml(title)}</strong>${settingsRoute ? '<button class="sc-icon-btn" data-action="settings-close" aria-label="Close Settings">×</button>' : ''}</div>`;
+  }
   function openButton(row, label = 'Open Job') { return safeProjectId(row?.projectId) ? `<button data-action="open-job" data-project="${escapeHtml(row.projectId)}">${escapeHtml(label)}</button>` : ''; }
   function searchMarkup() { return `<form class="sc-search" data-sc-search-form><input name="projectId" inputmode="search" autocomplete="off" placeholder="Find known context or open job #"><button type="submit">Find</button></form>`; }
 
@@ -344,7 +439,7 @@ function createWorkspaceUi(options = {}) {
     const hold = selected.isSafetyHeld ? '<div class="sc-note">Companion stopped extending the local value at the shared verification boundary. This does not claim that the native SquareCoil clock was paused.</div>' : '';
     const native = timer.nativeDisposition && timer.nativeDisposition !== 'TRACKABLE_CONTEXT'
       ? `<div class="sc-note">Native disposition: ${escapeHtml(timer.nativeDisposition.toLowerCase().replace(/_/g, ' '))}. This is separate from the selected Context status.</div>` : '';
-    return `<div class="sc-view">${currentStrip(timer, operational, selected)}<section class="sc-timer-card"><div class="sc-eyebrow">${selected.kind === 'job' ? `Job ${escapeHtml(selected.projectId)}` : 'General context'}</div><div class="sc-title">${escapeHtml(selected.label)}</div><div class="sc-status" data-tone="${statusTone(status)}"><span class="sc-dot" data-tone="${statusTone(status)}"></span>${escapeHtml(statusLabel(status))}</div><div class="sc-metrics"><div class="sc-metric"><span class="sc-eyebrow">Today</span><strong>${formatDuration(selected.todayMs)}${selected.isProvisional ? '*' : ''}</strong></div><div class="sc-metric"><span class="sc-eyebrow">${selected.kind === 'job' ? 'Job total' : 'Context total'}</span><strong>${formatDuration(selected.totalMs)}${selected.isProvisional ? '*' : ''}</strong></div></div>${activeSession ? `<div class="sc-session"><span>Current session${timer.running.provisional ? ' · provisional' : ''}</span><strong>${formatDuration(timer.running.elapsedMs)}</strong></div>` : ''}${pending}${hold}${native}<div class="sc-actions">${busyAction ? '<button disabled>Working…</button>' : actions.join('')}</div></section><div class="sc-nav-grid"><button data-action="view" data-view="recent"><strong>Recent Jobs</strong><small>Visibility, recency, status</small></button><button data-action="view" data-view="overview"><strong>Time Overview</strong><small>Today, week, day, context</small></button><button data-action="view" data-view="history"><strong>History</strong><small>Finalized logical sessions</small></button><button data-action="view" data-view="settings"><strong>Settings</strong><small>Inherited appearance only</small></button></div>${searchMarkup()}</div>`;
+    return `<div class="sc-view">${currentStrip(timer, operational, selected)}<section class="sc-timer-card"><div class="sc-eyebrow">${selected.kind === 'job' ? `Job ${escapeHtml(selected.projectId)}` : 'General context'}</div><div class="sc-title">${escapeHtml(selected.label)}</div><div class="sc-status" data-tone="${statusTone(status)}"><span class="sc-dot" data-tone="${statusTone(status)}"></span>${escapeHtml(statusLabel(status))}</div><div class="sc-metrics"><div class="sc-metric"><span class="sc-eyebrow">Today</span><strong>${formatDuration(selected.todayMs)}${selected.isProvisional ? '*' : ''}</strong></div><div class="sc-metric"><span class="sc-eyebrow">${selected.kind === 'job' ? 'Job total' : 'Context total'}</span><strong>${formatDuration(selected.totalMs)}${selected.isProvisional ? '*' : ''}</strong></div></div>${activeSession ? `<div class="sc-session"><span>Current session${timer.running.provisional ? ' · provisional' : ''}</span><strong>${formatDuration(timer.running.elapsedMs)}</strong></div>` : ''}${pending}${hold}${native}<div class="sc-actions">${busyAction ? '<button disabled>Working…</button>' : actions.join('')}</div></section><div class="sc-nav-grid"><button data-action="view" data-view="recent"><strong>Recent Jobs</strong><small>Visibility, recency, status</small></button><button data-action="view" data-view="overview"><strong>Time Overview</strong><small>Today, week, day, context</small></button><button data-action="view" data-view="history"><strong>History</strong><small>Finalized logical sessions</small></button><button data-action="view" data-view="settings"><strong>Settings</strong><small>Appearance, limits &amp; support</small></button></div>${searchMarkup()}</div>`;
   }
 
   function recentView(timer) {
@@ -383,8 +478,51 @@ function createWorkspaceUi(options = {}) {
     return `<div class="sc-view">${viewHeader('Context Detail', 'overview')}<div class="sc-title">${escapeHtml(detail.label)}</div><div class="sc-status" data-tone="${statusTone(detail.status)}">${escapeHtml(statusLabel(detail.status))}${marker(detail)}</div><div class="sc-summary-grid"><div class="sc-summary"><span class="sc-eyebrow">Recorded Today</span><strong>${formatDuration(detail.todayMs)}</strong></div><div class="sc-summary"><span class="sc-eyebrow">This Week</span><strong>${formatDuration(detail.weekMs)}</strong></div><div class="sc-summary"><span class="sc-eyebrow">Context Total</span><strong>${formatDuration(detail.totalMs)}</strong></div><div class="sc-summary"><span class="sc-eyebrow">Dated history</span><strong>${formatDuration(detail.datedMs)}</strong></div></div>${detail.legacyUnattributedMs ? `<div class="sc-note">Older time without date detail: ${formatDuration(detail.legacyUnattributedMs)}. It is included in Total but not fabricated into Today, Week, or daily history.</div>` : ''}<div class="sc-eyebrow" style="margin-top:12px">Daily attributed totals</div>${detail.dailyRows?.length ? detail.dailyRows.slice().reverse().map(day => `<div class="sc-row"><span>${escapeHtml(day.localDate)}</span><strong>${formatDuration(day.durationMs, { compact: true })}</strong></div>`).join('') : '<div class="sc-empty">No dated history for this context.</div>'}<div class="sc-eyebrow" style="margin-top:12px">Finalized logical sessions</div>${detail.finalizedSessions?.length ? detail.finalizedSessions.slice(0, 20).map(session => `<div class="sc-row"><span>${escapeHtml(formatDateTime(session.endAtMs))}</span><strong>${formatDuration(session.durationMs, { compact: true })}</strong></div>`).join('') : '<div class="sc-empty">No finalized sessions.</div>'}<div class="sc-actions">${openButton(detail)}</div></div>`;
   }
 
+  function settingsNav(viewName, title, detail) {
+    return `<button data-action="settings-route" data-view="${escapeHtml(viewName)}"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(detail)}</small></button>`;
+  }
+
   function settingsView() {
-    return `<div class="sc-view">${viewHeader('Settings')}<div class="sc-eyebrow">Appearance</div><div class="sc-choice"><button data-action="theme" data-value="light" data-active="${theme === 'light'}">Light</button><button data-action="theme" data-value="dark" data-active="${theme === 'dark'}">Dark</button></div><div class="sc-choice"><button data-action="surface" data-value="solid" data-active="${surface === 'solid'}">Solid</button><button data-action="surface" data-value="glass" data-active="${surface === 'glass'}">Glass</button></div><div class="sc-note">This inherited appearance surface styles only the Companion widget. Full B5 settings follow after the B4 data gate.</div><div class="sc-eyebrow" style="margin-top:12px">Data tools</div><div class="sc-nav-grid"><button data-action="view" data-view="data-tools"><strong>Archives &amp; Backup</strong><small>Safe cleanup, backup, restore, and CSV</small></button></div></div>`;
+    return `<div class="sc-view">${viewHeader('Settings')}<div class="sc-eyebrow">Timer</div><div class="sc-nav-grid">${settingsNav('timer-appearance', 'Appearance & Finish', `${theme} · ${surface}`)}${settingsNav('timer-limits', 'Timer Limits', `${limitDraft?.yellowMinutes ?? 60} / ${limitDraft?.orangeMinutes ?? 120} / ${limitDraft?.redMinutes ?? 240} min`)}</div><div class="sc-eyebrow sc-section-label">Library</div><div class="sc-nav-grid">${settingsNav('recent', 'Recent Jobs', 'Visibility and archive actions')}${settingsNav('overview', 'Time Overview', 'Today, week, day, context')}${settingsNav('history', 'History', 'Finalized Companion sessions')}${settingsNav('data-tools', 'Archives & Backup', 'Data tools: backup, restore, CSV, cleanup')}</div><div class="sc-eyebrow sc-section-label">SquareCoil</div><div class="sc-nav-grid">${settingsNav('website-theme', 'Website Theme', websiteTheme.replace(/_/g, ' '))}</div><div class="sc-eyebrow sc-section-label">Support</div><div class="sc-nav-grid">${settingsNav('submit-ticket', 'Submit a Ticket', `Email ${SUPPORT_EMAIL}`)}${settingsNav('send-feedback', 'Send Feedback', 'Suggestion, UI / UX, feature idea')}</div><div class="sc-eyebrow sc-section-label">About</div><div class="sc-nav-grid">${settingsNav('developer-support', 'Support the Developer', 'Free app · optional tips')}</div></div>`;
+  }
+
+  function choiceMarkup(action, values, current) {
+    return `<div class="sc-choice sc-choice-three">${values.map(([value, label]) => `<button data-action="${action}" data-value="${value}" data-active="${current === value}">${label}</button>`).join('')}</div>`;
+  }
+
+  function timerAppearanceView() {
+    const effectiveTheme = presentation?.timerAppearanceEffective || theme;
+    const effectiveFinish = presentation?.panelFinishEffective || surface;
+    const finishNote = surface === 'GLASS' && effectiveFinish === 'SOLID_FALLBACK'
+      ? '<div class="sc-note">Glass is selected, but this browser or accessibility mode currently uses a readable Solid fallback.</div>' : '';
+    return `<div class="sc-view">${viewHeader('Appearance & Finish', 'settings')}<div class="sc-eyebrow">Timer Appearance</div>${choiceMarkup('preference', [['LIGHT', 'Light'], ['DARK', 'Dark'], ['AUTO', 'Auto']], theme)}<div class="sc-note">Preference ${escapeHtml(theme)} · effective ${escapeHtml(effectiveTheme)}. Auto follows the system color scheme without changing the saved preference.</div><div class="sc-eyebrow sc-section-label">Panel Finish</div>${choiceMarkup('preference-finish', [['SOLID', 'Solid'], ['GLASS', 'Glass']], surface)}${finishNote}</div>`;
+  }
+
+  function websiteThemeView() {
+    const effective = presentation?.websiteThemeEffective || websiteTheme;
+    const logo = presentation?.logoStatus || 'native-logo';
+    return `<div class="sc-view">${viewHeader('SquareCoil Website Theme', 'settings')}${choiceMarkup('preference-site', [['ORIGINAL', 'Original'], ['REFINED_LIGHT', 'Refined Light'], ['SLEEK_DARK', 'Sleek Dark']], websiteTheme)}<div class="sc-note">Preference ${escapeHtml(websiteTheme.replace(/_/g, ' '))} · effective ${escapeHtml(effective.replace(/_/g, ' '))}. Styling is presentation-only and never changes native controls or clock actions.</div>${websiteTheme === 'SLEEK_DARK' && !String(logo).startsWith('configured') ? '<div class="sc-note">The approved dark logo is unavailable, so the native logo remains visible.</div>' : ''}</div>`;
+  }
+
+  function timerLimitsView() {
+    const draft = limitDraft || { ...DEFAULT_PREFERENCES, baseRevision: preferenceRevision, dirty: false };
+    const stale = draft.dirty && draft.baseRevision !== preferenceRevision;
+    return `<div class="sc-view">${viewHeader('Timer Limits', 'settings')}<form data-sc-limits-form><div class="sc-field-grid"><label>Yellow minutes<input type="number" min="1" step="1" name="yellowMinutes" value="${escapeHtml(draft.yellowMinutes)}"></label><label>Orange minutes<input type="number" min="1" step="1" name="orangeMinutes" value="${escapeHtml(draft.orangeMinutes)}"></label><label>Red minutes<input type="number" min="1" step="1" name="redMinutes" value="${escapeHtml(draft.redMinutes)}"></label></div>${stale ? '<div class="sc-note">A newer preference revision was committed in another tab. Reopen this form before saving so it cannot overwrite that change.</div>' : ''}<div class="sc-actions"><button class="sc-primary" type="submit" ${stale ? 'disabled' : ''}>Save Limits</button><button type="button" data-action="reset-limits">Reset to 60 / 120 / 240</button></div></form><div class="sc-note">Limits use exact unrounded Context Today values. They change tab accents only, never operational status or recorded time.</div></div>`;
+  }
+
+  function supportView(kind) {
+    const draft = supportDrafts[kind];
+    const ticket = kind === 'ticket';
+    const choices = ticket ? TICKET_TYPES : FEEDBACK_CATEGORIES;
+    const title = ticket ? 'Submit a Ticket' : 'Send Feedback';
+    const categoryLabel = ticket ? 'Type' : 'Category';
+    const diagnostics = draft.includeDiagnostics && draft.diagnostics
+      ? `<pre class="sc-diagnostics" data-sc-diagnostics>${escapeHtml(draft.diagnostics.text)}</pre>` : '';
+    return `<div class="sc-view">${viewHeader(title, 'settings')}<div class="sc-note">This opens an email draft addressed to ${SUPPORT_EMAIL}. Companion never sends it automatically; review and send it in your mail app.</div><form data-sc-support-form data-support-kind="${kind}"><label>${categoryLabel}<select name="category" data-support-field="category">${choices.map(value => `<option value="${escapeHtml(value)}" ${draft.category === value ? 'selected' : ''}>${escapeHtml(value)}</option>`).join('')}</select></label><label>Subject${ticket ? '' : ' (optional)'}<input name="subject" maxlength="160" value="${escapeHtml(draft.subject)}" data-support-field="subject"></label><label>Description<textarea name="description" maxlength="12000" rows="7" data-support-field="description">${escapeHtml(draft.description)}</textarea></label><label class="sc-check"><input type="checkbox" name="includeDiagnostics" data-support-field="includeDiagnostics" ${draft.includeDiagnostics ? 'checked' : ''}> Include privacy-safe diagnostics</label>${diagnostics}${supportMessage ? `<div class="sc-note">${escapeHtml(supportMessage)}</div>` : ''}${supportManualCopy ? `<pre class="sc-diagnostics" data-sc-manual-copy>${escapeHtml(supportManualCopy)}</pre>` : ''}<div class="sc-actions"><button class="sc-primary" type="submit">Open Email Draft</button><button type="button" data-action="copy-message" data-support-kind="${kind}">Copy Message</button><button type="button" data-action="copy-support-email">Copy Support Email</button>${draft.includeDiagnostics ? `<button type="button" data-action="refresh-diagnostics" data-support-kind="${kind}">Refresh Diagnostics</button><button type="button" data-action="copy-diagnostics" data-support-kind="${kind}">Copy Diagnostics</button>` : ''}</div></form></div>`;
+  }
+
+  function developerSupportView() {
+    return `<div class="sc-view">${viewHeader('Support the Developer', 'settings')}<div class="sc-title">Free app. Free updates. Optional tips.</div><div class="sc-note">The tiny development gremlins appreciate caffeine, but every Companion feature remains available whether or not you tip.</div><div class="sc-empty">No approved Buy Me a Coffee URL, Cash App name, or packaged QR is configured. Nothing has been fabricated or opened.</div></div>`;
   }
 
   function conflictMarkup() {
@@ -408,6 +546,12 @@ function createWorkspaceUi(options = {}) {
     if (view === 'history') return historyView(timer);
     if (view === 'context-detail') return contextDetailView(timer);
     if (view === 'settings') return settingsView();
+    if (view === 'timer-appearance') return timerAppearanceView();
+    if (view === 'website-theme') return websiteThemeView();
+    if (view === 'timer-limits') return timerLimitsView();
+    if (view === 'submit-ticket') return supportView('ticket');
+    if (view === 'send-feedback') return supportView('feedback');
+    if (view === 'developer-support') return developerSupportView();
     if (view === 'data-tools') return dataToolsView(core);
     return mainView(timer);
   }
@@ -415,19 +559,24 @@ function createWorkspaceUi(options = {}) {
   function render({ allowInteractionDeferral = false } = {}) {
     if (disposed) return;
     const target = mountRoot(); if (!target) return;
-    if (allowInteractionDeferral && (collapsed || draggedContextId || pendingFileMode || target.querySelector?.('button:hover, input:hover, input:focus, button:focus-visible'))) return;
+    if (allowInteractionDeferral && (collapsed || draggedContextId || pendingFileMode || target.querySelector?.('button:hover, input:hover, input:focus, textarea:focus, select:focus, button:focus-visible'))) return;
     const previousScroll = target.querySelector?.('.sc-content')?.scrollTop || 0;
     const core = readCoreSnapshot();
     const timer = core?.timer || null;
     if (timer) { syncSelection(timer); flushDeferredFocus(timer); }
-    target.dataset.protoTheme = theme;
-    target.dataset.protoSurface = surface;
+    target.dataset.protoTheme = String(presentation?.timerAppearanceEffective || theme).toLowerCase();
+    target.dataset.protoSurface = String(presentation?.panelFinishEffective || surface).startsWith('GLASS') ? 'glass' : 'solid';
     target.dataset.protoCollapsed = collapsed ? 'true' : 'false';
     target.dataset.workspaceState = snapshotStale ? 'stale' : timer ? 'loaded' : 'loading';
     const status = core?.blocked ? 'Blocked by legacy data' : core?.status ? String(core.status).replace(/-/g, ' ') : 'Connecting';
     const basis = timer?.timeBasis?.disclosed ? timer.timeBasis.label : timer?.workdayZone || 'waiting for time basis';
-    target.innerHTML = `${styleBlock()}<div class="sc-proto-shell"><div class="sc-proto-topbar"><div class="sc-proto-brand"><strong>SquareCoil Companion</strong><small>B4 data safety</small></div><span class="sc-proto-lifecycle" data-sc-status>${escapeHtml(status)}</span><button class="sc-icon-btn" data-action="sync" aria-label="Sync">↻</button><button class="sc-icon-btn" data-action="collapse" aria-label="${collapsed ? 'Expand' : 'Collapse'}">${collapsed ? '▣' : '–'}</button></div>${timer ? tabMarkup(timer) : ''}<div class="sc-content">${snapshotStale ? '<div class="sc-stale">Showing the last trusted revision while the workspace revalidates.</div>' : ''}${bodyMarkup(timer, core)}</div>${errorMessage ? `<div class="sc-error">${escapeHtml(errorMessage)}</div>` : ''}<div class="sc-foot">Revision ${timer?.revision ?? '—'} · preference ${timer?.sourcePreferenceRevision ?? '—'} · ${escapeHtml(basis)}</div></div>`;
+    target.innerHTML = `${styleBlock()}<div class="sc-proto-shell"><div class="sc-proto-topbar"><div class="sc-proto-brand"><strong>SquareCoil Companion</strong><small>B5-A settings &amp; presentation</small></div><span class="sc-proto-lifecycle" data-sc-status>${escapeHtml(status)}</span><button class="sc-icon-btn" data-action="sync" aria-label="Sync">↻</button><button class="sc-icon-btn" data-action="collapse" aria-label="${collapsed ? 'Expand' : 'Collapse'}">${collapsed ? '▣' : '–'}</button></div>${timer ? tabMarkup(timer) : ''}<div class="sc-content">${snapshotStale ? '<div class="sc-stale">Showing the last trusted revision while the workspace revalidates.</div>' : ''}${bodyMarkup(timer, core)}</div>${errorMessage ? `<div class="sc-error">${escapeHtml(errorMessage)}</div>` : ''}<div class="sc-foot">Revision ${timer?.revision ?? '—'} · preference ${preferenceRevision} · ${escapeHtml(basis)}</div></div>`;
     const content = target.querySelector?.('.sc-content'); if (content) content.scrollTop = previousScroll;
+    if (focusTarget) {
+      const selector = focusTarget;
+      focusTarget = null;
+      target.querySelector?.(selector)?.focus?.({ preventScroll: true });
+    }
   }
 
   async function invokeTimerAction(key, event) {
@@ -458,8 +607,7 @@ function createWorkspaceUi(options = {}) {
 
   function workspaceData() {
     return {
-      workspace: { order: [...durableOrder], hiddenContextIds: [...hiddenTabs] },
-      preferences: { theme, surface }
+      workspace: { order: [...durableOrder], hiddenContextIds: [...hiddenTabs] }
     };
   }
 
@@ -567,12 +715,119 @@ function createWorkspaceUi(options = {}) {
     finally { busyAction = null; render(); }
   }
 
+  async function commitPreferencePatch(patch, expectedRevision = preferenceRevision) {
+    const handle = coreHandle();
+    if (!handle || typeof handle.preferenceAction !== 'function') throw new Error('Trusted Preferences service is not available yet.');
+    await handle.preferenceAction(patch, expectedRevision);
+  }
+
+  function currentDraftKind() {
+    if (view === 'timer-limits' && limitDraft?.dirty) return 'Timer Limits';
+    if (view === 'submit-ticket' && supportDrafts.ticket.dirty) return 'Ticket';
+    if (view === 'send-feedback' && supportDrafts.feedback.dirty) return 'Feedback';
+    if (view === 'data-tools' && pendingImport) return 'staged data import';
+    return null;
+  }
+
+  function clearCurrentDraft() {
+    if (view === 'timer-limits') {
+      const preferences = lastGoodCore?.preferences || DEFAULT_PREFERENCES;
+      limitDraft = { yellowMinutes: preferences.yellowMinutes, orangeMinutes: preferences.orangeMinutes,
+        redMinutes: preferences.redMinutes, baseRevision: preferenceRevision, dirty: false };
+    } else if (view === 'submit-ticket') {
+      supportDrafts.ticket = { category: 'Bug', subject: '', description: '', includeDiagnostics: false, diagnostics: null, dirty: false };
+    } else if (view === 'send-feedback') {
+      supportDrafts.feedback = { category: 'Suggestion', subject: '', description: '', includeDiagnostics: false, diagnostics: null, dirty: false };
+    } else if (view === 'data-tools') {
+      pendingImport = null;
+    }
+    supportMessage = null;
+    supportManualCopy = null;
+  }
+
+  function allowSettingsDeparture() {
+    if (busyAction) {
+      errorMessage = 'This Settings operation is still finishing. Wait for its terminal result before leaving.';
+      render();
+      return false;
+    }
+    const kind = currentDraftKind();
+    if (!kind) return true;
+    if (!window.confirm(`Discard the unsaved ${kind} draft? Choose Cancel to keep editing.`)) return false;
+    clearCurrentDraft();
+    return true;
+  }
+
+  function navigateSettings(next, options = {}) {
+    if (!VIEW_IDS.has(next) || !allowSettingsDeparture()) return false;
+    if (!SETTINGS_VIEW_IDS.has(next) && next !== 'main') settingsReturnView = next;
+    else if (next === 'settings' || next === 'main') settingsReturnView = null;
+    view = next;
+    focusTarget = '[data-sc-view-heading]';
+    if (options.close === true) {
+      view = 'main';
+      settingsReturnView = null;
+      focusTarget = '[data-action="view"][data-view="settings"]';
+    }
+    render();
+    return true;
+  }
+
+  function frozenDiagnostics() {
+    const core = lastGoodCore || {};
+    return createDiagnosticSnapshot({
+      packageName: 'SquareCoil Companion',
+      packageVersion,
+      userAgent,
+      url: window.location?.href,
+      lifecycle: core.status || 'unavailable',
+      bridgeCapability: core.bridge?.capability || 'UNAVAILABLE',
+      bridgeStatus: core.bridge?.active ? 'active' : core.bridge?.initialized ? 'inactive' : 'unavailable',
+      coreReadiness: core.initialized && !core.blocked && core.timer ? 'ready' : core.blocked ? 'blocked' : 'not-ready',
+      preferences: core.preferences || DEFAULT_PREFERENCES,
+      presentation: core.presentation || presentation || {},
+      rootCount: document.querySelectorAll?.(`#${ROOT_ID}`)?.length || (document.getElementById(ROOT_ID) ? 1 : 0),
+      capturedAtMs: Date.now()
+    });
+  }
+
+  function supportComposition(kind) {
+    const draft = supportDrafts[kind];
+    return composeSupportMessage(kind, draft, draft.diagnostics, { packageVersion });
+  }
+
+  async function copyText(value, successMessage) {
+    try {
+      if (!window.navigator?.clipboard?.writeText) throw new Error('clipboard-unavailable');
+      await window.navigator.clipboard.writeText(value);
+      supportMessage = successMessage;
+      supportManualCopy = null;
+    } catch (_) {
+      supportMessage = 'Clipboard access was unavailable. The complete text remains visible for manual copy.';
+      supportManualCopy = String(value);
+    }
+  }
+
   function onClick(event) {
     const button = event.target.closest?.('[data-action]'); if (!button || !root?.contains(button)) return;
     const action = button.dataset.action;
     if (action === 'collapse') { collapsed = !collapsed; savePreferences(); render(); return; }
     if (action === 'back') { view = 'main'; render(); return; }
-    if (action === 'view') { const next = button.dataset.view; if (VIEW_IDS.has(next)) view = next; render(); return; }
+    if (action === 'view') {
+      const next = button.dataset.view;
+      if (!VIEW_IDS.has(next)) return;
+      if (next === 'settings') {
+        settingsReturnView = null;
+        focusTarget = '[data-sc-view-heading]';
+      } else if (settingsReturnView === view && next === 'settings') settingsReturnView = null;
+      else if (next === 'main') settingsReturnView = null;
+      view = next;
+      render();
+      return;
+    }
+    if (action === 'settings-route') { navigateSettings(button.dataset.view); return; }
+    if (action === 'settings-back') { navigateSettings(button.dataset.view || 'settings'); return; }
+    if (action === 'settings-close') { navigateSettings('main', { close: true }); return; }
     if (action === 'select') { selectContext(button.dataset.context); render(); return; }
     if (action === 'context-detail') { selectContext(button.dataset.context, 'context-detail'); render(); return; }
     if (action === 'hide-tab') { event.stopPropagation(); const id = button.dataset.context; const timer = lastGoodCore?.timer; if (id && id !== selectedContextId && id !== timer?.currentContextId) hiddenTabs.add(id); savePreferences(); render(); return; }
@@ -580,8 +835,45 @@ function createWorkspaceUi(options = {}) {
     if (action === 'load-history') { historyLimit += HISTORY_PAGE_SIZE; render(); return; }
     if (action === 'timer') { invokeTimerAction(button.dataset.timerAction, event); return; }
     if (action === 'open-job') { if (event.isTrusted === true) openJob(button.dataset.project); return; }
-    if (action === 'theme') { theme = button.dataset.value === 'dark' ? 'dark' : 'light'; savePreferences(); render(); return; }
-    if (action === 'surface') { surface = button.dataset.value === 'glass' ? 'glass' : 'solid'; savePreferences(); render(); return; }
+    if (action === 'preference' && event.isTrusted === true) {
+      withBusy('preference', () => commitPreferencePatch({ timerAppearance: button.dataset.value })); return;
+    }
+    if (action === 'preference-finish' && event.isTrusted === true) {
+      withBusy('preference', () => commitPreferencePatch({ panelFinish: button.dataset.value })); return;
+    }
+    if (action === 'preference-site' && event.isTrusted === true) {
+      withBusy('preference', () => commitPreferencePatch({ websiteTheme: button.dataset.value })); return;
+    }
+    if (action === 'reset-limits' && event.isTrusted === true) {
+      if (!window.confirm('Reset Timer Limits to 60 / 120 / 240 minutes?')) return;
+      withBusy('preference', async () => {
+        await commitPreferencePatch({ yellowMinutes: 60, orangeMinutes: 120, redMinutes: 240 }, preferenceRevision);
+        limitDraft = null;
+      });
+      return;
+    }
+    if (action === 'refresh-diagnostics' && event.isTrusted === true) {
+      const draft = supportDrafts[button.dataset.supportKind];
+      if (draft?.includeDiagnostics) draft.diagnostics = frozenDiagnostics();
+      supportMessage = 'Diagnostics refreshed. The visible snapshot is now frozen for this draft.';
+      render();
+      return;
+    }
+    if (action === 'copy-diagnostics' && event.isTrusted === true) {
+      const draft = supportDrafts[button.dataset.supportKind];
+      if (draft?.diagnostics?.text) withBusy('copy', () => copyText(draft.diagnostics.text, 'The visible diagnostics snapshot was copied.'));
+      return;
+    }
+    if (action === 'copy-message' && event.isTrusted === true) {
+      const composition = supportComposition(button.dataset.supportKind);
+      if (!composition.ok) { errorMessage = composition.errors.join(' '); render(); return; }
+      withBusy('copy', () => copyText(composition.copyText, 'The exact email message was copied.'));
+      return;
+    }
+    if (action === 'copy-support-email' && event.isTrusted === true) {
+      withBusy('copy', () => copyText(SUPPORT_EMAIL, 'The Support email address was copied.'));
+      return;
+    }
     if (action === 'data-export' && event.isTrusted === true) {
       withBusy('data-export', async () => { downloadArtifact(button.dataset.export); });
       return;
@@ -612,6 +904,23 @@ function createWorkspaceUi(options = {}) {
   }
 
   function onChange(event) {
+    const supportField = event.target?.closest?.('[data-support-field]');
+    if (supportField && root?.contains(supportField)) {
+      const form = supportField.closest?.('[data-sc-support-form]');
+      const draft = supportDrafts[form?.dataset?.supportKind];
+      if (draft) {
+        const field = supportField.dataset.supportField;
+        if (field === 'includeDiagnostics') {
+          draft.includeDiagnostics = supportField.checked === true;
+          draft.diagnostics = draft.includeDiagnostics ? frozenDiagnostics() : null;
+        } else draft[field] = supportField.value;
+        draft.dirty = true;
+        supportMessage = null;
+        supportManualCopy = null;
+        render();
+      }
+      return;
+    }
     const input = event.target?.closest?.('[data-sc-data-file]');
     if (!input || !root?.contains(input) || !input.files?.[0] || !pendingFileMode) return;
     const file = input.files[0];
@@ -623,6 +932,30 @@ function createWorkspaceUi(options = {}) {
       else await stageImport(DATA_COMMANDS.RESTORE_BACKUP, { input: text, mode: mode === 'BACKUP_REPLACE' ? 'REPLACE' : 'MERGE', importWorkspace: true, importPreferences: true });
       input.value = '';
     });
+  }
+
+  function onInput(event) {
+    const limitInput = event.target?.closest?.('[data-sc-limits-form] input[name]');
+    if (limitInput && root?.contains(limitInput)) {
+      if (!limitDraft) limitDraft = { ...DEFAULT_PREFERENCES, baseRevision: preferenceRevision, dirty: false };
+      limitDraft[limitInput.name] = limitInput.value;
+      limitDraft.dirty = true;
+      return;
+    }
+    const supportField = event.target?.closest?.('[data-support-field]');
+    if (!supportField || !root?.contains(supportField) || supportField.type === 'checkbox') return;
+    const form = supportField.closest?.('[data-sc-support-form]');
+    const draft = supportDrafts[form?.dataset?.supportKind];
+    if (!draft) return;
+    draft[supportField.dataset.supportField] = supportField.value;
+    draft.dirty = true;
+    supportMessage = null;
+    supportManualCopy = null;
+  }
+
+  function onKeyDown(event) {
+    if (!SETTINGS_VIEW_IDS.has(view)) return;
+    if (event.target?.closest?.('input, textarea, select, [role="dialog"]')) event.stopPropagation?.();
   }
 
   function onDoubleClick(event) {
@@ -648,6 +981,50 @@ function createWorkspaceUi(options = {}) {
   }
 
   function onSubmit(event) {
+    if (event.target.matches?.('[data-sc-limits-form]')) {
+      event.preventDefault();
+      if (event.isTrusted !== true || !limitDraft) return;
+      const values = {
+        yellowMinutes: Number(limitDraft.yellowMinutes),
+        orangeMinutes: Number(limitDraft.orangeMinutes),
+        redMinutes: Number(limitDraft.redMinutes)
+      };
+      if (!validLimits(values)) {
+        errorMessage = 'Timer Limits require integers with 1 ≤ Yellow ≤ Orange ≤ Red.';
+        render();
+        return;
+      }
+      if (limitDraft.baseRevision !== preferenceRevision) {
+        errorMessage = 'A newer preference revision exists. Reopen Timer Limits before saving.';
+        render();
+        return;
+      }
+      withBusy('preference', async () => {
+        await commitPreferencePatch(values, limitDraft.baseRevision);
+        limitDraft = null;
+      });
+      return;
+    }
+    if (event.target.matches?.('[data-sc-support-form]')) {
+      event.preventDefault();
+      if (event.isTrusted !== true) return;
+      const kind = event.target.dataset.supportKind;
+      const composition = supportComposition(kind);
+      if (!composition.ok) {
+        errorMessage = composition.errors.join(' ');
+        render();
+        return;
+      }
+      if (composition.tooLarge || !composition.mailto) {
+        supportMessage = 'This draft is too large for a reliable mailto link. Nothing was truncated; use Copy Message.';
+        render();
+        return;
+      }
+      window.open(composition.mailto, '_blank', 'noopener');
+      supportMessage = `Email draft requested for ${composition.recipient}. Companion cannot confirm that it opened or was sent.`;
+      render();
+      return;
+    }
     if (!event.target.matches?.('[data-sc-search-form]')) return;
     event.preventDefault(); if (event.isTrusted !== true) return;
     const query = String(new FormData(event.target).get('projectId') || '').trim();
@@ -684,6 +1061,7 @@ function createWorkspaceUi(options = {}) {
       root.removeEventListener('submit', onSubmit); root.removeEventListener('dragstart', onDragStart);
       root.removeEventListener('dragover', onDragOver); root.removeEventListener('drop', onDrop);
       root.removeEventListener('change', onChange);
+      root.removeEventListener('input', onInput); root.removeEventListener('keydown', onKeyDown);
     }
     root = null;
   }

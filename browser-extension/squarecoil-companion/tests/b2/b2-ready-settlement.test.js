@@ -166,6 +166,25 @@ test('UT-B2-READY-007 cached, unsubscribed, errored, or expired coordination can
   }
 });
 
+test('UT-B2-READY-025 bounded renderer-to-worker clock skew stays current while materially future evidence fails closed', () => {
+  const decisionAtMs = 10_000;
+  const withinSkew = evaluateB2ReadySettlement(
+    shell(),
+    { ...authority(), capturedAtMs: decisionAtMs + 500, leaseExpiry: decisionAtMs + 60_000 },
+    core(),
+    { decisionAtMs }
+  );
+  assert.equal(withinSkew.ready, true);
+  const beyondSkew = evaluateB2ReadySettlement(
+    shell(),
+    { ...authority(), capturedAtMs: decisionAtMs + 1_001, leaseExpiry: decisionAtMs + 60_000 },
+    core(),
+    { decisionAtMs }
+  );
+  assert.equal(beyondSkew.ready, false);
+  assert.equal(beyondSkew.reason, 'coordination-not-current');
+});
+
 test('UT-B2-READY-008 trusted-core and Bridge ownership must match the current authority disposition', () => {
   assert.equal(evaluateB2ReadySettlement(
     shell(),

@@ -78,6 +78,7 @@ async function createHarness() {
   const writes = [];
   const opens = [];
   const timerActions = [];
+  const preferenceWrites = [];
   let syncCount = 0;
   let intervalCallback = null;
 
@@ -116,13 +117,24 @@ async function createHarness() {
   const core = {
     status: 'trusted-core-owner-active',
     blocked: false,
-    timer
+    timer,
+    initialized: true,
+    preferences: { initialized: true, preferenceRevision: 1, timerAppearance: 'LIGHT', panelFinish: 'SOLID',
+      websiteTheme: 'ORIGINAL', yellowMinutes: 60, orangeMinutes: 120, redMinutes: 240 },
+    presentation: { timerAppearanceEffective: 'LIGHT', panelFinishEffective: 'SOLID', websiteThemeEffective: 'ORIGINAL' }
   };
 
   const handle = {
     coreSnapshot() { return core; },
     async timerAction(type) { timerActions.push(type); },
-    async syncBridge() { syncCount += 1; }
+    async syncBridge() { syncCount += 1; },
+    async preferenceAction(patch, expectedPreferenceRevision) {
+      preferenceWrites.push({ patch: structuredClone(patch), expectedPreferenceRevision });
+      Object.assign(core.preferences, patch);
+      core.preferences.preferenceRevision += 1;
+      if (patch.timerAppearance) core.presentation.timerAppearanceEffective = patch.timerAppearance;
+      if (patch.panelFinish) core.presentation.panelFinishEffective = patch.panelFinish;
+    }
   };
 
   const ui = createWorkspaceUi({
@@ -158,6 +170,7 @@ async function createHarness() {
     writes,
     opens,
     timerActions,
+    preferenceWrites,
     click,
     drain,
     getSyncCount: () => syncCount,
@@ -222,17 +235,21 @@ test('UT-B2-PROTOUI-005 selecting inactive history is inspection-only and never 
   h.ui.teardown();
 });
 
-test('UT-B2-PROTOUI-006 theme, surface, and collapse controls update presentation state and persist preferences', async () => {
+test('UT-B2-PROTOUI-006 theme and finish commit through Preferences while collapse remains local presentation state', async () => {
   const h = await createHarness();
-  h.click({ action: 'theme', value: 'dark' });
+  h.click({ action: 'view', view: 'settings' });
+  h.click({ action: 'settings-route', view: 'timer-appearance' });
+  h.click({ action: 'preference', value: 'DARK' });
+  await h.drain();
   assert.equal(h.root.dataset.protoTheme, 'dark');
-  h.click({ action: 'surface', value: 'glass' });
+  h.click({ action: 'preference-finish', value: 'GLASS' });
+  await h.drain();
   assert.equal(h.root.dataset.protoSurface, 'glass');
   h.click({ action: 'collapse' });
   assert.equal(h.root.dataset.protoCollapsed, 'true');
   await h.drain();
-  assert.equal(h.writes.some(write => write.protoUiTheme === 'dark'), true);
-  assert.equal(h.writes.some(write => write.protoUiSurface === 'glass'), true);
+  assert.deepEqual(h.preferenceWrites.map(write => write.patch), [{ timerAppearance: 'DARK' }, { panelFinish: 'GLASS' }]);
+  assert.equal(h.writes.some(write => Object.hasOwn(write, 'protoUiTheme') || Object.hasOwn(write, 'protoUiSurface')), false);
   assert.equal(h.writes.some(write => write.protoUiCollapsed === true), true);
   h.ui.teardown();
 });

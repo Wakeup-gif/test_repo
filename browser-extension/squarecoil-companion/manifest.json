@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "US Sign SquareCoil Companion",
   "version": "0.7.1",
-  "version_name": "0.7.1 B4 Data Safety Candidate",
-  "description": "SquareCoil Companion B4 candidate with trusted Timer/Ledger core, canonical workspace, and fail-closed data safety. Development testing only.",
+  "version_name": "0.7.1 B5-A Settings and Presentation Candidate",
+  "description": "SquareCoil Companion B5-A candidate with revisioned settings, bounded presentation themes, and privacy-safe support drafting. Development testing only.",
   "permissions": ["storage", "scripting", "webRequest"],
   "host_permissions": [
     "https://ussignandmill.squarecoil.net/*"

@@ -6,8 +6,8 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const zlib = require('node:zlib');
 
-const CANONICAL_BUILD_ID = 'rebuild-b4-data-safety';
-const CANONICAL_STAGE = 'B4';
+const CANONICAL_BUILD_ID = 'rebuild-b5a-settings-presentation';
+const CANONICAL_STAGE = 'B5-A';
 const FIXTURE_ORIGIN = 'https://ussignandmill.squarecoil.net';
 const FIXTURE_PATH = '/__b1_fixture__/a4.html';
 const FRAME_PATH = '/__b1_fixture__/frame.html';
@@ -65,6 +65,13 @@ const REQUIRED_B4_DATA_A4_FIXTURE_IDS = Object.freeze([
   'B4-DATA-002',
   'B4-DATA-003',
   'B4-DATA-004'
+]);
+const REQUIRED_B5_SETTINGS_A4_FIXTURE_IDS = Object.freeze([
+  'B5-SETTINGS-001',
+  'B5-SETTINGS-002',
+  'B5-SETTINGS-003',
+  'B5-SETTINGS-004',
+  'B5-SETTINGS-005'
 ]);
 const REQUIRED_PACKAGE_FILES = Object.freeze([
   'dist/background.js',
@@ -715,6 +722,12 @@ class ContentBridge {
     return this.run(() => `globalThis.__squareCoilCompanionAuthorityHealth.timerAction(${serialized})`);
   }
 
+  async preferenceAction(patch, expectedPreferenceRevision) {
+    const serializedPatch = JSON.stringify(patch);
+    const serializedRevision = JSON.stringify(expectedPreferenceRevision);
+    return this.run(() => `globalThis.__squareCoilCompanionAuthorityHealth.preferenceAction(${serializedPatch}, ${serializedRevision})`);
+  }
+
   async dataExport(kind, values = {}) {
     const serializedKind = JSON.stringify(kind);
     const serializedValues = JSON.stringify(values);
@@ -977,6 +990,47 @@ function runB4DataBrowserCase(cases, family, fixtureIds, slug, name, task) {
     b4DataFixtureIds: fixtureIds,
     b4Scope: 'DATA_SAFETY_BACKUP_RESTORE_CSV'
   });
+}
+
+function runB5SettingsBrowserCase(cases, family, fixtureIds, slug, name, task) {
+  for (const fixtureId of fixtureIds) {
+    if (!REQUIRED_B5_SETTINGS_A4_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown B5-A settings A4 fixture ID: ${fixtureId}`);
+  }
+  const browserCode = family === 'chrome' ? 'CH' : 'ED';
+  const fixtureCode = fixtureIds.map(value => value.replace('B5-SETTINGS-', '')).join('-');
+  return runCase(cases, `A4-B5-A-${browserCode}-${fixtureCode}-${slug}`, name, task, {
+    b5SettingsFixtureIds: fixtureIds,
+    b5Scope: 'SETTINGS_PRESENTATION_READINESS'
+  });
+}
+
+async function ensureWorkspaceExpanded(page, timeoutMs) {
+  const content = page.locator(`#${ROOT_ID} .sc-content`);
+  if (!await content.isVisible().catch(() => false)) {
+    await clickWorkspaceControl(page, `[data-action="collapse"]`, timeoutMs);
+  }
+  await content.waitFor({ state: 'visible', timeout: timeoutMs });
+}
+
+async function clickWorkspaceControl(page, selector, timeoutMs) {
+  await page.bringToFront();
+  const control = page.locator(`#${ROOT_ID} ${selector}`);
+  await control.hover({ timeout: timeoutMs });
+  await control.click({ timeout: timeoutMs });
+}
+
+async function openSettingsHome(page, timeoutMs) {
+  await ensureWorkspaceExpanded(page, timeoutMs);
+  const heading = page.locator(`#${ROOT_ID} [data-sc-view-heading]`);
+  if (await heading.innerText().catch(() => '') === 'Settings') return;
+    const close = page.locator(`#${ROOT_ID} [data-action="settings-close"]`);
+    if (await close.count()) await clickWorkspaceControl(page, `[data-action="settings-close"]`, timeoutMs);
+    else {
+      const main = page.locator(`#${ROOT_ID} [data-action="view"][data-view="main"]`);
+      if (await main.count()) await clickWorkspaceControl(page, `[data-action="view"][data-view="main"]`, timeoutMs);
+    }
+  await clickWorkspaceControl(page, `[data-action="view"][data-view="settings"]`, timeoutMs);
+  await waitFor(async () => await heading.innerText().catch(() => '') === 'Settings' ? true : null, 'Settings Home navigation', timeoutMs);
 }
 
 function runB2TransitionLifecycleBrowserCase(cases, family, fixtureIds, stableFixtureIds, slug, name, task, extraMetadata = {}) {
@@ -1482,7 +1536,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
             mainText: root.querySelector('.sc-content')?.textContent || ''
           } : null;
         }, ROOT_ID), 'B3 canonical workspace initial render', options.timeoutMs);
-        assert(main.brand === 'B4 data safety', 'B4 workspace brand did not identify the active data-safety gate', main);
+        assert(main.brand === 'B5-A settings & presentation', 'B5-A workspace brand did not identify the active settings/presentation gate', main);
         assert(main.selectedContextId === 'job:260701', 'Initial B3 selection did not reflect current Context truth', main);
         assert(main.selectedAria.includes('Today') && main.selectedAria.includes('timer limit') && main.selectedAria.includes('Running'), 'Compact tab omitted Today, threshold, or operational semantics', main);
 
@@ -1511,8 +1565,8 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
       'B4 data products expose one count-consistent revision without live-state authority',
       async () => {
         const before = await bridge.coreSnapshot();
-        await page.locator(`#${ROOT_ID} [data-action="view"][data-view="settings"]`).click();
-        await page.locator(`#${ROOT_ID} [data-action="view"][data-view="data-tools"]`).click();
+        await openSettingsHome(page, options.timeoutMs);
+        await page.locator(`#${ROOT_ID} [data-action="settings-route"][data-view="data-tools"]`).click();
         const surface = await page.locator(`#${ROOT_ID} .sc-content`).innerText();
         assert(surface.includes('Full Backup JSON') && surface.includes('History CSV') && surface.includes('Time Report CSV'), 'B4 data product surface was incomplete', surface);
         assert(surface.includes('SquareCoil official time is never changed'), 'B4 data surface omitted its native-data boundary', surface);
@@ -1523,8 +1577,8 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
         });
         const history = await bridge.dataExport('HISTORY_CSV');
         const report = await bridge.dataExport('TIME_REPORT_CSV');
-        await page.locator(`#${ROOT_ID} [data-action="view"][data-view="settings"]`).click();
-        await page.locator(`#${ROOT_ID} [data-action="view"][data-view="main"]`).click();
+        await page.locator(`#${ROOT_ID} [data-action="settings-back"][data-view="settings"]`).click();
+        await page.locator(`#${ROOT_ID} [data-action="settings-close"]`).click();
         assert(backup.format === 'squarecoil-companion-backup' && backup.schemaVersion === 1, 'Full Backup identity was invalid', backup);
         assert(backup.snapshotRevision === before.revision, 'Full Backup was not captured from the observed authoritative revision', { before, backup });
         assert(backup.recordCounts.contexts === backup.contexts.length && backup.recordCounts.ledgerSegments === backup.ledgerSegments.length && backup.recordCounts.recoveryEvidence === backup.recoveryEvidence.length, 'Full Backup record counts were inconsistent', backup.recordCounts);
@@ -1585,10 +1639,10 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
             error.details = { popupTarget, popupUrl: popupPage.url(), lastPopupHealth };
             throw error;
           }
-          assert(popupHealth.stage === 'B4 · Data safety', 'Popup stage did not identify the B4 data-safety runtime', popupHealth);
+          assert(popupHealth.stage === 'B5-A · Settings & presentation', 'Popup stage did not identify the B5-A settings/presentation runtime', popupHealth);
           assert(popupHealth.classification === 'HEALTHY_SAME_BUILD', 'Popup did not display healthy same-build classification', popupHealth);
           assert(popupHealth.reason === 'ready' && popupHealth.healthTone === 'ok', 'Popup did not render positive READY health', popupHealth);
-          assert(popupHealth.explanation.includes('cannot manufacture READY, restore live timer state, or modify SquareCoil official data'), 'Popup did not retain the fail-closed B4 data boundary', popupHealth);
+          assert(popupHealth.explanation.includes('cannot manufacture READY, restore live timer state, or modify SquareCoil official data'), 'Popup did not retain the fail-closed B5-A authority boundary', popupHealth);
           return { settledHealth, popupTarget, popupHealth };
         } finally {
           await popupPage.close().catch(() => {});
@@ -1790,7 +1844,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
           }, 'B3 incoming Context focus in OWNER and OBSERVER workspaces', options.timeoutMs);
 
           await page.locator(`#${ROOT_ID} .sc-tab[data-context="job:260701"]`).click({ force: true });
-          await page.locator(`#${ROOT_ID} [data-action="collapse"]`).click({ force: true });
+          await clickWorkspaceControl(page, `[data-action="collapse"]`, options.timeoutMs);
           await bridge.syncBridge();
           const heartbeatEvidence = await waitFor(async () => page.evaluate(rootId => {
             const root = document.getElementById(rootId);
@@ -1798,7 +1852,8 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
             return root?.dataset.protoCollapsed === 'true' && selected?.dataset.context === 'job:260701'
               ? { collapsed: root.dataset.protoCollapsed, selectedContextId: selected.dataset.context } : null;
           }, ROOT_ID), 'same-Context heartbeat focus stability', options.timeoutMs);
-          await page.locator(`#${ROOT_ID} [data-action="collapse"]`).click({ force: true });
+          await clickWorkspaceControl(page, `[data-action="collapse"]`, options.timeoutMs);
+          await page.locator(`#${ROOT_ID} .sc-content`).waitFor({ state: 'visible', timeout: options.timeoutMs });
 
           const presentationBefore = await bridge.coreSnapshot();
           await page.locator(`#${ROOT_ID} .sc-tab[data-context="job:260702"]`).click({ force: true });
@@ -1868,9 +1923,8 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
         const archivedRow = archived.data.archivedRows.find(row => row.contextId === 'job:260701');
         assert(archivedRow.totalMs === jobABefore.totalMs, 'Archive changed the Context total', { jobABefore, archivedRow });
 
-        await page.locator(`#${ROOT_ID} [data-action="view"][data-view="main"]`).click({ force: true });
-        await page.locator(`#${ROOT_ID} [data-action="view"][data-view="settings"]`).click({ force: true });
-        await page.locator(`#${ROOT_ID} [data-action="view"][data-view="data-tools"]`).click({ force: true });
+        await openSettingsHome(page, options.timeoutMs);
+        await page.locator(`#${ROOT_ID} [data-action="settings-route"][data-view="data-tools"]`).click({ force: true });
         await page.locator(`#${ROOT_ID} [data-action="data-context"][data-data-type="DATA_RESTORE_ARCHIVED"][data-context="job:260701"]`).click({ force: true });
         const restored = await waitFor(async () => {
           const snapshot = await bridge.coreSnapshot();
@@ -1899,8 +1953,8 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
         assert(replaceError && /quiescence/i.test(replaceError), 'Active-state Replace was not rejected', replaceError);
         assert(afterReplaceAttempt.revision === afterDedupe.revision && afterReplaceAttempt.ledgerSegmentCount === afterDedupe.ledgerSegmentCount, 'Rejected Replace changed authoritative state', { afterDedupe, afterReplaceAttempt });
         assert(result.network.nativeMutationAttempts.length === 0, 'B4 data operations attempted a native SquareCoil mutation', result.network.nativeMutationAttempts);
-        await page.locator(`#${ROOT_ID} [data-action="view"][data-view="settings"]`).click({ force: true });
-        await page.locator(`#${ROOT_ID} [data-action="view"][data-view="main"]`).click({ force: true });
+        await page.locator(`#${ROOT_ID} [data-action="settings-back"][data-view="settings"]`).click({ force: true });
+        await page.locator(`#${ROOT_ID} [data-action="settings-close"]`).click({ force: true });
         return {
           malformedError,
           archivedRevision: archived.revision,
@@ -1909,6 +1963,152 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
           replaceError,
           ledgerSegmentCount: afterReplaceAttempt.ledgerSegmentCount
         };
+      }
+    );
+
+    await runB5SettingsBrowserCase(
+      result.cases,
+      family,
+      ['B5-SETTINGS-001', 'B5-SETTINGS-002', 'B5-SETTINGS-003', 'B5-SETTINGS-004', 'B5-SETTINGS-005'],
+      'SETTLED-PREFERENCES-PRESENTATION-SUPPORT',
+      'B5-A settings settle across tabs while presentation and Support stay bounded and fail closed',
+      async () => {
+        const before = await bridge.coreSnapshot();
+        const observerPage = await context.newPage();
+        let observerBridge = null;
+        try {
+          await observerPage.goto(`${FIXTURE_ORIGIN}${FIXTURE_PATH}`, { waitUntil: 'domcontentloaded', timeout: options.timeoutMs });
+          await waitFor(async () => (await pageState(observerPage)).documentToken, 'B5-A observer document identity', options.timeoutMs);
+          observerBridge = new ContentBridge(context, observerPage, extensionId, options.timeoutMs, candidateIdentity);
+          await observerBridge.initialize();
+          await waitFor(async () => {
+            const snapshot = await observerBridge.coreSnapshot();
+            return snapshot?.preferences?.preferenceRevision === before.preferences.preferenceRevision ? snapshot : null;
+          }, 'B5-A observer preference baseline', options.timeoutMs);
+
+          await openSettingsHome(page, options.timeoutMs);
+          const settingsHome = await page.locator(`#${ROOT_ID} .sc-content`).innerText();
+          assert(settingsHome.includes('Appearance & Finish') && settingsHome.includes('Timer Limits') && settingsHome.includes('Website Theme') && settingsHome.includes('Submit a Ticket') && settingsHome.includes('Send Feedback'), 'B5-A Settings Home was incomplete', settingsHome);
+
+          await clickWorkspaceControl(page, `[data-action="settings-route"][data-view="timer-appearance"]`, options.timeoutMs);
+          await clickWorkspaceControl(page, `[data-action="preference"][data-value="AUTO"]`, options.timeoutMs);
+          const autoSnapshot = await waitFor(async () => {
+            const snapshot = await bridge.coreSnapshot();
+            return snapshot?.preferences?.timerAppearance === 'AUTO' ? snapshot : null;
+          }, 'B5-A Auto preference commit', options.timeoutMs);
+          await waitFor(async () => await page.locator(`#${ROOT_ID} [data-action="preference"][data-value="AUTO"][data-active="true"]`).count() ? true : null, 'B5-A Auto UI settlement', options.timeoutMs);
+          await clickWorkspaceControl(page, `[data-action="preference-finish"][data-value="GLASS"]`, options.timeoutMs);
+          const glassSnapshot = await waitFor(async () => {
+            const snapshot = await bridge.coreSnapshot();
+            return snapshot?.preferences?.panelFinish === 'GLASS' ? snapshot : null;
+          }, 'B5-A Glass preference commit', options.timeoutMs);
+          await waitFor(async () => await page.locator(`#${ROOT_ID} [data-action="preference-finish"][data-value="GLASS"][data-active="true"]`).count() ? true : null, 'B5-A Glass UI settlement', options.timeoutMs);
+          assert(['GLASS', 'SOLID_FALLBACK'].includes(glassSnapshot.presentation.panelFinishEffective), 'B5-A Glass did not report its real effective presentation', glassSnapshot.presentation);
+
+          await clickWorkspaceControl(page, `[data-action="settings-back"][data-view="settings"]`, options.timeoutMs);
+          await clickWorkspaceControl(page, `[data-action="settings-route"][data-view="website-theme"]`, options.timeoutMs);
+          await clickWorkspaceControl(page, `[data-action="preference-site"][data-value="SLEEK_DARK"]`, options.timeoutMs);
+          const darkPresentation = await waitFor(async () => page.evaluate(() => ({
+            layerCount: document.querySelectorAll('#squarecoil-companion-site-theme').length,
+            effective: document.documentElement.getAttribute('data-squarecoil-companion-site-theme')
+          })).then(value => value.layerCount === 1 && value.effective === 'SLEEK_DARK' ? value : null), 'B5-A Sleek Dark presentation', options.timeoutMs);
+          await waitFor(async () => await page.locator(`#${ROOT_ID} [data-action="preference-site"][data-value="SLEEK_DARK"][data-active="true"]`).count() ? true : null, 'B5-A Sleek Dark UI settlement', options.timeoutMs);
+          await clickWorkspaceControl(page, `[data-action="preference-site"][data-value="REFINED_LIGHT"]`, options.timeoutMs);
+          const refinedPresentation = await waitFor(async () => page.evaluate(() => ({
+            layerCount: document.querySelectorAll('#squarecoil-companion-site-theme').length,
+            effective: document.documentElement.getAttribute('data-squarecoil-companion-site-theme')
+          })).then(value => value.layerCount === 1 && value.effective === 'REFINED_LIGHT' ? value : null), 'B5-A Refined Light presentation', options.timeoutMs);
+          await waitFor(async () => await page.locator(`#${ROOT_ID} [data-action="preference-site"][data-value="REFINED_LIGHT"][data-active="true"]`).count() ? true : null, 'B5-A Refined Light UI settlement', options.timeoutMs);
+          await clickWorkspaceControl(page, `[data-action="preference-site"][data-value="ORIGINAL"]`, options.timeoutMs);
+          const originalPresentation = await waitFor(async () => page.evaluate(() => ({
+            layerCount: document.querySelectorAll('#squarecoil-companion-site-theme').length,
+            effective: document.documentElement.getAttribute('data-squarecoil-companion-site-theme')
+          })).then(value => value.layerCount === 0 && value.effective === null ? value : null), 'B5-A Original presentation restoration', options.timeoutMs);
+          await waitFor(async () => await page.locator(`#${ROOT_ID} [data-action="preference-site"][data-value="ORIGINAL"][data-active="true"]`).count() ? true : null, 'B5-A Original UI settlement', options.timeoutMs);
+
+          await clickWorkspaceControl(page, `[data-action="settings-back"][data-view="settings"]`, options.timeoutMs);
+          await clickWorkspaceControl(page, `[data-action="settings-route"][data-view="timer-limits"]`, options.timeoutMs);
+          await page.locator(`#${ROOT_ID} [data-sc-limits-form] input[name="yellowMinutes"]`).fill('45', { force: true });
+          const observerBefore = await observerBridge.coreSnapshot();
+          await observerBridge.preferenceAction({ yellowMinutes: 50, orangeMinutes: 100, redMinutes: 200 }, observerBefore.preferences.preferenceRevision);
+          const crossTab = await waitFor(async () => {
+            const owner = await bridge.coreSnapshot();
+            const observer = await observerBridge.coreSnapshot();
+            return owner?.preferences?.yellowMinutes === 50 && owner.preferences.preferenceRevision === observer?.preferences?.preferenceRevision
+              ? { owner, observer } : null;
+          }, 'B5-A cross-tab preference settlement', options.timeoutMs);
+          await page.locator(`#${ROOT_ID} [data-sc-view-heading]`).click({ force: true });
+          await waitFor(async () => {
+            const text = await page.locator(`#${ROOT_ID} .sc-content`).innerText();
+            const disabled = await page.locator(`#${ROOT_ID} [data-sc-limits-form] button[type="submit"]`).isDisabled().catch(() => false);
+            return text.includes('newer preference revision') && disabled ? { text, disabled } : null;
+          }, 'B5-A stale Limits rejection', options.timeoutMs);
+          page.once('dialog', dialog => dialog.accept());
+          await clickWorkspaceControl(page, `[data-action="settings-back"][data-view="settings"]`, options.timeoutMs);
+          await clickWorkspaceControl(page, `[data-action="settings-route"][data-view="timer-limits"]`, options.timeoutMs);
+          await page.locator(`#${ROOT_ID} [data-sc-limits-form] input[name="yellowMinutes"]`).fill('30', { force: true });
+          await page.locator(`#${ROOT_ID} [data-sc-limits-form] input[name="orangeMinutes"]`).fill('60', { force: true });
+          await page.locator(`#${ROOT_ID} [data-sc-limits-form] input[name="redMinutes"]`).fill('120', { force: true });
+          await clickWorkspaceControl(page, `[data-sc-limits-form] button[type="submit"]`, options.timeoutMs);
+          const committedLimits = await waitFor(async () => {
+            const owner = await bridge.coreSnapshot();
+            const observer = await observerBridge.coreSnapshot();
+            return owner?.preferences?.yellowMinutes === 30 && owner.preferences.orangeMinutes === 60 && owner.preferences.redMinutes === 120 &&
+              owner.preferences.preferenceRevision === observer?.preferences?.preferenceRevision ? owner : null;
+          }, 'B5-A coherent Timer Limits commit', options.timeoutMs);
+
+          await clickWorkspaceControl(page, `[data-action="settings-back"][data-view="settings"]`, options.timeoutMs);
+          await clickWorkspaceControl(page, `[data-action="settings-route"][data-view="send-feedback"]`, options.timeoutMs);
+          await page.locator(`#${ROOT_ID} [data-sc-support-form] textarea[name="description"]`).fill('Installed browser acceptance feedback', { force: true });
+          await page.locator(`#${ROOT_ID} [data-sc-support-form] input[name="includeDiagnostics"]`).check({ force: true });
+          const supportSurface = await page.locator(`#${ROOT_ID} .sc-content`).innerText();
+          assert(supportSurface.includes('Companion never sends it automatically') && supportSurface.includes('Open Email Draft') && supportSurface.includes('Copy Message'), 'B5-A Support did not preserve explicit delivery controls', supportSurface);
+          assert(supportSurface.includes('Page type: general-page') && !supportSurface.includes('private-job') && !supportSurface.includes('project.php?id='), 'B5-A diagnostics exposed page identity or omitted the frozen preview', supportSurface);
+          page.once('dialog', dialog => dialog.dismiss());
+          await clickWorkspaceControl(page, `[data-action="settings-close"]`, options.timeoutMs);
+          assert(await page.locator(`#${ROOT_ID} [data-sc-view-heading]`).innerText() === 'Send Feedback', 'B5-A dirty draft was silently discarded');
+          page.once('dialog', dialog => dialog.accept());
+          await clickWorkspaceControl(page, `[data-action="settings-close"]`, options.timeoutMs);
+
+          await clickWorkspaceControl(page, `[data-action="view"][data-view="settings"]`, options.timeoutMs);
+          await clickWorkspaceControl(page, `[data-action="settings-route"][data-view="developer-support"]`, options.timeoutMs);
+          const developerSupport = await page.locator(`#${ROOT_ID} .sc-content`).innerText();
+          assert(developerSupport.includes('No approved Buy Me a Coffee URL, Cash App name, or packaged QR is configured'), 'B5-A fabricated a Developer Support destination', developerSupport);
+          await clickWorkspaceControl(page, `[data-action="settings-back"][data-view="settings"]`, options.timeoutMs);
+          await clickWorkspaceControl(page, `[data-action="settings-close"]`, options.timeoutMs);
+
+          const after = await bridge.coreSnapshot();
+          assert(after.ledgerSegmentCount === before.ledgerSegmentCount && after.timer.timerState === before.timer.timerState && after.timer.currentContextId === before.timer.currentContextId, 'B5-A preferences changed Timer/Ledger authority', { before, after });
+          assert(result.network.nativeMutationAttempts.length === 0, 'B5-A settings attempted a native SquareCoil mutation', result.network.nativeMutationAttempts);
+          return {
+            preferenceRevisionBefore: before.preferences.preferenceRevision,
+            preferenceRevisionAfter: after.preferences.preferenceRevision,
+            autoEffective: autoSnapshot.presentation.timerAppearanceEffective,
+            glassEffective: glassSnapshot.presentation.panelFinishEffective,
+            darkPresentation,
+            refinedPresentation,
+            originalPresentation,
+            staleRevision: crossTab.owner.preferences.preferenceRevision,
+            limits: { yellow: committedLimits.preferences.yellowMinutes, orange: committedLimits.preferences.orangeMinutes, red: committedLimits.preferences.redMinutes },
+            supportPreviewPresent: supportSurface.includes('Page type: general-page'),
+            developerSupportConfigured: false
+          };
+        } finally {
+          if (observerBridge) {
+            await observerBridge.authorityTeardown().catch(() => {});
+            await observerBridge.detach();
+          }
+          await observerPage.close().catch(() => {});
+          await waitFor(async () => {
+            const snapshot = await bridge.authoritySnapshot();
+            return snapshot?.healthy === true && snapshot.disposition === 'OWNER' ? snapshot : null;
+          }, 'B5-A primary OWNER after observer cleanup', options.timeoutMs);
+          await bridge.syncBridge().catch(() => {});
+          await waitFor(async () => {
+            const health = await bridge.send({ type: MESSAGES.HEALTH });
+            return health?.ready === true && health?.health?.state === 'READY' ? health : null;
+          }, 'B5-A post-observer READY settlement', options.timeoutMs);
+        }
       }
     );
 
@@ -2420,6 +2620,22 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
         b4Scope: 'DATA_SAFETY_BACKUP_RESTORE_CSV',
         status: 'FAIL',
         error: `Missing B4 data fixture IDs: ${result.b4DataFixtureCoverage.missing.join(', ')}`
+      });
+    }
+    const observedB5SettingsFixtureIds = [...new Set(result.cases.flatMap(testCase => testCase.b5SettingsFixtureIds || []))].sort();
+    result.b5SettingsFixtureCoverage = {
+      scope: 'B5_A_SETTINGS_PRESENTATION_READINESS_A4',
+      required: [...REQUIRED_B5_SETTINGS_A4_FIXTURE_IDS],
+      observed: observedB5SettingsFixtureIds,
+      missing: REQUIRED_B5_SETTINGS_A4_FIXTURE_IDS.filter(fixtureId => !observedB5SettingsFixtureIds.includes(fixtureId))
+    };
+    if (result.b5SettingsFixtureCoverage.missing.length) {
+      result.cases.push({
+        id: `A4-B5-A-${family === 'chrome' ? 'CH' : 'ED'}-FIXTURE-COVERAGE`,
+        name: 'Mandatory B5-A settings/presentation fixture coverage',
+        b5Scope: 'SETTINGS_PRESENTATION_READINESS',
+        status: 'FAIL',
+        error: `Missing B5-A settings fixture IDs: ${result.b5SettingsFixtureCoverage.missing.join(', ')}`
       });
     }
     const failedCases = result.cases.filter(testCase => testCase.status === 'FAIL');

@@ -450,6 +450,22 @@ function validateDataSafety(dataSafety, contexts) {
     }
   }
   if (!isRecord(dataSafety.preferences)) throw new Error('data-safety-preferences-invalid');
+  if (dataSafety.preferences.preferencesSchemaVersion !== undefined) {
+    const preferences = dataSafety.preferences;
+    if (preferences.preferencesSchemaVersion !== 1 || !isNonNegativeInteger(preferences.preferenceRevision)) {
+      throw new Error('preferences-schema-invalid');
+    }
+    if (!['LIGHT', 'DARK', 'AUTO'].includes(preferences.timerAppearance) ||
+        !['SOLID', 'GLASS'].includes(preferences.panelFinish) ||
+        !['ORIGINAL', 'REFINED_LIGHT', 'SLEEK_DARK'].includes(preferences.websiteTheme)) {
+      throw new Error('preferences-appearance-invalid');
+    }
+    if (!isFiniteInteger(preferences.yellowMinutes) || !isFiniteInteger(preferences.orangeMinutes) ||
+        !isFiniteInteger(preferences.redMinutes) || preferences.yellowMinutes < 1 ||
+        preferences.yellowMinutes > preferences.orangeMinutes || preferences.orangeMinutes > preferences.redMinutes) {
+      throw new Error('preferences-limits-invalid');
+    }
+  }
   if (!Array.isArray(dataSafety.activityLog) || dataSafety.activityLog.length > DATA_ACTIVITY_LIMIT) {
     throw new Error('data-safety-activity-invalid');
   }
