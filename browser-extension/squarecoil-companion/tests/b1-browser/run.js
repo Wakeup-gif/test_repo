@@ -15,6 +15,11 @@ const DASHBOARD_PATH = '/dashboard.php';
 const THEME_GENERIC_PATH = '/home.php';
 const LEADS_PATH = '/leads.php';
 const CALENDAR_PATH = '/calendar.php';
+const EMPTY_UI_PATH = '/__b5d_fixture__/empty.html';
+const EDITOR_FRAME_PATH = '/__b5d_fixture__/editor.html';
+const VENDOR_THEME_PATH = '/project_designs.php';
+const GANTT_THEME_PATH = '/project_milestones.php';
+const LOOKALIKE_VENDOR_PATH = '/folder/project_designs.php';
 const UNSUPPORTED_URL = 'data:text/html,<meta charset="utf-8"><title>A4 unsupported document</title><p>Synthetic unsupported document</p>';
 const ROOT_ID = 'ussign-job-timer';
 const RUNTIME_KEY = '__squareCoilCompanionRuntime';
@@ -89,6 +94,13 @@ const REQUIRED_B5C_A4_FIXTURE_IDS = Object.freeze([
   'B5C-THEME-002',
   'B5C-THEME-003',
   'B5C-THEME-004'
+]);
+const REQUIRED_B5D_A4_FIXTURE_IDS = Object.freeze([
+  'B5D-UI-001',
+  'B5D-VENDOR-001',
+  'B5D-OVERLAY-001',
+  'B5D-EDITOR-001',
+  'B5D-LAYOUT-001'
 ]);
 const REQUIRED_B6_A4_FIXTURE_IDS = Object.freeze([
   'B6-CANDIDATE-001',
@@ -889,6 +901,22 @@ function frameHtml() {
   return '<!doctype html><html><head><meta charset="utf-8"><title>A4 child frame</title><link rel="icon" href="data:,"></head><body><p>Synthetic child frame</p></body></html>';
 }
 
+function emptyUiFixtureHtml() {
+  return '<!doctype html><html><head><meta charset="utf-8"><title>SquareCoil Companion Empty Workspace Fixture</title><link rel="icon" href="data:,"></head><body><main><h1>SquareCoil home</h1><section class="timeclock-container"><button id="clockin">Clock in</button><span id="clockin-debug"></span><span id="clockin-remaining-time"></span><div class="clock-actions"></div></section></main></body></html>';
+}
+
+function editorFrameHtml() {
+  return '<!doctype html><html><head><meta charset="utf-8"><style>html,body{color:rgb(20,30,40);background:rgb(255,255,255)}</style></head><body class="cke_editable cke_editable_themed"><h2>Native editor heading</h2><p id="editor-copy" style="color:black">Native editor copy</p><a href="#native">Native link</a></body></html>';
+}
+
+function b5dThemeFixtureHtml(kind) {
+  const clock = clockContextHtml({ projectId: '260701', label: '260701 - Design' });
+  const nativeCss = '<style>body{margin:0}.vendor-native,.dataTables_wrapper,.select2-dropdown,.select2-selection--single,.qtip,.mfp-content,.fancybox-skin,.fancybox-inner,.dropzone,.cke,.cke_top,.cke_contents,.gantt-container,.gantt_grid,.gantt_task{color:rgb(20,30,40);background:rgb(255,255,255);border:1px solid rgb(180,185,190);border-radius:0}.paginate_button{color:rgb(20,30,40);background:rgb(245,245,245);border:1px solid rgb(180,185,190)}.mfp-bg,.fancybox-overlay{background:rgba(20,20,20,.25)}#content{padding:30px;overflow-x:visible}.panel-body,.table-responsive{max-width:none;overflow-x:visible}</style>';
+  const vendor = kind === 'vendor' ? '<main id="content"><section id="data-table" class="dataTables_wrapper"><div class="dataTables_info">Showing rows</div><div class="dataTables_paginate"><button id="paginate-current" class="paginate_button current">1</button></div></section><section id="select2" class="select2-container--default"><div id="select2-selection" class="select2-selection--single"><span class="select2-selection__rendered">Selected</span></div><div id="select2-dropdown" class="select2-dropdown"><div class="select2-results__option select2-results__option--highlighted">Option</div></div></section><aside id="qtip" class="qtip"><div class="qtip-titlebar">Tip</div><div class="qtip-content">Tip content</div></aside><div id="magnific-bg" class="mfp-bg"></div><div id="magnific" class="mfp-content"><button class="mfp-close">Close</button></div><div id="fancybox-overlay" class="fancybox-overlay"></div><div id="fancybox" class="fancybox-skin"><div class="fancybox-inner">Preview</div></div><div id="dropzone" class="dropzone dz-drag-hover">Drop files</div><div id="ckeditor" class="cke"><div id="cke-toolbar" class="cke_top"><div class="cke_toolbox"><span class="cke_toolgroup"><button class="cke_button"><span id="cke-icon" class="cke_button_icon">icon</span></button><button class="cke_button cke_button_disabled"><span id="cke-disabled-icon" class="cke_button_icon">disabled</span></button></span></div></div><div class="cke_contents"><iframe id="editor-frame" class="cke_wysiwyg_frame" src="' + EDITOR_FRAME_PATH + '"></iframe></div></div><div class="panel-body"><div class="table-responsive">Responsive table</div></div></main>' : '';
+  const gantt = kind === 'gantt' ? '<main id="content"><section id="gantt" class="gantt-container"><div class="gantt_grid"><div class="gantt_grid_scale"><div id="gantt-head" class="gantt_grid_head_cell">Milestone</div></div><div class="gantt_row">Row</div></div><div class="gantt_task"><div class="gantt_task_scale"><div class="gantt_scale_cell">Day</div></div><div class="gantt_task_row">Task</div></div></section></main>' : '';
+  return '<!doctype html><html><head><meta charset="utf-8"><title>SquareCoil B5-D Theme Fixture</title><link rel="icon" href="data:,">' + nativeCss + '</head><body class="mobile-view sb-l-m"><div id="content_wrapper"><div id="topbar">Topbar</div>' + vendor + gantt + '</div><section class="timeclock-container"><button id="clockin" hidden>Clock in</button><button id="clockout">Clock out</button><span id="clockin-debug"></span><span id="clockin-remaining-time">' + clock + '</span><div class="clock-actions"></div></section></body></html>';
+}
+
 function dashboardFixtureHtml() {
   const clock = clockContextHtml({ projectId: '260701', label: '260701 - Design' });
   return '<!doctype html><html><head><meta charset="utf-8"><title>SquareCoil Design Dashboard Fixture</title><link rel="icon" href="data:,"></head><body><main><div id="content"><div class="mw1000 center-block demo-block mt30"><section id="widget-tasks"><div><h2>17</h2><h5>Tasks</h5></div></section><section id="widget-designs"><div><h2>8</h2><h5>Designs</h5></div></section><section id="widget-estimates"><div><h2>3</h2><h5>Estimates</h5></div></section><div id="page-content"><div class="panel heading-border panel-primary"><div class="panel-body bg-light"><select id="multiple_location_id"><option value="shop-2" selected>Shop 2</option></select><div id="db-designs"><div id="inProgress" class="design-list-container"><a class="clickableRowx" href="/project.php?id=260701">A</a><a class="clickableRowx" href="/project.php?id=260702">B</a></div><div id="nextJob" class="design-list-container"><button disabled>Native disabled</button></div><div id="onHold" class="design-list-container"><span class="text-warning">Native warning</span></div></div></div></div></div></div><div id="description-modal"><div class="modal-content"><button>Close</button></div></div><section class="timeclock-container"><button id="clockin" hidden>Clock in</button><button id="clockout">Clock out</button><span id="clockin-debug"></span><span id="clockin-remaining-time">' + clock + '</span><div class="clock-actions"></div></section></main></body></html>';
@@ -920,6 +948,14 @@ async function installSyntheticRouting(context, networkEvidence, transitionFixtu
       networkEvidence.fulfilled.push(url.href);
       return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: frameHtml() });
     }
+    if (url.origin === FIXTURE_ORIGIN && url.pathname === EMPTY_UI_PATH) {
+      networkEvidence.fulfilled.push(url.href);
+      return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: emptyUiFixtureHtml() });
+    }
+    if (url.origin === FIXTURE_ORIGIN && url.pathname === EDITOR_FRAME_PATH) {
+      networkEvidence.fulfilled.push(url.href);
+      return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: editorFrameHtml() });
+    }
     if (url.origin === FIXTURE_ORIGIN && url.pathname === DASHBOARD_PATH) {
       networkEvidence.fulfilled.push(url.href);
       return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: dashboardFixtureHtml() });
@@ -929,12 +965,18 @@ async function installSyntheticRouting(context, networkEvidence, transitionFixtu
       const kind = url.pathname === LEADS_PATH ? 'leads' : url.pathname === CALENDAR_PATH ? 'calendar' : 'generic';
       return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: probeThemeFixtureHtml(kind) });
     }
+    if (url.origin === FIXTURE_ORIGIN && [VENDOR_THEME_PATH, GANTT_THEME_PATH, LOOKALIKE_VENDOR_PATH].includes(url.pathname)) {
+      networkEvidence.fulfilled.push(url.href);
+      return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: b5dThemeFixtureHtml(url.pathname === GANTT_THEME_PATH ? 'gantt' : 'vendor') });
+    }
     if (url.origin === FIXTURE_ORIGIN && url.pathname === '/ajax_time_clock.php') {
       const body = request.postData() || '';
       const record = { url: url.href, method: request.method(), body };
       if (request.method() === 'POST' && body === 'action=7') {
         networkEvidence.action7.push(record);
-        return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: action7Html(transitionFixture.clockContext) });
+        const frameUrl = request.frame()?.url?.() || '';
+        const emptySource = (() => { try { return new URL(frameUrl).pathname === EMPTY_UI_PATH; } catch (_) { return false; } })();
+        return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: emptySource ? '<span id="clockin-remaining-time"></span>' : action7Html(transitionFixture.clockContext) });
       }
       networkEvidence.nativeMutationAttempts.push(record);
       return route.abort('blockedbyclient');
@@ -1102,6 +1144,18 @@ function runB5CThemeBrowserCase(cases, family, fixtureIds, slug, name, task) {
   });
 }
 
+function runB5DThemeBrowserCase(cases, family, fixtureIds, slug, name, task) {
+  for (const fixtureId of fixtureIds) {
+    if (!REQUIRED_B5D_A4_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown B5-D A4 fixture ID: ${fixtureId}`);
+  }
+  const browserCode = family === 'chrome' ? 'CH' : 'ED';
+  const fixtureCode = fixtureIds.map(value => value.replace('B5D-', '')).join('-');
+  return runCase(cases, `A4-B5-D-${browserCode}-${fixtureCode}-${slug}`, name, task, {
+    b5dThemeFixtureIds: fixtureIds,
+    b5dThemeScope: 'ROUTE_BOUNDED_VENDOR_THEME_AND_ZERO_HISTORY_UI'
+  });
+}
+
 function runB6CandidateBrowserCase(cases, family, fixtureIds, slug, name, task, extraMetadata = {}) {
   for (const fixtureId of fixtureIds) {
     if (!REQUIRED_B6_A4_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown B6 A4 fixture ID: ${fixtureId}`);
@@ -1201,6 +1255,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
     b2KernelFixtureCoverage: null,
     b3WorkspaceFixtureCoverage: null,
     b5cThemeFixtureCoverage: null,
+    b5dThemeFixtureCoverage: null,
     b6CandidateFixtureCoverage: null,
     cases: [],
     durationMs: null,
@@ -1366,6 +1421,68 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
       },
       { profile: 'PROFILE-CLEAN' }
     );
+
+    await tracker.detach();
+    tracker = null;
+    await bridge.detach();
+    bridge = null;
+    await page.goto(UNSUPPORTED_URL, { waitUntil: 'domcontentloaded', timeout: options.timeoutMs });
+
+    await runB5DThemeBrowserCase(
+      result.cases,
+      family,
+      ['B5D-UI-001'],
+      'ZERO-HISTORY-NAVIGATION',
+      'Fresh zero-history Companion exposes Settings and Library without requiring a clock-in',
+      async () => {
+        const emptyPage = await context.newPage();
+        let emptyBridge = null;
+        emptyPage.on('console', message => {
+          if (message.type() === 'error' || message.type() === 'warning') result.console.errors.push({ type: message.type(), text: message.text() });
+        });
+        emptyPage.on('pageerror', error => result.console.pageErrors.push(String(error?.message || error)));
+        try {
+          await emptyPage.goto(`${FIXTURE_ORIGIN}${EMPTY_UI_PATH}`, { waitUntil: 'domcontentloaded', timeout: options.timeoutMs });
+          await waitFor(async () => (await pageState(emptyPage)).documentToken, 'B5-D empty-workspace document identity', options.timeoutMs);
+          emptyBridge = new ContentBridge(context, emptyPage, extensionId, options.timeoutMs, candidateIdentity);
+          await emptyBridge.initialize();
+          await emptyBridge.setEnabled(true);
+          const empty = await waitFor(async () => {
+            const snapshot = await emptyBridge.coreSnapshot().catch(() => null);
+            const settingsCount = await emptyPage.locator(`#${ROOT_ID} [data-action="view"][data-view="settings"]`).count().catch(() => 0);
+            return snapshot?.timer?.contextRows?.length === 0 && settingsCount === 1 ? snapshot : null;
+          }, 'B5-D zero-history Settings entry point', options.timeoutMs);
+          const before = { revision: empty.revision, ledgerSegmentCount: empty.ledgerSegmentCount,
+            timerState: empty.timer.timerState, currentContextId: empty.timer.currentContextId };
+          const home = await emptyPage.locator(`#${ROOT_ID} .sc-content`).innerText();
+          assert(home.includes('No Companion job history yet') && home.includes('Settings') && home.includes('Time Overview') && home.includes('History'),
+            'B5-D zero-history Home omitted feature navigation', home);
+          await clickWorkspaceControl(emptyPage, `[data-action="view"][data-view="settings"]`, options.timeoutMs);
+          const settings = await emptyPage.locator(`#${ROOT_ID} .sc-content`).innerText();
+          assert(settings.includes('Appearance & Finish') && settings.includes('Website Theme') && settings.includes('Archives & Backup') && settings.includes('Optional Presentation'),
+            'B5-D zero-history Settings did not expose the accepted feature areas', settings);
+          const after = await emptyBridge.coreSnapshot();
+          assert(after.ledgerSegmentCount === before.ledgerSegmentCount && after.timer.timerState === before.timerState &&
+            after.timer.currentContextId === before.currentContextId && after.timer.contextRows.length === 0,
+          'B5-D zero-history navigation changed Timer or Ledger authority', { before, after });
+          assert(result.network.nativeMutationAttempts.length === 0, 'B5-D zero-history navigation attempted a native SquareCoil mutation', result.network.nativeMutationAttempts);
+          return { home, settings, before, afterRevision: after.revision };
+        } finally {
+          if (emptyBridge) {
+            await emptyBridge.setEnabled(false).catch(() => {});
+            await emptyBridge.authorityTeardown().catch(() => {});
+            await emptyBridge.detach();
+          }
+          await emptyPage.close().catch(() => {});
+        }
+      }
+    );
+
+    await page.goto(`${FIXTURE_ORIGIN}${FIXTURE_PATH}`, { waitUntil: 'domcontentloaded', timeout: options.timeoutMs });
+    await waitFor(async () => (await pageState(page)).documentToken, 'post-B5-D primary document identity', options.timeoutMs);
+    bridge = new ContentBridge(context, page, extensionId, options.timeoutMs, candidateIdentity);
+    await bridge.initialize();
+    tracker = await createScriptTracker(context, page, extensionId);
 
     await runBrowserCase(result.cases, family, ['B1-LC-004'], 'ORPHAN', 'Clearly owned rebuild-marker orphan recovers while ambiguous ownership is retained', async () => {
       const parseBaseline = tracker.companionCount();
@@ -2509,6 +2626,211 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
       }
     );
 
+    await runB5DThemeBrowserCase(
+      result.cases,
+      family,
+      ['B5D-VENDOR-001', 'B5D-OVERLAY-001', 'B5D-EDITOR-001', 'B5D-LAYOUT-001'],
+      'VENDOR-EDITOR-LAYOUT',
+      'B5-D themes bounded vendor surfaces and editor documents with responsive print and forced-color cleanup',
+      async () => {
+        const before = await bridge.coreSnapshot();
+        await bridge.preferenceAction({ websiteTheme: 'SLEEK_DARK' }, before.preferences.preferenceRevision);
+        await waitFor(async () => {
+          const snapshot = await bridge.coreSnapshot();
+          return snapshot?.preferences?.websiteTheme === 'SLEEK_DARK' ? snapshot : null;
+        }, 'B5-D Sleek Dark preference settlement', options.timeoutMs);
+
+        const pages = [];
+        const bridges = [];
+        try {
+          for (const relative of [VENDOR_THEME_PATH, GANTT_THEME_PATH, LOOKALIKE_VENDOR_PATH]) {
+            const themedPage = await context.newPage();
+            pages.push(themedPage);
+            themedPage.on('console', message => {
+              if (message.type() === 'error' || message.type() === 'warning') result.console.errors.push({ type: message.type(), text: message.text() });
+            });
+            themedPage.on('pageerror', error => result.console.pageErrors.push(String(error?.message || error)));
+            await themedPage.goto(`${FIXTURE_ORIGIN}${relative}`, { waitUntil: 'domcontentloaded', timeout: options.timeoutMs });
+            await waitFor(async () => (await pageState(themedPage)).documentToken, `B5-D ${relative} document identity`, options.timeoutMs);
+            const themedBridge = new ContentBridge(context, themedPage, extensionId, options.timeoutMs, candidateIdentity);
+            await themedBridge.initialize();
+            bridges.push(themedBridge);
+          }
+
+          const [vendorPage, ganttPage, lookalikePage] = pages;
+          const vendor = await waitFor(async () => vendorPage.evaluate(() => {
+            const style = id => getComputedStyle(document.getElementById(id));
+            const frame = document.getElementById('editor-frame');
+            const editorDocument = frame?.contentDocument;
+            const state = {
+              theme: document.documentElement.getAttribute('data-squarecoil-companion-site-theme'),
+              route: document.documentElement.getAttribute('data-squarecoil-companion-site-route'),
+              layers: document.querySelectorAll('#squarecoil-companion-site-theme').length,
+              paginate: { color: style('paginate-current').color, background: style('paginate-current').backgroundColor, radius: style('paginate-current').borderRadius },
+              select: { color: style('select2-selection').color, background: style('select2-selection').backgroundColor, radius: style('select2-selection').borderRadius },
+              qtip: { color: style('qtip').color, background: style('qtip').backgroundColor, radius: style('qtip').borderRadius },
+              magnific: { color: style('magnific').color, background: style('magnific').backgroundColor },
+              fancybox: { color: style('fancybox').color, background: style('fancybox').backgroundColor },
+              overlays: { magnific: style('magnific-bg').backgroundColor, fancybox: style('fancybox-overlay').backgroundColor },
+              dropzone: { color: style('dropzone').color, background: style('dropzone').backgroundColor, radius: style('dropzone').borderRadius },
+              editor: {
+                chromeBackground: style('ckeditor').backgroundColor,
+                iconFilter: style('cke-icon').filter,
+                iconOpacity: style('cke-icon').opacity,
+                disabledOpacity: style('cke-disabled-icon').opacity,
+                frameMarker: frame?.getAttribute('data-squarecoil-companion-editor-frame') || null,
+                documentLayers: editorDocument?.querySelectorAll('#squarecoil-companion-ckeditor-document-theme').length || 0,
+                bodyBackground: editorDocument?.body ? getComputedStyle(editorDocument.body).backgroundColor : null,
+                bodyColor: editorDocument?.body ? getComputedStyle(editorDocument.body).color : null,
+                copyColor: editorDocument?.getElementById('editor-copy') ? getComputedStyle(editorDocument.getElementById('editor-copy')).color : null,
+                linkColor: editorDocument?.querySelector('a') ? getComputedStyle(editorDocument.querySelector('a')).color : null
+              }
+            };
+            return state.theme === 'SLEEK_DARK' && state.route === 'PROJECT_DESIGNS' && state.layers === 1 &&
+              state.editor.frameMarker === 'dark' && state.editor.documentLayers === 1 ? state : null;
+          }), 'B5-D vendor and editor adapter settlement', options.timeoutMs);
+
+          assert(vendor.paginate.color === 'rgb(255, 255, 255)' && vendor.paginate.background === 'rgba(143, 196, 229, 0.16)' && vendor.paginate.radius === '6px',
+            'B5-D DataTables adapter is incomplete', vendor.paginate);
+          assert(vendor.select.color === 'rgb(241, 245, 248)' && vendor.select.background === 'rgb(11, 20, 29)' && vendor.select.radius === '8px',
+            'B5-D Select2 adapter is incomplete', vendor.select);
+          for (const overlay of [vendor.qtip, vendor.magnific, vendor.fancybox]) {
+            assert(overlay.color === 'rgb(203, 215, 226)' && overlay.background === 'rgb(17, 28, 38)',
+              'B5-D overlay surface adapter is incomplete', { overlay, vendor });
+          }
+          assert(vendor.overlays.magnific === 'rgba(2, 7, 11, 0.78)' && vendor.overlays.fancybox === 'rgba(2, 7, 11, 0.78)',
+            'B5-D modal overlay adapter is incomplete', vendor.overlays);
+          assert(vendor.dropzone.color === 'rgb(203, 215, 226)' && vendor.dropzone.background === 'rgba(143, 196, 229, 0.16)' && vendor.dropzone.radius === '10px',
+            'B5-D Dropzone adapter is incomplete', vendor.dropzone);
+          assert(vendor.editor.chromeBackground === 'rgb(13, 24, 34)' && vendor.editor.iconFilter !== 'none' &&
+            vendor.editor.iconOpacity === '0.86' && vendor.editor.disabledOpacity === '0.28',
+          'B5-D CKEditor chrome or icon adapter is incomplete', vendor.editor);
+          assert(vendor.editor.bodyBackground === 'rgb(10, 17, 24)' && vendor.editor.bodyColor === 'rgb(220, 229, 238)' &&
+            vendor.editor.copyColor === 'rgb(230, 237, 244)' && vendor.editor.linkColor === 'rgb(143, 201, 255)',
+          'B5-D CKEditor document adapter is incomplete', vendor.editor);
+
+          const gantt = await waitFor(async () => ganttPage.evaluate(() => {
+            const container = getComputedStyle(document.getElementById('gantt'));
+            const heading = getComputedStyle(document.getElementById('gantt-head'));
+            const state = {
+              theme: document.documentElement.getAttribute('data-squarecoil-companion-site-theme'),
+              route: document.documentElement.getAttribute('data-squarecoil-companion-site-route'),
+              container: { color: container.color, background: container.backgroundColor, border: container.borderColor },
+              heading: { color: heading.color, background: heading.backgroundColor, border: heading.borderColor }
+            };
+            return state.theme === 'SLEEK_DARK' && state.route === 'PROJECT_MILESTONES' ? state : null;
+          }), 'B5-D Gantt adapter settlement', options.timeoutMs);
+          assert(gantt.container.color === 'rgb(203, 215, 226)' && gantt.container.background === 'rgb(17, 28, 38)' &&
+            gantt.heading.background === 'rgb(11, 20, 29)', 'B5-D Gantt adapter is incomplete', gantt);
+
+          const lookalike = await waitFor(async () => lookalikePage.evaluate(() => {
+            const wrapper = getComputedStyle(document.getElementById('data-table'));
+            const frame = document.getElementById('editor-frame');
+            const state = {
+              theme: document.documentElement.getAttribute('data-squarecoil-companion-site-theme'),
+              route: document.documentElement.getAttribute('data-squarecoil-companion-site-route'),
+              wrapperBackground: wrapper.backgroundColor,
+              editorFrameMarker: frame?.getAttribute('data-squarecoil-companion-editor-frame') || null,
+              editorDocumentLayers: frame?.contentDocument?.querySelectorAll('#squarecoil-companion-ckeditor-document-theme').length || 0
+            };
+            return state.theme === 'SLEEK_DARK' && state.route === 'GENERIC' ? state : null;
+          }), 'B5-D exact-route near-miss settlement', options.timeoutMs);
+          assert(lookalike.wrapperBackground === 'rgb(255, 255, 255)' && lookalike.editorFrameMarker === null && lookalike.editorDocumentLayers === 0,
+            'B5-D applied a vendor or editor adapter to an unlisted route', lookalike);
+
+          await vendorPage.setViewportSize({ width: 720, height: 900 });
+          const responsive = await vendorPage.evaluate(() => {
+            const content = getComputedStyle(document.getElementById('content'));
+            const panel = getComputedStyle(document.querySelector('.panel-body'));
+            return { paddingLeft: content.paddingLeft, paddingBottom: content.paddingBottom, maxWidth: panel.maxWidth, overflowX: panel.overflowX };
+          });
+          assert(responsive.paddingLeft === '10px' && responsive.paddingBottom === '38px' && responsive.maxWidth === '100%' && responsive.overflowX === 'auto',
+            'B5-D narrow-layout adapter is incomplete', responsive);
+
+          await vendorPage.emulateMedia({ media: 'print' });
+          const print = await vendorPage.evaluate(() => {
+            const content = getComputedStyle(document.getElementById('content'));
+            const companion = document.getElementById('ussign-job-timer');
+            return { color: content.color, background: content.backgroundColor, companionDisplay: companion ? getComputedStyle(companion).display : null };
+          });
+          assert(print.color === 'rgb(17, 17, 17)' && print.background === 'rgb(255, 255, 255)' && print.companionDisplay === 'none',
+            'B5-D print fallback is incomplete', print);
+          await vendorPage.emulateMedia({ media: 'screen' });
+
+          await vendorPage.emulateMedia({ forcedColors: 'active' });
+          const forced = await waitFor(async () => vendorPage.evaluate(() => {
+            const frame = document.getElementById('editor-frame');
+            const state = {
+              theme: document.documentElement.getAttribute('data-squarecoil-companion-site-theme'),
+              route: document.documentElement.getAttribute('data-squarecoil-companion-site-route'),
+              layers: document.querySelectorAll('#squarecoil-companion-site-theme').length,
+              editorFrameMarker: frame?.getAttribute('data-squarecoil-companion-editor-frame') || null,
+              editorDocumentLayers: frame?.contentDocument?.querySelectorAll('#squarecoil-companion-ckeditor-document-theme').length || 0
+            };
+            return state.theme === null && state.route === null && state.layers === 0 && state.editorDocumentLayers === 0 ? state : null;
+          }), 'B5-D forced-color native fallback', options.timeoutMs);
+          const forcedPreference = await bridge.coreSnapshot();
+          assert(forcedPreference.preferences.websiteTheme === 'SLEEK_DARK' && forced.editorFrameMarker === null,
+            'B5-D forced-color fallback rewrote preference or retained editor ownership', { forcedPreference: forcedPreference.preferences, forced });
+          await vendorPage.emulateMedia({ forcedColors: 'none' });
+          await waitFor(async () => vendorPage.evaluate(() => ({
+            theme: document.documentElement.getAttribute('data-squarecoil-companion-site-theme'),
+            editorLayers: document.getElementById('editor-frame')?.contentDocument?.querySelectorAll('#squarecoil-companion-ckeditor-document-theme').length || 0
+          })).then(state => state.theme === 'SLEEK_DARK' && state.editorLayers === 1 ? state : null),
+          'B5-D theme restoration after forced colors', options.timeoutMs);
+
+          const current = await bridge.coreSnapshot();
+          await bridge.preferenceAction({ websiteTheme: 'ORIGINAL' }, current.preferences.preferenceRevision);
+          const restored = [];
+          for (const themedPage of pages) {
+            restored.push(await waitFor(async () => themedPage.evaluate(() => {
+              const frame = document.getElementById('editor-frame');
+              const state = {
+                theme: document.documentElement.getAttribute('data-squarecoil-companion-site-theme'),
+                route: document.documentElement.getAttribute('data-squarecoil-companion-site-route'),
+                layers: document.querySelectorAll('#squarecoil-companion-site-theme').length,
+                editorFrameMarker: frame?.getAttribute('data-squarecoil-companion-editor-frame') || null,
+                editorDocumentLayers: frame?.contentDocument?.querySelectorAll('#squarecoil-companion-ckeditor-document-theme').length || 0
+              };
+              return state.theme === null && state.route === null && state.layers === 0 && state.editorDocumentLayers === 0 ? state : null;
+            }), 'B5-D Original restoration', options.timeoutMs));
+          }
+          const native = await vendorPage.evaluate(() => ({
+            wrapperBackground: getComputedStyle(document.getElementById('data-table')).backgroundColor,
+            editorBackground: getComputedStyle(document.getElementById('editor-frame').contentDocument.body).backgroundColor
+          }));
+          assert(native.wrapperBackground === 'rgb(255, 255, 255)' && native.editorBackground === 'rgb(255, 255, 255)',
+            'B5-D Original did not restore native vendor/editor presentation', native);
+          const after = await bridge.coreSnapshot();
+          assert(after.ledgerSegmentCount === before.ledgerSegmentCount && after.timer.timerState === before.timer.timerState &&
+            after.timer.currentContextId === before.timer.currentContextId,
+          'B5-D theme adapters changed Timer or Ledger authority', { before, after });
+          assert(result.network.nativeMutationAttempts.length === 0, 'B5-D theme adapters attempted a native SquareCoil mutation', result.network.nativeMutationAttempts);
+          return { vendor, gantt, lookalike, responsive, print, forced, restored, native,
+            nativeMutationAttempts: result.network.nativeMutationAttempts.length };
+        } finally {
+          for (const themedBridge of bridges.reverse()) {
+            await themedBridge.authorityTeardown().catch(() => {});
+            await themedBridge.detach();
+          }
+          for (const themedPage of pages.reverse()) await themedPage.close().catch(() => {});
+          const snapshot = await bridge.coreSnapshot().catch(() => null);
+          if (snapshot?.preferences?.websiteTheme !== 'ORIGINAL') {
+            await bridge.preferenceAction({ websiteTheme: 'ORIGINAL' }, snapshot.preferences.preferenceRevision).catch(() => {});
+          }
+          await waitFor(async () => {
+            const authority = await bridge.authoritySnapshot();
+            return authority?.healthy === true && authority.disposition === 'OWNER' ? authority : null;
+          }, 'B5-D primary OWNER after themed-page cleanup', options.timeoutMs);
+          await bridge.syncBridge().catch(() => {});
+          await waitFor(async () => {
+            const health = await bridge.send({ type: MESSAGES.HEALTH });
+            return health?.ready === true && health?.health?.state === 'READY' ? health : null;
+          }, 'B5-D post-cleanup READY settlement', options.timeoutMs);
+        }
+      }
+    );
+
     await runBrowserCase(result.cases, family, ['B1-LC-003', 'B1-LC-014'], 'RECOVERY', 'Dead interaction and removed root recover in place', async () => {
       assert(activeRuntimeId, 'Initial runtime was unavailable because the prerequisite case failed');
       const dead = await page.evaluate(({ rootId, probeEvent }) => {
@@ -3065,6 +3387,22 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
         b5cThemeScope: 'PROBE_BACKED_ROUTE_BOUNDED_THEME_ADAPTERS',
         status: 'FAIL',
         error: `Missing B5-C theme fixture IDs: ${result.b5cThemeFixtureCoverage.missing.join(', ')}`
+      });
+    }
+    const observedB5DThemeFixtureIds = [...new Set(result.cases.flatMap(testCase => testCase.b5dThemeFixtureIds || []))].sort();
+    result.b5dThemeFixtureCoverage = {
+      scope: 'B5_D_ROUTE_BOUNDED_VENDOR_THEME_AND_ZERO_HISTORY_UI_A4',
+      required: [...REQUIRED_B5D_A4_FIXTURE_IDS],
+      observed: observedB5DThemeFixtureIds,
+      missing: REQUIRED_B5D_A4_FIXTURE_IDS.filter(fixtureId => !observedB5DThemeFixtureIds.includes(fixtureId))
+    };
+    if (result.b5dThemeFixtureCoverage.missing.length) {
+      result.cases.push({
+        id: `A4-B5-D-${family === 'chrome' ? 'CH' : 'ED'}-FIXTURE-COVERAGE`,
+        name: 'Mandatory B5-D vendor-theme and zero-history UI fixture coverage',
+        b5dThemeScope: 'ROUTE_BOUNDED_VENDOR_THEME_AND_ZERO_HISTORY_UI',
+        status: 'FAIL',
+        error: `Missing B5-D theme/UI fixture IDs: ${result.b5dThemeFixtureCoverage.missing.join(', ')}`
       });
     }
     const observedB6CandidateFixtureIds = [...new Set(result.cases.flatMap(testCase => testCase.b6CandidateFixtureIds || []))].sort();

@@ -420,6 +420,10 @@ function createWorkspaceUi(options = {}) {
   function openButton(row, label = 'Open Job') { return safeProjectId(row?.projectId) ? `<button data-action="open-job" data-project="${escapeHtml(row.projectId)}">${escapeHtml(label)}</button>` : ''; }
   function searchMarkup() { return `<form class="sc-search" data-sc-search-form><input name="projectId" inputmode="search" autocomplete="off" placeholder="Find known context or open job #"><button type="submit">Find</button></form>`; }
 
+  function mainNavigationMarkup() {
+    return '<div class="sc-nav-grid"><button data-action="view" data-view="recent"><strong>Recent Jobs</strong><small>Visibility, recency, status</small></button><button data-action="view" data-view="overview"><strong>Time Overview</strong><small>Today, week, day, context</small></button><button data-action="view" data-view="history"><strong>History</strong><small>Finalized logical sessions</small></button><button data-action="view" data-view="settings"><strong>Settings</strong><small>Appearance, limits &amp; support</small></button></div>';
+  }
+
   function currentStrip(timer, operational, selected) {
     if (!operational) return '';
     const different = operational.contextId !== selected?.contextId;
@@ -429,7 +433,7 @@ function createWorkspaceUi(options = {}) {
   function mainView(timer) {
     const selected = selectedRow(timer);
     const operational = currentRow(timer);
-    if (!selected) return `<div class="sc-view"><div class="sc-empty">No Companion job history yet. Open a SquareCoil job to begin.</div>${searchMarkup()}</div>`;
+    if (!selected) return `<div class="sc-view"><div class="sc-empty"><strong>No Companion job history yet.</strong><br>Clock in or open a SquareCoil job to begin tracking. Settings and local data tools are available now.</div>${mainNavigationMarkup()}${searchMarkup()}</div>`;
     const selectedOperational = selected.contextId === timer.currentContextId;
     const status = selected.status || 'NOT_RUNNING';
     const activeSession = selectedOperational && status.startsWith('RUNNING') && timer.running;
@@ -443,7 +447,7 @@ function createWorkspaceUi(options = {}) {
     const hold = selected.isSafetyHeld ? '<div class="sc-note">Companion stopped extending the local value at the shared verification boundary. This does not claim that the native SquareCoil clock was paused.</div>' : '';
     const native = timer.nativeDisposition && timer.nativeDisposition !== 'TRACKABLE_CONTEXT'
       ? `<div class="sc-note">Native disposition: ${escapeHtml(timer.nativeDisposition.toLowerCase().replace(/_/g, ' '))}. This is separate from the selected Context status.</div>` : '';
-    return `<div class="sc-view">${currentStrip(timer, operational, selected)}<section class="sc-timer-card"><div class="sc-eyebrow">${selected.kind === 'job' ? `Job ${escapeHtml(selected.projectId)}` : 'General context'}</div><div class="sc-title">${escapeHtml(selected.label)}</div><div class="sc-status" data-tone="${statusTone(status)}"><span class="sc-dot" data-tone="${statusTone(status)}"></span>${escapeHtml(statusLabel(status))}</div><div class="sc-metrics"><div class="sc-metric"><span class="sc-eyebrow">Today</span><strong>${formatDuration(selected.todayMs)}${selected.isProvisional ? '*' : ''}</strong></div><div class="sc-metric"><span class="sc-eyebrow">${selected.kind === 'job' ? 'Job total' : 'Context total'}</span><strong>${formatDuration(selected.totalMs)}${selected.isProvisional ? '*' : ''}</strong></div></div>${activeSession ? `<div class="sc-session"><span>Current session${timer.running.provisional ? ' · provisional' : ''}</span><strong>${formatDuration(timer.running.elapsedMs)}</strong></div>` : ''}${pending}${hold}${native}<div class="sc-actions">${busyAction ? '<button disabled>Working…</button>' : actions.join('')}</div></section><div class="sc-nav-grid"><button data-action="view" data-view="recent"><strong>Recent Jobs</strong><small>Visibility, recency, status</small></button><button data-action="view" data-view="overview"><strong>Time Overview</strong><small>Today, week, day, context</small></button><button data-action="view" data-view="history"><strong>History</strong><small>Finalized logical sessions</small></button><button data-action="view" data-view="settings"><strong>Settings</strong><small>Appearance, limits &amp; support</small></button></div>${searchMarkup()}</div>`;
+    return `<div class="sc-view">${currentStrip(timer, operational, selected)}<section class="sc-timer-card"><div class="sc-eyebrow">${selected.kind === 'job' ? `Job ${escapeHtml(selected.projectId)}` : 'General context'}</div><div class="sc-title">${escapeHtml(selected.label)}</div><div class="sc-status" data-tone="${statusTone(status)}"><span class="sc-dot" data-tone="${statusTone(status)}"></span>${escapeHtml(statusLabel(status))}</div><div class="sc-metrics"><div class="sc-metric"><span class="sc-eyebrow">Today</span><strong>${formatDuration(selected.todayMs)}${selected.isProvisional ? '*' : ''}</strong></div><div class="sc-metric"><span class="sc-eyebrow">${selected.kind === 'job' ? 'Job total' : 'Context total'}</span><strong>${formatDuration(selected.totalMs)}${selected.isProvisional ? '*' : ''}</strong></div></div>${activeSession ? `<div class="sc-session"><span>Current session${timer.running.provisional ? ' · provisional' : ''}</span><strong>${formatDuration(timer.running.elapsedMs)}</strong></div>` : ''}${pending}${hold}${native}<div class="sc-actions">${busyAction ? '<button disabled>Working…</button>' : actions.join('')}</div></section>${mainNavigationMarkup()}${searchMarkup()}</div>`;
   }
 
   function recentView(timer) {

@@ -2,8 +2,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { STYLE_ID, ROOT_THEME_ATTRIBUTE, ROOT_ROUTE_ATTRIBUTE,
-  classifyWebsiteRoute, createThemeService } = require('../../src/presentation/theme-service');
+const { STYLE_ID, ROOT_THEME_ATTRIBUTE, ROOT_ROUTE_ATTRIBUTE, EDITOR_STYLE_ID, EDITOR_FRAME_ATTRIBUTE,
+  ROUTE_BY_PATH, classifyWebsiteRoute, createThemeService } = require('../../src/presentation/theme-service');
 
 class FakeElement {
   constructor(tag = 'div') {
@@ -21,6 +21,24 @@ class FakeElement {
   remove() { if (this.parent) this.parent.children = this.parent.children.filter(child => child !== this); this.parent = null; }
 }
 
+function editorFrame() {
+  const frame = new FakeElement('iframe');
+  const root = new FakeElement('html');
+  const head = new FakeElement('head');
+  const body = new FakeElement('body');
+  const listeners = new Map();
+  frame.contentDocument = {
+    documentElement: root,
+    head,
+    body,
+    createElement(tag) { return new FakeElement(tag); },
+    getElementById(id) { return head.children.find(child => child.id === id) || null; }
+  };
+  frame.addEventListener = (type, listener) => listeners.set(type, listener);
+  frame.removeEventListener = (type, listener) => { if (listeners.get(type) === listener) listeners.delete(type); };
+  return { frame, head, listeners };
+}
+
 function media(matches = false) {
   const listeners = new Set();
   return {
@@ -33,7 +51,7 @@ function media(matches = false) {
 }
 
 function harness({ glass = true, darkLogoUrl = '', logoInitiallyAvailable = true,
-  pathname = '/dashboard.php' } = {}) {
+  pathname = '/dashboard.php', editorFrames = [] } = {}) {
   const root = new FakeElement('html');
   const head = new FakeElement('head');
   const logo = new FakeElement('img');
@@ -49,7 +67,11 @@ function harness({ glass = true, darkLogoUrl = '', logoInitiallyAvailable = true
     head,
     createElement(tag) { return new FakeElement(tag); },
     querySelector(selector) { return selector.includes('img') && logoAvailable ? logo : null; },
-    querySelectorAll(selector) { return selector === `#${STYLE_ID}` ? head.children.filter(child => child.id === STYLE_ID) : []; },
+    querySelectorAll(selector) {
+      if (selector === `#${STYLE_ID}`) return head.children.filter(child => child.id === STYLE_ID);
+      if (selector === 'iframe.cke_wysiwyg_frame') return editorFrames;
+      return [];
+    },
     addEventListener(type, listener) { documentListeners.set(type, listener); },
     removeEventListener(type, listener) { if (documentListeners.get(type) === listener) documentListeners.delete(type); }
   };
@@ -176,10 +198,9 @@ test('UT-B5-THEME-009 canonical preference read-model identity retains its revis
 });
 
 test('UT-B5-THEME-010 probe-backed route classification is exact and bounded', () => {
-  assert.equal(classifyWebsiteRoute({ pathname: '/leads.php' }), 'LEADS');
-  assert.equal(classifyWebsiteRoute({ pathname: '/calendar.php' }), 'INSTALL_CALENDAR');
-  assert.equal(classifyWebsiteRoute({ pathname: '/project.php' }), 'GENERIC');
+  for (const [pathname, route] of Object.entries(ROUTE_BY_PATH)) assert.equal(classifyWebsiteRoute({ pathname }), route);
   assert.equal(classifyWebsiteRoute({ pathname: '/folder/leads.php' }), 'GENERIC');
+  assert.equal(classifyWebsiteRoute({ pathname: '/monthly_report.php' }), 'GENERIC');
 });
 
 test('UT-B5-THEME-011 Sleek Dark applies the probe-backed Leads adapter and Original removes route ownership', () => {
@@ -211,4 +232,63 @@ test('UT-B5-THEME-013 pageshow reclassifies an eligible SquareCoil route without
   h.windowListeners.get('pageshow')();
   assert.equal(h.root.getAttribute(ROOT_ROUTE_ATTRIBUTE), 'INSTALL_CALENDAR');
   assert.equal(h.document.querySelectorAll(`#${STYLE_ID}`).length, 1);
+});
+
+test('UT-B5-THEME-014 B5-D CSS contains bounded vendor responsive reduced-motion and print adapters', () => {
+  const h = harness({ pathname: '/project_designs.php' });
+  h.service.apply(preferences({ websiteTheme: 'SLEEK_DARK' }));
+  assert.equal(h.root.getAttribute(ROOT_ROUTE_ATTRIBUTE), 'PROJECT_DESIGNS');
+  const css = h.document.querySelectorAll(`#${STYLE_ID}`)[0].textContent;
+  for (const marker of ['dataTables_wrapper', 'select2-container--default', '.qtip', '.mfp-content', '.fancybox-skin', '.dropzone', '.cke_button_icon', '.gantt-container', '@media(max-width:1100px)', '@media(prefers-reduced-motion:reduce)', '@media print']) {
+    assert.match(css, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  }
+  assert.doesNotMatch(css, /\[class\*="gantt"\]/);
+  h.service.teardown();
+});
+
+test('UT-B5-THEME-015 B5-D same-origin CKEditor document styling is idempotent and Original removes it exactly', () => {
+  const editor = editorFrame();
+  const h = harness({ pathname: '/project_designs.php', editorFrames: [editor.frame] });
+  h.service.apply(preferences({ websiteTheme: 'SLEEK_DARK' }));
+  h.service.apply(preferences({ websiteTheme: 'SLEEK_DARK' }));
+  assert.equal(editor.head.children.filter(child => child.id === EDITOR_STYLE_ID).length, 1);
+  assert.match(editor.head.children.find(child => child.id === EDITOR_STYLE_ID).textContent, /\[style\*="color:black" i\]/);
+  assert.equal(editor.frame.getAttribute(EDITOR_FRAME_ATTRIBUTE), 'dark');
+  assert.equal(editor.listeners.size, 1);
+  h.service.apply(preferences({ websiteTheme: 'ORIGINAL', preferenceRevision: 2 }));
+  assert.equal(editor.head.children.filter(child => child.id === EDITOR_STYLE_ID).length, 0);
+  assert.equal(editor.frame.getAttribute(EDITOR_FRAME_ATTRIBUTE), null);
+  assert.equal(editor.listeners.size, 0);
+  h.service.teardown();
+});
+
+test('UT-B5-THEME-016 B5-D forced-colors fallback removes outer and CKEditor ownership without changing preference', () => {
+  const editor = editorFrame();
+  const h = harness({ pathname: '/project_designs.php', editorFrames: [editor.frame] });
+  h.service.apply(preferences({ websiteTheme: 'SLEEK_DARK' }));
+  assert.equal(editor.head.children.filter(child => child.id === EDITOR_STYLE_ID).length, 1);
+  h.forced.set(true);
+  const snapshot = h.service.snapshot();
+  assert.equal(snapshot.websiteThemePreference, 'SLEEK_DARK');
+  assert.equal(snapshot.websiteThemeEffective, 'ORIGINAL');
+  assert.equal(editor.head.children.filter(child => child.id === EDITOR_STYLE_ID).length, 0);
+  assert.equal(editor.frame.getAttribute(EDITOR_FRAME_ATTRIBUTE), null);
+  h.service.teardown();
+});
+
+test('UT-B5-THEME-017 B5-D inaccessible CKEditor documents fail closed without a false themed marker', () => {
+  const attributes = new Map();
+  const frame = {
+    get contentDocument() { throw new Error('cross-origin'); },
+    addEventListener() {}, removeEventListener() {},
+    setAttribute(name, value) { attributes.set(name, String(value)); },
+    getAttribute(name) { return attributes.get(name) ?? null; },
+    removeAttribute(name) { attributes.delete(name); }
+  };
+  const h = harness({ pathname: '/project_designs.php', editorFrames: [frame] });
+  h.service.apply(preferences({ websiteTheme: 'SLEEK_DARK' }));
+  assert.equal(frame.getAttribute(EDITOR_FRAME_ATTRIBUTE), null);
+  assert.equal(h.document.querySelectorAll(`#${STYLE_ID}`).length, 1);
+  h.service.teardown();
+  assert.equal(frame.getAttribute(EDITOR_FRAME_ATTRIBUTE), null);
 });

@@ -326,6 +326,9 @@ for (const fixtureId of ['B5B-CINE-001', 'B5B-CINE-002', 'B5B-DASH-001', 'B5B-DA
 for (const fixtureId of ['B5C-THEME-001', 'B5C-THEME-002', 'B5C-THEME-003', 'B5C-THEME-004']) {
   assert(browserFixtureSource.includes(fixtureId), `B5-C browser fixture register is missing ${fixtureId}`);
 }
+for (const fixtureId of ['B5D-UI-001', 'B5D-VENDOR-001', 'B5D-OVERLAY-001', 'B5D-EDITOR-001', 'B5D-LAYOUT-001']) {
+  assert(browserFixtureSource.includes(fixtureId), `B5-D browser fixture register is missing ${fixtureId}`);
+}
 for (const fixtureId of ['B6-CANDIDATE-001', 'B6-PROFILE-001', 'B6-PROFILE-002']) {
   assert(browserFixtureSource.includes(fixtureId), `B6 browser fixture register is missing ${fixtureId}`);
 }
@@ -522,4 +525,4 @@ assert(!JSON.stringify(manifest.host_permissions || []).includes('bing.com'), 'B
 console.log(`B6 release-candidate validation passed for SquareCoil Companion v${manifest.version}`);
 console.log(`Canonical build identity: ${BUILD_ID} (${BUILD_STAGE}).`);
 console.log('The worker owns one fenced authority kernel; only the isolated content controller owns its versioned client transport.');
-console.log(`Fixture register validated: ${unitFixtureMappings.length} B1 A2 mappings, ${requiredIntegrationFixtures.length} B1 A3 IDs, ${requiredBrowserFixtures.length} B1 A4 IDs, 2 B2.1 A4 IDs, 5 B2.2 A4 IDs, 3 final-B2 READY A4 IDs, 4 B3 workspace A4 IDs, 4 B4 data A4 IDs, 5 B5-A settings A4 IDs, 5 B5-B optional A4 IDs, 4 B5-C theme A4 IDs, 3 B6 candidate/profile A4 IDs, ${b2FixtureIds.size} B2 stable IDs, ${b3FixtureIds.size} B3 stable IDs, ${b4FixtureIds.size} B4 stable IDs, and ${b5FixtureIds.size} B5 stable IDs; no skipped/todo/focused fixtures.`);
+console.log(`Fixture register validated: ${unitFixtureMappings.length} B1 A2 mappings, ${requiredIntegrationFixtures.length} B1 A3 IDs, ${requiredBrowserFixtures.length} B1 A4 IDs, 2 B2.1 A4 IDs, 5 B2.2 A4 IDs, 3 final-B2 READY A4 IDs, 4 B3 workspace A4 IDs, 4 B4 data A4 IDs, 5 B5-A settings A4 IDs, 5 B5-B optional A4 IDs, 4 B5-C theme A4 IDs, 5 B5-D theme/UI A4 IDs, 3 B6 candidate/profile A4 IDs, ${b2FixtureIds.size} B2 stable IDs, ${b3FixtureIds.size} B3 stable IDs, ${b4FixtureIds.size} B4 stable IDs, and ${b5FixtureIds.size} B5 stable IDs; no skipped/todo/focused fixtures.`);

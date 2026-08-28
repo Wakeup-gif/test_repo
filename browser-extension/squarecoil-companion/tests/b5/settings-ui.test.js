@@ -199,3 +199,17 @@ test('UT-B5-UI-010 Restore Native commits one fenced presentation batch and remo
   assert.deepEqual(h.preferenceCommands[0].patch, { websiteTheme: 'ORIGINAL', cinematicBackground: 'NONE', dashboardProfile: 'OFF' });
   assert.deepEqual(h.permissionCalls, ['remove']); h.ui.teardown();
 });
+
+test('UT-B5-UI-011 zero-history Home keeps Library and Settings reachable before the first clock-in', async () => {
+  const h = await harness();
+  assert.match(h.root.innerHTML, /No Companion job history yet/);
+  for (const destination of ['recent', 'overview', 'history', 'settings']) {
+    assert.match(h.root.innerHTML, new RegExp(`data-action="view" data-view="${destination}"`));
+  }
+  const before = structuredClone(h.core.timer);
+  h.click({ action: 'view', view: 'settings' });
+  assert.match(h.root.innerHTML, /Appearance &amp; Finish/);
+  assert.deepEqual(h.core.timer, before);
+  assert.equal(h.preferenceCommands.length, 0);
+  h.ui.teardown();
+});
