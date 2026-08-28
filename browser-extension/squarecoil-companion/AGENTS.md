@@ -4,7 +4,7 @@ This file scopes only `browser-extension/squarecoil-companion/`.
 
 ## Current task
 
-B2-C and B3 are accepted on `codex/squarecoil-b2c-migration`. B4 Data Safety / Backup / CSV is the current authorized task. The user has explicitly authorized sequential continuation through B5-A, B5-B, and B6 after each preceding gate passes.
+B2-C, B3, and B4 are accepted on `codex/squarecoil-b2c-migration`. B5-A Core Settings / Support / Themes is the current authorized task. The user has explicitly authorized sequential continuation through B5-B and B6 after each preceding gate passes.
 
 Do not merge or promote to `main`, publish a release/store build, or add a new live SquareCoil mutation without separate exact approval.
 
@@ -91,4 +91,4 @@ Do not finish with unrelated changes.
 
 ## Stage boundary
 
-Implement only the settled B4 behavior, update its evidence/current-state documents, commit and push the coherent gate, and require its exact acceptance before continuing to B5-A. Do not begin B6 until B5-A/B5-B pass. Promotion, publication, and new live mutations remain out of scope.
+Implement only the settled B5-A behavior, update its evidence/current-state documents, commit and push the coherent gate, and require its exact acceptance before continuing to B5-B. Do not begin B6 until B5-A/B5-B pass. Promotion, publication, and new live mutations remain out of scope.
