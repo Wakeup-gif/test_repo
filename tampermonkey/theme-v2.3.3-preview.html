@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SquareCoil Theme Regression Preview</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; font: 14px Arial, sans-serif; background: #eceff2; }
+    header.navbar { position: fixed; inset: 0 0 auto 0; z-index: 4; height: 58px; display: flex; align-items: center; padding: 0 20px; background: #fff; }
+    .brand { font-size: 18px; font-weight: 700; }
+    .dropdown { position: relative; margin-left: auto; }
+    .dropdown-toggle { display: block; padding: 20px; }
+    .dropdown-menu { position: absolute; top: 48px; right: 0; display: block; width: 250px; margin: 0; padding: 0; list-style: none; background: #fff; }
+    .list-group-item, .dropdown-footer { border-bottom: 1px solid #e7e7e7; background: #fff; }
+    .list-group-item a, .dropdown-footer a { display: block; padding: 13px 15px; }
+    .shell { display: grid; grid-template-columns: 230px 1fr; min-height: 100vh; padding-top: 58px; }
+    #sidebar_left { padding: 20px; background: #2d343c; color: #fff; }
+    .menu-row { padding: 11px 12px; border-bottom: 1px solid rgba(255,255,255,.08); }
+    #content_wrapper { min-width: 0; padding: 26px; }
+    #content { min-width: 0; }
+    .panel { padding: 22px; background: #fff; border: 1px solid #ddd; }
+    h1, h2 { margin-top: 0; }
+    .leads-grid { display: grid; grid-template-columns: 280px minmax(0,1fr); gap: 26px; }
+    .admin-form { display: grid; gap: 14px; }
+    .gui-input, .input-sm { width: 100%; height: 42px; padding: 0 13px; background: #fff; border: 1px solid #ddd; }
+    .rows { display: grid; }
+    .lead-row { display: grid; grid-template-columns: 110px 1fr 1.4fr 150px; gap: 16px; padding: 18px 12px; border-bottom: 1px solid #ddd; }
+    .editor-layout { display: grid; gap: 20px; }
+    .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .form-control { width: 100%; min-height: 40px; padding: 9px 12px; background: #fff; border: 1px solid #ddd; }
+    .cke { border: 1px solid #ddd; background: #eee; }
+    .cke_top { display: flex; gap: 6px; padding: 7px; background: #eee; }
+    .cke_toolgroup { display: inline-flex; gap: 2px; padding: 2px; }
+    .cke_button { display: inline-flex; width: 30px; height: 28px; align-items: center; justify-content: center; }
+    .cke_button_icon { width: 16px; height: 16px; background: #111; clip-path: polygon(12% 12%,88% 12%,88% 36%,60% 36%,60% 88%,36% 88%,36% 36%,12% 36%); }
+    .cke_contents { height: 360px; background: #fff; }
+    .cke_wysiwyg_frame { width: 100%; height: 100%; border: 0; background: #fff; }
+    .calendar-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+    .fc table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    .fc th, .fc td { border: 1px solid #ddd; }
+    .fc th { height: 34px; }
+    .fc-day { height: 210px; vertical-align: top; background: #f8f8f8; }
+    .fc-event { display: block; margin: 8px; padding: 8px; color: #000; background: #fff; border: 2px solid #000; text-decoration: none; }
+    .fc-event .cp { width: 98%; height: 8px; margin-top: 7px; background: #fff; border: 1px solid gray; }
+    .fc-other-month { opacity: .72; }
+    .fc-today { outline: 2px solid #66b6ff; outline-offset: -2px; }
+    .preview-switcher { position: fixed; right: 18px; bottom: 18px; z-index: 20; display: flex; gap: 8px; padding: 8px; border-radius: 10px; background: rgba(5,12,19,.92); }
+    .preview-switcher a { padding: 8px 11px; color: #dbe9f5; text-decoration: none; border: 1px solid rgba(255,255,255,.14); border-radius: 7px; }
+  </style>
+</head>
+<body>
+  <header class="navbar">
+    <div class="brand">SC&nbsp;&nbsp;SquareCoil</div>
+    <div class="dropdown">
+      <a class="dropdown-toggle">Help Center</a>
+      <ul class="dropdown-menu list-group dropdown-persist w250">
+        <li class="list-group-item"><a>▣ Tutorials</a></li>
+        <li class="list-group-item"><a>? Request Help</a></li>
+        <li class="list-group-item"><a>✦ Report a Problem</a></li>
+        <li class="dropdown-footer"><a>Request an Enhancement</a></li>
+      </ul>
+    </div>
+  </header>
+  <div class="shell">
+    <aside id="sidebar_left">
+      <strong>MENU</strong>
+      <div class="menu-row">Dashboard</div>
+      <div class="menu-row">Leads</div>
+      <div class="menu-row">Existing Projects</div>
+      <div class="menu-row">Schedule</div>
+      <div class="menu-row">Reports</div>
+    </aside>
+    <div id="content_wrapper"><main id="content"></main></div>
+  </div>
+  <nav class="preview-switcher">
+    <a href="?view=leads">Leads</a>
+    <a href="?view=editor">Editor</a>
+    <a href="?view=calendar">Calendar</a>
+  </nav>
+  <script>
+    const view = new URLSearchParams(location.search).get("view") || "leads";
+    const root = document.documentElement;
+    const content = document.getElementById("content");
+
+    root.classList.add("us-sign-v230", "us-sign-theme-dark-glass");
+    root.dataset.usSignV230Route = view === "calendar" ? "install-calendar" : view === "leads" ? "leads" : "generic";
+
+    const views = {
+      leads: `
+        <div class="leads-grid">
+          <section class="panel heading-border panel-primary">
+            <h2>Lead Search</h2>
+            <div class="admin-form theme-primary">
+              <input class="gui-input" placeholder="Lead Number">
+              <input class="gui-input" placeholder="Lead Name">
+              <select class="input-sm"><option>Status</option></select>
+              <input class="gui-input" placeholder="Address">
+              <select class="input-sm"><option>State / Province / County</option></select>
+              <select class="input-sm"><option>Salesperson</option></select>
+              <button class="btn btn-primary">SEARCH</button>
+            </div>
+          </section>
+          <section class="panel">
+            <h2>Matching Leads</h2>
+            <div class="rows">
+              <div class="lead-row"><strong>Number</strong><strong>Name</strong><strong>Address</strong><strong>Status</strong></div>
+              <div class="lead-row"><a>2026-110</a><span>Sample project</span><span>Sanitized address</span><strong class="text-success">Converted</strong></div>
+              <div class="lead-row"><a>2026-109</a><span>Another project</span><span>Sanitized address</span><strong class="text-warning">Awareness</strong></div>
+            </div>
+          </section>
+        </div>`,
+      editor: `
+        <div class="editor-layout">
+          <section class="panel">
+            <h1>Design Workspace</h1>
+            <div class="field-grid">
+              <input class="form-control" value="Required date">
+              <select class="form-control"><option>Assigned designer</option></select>
+              <select class="form-control"><option>In Progress</option></select>
+              <select class="form-control"><option>Standard priority</option></select>
+            </div>
+          </section>
+          <section class="cke cke_chrome">
+            <div class="cke_inner">
+              <div class="cke_top"><span class="cke_toolgroup"><a class="cke_button"><span class="cke_button_icon"></span></a><a class="cke_button"><span class="cke_button_icon"></span></a><a class="cke_button cke_button_disabled"><span class="cke_button_icon"></span></a></span><a class="cke_combo_button"><span class="cke_combo_text">Styles</span><span class="cke_combo_arrow">▾</span></a></div>
+              <div class="cke_contents"><iframe class="cke_wysiwyg_frame" srcdoc="<!doctype html><html><head></head><body class='cke_editable cke_editable_themed'><h2>Scope of Work</h2><p>Readable editor copy should belong to the dark workspace.</p><p><strong>Important:</strong> semantic <span style='color: red'>red</span>, <span style='color: blue'>blue</span>, and <span style='color: green'>green</span> remain distinguishable.</p></body></html>"></iframe></div>
+            </div>
+          </section>
+        </div>`,
+      calendar: `
+        <section class="panel">
+          <div class="calendar-toolbar"><h1>Install Calendar</h1><div><button class="btn">month</button> <button class="btn">week</button> <button class="btn">day</button></div></div>
+          <div class="fc fc-unthemed fc-ltr"><div class="fc-view-container"><div class="fc-view fc-month-view fc-basic-view"><table><thead><tr><th class="fc-widget-header">Sun</th><th class="fc-widget-header">Mon</th><th class="fc-widget-header">Tue</th><th class="fc-widget-header">Wed</th><th class="fc-widget-header">Thu</th><th class="fc-widget-header">Fri</th><th class="fc-widget-header">Sat</th></tr></thead><tbody><tr><td class="fc-day fc-widget-content fc-other-month"></td><td class="fc-day fc-widget-content"><a class="fc-event" style="border-color:#2f95d8"><span class="fc-content"><span class="fc-title"><span class="event-title">Blue-coded install</span></span></span><div class="cp"></div></a></td><td class="fc-day fc-widget-content"><a class="fc-event" style="border-color:#ca4f4f"><span class="fc-content"><span class="fc-title"><span class="event-title" style="color:#ff9a95">Attention state</span></span></span><div class="cp"></div></a></td><td class="fc-day fc-widget-content fc-today"></td><td class="fc-day fc-widget-content"></td><td class="fc-day fc-widget-content"><a class="fc-event" style="border-color:#d59f39"><span class="fc-content"><span class="fc-title"><span class="event-title">Scheduled work</span></span></span><div class="cp"></div></a></td><td class="fc-day fc-widget-content"></td></tr></tbody></table></div></div></div>
+        </section>`
+    };
+
+    content.innerHTML = views[view] || views.leads;
+
+    window.GM_addStyle = css => {
+      const style = document.createElement("style");
+      style.textContent = css;
+      document.head.appendChild(style);
+      return style;
+    };
+    window.GM_getValue = (_key, fallback) => fallback;
+    window.GM_setValue = () => {};
+    window.GM_registerMenuCommand = () => {};
+
+    fetch("./US-Sign-Full-UI-Theme-v2.3.3.user.js")
+      .then(response => response.text())
+      .then(source => {
+        (0, eval)(source);
+        root.dataset.usSignV230Route = view === "calendar" ? "install-calendar" : view === "leads" ? "leads" : "generic";
+      })
+      .catch(error => {
+        const message = document.createElement("pre");
+        message.textContent = `Theme load failed: ${error.message}`;
+        document.body.appendChild(message);
+      });
+  </script>
+</body>
+</html>
