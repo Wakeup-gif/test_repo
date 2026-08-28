@@ -90,7 +90,7 @@ function createFixture() {
     clients.push(value);
     return value;
   }
-  return { area, clock, client };
+  return { area, clock, client, router };
 }
 
 function contextEvent(type, bridgeSeq, context, atMs, priorContextId = null) {
@@ -132,7 +132,7 @@ function bridgeFactory(holder, initialEvents = []) {
         return bridge.snapshot();
       },
       async setOwner(value) { owner = value === true; return bridge.snapshot(); },
-      async verifyNow() { return bridge.snapshot(); },
+      async verifyNow() { holder.verifications = (holder.verifications || 0) + 1; return bridge.snapshot(); },
       async teardown() { disposed = true; owner = false; return bridge.snapshot(); },
       snapshot() {
         return { initialized: true, active: !disposed, disposed, owner, capability: 'SYNTHETIC_A3' };
@@ -225,6 +225,30 @@ test('IT-B2-BRIDGE-TIMER-001 Bridge events cross the owner fence into one Timer/
   await observerCore.teardown();
   await ownerCore.teardown();
   await observerClient.teardown();
+  await ownerClient.teardown();
+});
+
+test('IT-B2-BRIDGE-TIMER-005 observer fallback hint prompts OWNER verification without a Timer boundary', async () => {
+  const fixture = createFixture();
+  const ownerClient = fixture.client(401, 'runtime-hint-owner-00001');
+  const observerClient = fixture.client(402, 'runtime-hint-observer-001');
+  const ownerBridge = {};
+  const ownerCore = createTrustedTransitionCore({ authorityClient: ownerClient,
+    legacyStorage: emptyLegacyStorage, now: () => fixture.clock.value,
+    randomId: ids('hint-owner-command'), createBridge: bridgeFactory(ownerBridge) });
+  await ownerCore.ensure();
+  await observerClient.ensure();
+  const before = ownerCore.snapshot();
+  await observerClient.forwardNativeEvidence({ kind: 'PASSIVE_ACTIVITY_HINT',
+    sourceRuntimeId: observerClient.snapshot().runtimeInstanceId,
+    documentToken: observerClient.snapshot().documentToken });
+  await waitFor(() => ownerBridge.verifications === 1, 'OWNER did not promptly verify observer hint');
+  const after = ownerCore.snapshot();
+  assert.equal(after.revision, before.revision);
+  assert.equal(after.ledgerSegmentCount, before.ledgerSegmentCount);
+  assert.equal(after.timer.timerState, before.timer.timerState);
+  await observerClient.teardown();
+  await ownerCore.teardown();
   await ownerClient.teardown();
 });
 

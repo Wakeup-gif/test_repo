@@ -4,7 +4,7 @@
   "version": "0.7.1",
   "version_name": "0.7.1 Proto Squirel Coil Plugin",
   "description": "Accelerated SquareCoil Companion prototype with trusted Timer/Ledger core and nested workspace UI. Development testing only.",
-  "permissions": ["storage", "scripting"],
+  "permissions": ["storage", "scripting", "webRequest"],
   "host_permissions": [
     "https://ussignandmill.squarecoil.net/*"
   ],

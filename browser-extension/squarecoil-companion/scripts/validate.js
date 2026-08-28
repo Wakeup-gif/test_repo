@@ -21,7 +21,7 @@ assert(manifest.version === release.latestVersion, `manifest version ${manifest.
 assert(manifest.version === packageMetadata.version, `manifest version ${manifest.version} must match package metadata ${packageMetadata.version}`);
 assert(BUILD_ID === 'rebuild-b2-trusted-transition-core', 'B2.2 build ID must identify the trusted transition core');
 assert(BUILD_STAGE === 'B2.2', 'B2.2 build stage must remain explicit');
-assert(JSON.stringify(manifest.permissions || []) === JSON.stringify(['storage', 'scripting']), 'Rebuild permissions must remain storage + scripting only');
+assert(JSON.stringify(manifest.permissions || []) === JSON.stringify(['storage', 'scripting', 'webRequest']), 'B2-C permissions must remain storage + scripting + passive webRequest observation only');
 assert(JSON.stringify(manifest.host_permissions || []) === JSON.stringify(['https://ussignandmill.squarecoil.net/*']), 'Rebuild host permission must remain limited to the exact SquareCoil tenant');
 assert(JSON.stringify(Object.keys(manifest.background || {}).sort()) === JSON.stringify(['service_worker']), 'B1 background policy must contain only the service worker entry');
 assert(manifest.background?.service_worker === 'dist/background.js', 'B1 manifest must use generated dist/background.js');
@@ -327,7 +327,8 @@ assert(contentBundle.includes('src/squarecoil/bridge-service.js'), 'The isolated
 assert(contentBundle.includes("const ACTION_7_BODY = 'action=7'"), 'The packaged Bridge must retain the exact read-only action-7 body');
 assert(!contentBundle.includes('createTimerCommandHandler'), 'The isolated content bundle must not package the Timer writer implementation');
 assert(!contentBundle.includes('createMigrationCommandHandler'), 'The isolated content bundle must not package migration execution');
-assert(!contentBundle.includes('.ajaxComplete'), 'B2.2 must not install a live MAIN-world AJAX mutation-completion hook');
+assert(background.includes('EXTENSION_WEBREQUEST_COMPLETION'), 'B2-C worker must package native webRequest completion observation');
+assert(contentBundle.includes('VERIFICATION_FALLBACK'), 'B2-C must report reduced capability when completion observation is unavailable');
 assert(!/action=(?:2|3|4)(?:\D|$)/.test(contentBundle), 'B2.2 packaged Bridge must not issue native SquareCoil mutation actions');
 assert(!/localStorage\.(?:setItem|removeItem|clear)\s*\(/.test(contentBundle), 'B2.2 legacy preflight must remain read-only');
 assert(!contentBundle.includes('squarecoil-companion-authority-v1'), 'The isolated content bundle must not expose the retired page authority channel');

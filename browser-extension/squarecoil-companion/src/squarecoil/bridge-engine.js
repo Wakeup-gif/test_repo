@@ -216,6 +216,9 @@ function recordNativeCompletion(inputState, options = {}) {
     return reject(state, 'UNSUPPORTED_NATIVE_ACTION');
   }
   const completedAtMs = assertTimestamp(options.completedAtMs, 'completedAtMs');
+  if (state.lastConfirmed && completedAtMs < state.lastConfirmed.observedAtMs) {
+    return reject(state, 'NATIVE_COMPLETION_SUPERSEDED');
+  }
   const sourceRuntimeId = requireText(options.sourceRuntimeId, 'sourceRuntimeId');
   const completionKey = normalizeOptionalText(options.completionKey);
   if (completionKey) {

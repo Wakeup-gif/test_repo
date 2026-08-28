@@ -10,6 +10,7 @@ const AUTHORITY_MESSAGES = Object.freeze({
   COMMAND: `${AUTHORITY_MESSAGE_PREFIX}COMMAND`,
   SUBSCRIBE: `${AUTHORITY_MESSAGE_PREFIX}SUBSCRIBE`,
   HEARTBEAT: `${AUTHORITY_MESSAGE_PREFIX}HEARTBEAT`,
+  FORWARD_NATIVE_EVIDENCE: `${AUTHORITY_MESSAGE_PREFIX}FORWARD_NATIVE_EVIDENCE`,
   DISCONNECT: `${AUTHORITY_MESSAGE_PREFIX}DISCONNECT`,
   UPDATE: `${AUTHORITY_MESSAGE_PREFIX}UPDATE`
 });
@@ -24,6 +25,7 @@ const REQUEST_TYPES = new Set([
   AUTHORITY_MESSAGES.COMMAND,
   AUTHORITY_MESSAGES.SUBSCRIBE,
   AUTHORITY_MESSAGES.HEARTBEAT,
+  AUTHORITY_MESSAGES.FORWARD_NATIVE_EVIDENCE,
   AUTHORITY_MESSAGES.DISCONNECT
 ]);
 
@@ -79,6 +81,9 @@ function validateAuthorityRequest(message) {
     ) {
       return { ok: false, reason: 'authority-command-origin-runtime-invalid' };
     }
+  }
+  if (message.type === AUTHORITY_MESSAGES.FORWARD_NATIVE_EVIDENCE && !isPlainObject(message.evidence)) {
+    return { ok: false, reason: 'authority-native-evidence-invalid' };
   }
   return { ok: true };
 }

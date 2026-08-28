@@ -134,7 +134,7 @@ test('UT-B2-BRIDGE-026 live Bridge transport can issue only exact read-only acti
   assert.equal(events[0].type, 'CONTEXT_DETECTED');
   assert.equal(events[0].context.contextId, 'job:260702');
   assert.equal(health.nativeMutationRequestCount, 0);
-  assert.equal(health.capability, 'FULL_NO_NATIVE_COMPLETION_HOOK');
+  assert.equal(health.capability, 'VERIFICATION_FALLBACK');
 
   const tornDown = await bridge.teardown();
   assert.equal(tornDown.active, false);
@@ -163,4 +163,98 @@ test('UT-B2-BRIDGE-027 OBSERVER attaches passive audited listeners but performs 
   assert.equal(deliveries, 0);
   assert.equal((await bridge.verifyNow('observer-manual')).reason, 'observer-no-server-verification');
   await bridge.teardown();
+});
+
+test('UT-B2-BRIDGE-028 NAT-C01/C03 OWNER records successful completion then verifies exactly one native boundary', async () => {
+  const fixture = browserFixture();
+  let project = '260702';
+  fixture.document.querySelectorAll = selector => {
+    if (selector === '#clockin-remaining-time') return [element(
+      `<a href="/project.php?id=${project}">${project} - Fabrication</a>`, `${project} - Fabrication`)];
+    if (selector === '#clockout' || selector === '.timeclock-container') return [element()];
+    return [];
+  };
+  const events = [];
+  let time = 1_000;
+  const bridge = createSquareCoilBridgeService({ document: fixture.document, window: fixture.window,
+    timers: fixture.timers, sourceRuntimeId: 'runtime-native-owner-0001', now: () => time++,
+    fetch: async () => ({ ok: true, text: async () =>
+      `<span id="clockin-remaining-time"><a href="/project.php?id=${project}">${project} - Fabrication</a></span>` }),
+    onEvents: async values => events.push(...values) });
+  await bridge.ensure({ owner: true });
+  project = '260703';
+  const completion = await bridge.observeNativeCompletion({ nativeAction: 3, successful: true,
+    completedAtMs: 1_010, completionKey: 'native-owner-completion-01', requestProjectId: '260703' });
+  assert.equal(completion.accepted, true);
+  const changes = events.filter(event => event.type === 'CONTEXT_CHANGED');
+  assert.equal(changes.length, 1);
+  assert.equal(changes[0].boundaryAtMs, 1_010);
+  assert.equal(changes[0].boundaryCertainty, 'NATIVE_CONFIRMED');
+  assert.equal(bridge.snapshot().nativeMutationRequestCount, 0);
+});
+
+test('UT-B2-BRIDGE-029 NAT-C02/C06/C09 OBSERVER fallback hint performs no verification or writes locally', async () => {
+  const fixture = browserFixture();
+  const hints = [];
+  let requests = 0;
+  let writes = 0;
+  const bridge = createSquareCoilBridgeService({ document: fixture.document, window: fixture.window,
+    timers: fixture.timers, sourceRuntimeId: 'runtime-native-observer-01',
+    documentToken: 'document-native-observer-01', now: () => 2_000,
+    fetch: async () => { requests += 1; throw new Error('observer-must-not-verify'); },
+    onVerificationHint: async evidence => hints.push(evidence), onEvents: async () => { writes += 1; } });
+  const health = await bridge.ensure({ owner: false });
+  assert.equal(health.capability, 'VERIFICATION_FALLBACK');
+  fixture.listeners.get('document:click')({ target: { closest: selector => selector === '.clock-actions' ? {} : null } });
+  await Promise.resolve();
+  assert.deepEqual(hints, [{ kind: 'PASSIVE_ACTIVITY_HINT' }]);
+  assert.equal(requests, 0);
+  assert.equal(writes, 0);
+  assert.equal((await bridge.observeNativeCompletion({ nativeAction: 2, successful: false })).accepted, false);
+  await bridge.teardown();
+  assert.equal((await bridge.observeNativeCompletion({ nativeAction: 4, successful: true })).reason,
+    'NATIVE_COMPLETION_UNSUCCESSFUL');
+  assert.equal(hints.length, 1);
+});
+
+test('UT-B2-BRIDGE-030 FULL capability requires production webRequest observation availability', async () => {
+  const fixture = browserFixture();
+  const bridge = createSquareCoilBridgeService({ document: fixture.document, window: fixture.window,
+    timers: fixture.timers, sourceRuntimeId: 'runtime-jquery-observer-01',
+    documentToken: 'document-jquery-observer-01', now: () => 3_000,
+    fetch: async () => { throw new Error('observer-must-not-verify'); },
+    completionObservationAvailable: true });
+  assert.equal((await bridge.ensure({ owner: false })).capability, 'FULL');
+  await bridge.teardown();
+});
+
+test('UT-B2-BRIDGE-032 successful observed action 2 verifies one native-confirmed CLOCKED_OUT boundary', async () => {
+  const fixture = browserFixture();
+  let clockedOut = false;
+  fixture.document.querySelectorAll = selector => {
+    if (!clockedOut && selector === '#clockin-remaining-time') return [element(
+      '<a href="/project.php?id=260702">260702 - Fabrication</a>', '260702 - Fabrication')];
+    if (clockedOut && selector === '#clockin') return [element()];
+    if (!clockedOut && selector === '#clockout') return [element()];
+    if (selector === '.timeclock-container') return [element()];
+    return [];
+  };
+  const events = [];
+  let time = 4_000;
+  const bridge = createSquareCoilBridgeService({ document: fixture.document, window: fixture.window,
+    timers: fixture.timers, sourceRuntimeId: 'runtime-action-two-owner', now: () => time++,
+    completionObservationAvailable: true,
+    fetch: async () => ({ ok: true, text: async () => clockedOut
+      ? '<span id="clockin-remaining-time"></span>'
+      : '<span id="clockin-remaining-time"><a href="/project.php?id=260702">260702 - Fabrication</a></span>' }),
+    onEvents: async values => events.push(...values) });
+  await bridge.ensure({ owner: true });
+  clockedOut = true;
+  time = 4_020;
+  await bridge.observeNativeCompletion({ nativeAction: 2, successful: true, completedAtMs: 4_010,
+    completionKey: 'webrequest:worker:request-action-two' });
+  const boundaries = events.filter(event => event.type === 'CLOCKED_OUT');
+  assert.equal(boundaries.length, 1);
+  assert.equal(boundaries[0].boundaryAtMs, 4_010);
+  assert.equal(boundaries[0].boundaryCertainty, 'NATIVE_CONFIRMED');
 });

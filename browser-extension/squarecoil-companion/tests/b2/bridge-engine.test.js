@@ -401,3 +401,16 @@ test('UT-B2-BRIDGE-024 Bridge state and events are immutable and contain no Time
   assert.equal('ledger' in event, false);
   assert.throws(() => { event.context.contextId = 'job:evil'; }, TypeError);
 });
+
+test('UT-B2-BRIDGE-031 delayed native evidence cannot supersede newer confirmed state', () => {
+  const confirmed = confirmJob(createBridgeEngineState(), '260702', '260702 - Current', 2_000);
+  for (const nativeAction of [NATIVE_ACTIONS.FULL_CLOCK_OUT, NATIVE_ACTIONS.CHANGE_CONTEXT, NATIVE_ACTIONS.LEAVE_CONTEXT]) {
+    const delayed = nativeCandidate(confirmed.state, nativeAction, 1_999, {
+      requestProjectId: nativeAction === NATIVE_ACTIONS.CHANGE_CONTEXT ? '260703' : null,
+      completionKey: `delayed-${nativeAction}`
+    });
+    assert.equal(delayed.accepted, false);
+    assert.equal(delayed.reason, 'NATIVE_COMPLETION_SUPERSEDED');
+    assert.equal(delayed.state.candidates.length, 0);
+  }
+});

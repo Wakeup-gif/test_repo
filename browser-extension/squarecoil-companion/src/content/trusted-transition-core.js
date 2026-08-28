@@ -210,6 +210,14 @@ function createTrustedTransitionCore(options = {}) {
     return {
       ...bridgeEnvironment,
       sourceRuntimeId: authorityClient.snapshot().runtimeInstanceId,
+      documentToken: authorityClient.snapshot().documentToken,
+      completionObservationAvailable: authorityClient.snapshot().nativeObservationAvailable,
+      onForwardEvidence: evidence => authorityClient.forwardNativeEvidence(evidence),
+      onVerificationHint: () => authorityClient.forwardNativeEvidence({
+        kind: 'PASSIVE_ACTIVITY_HINT',
+        sourceRuntimeId: authorityClient.snapshot().runtimeInstanceId,
+        documentToken: authorityClient.snapshot().documentToken
+      }),
       onEvents: acceptBridgeEvents,
       onHealthChange: value => {
         if (value.lastError) publishStatus('bridge-degraded', value.lastError);
@@ -271,6 +279,14 @@ function createTrustedTransitionCore(options = {}) {
     if (disposed) throw new Error('trusted-transition-core-disposed');
     if (initialized) return snapshot();
     unsubscribe = authorityClient.subscribe(event => {
+      if (event?.verificationHint && bridge && authorityOwner && !blocked) {
+        bridge.verifyNow('forwarded-passive-activity-hint').catch(error => publishStatus('bridge-degraded', error));
+        return;
+      }
+      if (event?.nativeEvidence && bridge && authorityOwner && !blocked) {
+        bridge.observeNativeCompletion(event.nativeEvidence).catch(error => publishStatus('bridge-evidence-rejected', error));
+        return;
+      }
       if (!adopt(event)) return;
       if (!initialized || disposed) {
         publishStatus('authority-document-updated');

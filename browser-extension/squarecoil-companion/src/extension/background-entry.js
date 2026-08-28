@@ -16,6 +16,7 @@ const {
 } = require('./authority-protocol');
 const { createAuthorityRouter } = require('./authority-router');
 const { createDefaultAuthorityKernel } = require('./authority-kernel');
+const { createNativeCompletionObserver } = require('./native-completion-observer');
 
 const BOOT_MESSAGE = 'SC_COMPANION_BOOT';
 const HEALTH_MESSAGE = 'SC_COMPANION_GET_HEALTH';
@@ -93,6 +94,11 @@ async function prepareIsolatedAuthorityTeardown(request, runtimeInstanceId) {
 // coordination install one adapter here; page and content code never import or
 // call an authoritative store directly.
 const authorityRouter = createAuthorityRouter({ publish: publishAuthorityUpdate });
+const nativeCompletionObserver = createNativeCompletionObserver({
+  webRequest: chrome.webRequest,
+  onCompletion: evidence => authorityRouter.observeNativeCompletion(evidence)
+});
+authorityRouter.setNativeObservationAvailable(nativeCompletionObserver.available);
 
 function installAuthorityAdapter(adapter) {
   return authorityRouter.installAdapter(adapter);
@@ -1235,7 +1241,8 @@ async function handleAuthorityMessage(request, message) {
   }
   if (
     message.type === AUTHORITY_MESSAGES.CONNECT ||
-    message.type === AUTHORITY_MESSAGES.COMMAND
+    message.type === AUTHORITY_MESSAGES.COMMAND ||
+    message.type === AUTHORITY_MESSAGES.FORWARD_NATIVE_EVIDENCE
   ) {
     const verified = await verifyAuthorityRuntime(request, message);
     if (!verified.ok) {

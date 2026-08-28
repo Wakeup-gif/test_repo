@@ -49,6 +49,7 @@ function createAuthorityClient(options = {}) {
   let coordinationRevision = null;
   let leaseExpiry = null;
   let revision = null;
+  let nativeObservationAvailable = false;
   let lastSequence = 0;
   let lastError = null;
   let healthy = false;
@@ -76,7 +77,8 @@ function createAuthorityClient(options = {}) {
       lastSequence,
       lastError,
       runtimeInstanceId,
-      documentToken
+      documentToken,
+      nativeObservationAvailable
     };
   }
 
@@ -194,6 +196,7 @@ function createAuthorityClient(options = {}) {
     coordinationRevision = response.coordinationRevision ?? coordinationRevision;
     leaseExpiry = response.leaseExpiry ?? leaseExpiry;
     revision = response.revision ?? revision;
+    nativeObservationAvailable = response.nativeObservationAvailable === true;
   }
 
   function invalidateConnectionForReconnect() {
@@ -370,6 +373,17 @@ function createAuthorityClient(options = {}) {
     return task;
   }
 
+  async function forwardNativeEvidence(evidence) {
+    if (!isPlainObject(evidence)) throw new Error('authority-native-evidence-invalid');
+    await ensure();
+    const response = requirePositive(await request(AUTHORITY_MESSAGES.FORWARD_NATIVE_EVIDENCE, {
+      sessionId,
+      evidence
+    }), 'forward-native-evidence');
+    acceptConnection(response);
+    return response.result;
+  }
+
   function subscribe(listener) {
     if (typeof listener !== 'function') throw new Error('authority-update-listener-invalid');
     updateListeners.add(listener);
@@ -445,6 +459,7 @@ function createAuthorityClient(options = {}) {
     read,
     command,
     migrationCommand,
+    forwardNativeEvidence,
     subscribe,
     heartbeat,
     teardown,
