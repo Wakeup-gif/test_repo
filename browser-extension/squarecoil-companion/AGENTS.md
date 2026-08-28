@@ -4,7 +4,7 @@ This file scopes only `browser-extension/squarecoil-companion/`.
 
 ## Current task
 
-B2-C, B3, and B4 are accepted on `codex/squarecoil-b2c-migration`. B5-A Core Settings / Support / Themes is the current authorized task. The user has explicitly authorized sequential continuation through B5-B and B6 after each preceding gate passes.
+B2-C, B3, B4, and B5-A are accepted on `codex/squarecoil-b2c-migration`. B5-B Optional Presentation is the current authorized task. The user has explicitly authorized sequential continuation through B6 after B5-B passes.
 
 Do not merge or promote to `main`, publish a release/store build, or add a new live SquareCoil mutation without separate exact approval.
 
@@ -89,6 +89,15 @@ Do not finish with unrelated changes.
 - Cross-tab order/visibility converges, and active interactions are not broken by refresh.
 - Installed Chrome and Edge pass the B3 A4 fixtures with no native mutation attempts.
 
+## Accepted B5-A gate
+
+- One fenced Preferences service owns durable appearance and Timer Limit revisions; stale multi-field drafts fail closed.
+- Timer Appearance, Panel Finish, and Website Theme preserve durable preference versus effective accessibility/capability fallback.
+- Theme application owns at most one removable layer and never gains Timer, Ledger, Bridge, lifecycle, or native-clock authority.
+- Settings routes and Support drafts remain transient and guarded; diagnostics are opt-in, frozen, and privacy-whitelisted.
+- Missing Developer Support configuration stays unavailable without fabricated links, payment state, or QR content.
+- Exact candidate `117b81604c66d57a3cbf356d6d974bef4a887242` passed aggregate, prototype, installed Chrome/Edge, package-integrity, and CI gates with no native mutation attempts.
+
 ## Stage boundary
 
-Implement only the settled B5-A behavior, update its evidence/current-state documents, commit and push the coherent gate, and require its exact acceptance before continuing to B5-B. Do not begin B6 until B5-A/B5-B pass. Promotion, publication, and new live mutations remain out of scope.
+Implement only the settled, explicitly activated B5-B optional-presentation behavior, update its evidence/current-state documents, commit and push the coherent gate, and require exact acceptance before continuing to B6. Keep optional features off by default and fail closed when source, route, permission, accessibility, lifecycle, or teardown evidence is incomplete. Promotion, publication, and new live mutations remain out of scope.

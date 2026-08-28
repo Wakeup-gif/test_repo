@@ -546,6 +546,10 @@ These are implementation/readiness facts, not reasons to reopen settled core arc
 
 **2026-08-28 B3 acceptance addendum:** the canonical workspace implements the L5/L5A tab, focus, selected/current, Recent, Overview, daily/context detail, and finalized History contract. Exact candidate `e3b369e691df317462bf6ef53cd981f682cca1d2` passed clean-package, installed Chrome/Edge, and CI acceptance. Optional presentation and destructive data features remain outside B3.
 
+**2026-08-28 B4 acceptance addendum:** the fenced data-safety layer implements archive/restore, explicit deletion/wipe, exact Full Backup, History CSV, reporting-only Time Report CSV, conflict-aware merge/replace, and quiescence/protected-state gates. Exact candidate `e5b6bb6014aee087b85fcd97901b3944e45a77ec` passed clean-package, installed Chrome/Edge, and CI acceptance without restoring live Timer state.
+
+**2026-08-28 B5-A acceptance addendum:** one revisioned Preferences service now drives Settings, Timer Limits, Light/Dark/Auto, Solid/Glass, Original/Refined Light/Sleek Dark, Support/Feedback, privacy-safe diagnostics, and fail-closed Developer Support. Exact candidate `117b81604c66d57a3cbf356d6d974bef4a887242` passed 437 aggregate tests, 13 prototype tests, 24/24 installed cases in both Chrome and Edge, exact package identity, and CI with no native mutation attempt. B5-B optional presentation remains off and separately gated.
+
 ---
 
 # 12. Build Path From the Current Checkpoint
@@ -625,6 +629,8 @@ Implement only after L6 authority is satisfied:
 - Time Report CSV;
 - large-history access/retention guarantees.
 
+**Completion addendum:** accepted at exact candidate `e5b6bb6014aee087b85fcd97901b3944e45a77ec`.
+
 ## Phase B5-A - Core presentation/settings/support
 
 First-release presentation scope:
@@ -637,6 +643,8 @@ First-release presentation scope:
 - Settings routes;
 - Support/Feedback;
 - Developer Support if configured.
+
+**Completion addendum:** accepted at exact candidate `117b81604c66d57a3cbf356d6d974bef4a887242`; missing Developer Support configuration remains visibly unavailable rather than fabricated.
 
 ## Phase B5-B - Optional presentation packs
 
@@ -674,17 +682,25 @@ Pass when the newly surfaced required parity features have behavior contracts wi
 
 Pass when canonical state/bridge/core-timer gaps are closed and accepted.
 
+**Current result: PASS.**
+
 ## Gate G3 - Workspace/time views
 
 Pass when B3 UI reads one canonical model, preserves selection/operational separation, and interaction behavior is accepted.
+
+**Current result: PASS.**
 
 ## Gate G4 - Data safety
 
 Pass when destructive and file workflows are safe, staged, and migration/restore compatible.
 
+**Current result: PASS.**
+
 ## Gate G5 - Core presentation
 
 Pass when themes/settings cannot destabilize the core and installed-browser interaction remains good.
+
+**Current result: PASS.**
 
 ## Gate G5-OPT - Optional visual packs
 
