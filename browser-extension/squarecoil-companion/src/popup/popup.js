@@ -139,7 +139,7 @@ function sendToActiveTab(type) {
 document.addEventListener('DOMContentLoaded', async () => {
   const manifest = chrome.runtime.getManifest();
   setText('version', `v${manifest.version}`);
-  setText('stage', 'B2 · Settlement-gated runtime');
+  setText('stage', 'B3 · Canonical workspace');
 
   const settings = await chrome.storage.local.get({ timerEnabled: true });
   const toggle = document.getElementById('enabled');

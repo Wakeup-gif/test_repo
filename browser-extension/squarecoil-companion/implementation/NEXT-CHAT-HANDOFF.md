@@ -1,110 +1,42 @@
-# SquareCoil Companion Rebuild - B1 Settled Handoff
+# SquareCoil Companion Rebuild — Current Handoff
 
-## Verified project baseline
+Updated: 2026-08-28
+Repository: `Wakeup-gif/test_repo`
+Branch: `codex/squarecoil-b2c-migration`
 
-- Repository: `Wakeup-gif/test_repo`
-- Production `main`: `9378da24f393b40066816133e7fa0f48063115f0`
-- Planning branch when B1 repair began: `42057ae7894a0f0051212a60cf764688a566b7d8`
-- B1 branch: `rebuild/squarecoil-companion-b1-lifecycle`
-- B1 remote baseline before repair: `c0afb241d91141ed818d9395ac14257207ad59ed`
-- Accepted B1 implementation: `f2d1769ddbe2b6966411fee3764a09b904dfe6ff`
-- Framework and Logic L0-L8: settled
-- B1: `SETTLED`
-- B1 browser acceptance: `COMPLETE / PASS`
-- B2: `BLOCKED / UNAPPROVED-DRAFT`
+## Current gate
 
-Production `main`, the planning branch, and the quarantined B2 drafts are outside the controlled B1 repair and must remain unchanged.
+- B1 through B2-C: accepted and preserved.
+- B3 Canonical Time Views / Workspace: implemented; final clean exact-package acceptance pending.
+- B4: explicitly authorized after B3 passes; not started in this candidate.
+- B5-A, B5-B, B6: authorized sequentially after the preceding gates pass.
 
-## Read first
+No merge/promotion to `main`, release/store publication, or new live SquareCoil mutation is authorized.
 
-Read the canonical contract set from planning commit
-`42057ae7894a0f0051212a60cf764688a566b7d8`, in this order:
+## B3 candidate
 
-1. `HANDOFF-NEXT-CHAT.md`
-2. `REBUILD-START-HERE.md`
-3. `docs/REBUILD-MASTER-PLAN.md`
-4. `docs/LOGIC-STAGE-PLAN.md`
-5. `logic/L0-INVARIANTS.md`
-6. `logic/L1-LIFECYCLE.md`
-7. `logic/L2-STATE-TIME-MIGRATION.md`
-8. `logic/L3-SQUARECOIL-BRIDGE.md`
-9. `logic/L4-TIMER-BEHAVIOR.md`
-10. `logic/L5-TIME-VIEWS-WORKSPACE.md`
-11. `logic/L6-DATA-SAFETY-BACKUP.md`
-12. `logic/L7-SETTINGS-SUPPORT-THEMES.md`
-13. `logic/L8-ACCEPTANCE-HANDOFF.md`
-14. `docs/REPOSITORY-EVIDENCE-MAP.md`
-15. `docs/LOGIC-TRACEABILITY-MATRIX.md`
-16. `CODEX-IMPLEMENTATION-HANDOFF.md`
+The implementation now provides one canonical revisioned read surface for compact Context Today tabs, Main, Recent, Overview, By Day, By Context, Context Detail, and finalized logical History. Selection, reorder, hide/show, and navigation are presentation-only. Real native Context transitions retain a durable focus identity across later verification, while boot discovery, same-Context verification, stale intent, and older deferred intent fail closed.
 
-Then read the newer execution records from the B1 branch:
+See `implementation/B3-WORKSPACE-EVIDENCE.md` and `docs/FEATURE-LEDGER.md`.
 
-1. `implementation/B1-SHELL-LIFECYCLE.md`
-2. `implementation/B1-ACCEPTANCE-EVIDENCE.md`
+## Required B3 closeout
 
-Planning remains the canonical behavior-contract authority. The B1 branch
-records the newer verified implementation status but must not change planning's
-product semantics.
+1. Run `npm run test:b3:unit`.
+2. Run `npm run test:b3:integration`.
+3. Run `npm run test:proto-ui`.
+4. Run `npm run check:b3-workspace`.
+5. Commit the clean candidate.
+6. Build one exact package with `sourceDirty: false` and the candidate commit SHA.
+7. Run the same unchanged package/ZIP independently in installed Chrome and Edge.
+8. Push, verify remote equality, and verify CI.
+9. Record the immutable candidate/ZIP/browser evidence and mark B3 accepted.
 
-## Recovered B1 state
+Dirty development Chrome and Edge rehearsals already pass against the same bytes, but are not acceptance evidence.
 
-The original B1 branch contained a useful shell/lifecycle implementation, but
-review found evidence and correctness gaps. The authorized controlled repair
-closed:
+## Next authorized gate
 
-- truthful READY and degraded-state classification;
-- one runtime/root owner per exact document;
-- cancellation-safe boot, recovery, and teardown;
-- sticky failed cleanup with explicit teardown-only retry;
-- ownership-last release and partial-initialization cleanup;
-- strict legacy, malformed, unreadable, orphan, build, package-version, candidate-fingerprint, and document identity handling;
-- service-worker restart, BFCache, navigation, and disable/re-enable safety;
-- stale callback, settings, injection, and teardown race fencing;
-- package source identity and exact-byte validation;
-- branded Chrome and Edge browser acceptance.
+After B3 passes, read the complete B4 source set required by `AGENTS.md`, especially L6, the B4 readiness audit, relevant L2 persistence/migration rules, and L8 B4 acceptance. Implement only settled data-safety behavior. Imported/restored data must never fabricate Active, Pending, or Local Pause state; destructive actions require explicit, reviewable commands.
 
-The real B1 runtime must continue to report:
+## Safety boundary
 
-```text
-DEGRADED / coordination-not-implemented-b1
-```
-
-That is the settled L1 boundary. One-writer coordination belongs to B2.
-
-## Accepted evidence status
-
-At this handoff checkpoint:
-
-- A1 exact static/package validation: COMPLETE / PASS;
-- A2 unit: 77 passed, 0 failed, 0 skipped or todo;
-- A3 integration: 38 passed, 0 failed, 0 skipped or todo;
-- A4 clean branded Chrome: 15 of 15 PASS;
-- A4 clean branded Edge: 15 of 15 PASS;
-- exact browser-tested source commit:
-  `f2d1769ddbe2b6966411fee3764a09b904dfe6ff`;
-- exact browser-tested ZIP SHA-256:
-  `ade889c43b78d73a14421ecda5715624774bbf44a6e09855680c1b09c6a34f1e`;
-- GitHub Actions run
-  [`32992114188`](https://github.com/Wakeup-gif/test_repo/actions/runs/32992114188):
-  completed successfully for the exact accepted implementation commit;
-- production `main` and planning remained unchanged;
-- the 24-file B2 draft remained quarantined and untouched.
-
-See `implementation/B1-ACCEPTANCE-EVIDENCE.md` for exact candidate, inventory,
-browser executable, workflow artifact, and proof-boundary details. The GitHub
-workflow package is separate A1 evidence and must not be substituted for the
-exact Windows package that passed A4.
-
-## Next authorization
-
-The exact next authorization is `REVIEW B2`. It permits read-only inspection of
-the quarantined B2 draft against the settled L2-L4 contracts and this final B1
-base. It does not authorize implementation.
-
-Do not start B2 without a reviewed repair slice and a later exact `START B2`.
-Do not modify `main`, merge, publish a release, or extend the B1 evidence beyond
-its synthetic clean-profile lifecycle scope.
-
-The protected planning branch remains the canonical behavior-contract authority
-and still contains its pre-repair B1 status checkpoint. The newer verified
-execution status is recorded on this B1 implementation branch.
+Exactly one fenced OWNER remains the authoritative Timer/Ledger writer. SquareCoil remains the company clock. The Bridge remains observational/read-only. Presentation and optional features never become timer authority. All installed-browser work remains synthetic/read-only unless the user separately authorizes one exact live action.

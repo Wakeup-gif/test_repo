@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 jobs:
-  validate-b2-transition:
+  validate-b3-workspace:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -26,18 +26,20 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Build, test, and validate final B2 settlement
+      - name: Build, test, and validate B3 canonical workspace
         shell: bash
         run: |
           set -euo pipefail
           test -z "$(git status --porcelain --untracked-files=all)"
-          npm --prefix browser-extension/squarecoil-companion run check:b2-transition
+          npm --prefix browser-extension/squarecoil-companion run check:b3-workspace
 
-      - name: Run Proto Squirel Coil UI interaction gate
+      - name: Run inherited and canonical workspace interaction gates
         shell: bash
         run: |
           set -euo pipefail
           npm --prefix browser-extension/squarecoil-companion run test:proto-ui
+          npm --prefix browser-extension/squarecoil-companion run test:b3:unit
+          npm --prefix browser-extension/squarecoil-companion run test:b3:integration
 
       - name: Validate generated JavaScript syntax
         shell: bash
@@ -67,16 +69,16 @@ jobs:
           cp "$ROOT/popup/popup.css" "$PACKAGE_ROOT/popup/popup.css"
 
           node "$ROOT/scripts/validate-package.js" "$PACKAGE_ROOT" --expected-source-sha "$GITHUB_SHA" --evidence "$EVIDENCE_ROOT/package-root.json"
-          CANONICAL="$RUNNER_TEMP/SquareCoil-Companion-v${VERSION}-B2-READY-SETTLEMENT.zip"
+          CANONICAL="$RUNNER_TEMP/SquareCoil-Companion-v${VERSION}-B3-CANONICAL-WORKSPACE.zip"
           (cd "$PACKAGE_ROOT" && zip -X -r "$CANONICAL" . >/dev/null)
-          CHROME_OUT="$GITHUB_WORKSPACE/SquareCoil-Companion-v${VERSION}-B2-READY-SETTLEMENT-CHROME.zip"
-          EDGE_OUT="$GITHUB_WORKSPACE/SquareCoil-Companion-v${VERSION}-B2-READY-SETTLEMENT-EDGE.zip"
+          CHROME_OUT="$GITHUB_WORKSPACE/SquareCoil-Companion-v${VERSION}-B3-CANONICAL-WORKSPACE-CHROME.zip"
+          EDGE_OUT="$GITHUB_WORKSPACE/SquareCoil-Companion-v${VERSION}-B3-CANONICAL-WORKSPACE-EDGE.zip"
           cp "$CANONICAL" "$CHROME_OUT"
           cp "$CANONICAL" "$EDGE_OUT"
           cmp --silent "$CHROME_OUT" "$EDGE_OUT"
 
           for label in CHROME EDGE; do
-            archive="$GITHUB_WORKSPACE/SquareCoil-Companion-v${VERSION}-B2-READY-SETTLEMENT-${label}.zip"
+            archive="$GITHUB_WORKSPACE/SquareCoil-Companion-v${VERSION}-B3-CANONICAL-WORKSPACE-${label}.zip"
             extracted="$RUNNER_TEMP/squarecoil-${label,,}"
             rm -rf "$extracted"
             mkdir -p "$extracted"
@@ -91,26 +93,26 @@ jobs:
             printf '%s  %s\n' "$EDGE_SHA" "$(basename "$EDGE_OUT")"
           } | tee "$EVIDENCE_ROOT/archive-sha256.txt"
 
-      - name: Upload Chrome final-B2 settlement package
+      - name: Upload Chrome B3 canonical workspace package
         uses: actions/upload-artifact@v4
         with:
-          name: squarecoil-companion-b2-ready-settlement-chrome
-          path: SquareCoil-Companion-v*-B2-READY-SETTLEMENT-CHROME.zip
+          name: squarecoil-companion-b3-canonical-workspace-chrome
+          path: SquareCoil-Companion-v*-B3-CANONICAL-WORKSPACE-CHROME.zip
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload Edge final-B2 settlement package
+      - name: Upload Edge B3 canonical workspace package
         uses: actions/upload-artifact@v4
         with:
-          name: squarecoil-companion-b2-ready-settlement-edge
-          path: SquareCoil-Companion-v*-B2-READY-SETTLEMENT-EDGE.zip
+          name: squarecoil-companion-b3-canonical-workspace-edge
+          path: SquareCoil-Companion-v*-B3-CANONICAL-WORKSPACE-EDGE.zip
           if-no-files-found: error
           retention-days: 30
 
-      - name: Upload final-B2 settlement package evidence
+      - name: Upload B3 canonical workspace package evidence
         uses: actions/upload-artifact@v4
         with:
-          name: squarecoil-companion-b2-ready-settlement-package-evidence
+          name: squarecoil-companion-b3-canonical-workspace-package-evidence
           path: ${{ runner.temp }}/squarecoil-evidence/*
           if-no-files-found: error
           retention-days: 30

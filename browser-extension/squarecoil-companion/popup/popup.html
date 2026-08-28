@@ -11,7 +11,7 @@
     <header>
       <div>
         <h1>SquareCoil Companion</h1>
-        <p id="stage">B2 · Settlement-gated runtime</p>
+        <p id="stage">B3 · Canonical workspace</p>
       </div>
       <span id="version">v0.7.1</span>
     </header>
@@ -32,7 +32,7 @@
       <div><span>Lifecycle</span><b id="lifecycle">Checking…</b></div>
       <div><span>Reason</span><b id="reason">—</b></div>
       <div><span>Runtime</span><code id="runtimeId">—</code></div>
-      <p>READY appears only after lifecycle, fenced authority, migration, trusted core, and Bridge checks all settle. Incomplete or blocked checks stay degraded.</p>
+      <p>READY still requires lifecycle, fenced authority, migration, trusted core, and Bridge settlement. The B3 workspace reads that trusted state; it cannot manufacture READY or write timing.</p>
       <button id="refresh" type="button">Refresh health</button>
       <button id="retryCleanup" type="button" hidden>Retry cleanup only</button>
       <button id="startFresh" type="button" hidden>Start fresh runtime</button>

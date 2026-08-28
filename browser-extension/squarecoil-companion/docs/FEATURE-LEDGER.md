@@ -1,0 +1,27 @@
+# SquareCoil Companion Current Feature Ledger
+
+Updated: 2026-08-28
+Branch: `codex/squarecoil-b2c-migration`
+
+This is the execution ledger. Planning history remains in `docs/FEATURE-MINE-RECONCILIATION.md`.
+
+| Feature | Stage | Source/evidence | Class/default | Permissions | Read/write classification | Status, tests, blockers |
+|---|---|---|---|---|---|---|
+| Lifecycle and one-root shell | B1 | lifecycle/controller + B1 evidence | Core/on | SquareCoil host, storage | lifecycle only | Accepted; inherited B1 gates green |
+| OWNER/OBSERVER authority and fenced Timer/Ledger | B2.1 | authority kernel/store/protocol | Core/on | storage | sole authoritative local writer | Accepted; inherited B2 kernel gates green |
+| Read-only Bridge and native action observation | B2.2/B2-C | Bridge service/engine, webRequest observer | Core/on | SquareCoil host, webRequest | observation/read-only transport; OWNER routes verified Timer command | Accepted; no direct native mutation path |
+| Migration and final READY settlement | B2-C | migration + settlement evidence | Core/on | storage | fenced migration write; fail-closed health read | Accepted; blocked/incomplete states remain non-READY |
+| Canonical workspace and time views | B3 | `src/timer/read-model.js`, `src/ui/*`, B3 evidence | Core/on | storage | read/navigation plus presentation preferences | Candidate; exact clean Chrome/Edge acceptance pending |
+| Archive/Delete/Wipe | B4 | L6/B4 readiness | Core/on when implemented | storage, downloads only where justified | explicit destructive local data commands | Not started; locked in B3 UI |
+| Full Backup JSON and restore | B4 | L6/B4 readiness | Core/on when implemented | storage/downloads/file picker as justified | explicit export/import; never restores live state | Not started |
+| History CSV and Time Report CSV | B4 | L6/B4 readiness | Core/on when implemented | downloads only where justified | export/read-only | Not started |
+| Core Settings and support | B5-A | L7/B5 readiness | Core/on | storage; external navigation only when explicit | preferences/navigation | Not started |
+| Original / Refined Light / Sleek Dark | B5-A | L7 + historical theme evidence | Core; settled first-install defaults | storage | presentation-only | Not started |
+| Cinematic/Bing presentation pack | B5-B | isolated reskin audit/lab | Optional/off | optional network host permission if proven | presentation/network read only | Not started; privacy/cache/stale-result gate required |
+| Design Dashboard presentation profile | B5-B | historical UI lineage | Optional/off | route host only | presentation-only | Not started; route/teardown gate required |
+| File-path/reference navigation utilities | future optional | userscript inventory | Optional/off | least-privilege route access | read/navigation only | Inventory pending B5-B; no business mutation allowed |
+| Watched Jobs/notifications | future separately gated | site-audit roadmap | Optional/off | alarms/notifications/allowlisted reads only if proven | read-only polling + local notification | Excluded from current stages unless separately contracted |
+| Adobe Acrobat tools | external integration | userscript inventory | Separate/off | separate Acrobat hosts | outside core Companion | Excluded from core; separate future contract |
+| Old Job Timer userscript runtime | superseded | historical Timer lineage | Excluded/off | none | unsafe duplicate timer authority | Never integrate or run |
+
+Every B5-B optional feature must add a stable ID/version, category, route list, permissions, dependencies/conflicts, storage/migration, activation/deactivation/teardown/recovery, health, privacy/retention, automated coverage, and installed-browser evidence before this ledger may mark it accepted.

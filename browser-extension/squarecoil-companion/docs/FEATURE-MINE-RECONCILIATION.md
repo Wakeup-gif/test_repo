@@ -542,7 +542,9 @@ Known structural/implementation caveats remain:
 
 These are implementation/readiness facts, not reasons to reopen settled core architecture.
 
-**2026-08-27 B2-C completion addendum:** the B2 caveats above describe the checkpoint that entered this reconciliation. The active `codex/squarecoil-b2c-migration` branch has since implemented migration invocation, passive native action 2/3/4 observation, current-OWNER routing, verification fallback, and the final READY settlement gate. That closes the known B2 implementation list when all required exact-candidate acceptance gates are green. The remaining UI caveats are B3-facing and are not authorized by this addendum.
+**2026-08-27 B2-C completion addendum:** the B2 caveats above describe the checkpoint that entered this reconciliation. The active `codex/squarecoil-b2c-migration` branch has since implemented and accepted migration invocation, passive native action 2/3/4 observation, current-OWNER routing, verification fallback, and the final READY settlement gate.
+
+**2026-08-28 B3 implementation addendum:** the canonical workspace now implements the L5/L5A tab, focus, selected/current, Recent, Overview, daily/context detail, and finalized History contract. Exact clean-package acceptance remains the final gate. Optional presentation and destructive data features remain outside B3.
 
 ---
 
@@ -588,7 +590,7 @@ Before calling the core finished, close the currently known canonical gaps:
 
 The prototype UI must not be used to hide unfinished B2 authority work.
 
-**Completion addendum:** this bounded phase is now implemented and acceptance-gated on the active B2-C branch. Stop at this boundary; Phase B3 still requires separate explicit authorization.
+**Completion addendum:** this bounded phase is accepted on the active branch. The user subsequently authorized sequential continuation through B6.
 
 ## Phase B3 - Canonical Time Views / Workspace
 

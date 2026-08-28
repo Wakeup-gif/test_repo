@@ -123,15 +123,15 @@ function createTrustedTransitionCore(options = {}) {
     return value;
   }
 
-  function timerView() {
+  function timerView(view = {}) {
     if (!authorityDocument) return null;
-    return createTimerReadModel(viewDocument, { now }).snapshot({ atMs: now() });
+    return createTimerReadModel(viewDocument, { now }).snapshot({ ...view, atMs: now() });
   }
 
-  function snapshot() {
+  function snapshot(view = {}) {
     let readModel = null;
     let readModelError = null;
-    try { readModel = timerView(); }
+    try { readModel = timerView(view); }
     catch (error) { readModelError = String(error?.message || error); }
     return deepFreeze({
       initialized,

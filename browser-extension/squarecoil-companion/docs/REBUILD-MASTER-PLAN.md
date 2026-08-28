@@ -1,6 +1,6 @@
 # SquareCoil Companion Rebuild Master Plan
 
-Status: **Framework ready for logic**  
+Status: **B3 implementation candidate; B1 through B2-C accepted**
 Planning branch: `planning/squarecoil-companion-rebuild`  
 Production baseline: `main` at `9378da24f393b40066816133e7fa0f48063115f0` (`v0.7.1 Chrome Interaction Recovery`)  
 Purpose: rebuild the Companion into a stable, modular, easy-to-update Chrome/Edge extension without losing established behavior, saved job history, or the UX improvements already developed.

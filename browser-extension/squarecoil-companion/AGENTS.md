@@ -3,91 +3,92 @@
 This file scopes only `browser-extension/squarecoil-companion/`.
 
 ## Current task
-Final B2-C is implemented on `codex/squarecoil-b2c-migration`: migration invocation, passive native action 2/3/4 observation, current-OWNER evidence routing, verification fallback, and the final READY settlement gate. Preserve that boundary and keep every B2 acceptance gate green.
 
-Do not begin B3, B4, or B5 without a new explicit authorization. Final B2 settlement does not promote this branch to production `main`.
+B2-C is accepted on `codex/squarecoil-b2c-migration`. B3 Canonical Time Views / Workspace is the current acceptance candidate. The user has explicitly authorized sequential continuation through B4, B5-A, B5-B, and B6 after each preceding gate passes.
 
-Read these before changing final B2 code:
-1. `docs/B2C-BUILDER-HANDOFF.md`
-2. `logic/B2C-COMPLETION-READINESS.md`
-3. `logic/B2C-IMPLEMENTATION-ENTRY-AUDIT.md`
-4. `logic/L2-STATE-TIME-MIGRATION.md`
-5. `logic/L1-LIFECYCLE.md`
-6. `logic/L3-SQUARECOIL-BRIDGE.md`
-7. `logic/L8-ACCEPTANCE-HANDOFF.md`
+Do not merge or promote to `main`, publish a release/store build, or add a new live SquareCoil mutation without separate exact approval.
 
-Do not redesign settled behavior. If implementation exposes a true contradiction, stop and report it rather than inventing new product behavior.
+Before B3 changes, read:
+
+1. `logic/L2-STATE-TIME-MIGRATION.md`
+2. `logic/L4-TIMER-BEHAVIOR.md`
+3. `logic/L5-TIME-VIEWS-WORKSPACE.md`
+4. `logic/L5A-TAB-PARITY-FOCUS-DELTA.md`
+5. `logic/L8-ACCEPTANCE-HANDOFF.md`
+6. `logic/B3-WORKSPACE-READINESS-AUDIT.md`
+7. accepted B1/B2 evidence and the actual source/tests
+
+Before B4 changes, read all of B3's preserved contracts plus:
+
+1. `logic/L6-DATA-SAFETY-BACKUP.md`
+2. `logic/B4-DATA-READINESS-AUDIT.md`
+3. the L2 persistence/migration rules referenced by that audit
+4. the B4 acceptance requirements in `logic/L8-ACCEPTANCE-HANDOFF.md`
+
+Before B5-A/B5-B changes, read `logic/L7-SETTINGS-SUPPORT-THEMES.md`, the applicable B5 readiness audit, the feature reconciliation/ledger, and every source/audit artifact explicitly required there.
+
+Do not redesign settled behavior. If implementation exposes a true contradiction, stop and report it.
 
 ## Architecture constraints
-- Exactly one authoritative Timer/Ledger writer.
+
+- Exactly one authoritative Timer/Time Ledger writer.
 - SquareCoil remains company-clock authority.
 - The Bridge is observational/read-only.
-- Migration mutation is OWNER-only and fenced.
+- Migration and authoritative mutations are OWNER-only and fenced.
 - OBSERVER runtimes never create fallback local authority.
+- Exact acknowledgments and current-generation evidence remain mandatory.
 - Retained v0.7 localStorage keys are read-only forensic evidence; do not delete or rewrite them.
-- Do not silently rerun or merge migration after a completed marker when CURRENT/ARCHIVE source evidence changed.
-- ACTIVITY-only post-migration source changes must not block timing when CURRENT/ARCHIVE still match.
-- No Bridge-driven timing may begin while migration is REQUIRED, IN_PROGRESS, FAILED, UNAVAILABLE, or SOURCE_CHANGED_AFTER_COMPLETION.
-- Imported data must not create live Active/Pending/Local Pause solely from file/source state.
-- Do not weaken revision/fencing checks.
+- Imported data cannot fabricate live Active, Pending, or Local Pause state.
+- Workspace selection, visibility, order, navigation, appearance, and optional presentation never own timing.
+- Optional presentation failures must not degrade healthy Timer authority.
+- Disabled optional features must remove their owned resources and leave native SquareCoil/core Companion behavior intact.
+- Do not weaken revision, fencing, lifecycle, migration, or READY settlement checks.
 
-## Primary files for this slice
-- `src/core/b2-ready-settlement.js`
-- `src/content/trusted-transition-core.js`
-- `src/extension/authority-client.js`
-- `src/extension/authority-protocol.js`
-- `src/extension/authority-router.js`
-- `src/extension/background-entry.js`
-- `src/extension/native-completion-observer.js`
-- `src/squarecoil/bridge-engine.js`
-- `src/squarecoil/bridge-service.js`
-- `src/popup/popup.js`
-- `popup/popup.html`
+## Source and generated output
 
-Add or modify tests under `tests/b2/` and `tests/b2-integration/` as needed.
+Work from this directory for npm scripts. Node.js 22 is the CI baseline. The project has no external npm dependencies and no lockfile.
 
-Do not edit `dist/` directly. `scripts/build.js` generates it from `src/`.
+Do not edit `dist/` directly. `scripts/build.js` generates it from `src/`; `dist/` is intentionally untracked.
 
-## Environment
-- Node.js 22 is the CI baseline.
-- The project currently has no external npm dependencies and no lockfile.
-- Work from `browser-extension/squarecoil-companion/` when running npm scripts.
+## Required B3 checks
 
-## Required checks before finishing
-Run all of these after code changes:
+Run all of these after B3 code changes:
 
 ```bash
-npm run test:b2:unit
-npm run test:b2:integration
+npm run test:b3:unit
+npm run test:b3:integration
 npm run test:proto-ui
-npm run check:b2-transition
+npm run check:b3-workspace
 ```
 
-`check:b2-transition` runs the full build/unit/integration/validation path, so failures there are release-blocking for this task.
+All accepted B1/B2 checks in the aggregate gate must remain green. B3 fixtures use stable unique `UT-B3-*` or `IT-B3-*` IDs.
 
-For a final B2 candidate, also build one clean exact package and run `tests/b1-browser/run.js` independently in installed branded Chrome and Edge. Both runs must be acceptance-eligible PASS results against unchanged package/ZIP bytes and the exact candidate source SHA.
+For final B3 acceptance, build one clean exact package and run `tests/b1-browser/run.js` independently in installed branded Chrome and Edge. Both must pass against unchanged package/ZIP bytes and the exact candidate source SHA. Dirty development runs are diagnostic only.
 
-Also confirm:
+Before any later-stage commit, run that stage's explicit gate plus every earlier aggregate regression and the installed-browser acceptance required by its owning audit.
+
+Also run:
 
 ```bash
+git diff --check
 git status --short
 ```
 
 Do not finish with unrelated changes.
 
-## Acceptance gate for this task
-All accepted B1/B2 behavior must remain green. The implementation must continue to cover MIG-C01 through MIG-C07, NAT-C01 through NAT-C09, and READY-C01 through READY-C04. READY must be derived only from current-generation, exact-acknowledged authority evidence plus aligned trusted-core, migration, and Bridge state. Cached/stale authority, ownership mismatch, incomplete preflight, missing initial OWNER observation, unavailable Bridge, and blocked migration must remain non-READY.
+## B3 acceptance gate
 
-Do not proceed to B3, B4, or B5 in this task.
+- One canonical revision feeds Main, tabs, Recent, Overview, By Day, By Context, Context Detail, and finalized History.
+- Tab time is Context Today; thresholds compare exact unrounded Today and are not the operational-status signal.
+- General Contexts do not consume numbered-job capacity; selected/current truth is protected.
+- Selection, reorder, hide/show, and navigation never mutate Timer/Ledger state or native SquareCoil.
+- Real incoming Context transitions produce ordered focus intent; boot discovery, same-Context verification, stale intent, and older deferred intent do not steal focus.
+- Current/native disposition remains distinct from selected historical inspection.
+- Pending, provisional, Safety Hold, time-basis fallback, and undated legacy balances are disclosed without fabricated attribution.
+- History is finalized-only, reconstructs logical sessions safely, and loads incrementally without pruning authoritative history.
+- Cross-tab order/visibility converges, and active interactions are not broken by refresh.
+- Installed Chrome and Edge pass the B3 A4 fixtures with no native mutation attempts.
 
-## Definition of done
-- Actions 2/3/4 are observed passively only after successful completion.
-- Sanitized evidence reaches exactly one current fenced OWNER.
-- OWNER performs mandatory fresh verification before any Timer/Ledger mutation.
-- Duplicate, stale-generation, retired-runtime, and genuinely superseded evidence fails closed.
-- Missing native observation reports `VERIFICATION_FALLBACK`, never false `FULL`.
-- OWNER and OBSERVER effective health report READY only when their authority and Bridge roles agree.
-- Popup health uses the final settlement result and explains that incomplete/blocked prerequisites remain degraded.
-- Installed branded Chrome and Edge pass against one exact clean package; dirty development runs are non-acceptance only.
-- Existing accepted migration and B1/B2 behavior remains green.
-- Changes are committed on the provided Codex branch; do not create another branch.
+## Stage boundary
+
+After B3 is accepted, update the evidence/current-state documents, commit and push the coherent gate, then continue to B4. Do not begin B5 until B4 passes; do not begin B6 until B5-A/B5-B pass. Promotion, publication, and new live mutations remain out of scope.

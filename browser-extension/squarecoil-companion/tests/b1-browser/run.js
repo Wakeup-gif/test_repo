@@ -6,8 +6,8 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const zlib = require('node:zlib');
 
-const CANONICAL_BUILD_ID = 'rebuild-b2-ready-settlement';
-const CANONICAL_STAGE = 'B2-C';
+const CANONICAL_BUILD_ID = 'rebuild-b3-canonical-workspace';
+const CANONICAL_STAGE = 'B3';
 const FIXTURE_ORIGIN = 'https://ussignandmill.squarecoil.net';
 const FIXTURE_PATH = '/__b1_fixture__/a4.html';
 const FRAME_PATH = '/__b1_fixture__/frame.html';
@@ -53,6 +53,12 @@ const REQUIRED_B2_READY_A4_FIXTURE_IDS = Object.freeze([
   'B2-READY-001',
   'B2-READY-002',
   'B2-READY-003'
+]);
+const REQUIRED_B3_WORKSPACE_A4_FIXTURE_IDS = Object.freeze([
+  'B3-WORKSPACE-001',
+  'B3-WORKSPACE-002',
+  'B3-WORKSPACE-003',
+  'B3-WORKSPACE-004'
 ]);
 const REQUIRED_PACKAGE_FILES = Object.freeze([
   'dist/background.js',
@@ -912,12 +918,27 @@ function runB2TransitionBrowserCase(cases, family, fixtureIds, slug, name, task,
   for (const fixtureId of extraMetadata.b2ReadyFixtureIds || []) {
     if (!REQUIRED_B2_READY_A4_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown final B2 READY A4 fixture ID: ${fixtureId}`);
   }
+  for (const fixtureId of extraMetadata.b3WorkspaceFixtureIds || []) {
+    if (!REQUIRED_B3_WORKSPACE_A4_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown B3 workspace A4 fixture ID: ${fixtureId}`);
+  }
   const browserCode = family === 'chrome' ? 'CH' : 'ED';
   const fixtureCode = fixtureIds.map(value => value.replace('B2-TRANSITION-', '')).join('-');
   return runCase(cases, `A4-B2.2-${browserCode}-${fixtureCode}-${slug}`, name, task, {
     b2TransitionFixtureIds: fixtureIds,
     b2Scope: 'TRUSTED_TRANSITION_CORE_PARTIAL',
     ...extraMetadata
+  });
+}
+
+function runB3WorkspaceBrowserCase(cases, family, fixtureIds, slug, name, task) {
+  for (const fixtureId of fixtureIds) {
+    if (!REQUIRED_B3_WORKSPACE_A4_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown B3 workspace A4 fixture ID: ${fixtureId}`);
+  }
+  const browserCode = family === 'chrome' ? 'CH' : 'ED';
+  const fixtureCode = fixtureIds.map(value => value.replace('B3-WORKSPACE-', '')).join('-');
+  return runCase(cases, `A4-B3-${browserCode}-${fixtureCode}-${slug}`, name, task, {
+    b3WorkspaceFixtureIds: fixtureIds,
+    b3Scope: 'CANONICAL_TIME_VIEWS_WORKSPACE'
   });
 }
 
@@ -975,6 +996,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
     console: { errors: [], pageErrors: [] },
     stableFixtureCoverage: null,
     b2KernelFixtureCoverage: null,
+    b3WorkspaceFixtureCoverage: null,
     cases: [],
     durationMs: null,
     cleanupWarning: null
@@ -1396,6 +1418,46 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
       }
     );
 
+    await runB3WorkspaceBrowserCase(
+      result.cases,
+      family,
+      ['B3-WORKSPACE-001', 'B3-WORKSPACE-002'],
+      'READ-MODEL-VIEWS',
+      'Canonical B3 tabs and time views render one trusted revision without writing Timer state',
+      async () => {
+        const before = await bridge.coreSnapshot();
+        const main = await waitFor(async () => page.evaluate(rootId => {
+          const root = document.getElementById(rootId);
+          const selected = root?.querySelector('.sc-tab[data-selected="true"]');
+          return root?.dataset.workspaceState === 'loaded' && selected ? {
+            workspaceState: root.dataset.workspaceState,
+            brand: root.querySelector('.sc-proto-brand small')?.textContent || '',
+            selectedContextId: selected.dataset.context || null,
+            selectedAria: selected.getAttribute('aria-label') || '',
+            mainText: root.querySelector('.sc-content')?.textContent || ''
+          } : null;
+        }, ROOT_ID), 'B3 canonical workspace initial render', options.timeoutMs);
+        assert(main.brand === 'B3 canonical workspace', 'B3 workspace brand was not canonical', main);
+        assert(main.selectedContextId === 'job:260701', 'Initial B3 selection did not reflect current Context truth', main);
+        assert(main.selectedAria.includes('Today') && main.selectedAria.includes('timer limit') && main.selectedAria.includes('Running'), 'Compact tab omitted Today, threshold, or operational semantics', main);
+
+        await page.locator(`#${ROOT_ID} [data-action="view"][data-view="overview"]`).click();
+        const overview = await page.locator(`#${ROOT_ID} .sc-content`).innerText();
+        const normalizedOverview = overview.toLowerCase();
+        assert(normalizedOverview.includes('time overview') && normalizedOverview.includes('today by job / context') && normalizedOverview.includes('by day') && normalizedOverview.includes('by job / context'), 'B3 Overview destinations were incomplete', overview);
+        await page.locator(`#${ROOT_ID} [data-action="view"][data-view="main"]`).click();
+        await page.locator(`#${ROOT_ID} [data-action="view"][data-view="history"]`).click();
+        const history = await page.locator(`#${ROOT_ID} .sc-content`).innerText();
+        assert(history.includes('History') && history.includes('finalized Companion work only'), 'B3 History did not preserve finalized-work semantics', history);
+        await page.locator(`#${ROOT_ID} [data-action="view"][data-view="main"]`).click();
+
+        const after = await bridge.coreSnapshot();
+        assert(after.revision === before.revision && after.ledgerSegmentCount === before.ledgerSegmentCount, 'B3 view navigation mutated authoritative Timer/Ledger state', { before, after });
+        assert(result.network.nativeMutationAttempts.length === 0, 'B3 view navigation attempted a native SquareCoil mutation', result.network.nativeMutationAttempts);
+        return { beforeRevision: before.revision, afterRevision: after.revision, main, overview, history };
+      }
+    );
+
     await runB2ReadyBrowserCase(
       result.cases,
       family,
@@ -1443,10 +1505,10 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
             error.details = { popupTarget, popupUrl: popupPage.url(), lastPopupHealth };
             throw error;
           }
-          assert(popupHealth.stage === 'B2 · Settlement-gated runtime', 'Popup stage did not identify the final B2 settlement runtime', popupHealth);
+          assert(popupHealth.stage === 'B3 · Canonical workspace', 'Popup stage did not identify the B3 canonical workspace runtime', popupHealth);
           assert(popupHealth.classification === 'HEALTHY_SAME_BUILD', 'Popup did not display healthy same-build classification', popupHealth);
           assert(popupHealth.reason === 'ready' && popupHealth.healthTone === 'ok', 'Popup did not render positive READY health', popupHealth);
-          assert(popupHealth.explanation.includes('Incomplete or blocked checks stay degraded.'), 'Popup did not retain fail-closed settlement guidance', popupHealth);
+          assert(popupHealth.explanation.includes('cannot manufacture READY or write timing'), 'Popup did not retain fail-closed B3 settlement guidance', popupHealth);
           return { settledHealth, popupTarget, popupHealth };
         } finally {
           await popupPage.close().catch(() => {});
@@ -1585,6 +1647,11 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
               : null;
           }, 'synchronized B2.2 OWNER and OBSERVER read models', options.timeoutMs);
           assert(before.observerCore.bridge.requestCount === 0, 'OBSERVER issued a server verification request', before.observerCore.bridge);
+          await waitFor(async () => {
+            const ownerSelected = await page.locator(`#${ROOT_ID} .sc-tab[data-selected="true"]`).getAttribute('data-context').catch(() => null);
+            const observerSelected = await observerPage.locator(`#${ROOT_ID} .sc-tab[data-selected="true"]`).getAttribute('data-context').catch(() => null);
+            return ownerSelected === 'job:260701' && observerSelected === 'job:260701' ? true : null;
+          }, 'B3 OWNER and OBSERVER baseline Context render', options.timeoutMs);
 
           await page.waitForTimeout(25);
           transitionFixture.clockContext = { projectId: '260702', label: '260702 - Fabrication' };
@@ -1627,7 +1694,60 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
           assert(after.ownerCore.timer.currentContextTotalMs >= 0, 'Job B total was unavailable', after.ownerCore.timer);
           assert(after.observerCore.bridge.requestCount === 0, 'OBSERVER became a duplicate Bridge writer during the switch', after.observerCore.bridge);
           assert(result.network.nativeMutationAttempts.length === 0, 'Job switch attempted a native SquareCoil mutation', result.network.nativeMutationAttempts);
-          return { before, after, action7Requests: result.network.action7.length };
+          const focusEvidence = await waitFor(async () => {
+            const owner = await page.evaluate(rootId => {
+              const root = document.getElementById(rootId);
+              const selected = root?.querySelector('.sc-tab[data-selected="true"]');
+              return selected ? { selectedContextId: selected.dataset.context, collapsed: root.dataset.protoCollapsed } : null;
+            }, ROOT_ID);
+            const observer = await observerPage.evaluate(rootId => {
+              const root = document.getElementById(rootId);
+              const selected = root?.querySelector('.sc-tab[data-selected="true"]');
+              return selected ? { selectedContextId: selected.dataset.context, collapsed: root.dataset.protoCollapsed } : null;
+            }, ROOT_ID);
+            return owner?.selectedContextId === 'job:260702' && observer?.selectedContextId === 'job:260702'
+              ? { owner, observer } : null;
+          }, 'B3 incoming Context focus in OWNER and OBSERVER workspaces', options.timeoutMs);
+
+          await page.locator(`#${ROOT_ID} .sc-tab[data-context="job:260701"]`).click({ force: true });
+          await page.locator(`#${ROOT_ID} [data-action="collapse"]`).click({ force: true });
+          await bridge.syncBridge();
+          const heartbeatEvidence = await waitFor(async () => page.evaluate(rootId => {
+            const root = document.getElementById(rootId);
+            const selected = root?.querySelector('.sc-tab[data-selected="true"]');
+            return root?.dataset.protoCollapsed === 'true' && selected?.dataset.context === 'job:260701'
+              ? { collapsed: root.dataset.protoCollapsed, selectedContextId: selected.dataset.context } : null;
+          }, ROOT_ID), 'same-Context heartbeat focus stability', options.timeoutMs);
+          await page.locator(`#${ROOT_ID} [data-action="collapse"]`).click({ force: true });
+
+          const presentationBefore = await bridge.coreSnapshot();
+          await page.locator(`#${ROOT_ID} .sc-tab[data-context="job:260702"]`).click({ force: true });
+          await page.locator(`#${ROOT_ID} [data-action="hide-tab"][data-context="job:260701"]`).click({ force: true });
+          await waitFor(async () => {
+            const ownerVisible = await page.locator(`#${ROOT_ID} .sc-tab[data-context="job:260701"]`).count();
+            const observerVisible = await observerPage.locator(`#${ROOT_ID} .sc-tab[data-context="job:260701"]`).count();
+            return ownerVisible === 0 && observerVisible === 0 ? true : null;
+          }, 'cross-tab B3 hidden-tab synchronization', options.timeoutMs);
+          await page.locator(`#${ROOT_ID} [data-action="view"][data-view="recent"]`).click({ force: true });
+          await page.locator(`#${ROOT_ID} [data-action="show-tab"][data-context="job:260701"]`).click({ force: true });
+          await waitFor(async () => {
+            const ownerVisible = await page.locator(`#${ROOT_ID} .sc-tab[data-context="job:260701"]`).count();
+            const observerVisible = await observerPage.locator(`#${ROOT_ID} .sc-tab[data-context="job:260701"]`).count();
+            return ownerVisible === 1 && observerVisible === 1 ? true : null;
+          }, 'cross-tab B3 restored-tab synchronization', options.timeoutMs);
+          await page.locator(`#${ROOT_ID} .sc-tab[data-context="job:260702"]`).dragTo(
+            page.locator(`#${ROOT_ID} .sc-tab[data-context="job:260701"]`),
+            { force: true }
+          );
+          const orderEvidence = await waitFor(async () => {
+            const owner = await page.evaluate(rootId => Array.from(document.getElementById(rootId)?.querySelectorAll('.sc-tab') || []).map(node => node.dataset.context), ROOT_ID);
+            const observer = await observerPage.evaluate(rootId => Array.from(document.getElementById(rootId)?.querySelectorAll('.sc-tab') || []).map(node => node.dataset.context), ROOT_ID);
+            return owner[0] === 'job:260702' && JSON.stringify(owner) === JSON.stringify(observer) ? { owner, observer } : null;
+          }, 'cross-tab B3 durable tab-order synchronization', options.timeoutMs);
+          const presentationAfter = await bridge.coreSnapshot();
+          assert(presentationAfter.revision === presentationBefore.revision && presentationAfter.ledgerSegmentCount === presentationBefore.ledgerSegmentCount, 'B3 select/hide/show/reorder changed authoritative Timer/Ledger state', { presentationBefore, presentationAfter });
+          assert(result.network.nativeMutationAttempts.length === 0, 'B3 workspace interaction attempted a native SquareCoil mutation', result.network.nativeMutationAttempts);
+          return { before, after, focusEvidence, heartbeatEvidence, orderEvidence, action7Requests: result.network.action7.length };
         } finally {
           if (observerBridge) {
             await observerBridge.authorityTeardown().catch(() => {});
@@ -1635,7 +1755,8 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
           }
           await observerPage.close().catch(() => {});
         }
-      }
+      },
+      { b3WorkspaceFixtureIds: ['B3-WORKSPACE-003', 'B3-WORKSPACE-004'] }
     );
 
     await runBrowserCase(result.cases, family, ['B1-LC-003', 'B1-LC-014'], 'RECOVERY', 'Dead interaction and removed root recover in place', async () => {
@@ -2114,6 +2235,22 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
         b2Scope: 'FINAL_READY_SETTLEMENT',
         status: 'FAIL',
         error: `Missing final B2 READY fixture IDs: ${result.b2ReadySettlementCoverage.missing.join(', ')}`
+      });
+    }
+    const observedB3WorkspaceFixtureIds = [...new Set(result.cases.flatMap(testCase => testCase.b3WorkspaceFixtureIds || []))].sort();
+    result.b3WorkspaceFixtureCoverage = {
+      scope: 'B3_CANONICAL_TIME_VIEWS_WORKSPACE_A4',
+      required: [...REQUIRED_B3_WORKSPACE_A4_FIXTURE_IDS],
+      observed: observedB3WorkspaceFixtureIds,
+      missing: REQUIRED_B3_WORKSPACE_A4_FIXTURE_IDS.filter(fixtureId => !observedB3WorkspaceFixtureIds.includes(fixtureId))
+    };
+    if (result.b3WorkspaceFixtureCoverage.missing.length) {
+      result.cases.push({
+        id: `A4-B3-${family === 'chrome' ? 'CH' : 'ED'}-FIXTURE-COVERAGE`,
+        name: 'Mandatory B3 canonical workspace fixture coverage',
+        b3Scope: 'CANONICAL_TIME_VIEWS_WORKSPACE',
+        status: 'FAIL',
+        error: `Missing B3 workspace fixture IDs: ${result.b3WorkspaceFixtureCoverage.missing.join(', ')}`
       });
     }
     const failedCases = result.cases.filter(testCase => testCase.status === 'FAIL');

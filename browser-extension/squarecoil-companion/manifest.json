@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "US Sign SquareCoil Companion",
   "version": "0.7.1",
-  "version_name": "0.7.1 Proto Squirel Coil Plugin",
-  "description": "Accelerated SquareCoil Companion prototype with trusted Timer/Ledger core and nested workspace UI. Development testing only.",
+  "version_name": "0.7.1 B3 Canonical Workspace Candidate",
+  "description": "SquareCoil Companion B3 candidate with trusted Timer/Ledger core and canonical time workspace. Development testing only.",
   "permissions": ["storage", "scripting", "webRequest"],
   "host_permissions": [
     "https://ussignandmill.squarecoil.net/*"

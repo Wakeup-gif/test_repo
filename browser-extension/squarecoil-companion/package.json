@@ -7,15 +7,18 @@
     "build": "node scripts/build.js",
     "test:b1:unit": "node --test tests/b1/*.test.js",
     "test:b2:unit": "node --test tests/b2/*.test.js",
-    "test:unit": "npm run test:b1:unit && npm run test:b2:unit",
+    "test:b3:unit": "node --test tests/b3/*.test.js",
+    "test:unit": "npm run test:b1:unit && npm run test:b2:unit && npm run test:b3:unit",
     "test:b1:integration": "node --test tests/b1-integration/*.test.js",
     "test:b2:integration": "node --test tests/b2-integration/*.test.js",
-    "test:integration": "npm run test:b1:integration && npm run test:b2:integration",
+    "test:b3:integration": "node --test tests/b3-integration/*.test.js",
+    "test:integration": "npm run test:b1:integration && npm run test:b2:integration && npm run test:b3:integration",
     "test:proto-ui": "node --test tests/b2/workspace-ui.test.js tests/b2/read-model-proto.test.js",
     "test": "npm run build && npm run test:unit && npm run test:integration",
     "validate": "node scripts/validate.js",
     "check:b1": "npm run build && npm run test:b1:unit && npm run test:b1:integration && npm run validate",
     "check:b2-kernel": "npm test && npm run validate",
-    "check:b2-transition": "npm test && npm run validate"
+    "check:b2-transition": "npm test && npm run validate",
+    "check:b3-workspace": "npm test && npm run validate"
   }
 }

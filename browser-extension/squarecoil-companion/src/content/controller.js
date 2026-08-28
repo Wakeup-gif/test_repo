@@ -83,8 +83,8 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
     return authorityClient ? authorityClient.snapshot() : unavailableAuthoritySnapshot();
   }
 
-  function coreSnapshot() {
-    return trustedCore ? trustedCore.snapshot() : {
+  function coreSnapshot(view = {}) {
+    return trustedCore ? trustedCore.snapshot(view) : {
       initialized: false,
       disposed: false,
       blocked: false,

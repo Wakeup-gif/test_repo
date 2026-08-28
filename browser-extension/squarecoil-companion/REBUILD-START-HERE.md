@@ -18,17 +18,17 @@ If chat context is lost or implementation direction becomes unclear, start here 
 
 **Logic status:** L0-L8 settled + post-mine L5A tab/focus delta settled
 
-**Implementation status:** B1, B2.1, and B2.2 accepted; final B2-C migration/native-observation/READY settlement implemented and acceptance-gated
+**Implementation status:** B1 through B2-C accepted; B3 canonical workspace implemented and in final exact-candidate acceptance
 
-**Prototype UI:** nested workspace prototype + dedicated UI interaction gate present
+**Workspace UI:** canonical B3 Main/Recent/Overview/By Day/By Context/Context Detail/History implementation present
 
 **Latest accepted implementation/UI-gate checkpoint before documentation/logic reconciliation:** `ba06297e689fa7a68574ea0c0fe6d12ee59e53bf`
 
 **Logic delta authority:** `logic/L5A-TAB-PARITY-FOCUS-DELTA.md`
 
-**Next canonical build action:** hold at the final B2 boundary pending review/promotion direction; B3 requires separate explicit authorization
+**Next canonical build action:** accept and push B3, then proceed directly to the authorized B4 data-safety gate
 
-The current branch still contains exploratory B3-facing UI work inherited from the prototype. Final B2 settlement does not promote that UI to canonical B3 and does not promote the branch to production.
+The user explicitly authorized sequential B3 through B6 work on this existing branch. That authorization does not promote the branch to production, authorize a release/store upload, or authorize new live SquareCoil mutations.
 
 ---
 
@@ -138,9 +138,9 @@ See `logic/L5A-TAB-PARITY-FOCUS-DELTA.md` for the full interaction, failure, and
 
 ---
 
-## Current prototype UI
+## Canonical B3 workspace
 
-The active prototype provides:
+The B3 implementation provides:
 
 - Chrome-like visible job tabs with a five-numbered-job cap;
 - selected-vs-operational separation;
@@ -157,14 +157,12 @@ The active prototype provides:
 - trusted-user interaction gating for Timer commands/navigation;
 - dedicated prototype UI tests.
 
-Known prototype limitations still include:
+Current boundary notes:
 
-- full `innerHTML` refresh strategy rather than retained-node rendering;
-- search focus is guarded, but scroll preservation is not solved;
-- null clock-out -> later Context behavior now has settled Logic in L5A but still needs implementation alignment/acceptance;
-- live tab Today + threshold parity is now settled Logic but not yet canonical B3 implementation;
-- destructive data tools remain intentionally locked;
-- full installed-browser A4 acceptance for the new UI has not been completed.
+- periodic refresh preserves the last trusted snapshot, scroll position, focused search input, and active presentation interactions;
+- native A -> B and none -> B focus uses a durable revision-bound transition identity, while boot and same-Context verification do not steal focus;
+- destructive data tools remain intentionally locked pending B4;
+- B3 is not accepted until the clean exact-package Chrome/Edge result is recorded.
 
 ---
 
@@ -184,22 +182,9 @@ Settlement remains acceptance-gated: all required automated checks, clean exact-
 
 ## Next action
 
-### Review and preserve canonical B2
+Complete B3 exact-candidate acceptance. If the aggregate gate, package binding, installed Chrome/Edge suite, push, and CI pass, record B3 as accepted and begin B4 against L6 and `logic/B4-DATA-READINESS-AUDIT.md`.
 
-Review the final B2-C implementation and evidence. Fix only B2 regressions or settlement defects within this boundary.
-
-### Stop before canonical B3
-
-B3 requires a new explicit authorization. When authorized, it must implement and accept the full L5 + L5A behavior, including:
-
-- canonical live tab Today;
-- threshold accent/accessibility;
-- persistent reorder/select/hide neutrality;
-- real incoming Context focus behavior;
-- null -> Context re-entry behavior;
-- same-Context no-focus/no-expand behavior;
-- stale/deferred focus protection;
-- real installed-browser interaction acceptance.
+B4 may add only the settled archive/delete/wipe/backup/restore/CSV behavior. It must not weaken B2 authority or let imported content fabricate a live Timer state.
 
 ---
 
@@ -247,6 +232,6 @@ Optional presentation must never block a core build that does not include it.
 
 ## Logic readiness
 
-**Ready** only for review and acceptance of the implemented final B2-C candidate under the existing staged dependencies.
+**Ready** for B3 exact-candidate acceptance and, after it passes, the already authorized B4 implementation gate.
 
-There are no open framework or Logic blockers in this delta. The final B2 implementation and acceptance gates are present on the active branch; promotion remains a separate decision, and B3 requires separate explicit authorization.
+There are no open framework or Logic blockers for B3. Promotion remains a separate decision.

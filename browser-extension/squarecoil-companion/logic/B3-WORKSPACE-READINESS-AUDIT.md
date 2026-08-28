@@ -1,7 +1,7 @@
 # SquareCoil Companion Rebuild
 ## B3 Workspace Behavior-Readiness Audit
 
-**Status:** Settled — B3 behavior is implementation-ready; current prototype is not canonical B3 acceptance-ready  
+**Status:** Settled — B3 behavior implemented; final exact-candidate acceptance pending
 **Scope:** compare the active prototype Workspace/read model against settled L5 + L5A behavior  
 **Active branch:** `proto/squirel-coil-plugin`  
 **Depends on:** L2, L4, L5, L5A, L8, and B2-C completion logic  
@@ -696,4 +696,12 @@ Canonical B3 acceptance is blocked by downstream implementation and the planned 
 
 No core Workspace behavior still has to be guessed.
 
-The next unresolved work is downstream B2-C implementation/acceptance, then canonical B3 implementation against L5 + L5A + this readiness audit. Logic should only reopen B3 if implementation exposes a genuine contradiction or a new product behavior decision.
+The implementation now closes the gaps catalogued above using one canonical revisioned read model and workspace owner. Final B3 acceptance still requires the exact clean package, installed Chrome/Edge results, remote branch push, and CI evidence. Logic should reopen only if that acceptance exposes a genuine contradiction or a new product decision.
+
+---
+
+# 30. 2026-08-28 Implementation Addendum
+
+The active branch now includes canonical Context Today tabs, exact threshold evaluation, soft five-job capacity, General Context handling, durable order/visibility, selected/current separation, revision-bound focus transitions, complete Overview/detail/finalized History views, stale-read retention, and cross-tab presentation synchronization. Stable coverage is mapped in `implementation/B3-WORKSPACE-EVIDENCE.md`.
+
+This addendum does not authorize B4 behavior inside B3 and does not turn presentation state into Timer authority.

@@ -512,6 +512,7 @@ function createEmptyDocument(options = {}) {
       active: null,
       pending: null,
       localPause: null,
+      lastFocusTransition: null,
       lastReason: 'initialized'
     },
     ledger: [],

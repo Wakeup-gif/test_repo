@@ -773,6 +773,9 @@ function createTimerCommandHandler(options = {}) {
       document.timer.lastObservation || null
     );
     document.timer.lastObservation = observationRecord(observation);
+    if (['CONTEXT_DETECTED', 'CONTEXT_CHANGED'].includes(observation.type)) {
+      document.timer.lastFocusTransition = observationRecord(observation);
+    }
 
     if (POSITIVE_TYPES.has(observation.type)) {
       return handlePositive(document, observation, trusted, atMs);

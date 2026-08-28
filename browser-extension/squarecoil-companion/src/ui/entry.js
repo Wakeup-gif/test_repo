@@ -68,6 +68,7 @@ function createSearchFocusGuard() {
     document,
     window,
     storage: chrome.storage.local,
+    storageChanges: chrome.storage.onChanged,
     getCoreHandle: () => globalThis.__squareCoilCompanionAuthorityHealth || null
   });
 
