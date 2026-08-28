@@ -8,7 +8,8 @@
     * { box-sizing: border-box; }
     body { margin: 0; min-height: 100vh; font: 14px Arial, sans-serif; background: #eceff2; }
     header.navbar { position: fixed; inset: 0 0 auto 0; z-index: 4; height: 58px; display: flex; align-items: center; padding: 0 20px; background: #fff; }
-    .brand { font-size: 18px; font-weight: 700; }
+    .navbar-brand { display: flex; align-items: center; }
+    .navbar-brand img { display: block; width: auto; height: 46px; }
     .dropdown { position: relative; margin-left: auto; }
     .dropdown-toggle { display: block; padding: 20px; }
     .dropdown-menu { position: absolute; top: 48px; right: 0; display: block; width: 250px; margin: 0; padding: 0; list-style: none; background: #fff; }
@@ -51,7 +52,7 @@
 </head>
 <body>
   <header class="navbar">
-    <div class="brand">SC&nbsp;&nbsp;SquareCoil</div>
+    <div class="navbar-branding"><a class="navbar-brand"><img src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="US Sign & Mill"></a></div>
     <div class="dropdown">
       <a class="dropdown-toggle">Help Center</a>
       <ul class="dropdown-menu list-group dropdown-persist w250">
@@ -156,7 +157,7 @@
     window.GM_registerMenuCommand = () => {};
 
     const themeScript = theme === "light"
-      ? "./US-Sign-Full-UI-Light-Theme-v1.0.0.user.js"
+      ? "./US-Sign-Full-UI-Light-Theme-v1.0.1.user.js"
       : "./US-Sign-Full-UI-Theme-v2.3.3.user.js";
 
     fetch(themeScript)

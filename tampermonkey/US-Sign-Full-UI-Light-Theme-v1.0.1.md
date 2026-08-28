@@ -1,4 +1,4 @@
-# SquareCoil Refined Light v1.0.0
+# SquareCoil Refined Light v1.0.1
 
 This standalone Tampermonkey skin provides a bright, low-glare alternative to the dark glass skin. It changes presentation only: it does not clock time, submit forms, edit jobs, or write SquareCoil business data.
 
@@ -21,10 +21,11 @@ Neutral surfaces use cool white, pale blue-gray, and dark slate text. Schedule-e
 - General inputs, tables, panels, and button states
 - FullCalendar day cells, events, progress strips, today, and other-month states
 - CKEditor toolbar, controls, iframe canvas, caret, and legacy inline text colors
+- Current US Sign & Mill header logo, embedded in the skin for reliable loading and placed on a dark contrast plate
 - Narrow-window overflow, reduced-motion, forced-color, and print behavior
 
 ## Use
 
-Install `US-Sign-Full-UI-Light-Theme-v1.0.0.user.js` in Tampermonkey and keep only one standalone SquareCoil skin enabled. The light script wins if both v1.0.0 light and v2.3.3 dark are accidentally enabled, but using one avoids duplicate CSS and network work.
+Install `US-Sign-Full-UI-Light-Theme-v1.0.1.user.js` in Tampermonkey and keep only one standalone SquareCoil skin enabled. The light script wins if both v1.0.1 light and v2.3.3 dark are accidentally enabled, but using one avoids duplicate CSS and network work.
 
 The Companion extension can later expose these as mutually exclusive options in Skin Settings: **System**, **Refined Light**, and **Dark Glass**.
