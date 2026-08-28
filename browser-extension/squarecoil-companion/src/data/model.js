@@ -362,7 +362,7 @@ function validateMigrationMetadata(migration) {
     throw new Error('migration-recovery-candidates-invalid');
   }
 
-  const markerKeys = [
+  const requiredMarkerKeys = [
     'completedAtMs',
     'completionState',
     'markerId',
@@ -371,12 +371,15 @@ function validateMigrationMetadata(migration) {
     'sourceIdentity',
     'sourceSchema'
   ];
+  const optionalMarkerKeys = ['activitySourceChecksum', 'authoritySourceChecksums'];
   const allowedSourceKeys = new Set(Object.values(LEGACY_SOURCE_KEYS));
   for (const [sourceId, marker] of Object.entries(migration.completedSources)) {
     if (sourceId !== V07_MIGRATION_MARKER_ID || !isRecord(marker)) {
       throw new Error('migration-completed-source-unsupported:' + sourceId);
     }
-    if (JSON.stringify(Object.keys(marker).sort()) !== JSON.stringify(markerKeys)) {
+    const actualMarkerKeys = Object.keys(marker);
+    if (requiredMarkerKeys.some(key => !actualMarkerKeys.includes(key)) ||
+        actualMarkerKeys.some(key => !requiredMarkerKeys.includes(key) && !optionalMarkerKeys.includes(key))) {
       throw new Error('migration-marker-fields-invalid:' + sourceId);
     }
     if (marker.markerId !== sourceId ||
@@ -397,6 +400,19 @@ function validateMigrationMetadata(migration) {
     const checksumMatch = /^fnv1a32:[0-9a-f]{8}:(\d+)$/.exec(String(marker.sourceChecksum || ''));
     if (!checksumMatch || !Number.isSafeInteger(Number(checksumMatch[1]))) {
       throw new Error('migration-source-checksum-invalid:' + sourceId);
+    }
+    if (marker.authoritySourceChecksums !== undefined) {
+      const checksums = marker.authoritySourceChecksums;
+      const authorityKeys = [LEGACY_SOURCE_KEYS.CURRENT, LEGACY_SOURCE_KEYS.ARCHIVE].sort();
+      if (!isRecord(checksums) ||
+          JSON.stringify(Object.keys(checksums).sort()) !== JSON.stringify(authorityKeys) ||
+          Object.values(checksums).some(value => !/^fnv1a32:[0-9a-f]{8}:\d+$/.test(String(value)))) {
+        throw new Error('migration-authority-source-checksums-invalid:' + sourceId);
+      }
+    }
+    if (marker.activitySourceChecksum !== undefined &&
+        !/^fnv1a32:[0-9a-f]{8}:\d+$/.test(String(marker.activitySourceChecksum))) {
+      throw new Error('migration-activity-source-checksum-invalid:' + sourceId);
     }
   }
 

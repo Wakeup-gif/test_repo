@@ -349,6 +349,27 @@ function createAuthorityClient(options = {}) {
     return task;
   }
 
+  function migrationCommand(commandEnvelope) {
+    if (!isPlainObject(commandEnvelope)) return Promise.reject(new Error('authority-command-invalid'));
+    if (disposed || teardownRequested) return Promise.reject(new Error('authority-client-disposed'));
+    const task = (async () => {
+      await ensure();
+      const response = requirePositive(await request(AUTHORITY_MESSAGES.COMMAND, {
+        sessionId,
+        directOwner: true,
+        command: { ...commandEnvelope, originRuntimeId: runtimeInstanceId }
+      }), 'command');
+      acceptConnection(response);
+      return response.result;
+    })();
+    commandPromises.add(task);
+    task.then(
+      () => commandPromises.delete(task),
+      () => commandPromises.delete(task)
+    );
+    return task;
+  }
+
   function subscribe(listener) {
     if (typeof listener !== 'function') throw new Error('authority-update-listener-invalid');
     updateListeners.add(listener);
@@ -423,6 +444,7 @@ function createAuthorityClient(options = {}) {
     ensure,
     read,
     command,
+    migrationCommand,
     subscribe,
     heartbeat,
     teardown,

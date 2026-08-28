@@ -149,6 +149,14 @@ function bridgeFactory(holder, initialEvents = []) {
 
 const emptyLegacyStorage = { getItem() { return null; } };
 
+async function waitFor(predicate, message) {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    if (predicate()) return;
+    await new Promise(resolve => setTimeout(resolve, 0));
+  }
+  assert.fail(message);
+}
+
 test('IT-B2-BRIDGE-TIMER-001 Bridge events cross the owner fence into one Timer/Ledger truth and synchronized read models', async () => {
   const fixture = createFixture();
   const ownerClient = fixture.client(301, 'runtime-trusted-owner-0001');
@@ -220,27 +228,117 @@ test('IT-B2-BRIDGE-TIMER-001 Bridge events cross the owner fence into one Timer/
   await ownerClient.teardown();
 });
 
-test('IT-B2-BRIDGE-TIMER-002 legacy presence blocks Bridge and Timer writes without reading values into the handoff', async () => {
+test('IT-B2-BRIDGE-TIMER-002 MIG-C01 production OWNER performs one migration before creating the Bridge', async () => {
   const fixture = createFixture();
   const client = fixture.client(401, 'runtime-legacy-blocked-001');
   let bridgeCreated = false;
   const core = createTrustedTransitionCore({
     authorityClient: client,
     legacyStorage: {
-      getItem(key) { return key === LEGACY_KEYS[0] ? '{"synthetic":"sensitive"}' : null; }
+      getItem(key) { return key === LEGACY_KEYS[0] ? '{"contexts":{}}' : null; }
     },
     now: () => fixture.clock.value,
     randomId: ids('legacy-core-command'),
-    createBridge() { bridgeCreated = true; throw new Error('blocked-core-must-not-create-bridge'); }
+    createBridge: bridgeFactory({})
   });
 
   const result = await core.ensure();
-  assert.equal(result.blocked, true);
-  assert.equal(result.status, 'legacy-migration-required');
-  assert.equal(bridgeCreated, false);
-  assert.equal(fixture.area.read().document.revision, 0);
+  bridgeCreated = result.bridge !== null;
+  assert.equal(result.blocked, false, JSON.stringify(result));
+  assert.equal(result.preflight.disposition, 'COMPLETE_MATCH');
+  assert.equal(bridgeCreated, true);
+  assert.equal(fixture.area.read().document.migration.completedSources['squarecoil-v07-localstorage-v1'].completionState, 'COMPLETE');
+  assert.equal(fixture.area.read().document.revision, 1);
   assert.equal(JSON.stringify(result).includes('synthetic'), false);
 
   await core.teardown();
   await client.teardown();
+});
+
+test('IT-B2-BRIDGE-TIMER-003 MIG-C02 waiting OBSERVER adopts completed migration without reload or duplicate import', async () => {
+  const fixture = createFixture();
+  const ownerClient = fixture.client(501, 'runtime-migration-owner-001');
+  const observerClient = fixture.client(502, 'runtime-migration-observer-01');
+  const legacyStorage = { getItem(key) { return key === LEGACY_KEYS[0] ? '{"contexts":{}}' : null; } };
+  await ownerClient.ensure();
+
+  let observerMigrationCommands = 0;
+  const observerAuthority = { ...observerClient, migrationCommand: (...args) => {
+    observerMigrationCommands += 1;
+    return observerClient.migrationCommand(...args);
+  } };
+  const observerBridge = {};
+  const observerCore = createTrustedTransitionCore({
+    authorityClient: observerAuthority,
+    legacyStorage,
+    now: () => fixture.clock.value,
+    randomId: ids('migration-observer-command'),
+    createBridge: bridgeFactory(observerBridge)
+  });
+  assert.equal((await observerCore.ensure()).preflight.disposition, 'REQUIRED');
+  assert.equal(observerCore.snapshot().bridge, null);
+
+  let ownerMigrationCommands = 0;
+  const ownerAuthority = { ...ownerClient, migrationCommand: (...args) => {
+    ownerMigrationCommands += 1;
+    return ownerClient.migrationCommand(...args);
+  } };
+  const ownerCore = createTrustedTransitionCore({
+    authorityClient: ownerAuthority,
+    legacyStorage,
+    now: () => fixture.clock.value,
+    randomId: ids('migration-owner-command'),
+    createBridge: bridgeFactory({})
+  });
+  await ownerCore.ensure();
+  await waitFor(() => observerCore.snapshot().bridge !== null,
+    'waiting observer did not adopt completed migration');
+
+  assert.equal(ownerMigrationCommands, 1);
+  assert.equal(observerMigrationCommands, 0);
+  assert.equal(observerCore.snapshot().preflight.disposition, 'COMPLETE_MATCH');
+  assert.equal(observerCore.snapshot().blocked, false);
+  assert.equal(fixture.area.read().document.revision, 1);
+  assert.equal(Object.keys(fixture.area.read().document.migration.completedSources).length, 1);
+
+  await observerCore.teardown();
+  await ownerCore.teardown();
+  await observerClient.teardown();
+  await ownerClient.teardown();
+});
+
+test('IT-B2-BRIDGE-TIMER-004 MIG-C02 waiting OBSERVER migrates after fenced ownership transfer', async () => {
+  const fixture = createFixture();
+  const firstOwner = fixture.client(601, 'runtime-migration-first-owner');
+  const waitingClient = fixture.client(602, 'runtime-migration-waiting-001');
+  const legacyStorage = { getItem(key) { return key === LEGACY_KEYS[0] ? '{"contexts":{}}' : null; } };
+  await firstOwner.ensure();
+
+  let migrationCommands = 0;
+  const waitingAuthority = { ...waitingClient, migrationCommand: (...args) => {
+    migrationCommands += 1;
+    return waitingClient.migrationCommand(...args);
+  } };
+  const waitingCore = createTrustedTransitionCore({
+    authorityClient: waitingAuthority,
+    legacyStorage,
+    now: () => fixture.clock.value,
+    randomId: ids('migration-takeover-command'),
+    createBridge: bridgeFactory({})
+  });
+  assert.equal((await waitingCore.ensure()).preflight.disposition, 'REQUIRED');
+  await firstOwner.teardown();
+  fixture.clock.value += 60_001;
+  await waitingClient.heartbeat();
+  await waitingCore.handleAuthoritySnapshot(waitingClient.snapshot());
+
+  assert.equal(waitingCore.snapshot().authorityOwner, true);
+  assert.equal(waitingCore.snapshot().preflight.disposition, 'COMPLETE_MATCH');
+  assert.equal(waitingCore.snapshot().blocked, false);
+  assert.notEqual(waitingCore.snapshot().bridge, null);
+  assert.equal(migrationCommands, 1);
+  assert.equal(fixture.area.read().document.revision, 1);
+
+  await waitingCore.teardown();
+  await waitingClient.teardown();
 });

@@ -7,6 +7,8 @@ const {
   validateAuthorityRequest
 } = require('./authority-protocol');
 const {
+  COMMAND_ACCESS,
+  commandAccess,
   isPublicTimerCommandType,
   isOwnerOnlyTimerCommandType
 } = require('../data/command-dispatcher');
@@ -317,7 +319,8 @@ function createAuthorityRouter(options = {}) {
     if (hasPrivateAuthorityKey(message.command)) {
       return fail(message, 'authority-private-command-field-rejected');
     }
-    if (!isPublicTimerCommandType(message.command.type)) {
+    const directOwner = commandAccess(message.command.type) === COMMAND_ACCESS.DIRECT_OWNER;
+    if (!isPublicTimerCommandType(message.command.type) && !(directOwner && message.directOwner === true)) {
       return fail(message, 'authority-command-not-public');
     }
     if (
@@ -326,7 +329,7 @@ function createAuthorityRouter(options = {}) {
     ) {
       return fail(message, 'authority-command-origin-runtime-mismatch');
     }
-    if (isOwnerOnlyTimerCommandType(message.command.type) && session.disposition !== 'OWNER') {
+    if ((isOwnerOnlyTimerCommandType(message.command.type) || directOwner) && session.disposition !== 'OWNER') {
       return fail(message, 'authority-command-owner-required');
     }
     const authenticatedCommand = {
