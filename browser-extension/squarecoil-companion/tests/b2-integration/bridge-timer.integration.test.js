@@ -5,8 +5,10 @@ const assert = require('node:assert/strict');
 const { createDefaultAuthorityKernel, AUTHORITY_STORAGE_KEY } = require('../../src/extension/authority-kernel');
 const { createAuthorityRouter } = require('../../src/extension/authority-router');
 const { createAuthorityClient } = require('../../src/extension/authority-client');
+const { createAuthorityUpdateTransport } = require('../../src/extension/authority-update-transport');
 const { AUTHORITY_MESSAGES, AUTHORITY_PROTOCOL_VERSION } = require('../../src/extension/authority-protocol');
 const { createTrustedTransitionCore } = require('../../src/content/trusted-transition-core');
+const { createSquareCoilBridgeService } = require('../../src/squarecoil/bridge-service');
 const { LEGACY_KEYS } = require('../../src/data/legacy-preflight');
 
 class FakeTimers {
@@ -26,7 +28,22 @@ function ids(namespace) {
   return prefix => `${namespace}-${prefix}-${String(++sequence).padStart(6, '0')}`;
 }
 
-function createFixture() {
+function runtimeMessageSurface() {
+  const listeners = new Set();
+  return {
+    addListener(listener) { listeners.add(listener); },
+    removeListener(listener) { listeners.delete(listener); },
+    async deliver(message) {
+      let acknowledgment;
+      for (const listener of listeners) {
+        listener(message, {}, value => { acknowledgment = value; });
+      }
+      return acknowledgment;
+    }
+  };
+}
+
+function createFixture(options = {}) {
   const values = {};
   const area = {
     async get(key) { return { [key]: values[key] === undefined ? undefined : structuredClone(values[key]) }; },
@@ -48,17 +65,28 @@ function createFixture() {
     runtimeWorkdayZone: 'UTC',
     now: () => clock.value,
     makeId: ids('kernel-core'),
-    leaseDurationMs: 60_000,
+    leaseDurationMs: options.leaseDurationMs ?? 60_000,
     buildVersion: '0.8.0-b2.2'
   });
   const clients = [];
+  const runtimes = new Map();
+  const deliveries = [];
+  const acknowledgedTransport = createAuthorityUpdateTransport({ tabs: {
+    async sendMessage(tabId, message, target) {
+      deliveries.push({ tabId, documentId: target?.documentId || null, message });
+      const runtime = runtimes.get(`${tabId}\u0000${target?.documentId || ''}`);
+      if (!runtime) throw new Error('integration-runtime-unavailable');
+      return runtime.deliver(message);
+    }
+  } });
   const router = createAuthorityRouter({
     adapter: kernel,
     workerInstanceId: 'worker-trusted-core-001',
     randomId: ids('router-core'),
-    publish: async update => {
+    now: () => clock.value,
+    publish: options.acknowledgedUpdates ? acknowledgedTransport.publish : async update => {
       for (const client of clients) {
-        client.handleWorkerUpdate({
+        client.value.handleWorkerUpdate({
           type: AUTHORITY_MESSAGES.UPDATE,
           protocolVersion: AUTHORITY_PROTOCOL_VERSION,
           ...update
@@ -69,28 +97,31 @@ function createFixture() {
   });
   function client(tabId, runtimeInstanceId) {
     const documentToken = `document-trusted-core-${tabId}`;
+    const expectedDocumentId = `browser-document-${tabId}`;
     const context = {
       tabId,
-      expectedDocumentId: `browser-document-${tabId}`,
+      expectedDocumentId,
       documentToken,
       buildId: 'build-trusted-core-integration',
       packageVersion: '0.8.0-b2.2',
       candidateFingerprint: 'd'.repeat(64)
     };
+    const runtime = runtimeMessageSurface();
     const value = createAuthorityClient({
       send: message => router.route(context, message),
       runtimeInstanceId,
       documentToken,
-      runtimeOnMessage: null,
+      runtimeOnMessage: options.acknowledgedUpdates ? runtime : null,
       requestTimeoutMs: 2_000,
       heartbeatIntervalMs: 30_000,
       randomId: ids(`client-core-${tabId}`),
       timers: new FakeTimers()
     });
-    clients.push(value);
+    clients.push({ value, context, runtime });
+    runtimes.set(`${tabId}\u0000${expectedDocumentId}`, runtime);
     return value;
   }
-  return { area, clock, client, router };
+  return { area, clock, client, deliveries, router };
 }
 
 function contextEvent(type, bridgeSeq, context, atMs, priorContextId = null) {
@@ -145,6 +176,86 @@ function bridgeFactory(holder, initialEvents = []) {
     holder.value = bridge;
     return bridge;
   };
+}
+
+function nativeBridgeEnvironment(clock, state) {
+  function element(innerHTML = '', textContent = '') {
+    return { innerHTML, textContent, hidden: false, style: { display: '', visibility: '' },
+      getAttribute() { return null; } };
+  }
+  const listeners = new Map();
+  const document = {
+    visibilityState: 'visible',
+    documentElement: {},
+    querySelectorAll(selector) {
+      if (!state.clockedOut && selector === '#clockin-remaining-time') {
+        return [element('<a href="/project.php?id=260801">260801 - Production</a>',
+          '260801 - Production')];
+      }
+      if (state.clockedOut && selector === '#clockin') return [element()];
+      if (!state.clockedOut && selector === '#clockout') return [element()];
+      if (selector === '.timeclock-container') return [element()];
+      return [];
+    },
+    addEventListener(type, listener) { listeners.set(`document:${type}`, listener); },
+    removeEventListener(type) { listeners.delete(`document:${type}`); }
+  };
+  class MutationObserver {
+    observe() {}
+    disconnect() {}
+  }
+  const window = {
+    location: { origin: 'https://ussignandmill.squarecoil.net' },
+    URL,
+    AbortController,
+    MutationObserver,
+    Element: class {},
+    addEventListener(type, listener) { listeners.set(`window:${type}`, listener); },
+    removeEventListener(type) { listeners.delete(`window:${type}`); }
+  };
+  return {
+    document,
+    window,
+    timers: new FakeTimers(),
+    now: () => clock.value,
+    fetch: async () => {
+      state.fetches += 1;
+      return { ok: true, text: async () => state.clockedOut
+        ? '<span id="clockin-remaining-time"></span>'
+        : '<span id="clockin-remaining-time"><a href="/project.php?id=260801">260801 - Production</a></span>' };
+    }
+  };
+}
+
+function nativeBridgeFactory(holder) {
+  return options => {
+    const service = createSquareCoilBridgeService(options);
+    holder.value = service;
+    holder.completions = 0;
+    return Object.freeze({
+      ensure: values => service.ensure(values),
+      setOwner: value => service.setOwner(value),
+      verifyNow: trigger => service.verifyNow(trigger),
+      async observeNativeCompletion(evidence) {
+        holder.completions += 1;
+        const result = await service.observeNativeCompletion(evidence);
+        holder.lastCompletion = result;
+        return result;
+      },
+      teardown: () => service.teardown(),
+      snapshot: () => service.snapshot()
+    });
+  };
+}
+
+function countingAuthority(client, holder) {
+  return Object.freeze({
+    ...client,
+    command(command) {
+      holder.commands.push(command);
+      return client.command(command);
+    }
+  });
 }
 
 const emptyLegacyStorage = { getItem() { return null; } };
@@ -250,6 +361,103 @@ test('IT-B2-BRIDGE-TIMER-005 observer fallback hint prompts OWNER verification w
   await observerClient.teardown();
   await ownerCore.teardown();
   await ownerClient.teardown();
+});
+
+test('IT-B2-BRIDGE-TIMER-006 takeover routes one acknowledged native clock-out through only the current OWNER', async () => {
+  const fixture = createFixture({ leaseDurationMs: 100, acknowledgedUpdates: true });
+  fixture.router.setNativeObservationAvailable(true);
+  const runtimeA = 'runtime-native-expired-owner-a';
+  const runtimeB = 'runtime-native-current-owner-b';
+  const clientA = fixture.client(701, runtimeA);
+  const clientB = fixture.client(702, runtimeB);
+  const commandsA = { commands: [] };
+  const commandsB = { commands: [] };
+  const bridgeA = {};
+  const bridgeB = {};
+  const page = { clockedOut: false, fetches: 0 };
+  const coreA = createTrustedTransitionCore({
+    authorityClient: countingAuthority(clientA, commandsA),
+    legacyStorage: emptyLegacyStorage,
+    now: () => fixture.clock.value,
+    randomId: ids('native-takeover-a'),
+    bridgeEnvironment: nativeBridgeEnvironment(fixture.clock, page),
+    createBridge: nativeBridgeFactory(bridgeA)
+  });
+  const coreB = createTrustedTransitionCore({
+    authorityClient: countingAuthority(clientB, commandsB),
+    legacyStorage: emptyLegacyStorage,
+    now: () => fixture.clock.value,
+    randomId: ids('native-takeover-b'),
+    bridgeEnvironment: nativeBridgeEnvironment(fixture.clock, page),
+    createBridge: nativeBridgeFactory(bridgeB)
+  });
+
+  await coreA.ensure();
+  await coreB.ensure();
+  assert.equal(coreA.snapshot().authorityOwner, true);
+  assert.equal(coreB.snapshot().authorityOwner, false);
+  assert.equal(fixture.area.read().document.timer.active.contextId, 'job:260801');
+
+  fixture.clock.value = 1_101;
+  await clientB.heartbeat();
+  await clientA.heartbeat();
+  await coreA.handleAuthoritySnapshot(clientA.snapshot());
+  await coreB.handleAuthoritySnapshot(clientB.snapshot());
+  assert.equal(coreA.snapshot().authorityOwner, false);
+  assert.equal(coreB.snapshot().authorityOwner, true);
+  assert.equal(fixture.router.snapshot().currentOwnerSessionId,
+    fixture.router.snapshot().sessions.find(session => session.runtimeInstanceId === runtimeB).sessionId);
+
+  const beforeNative = fixture.area.read().document;
+  const commandsABeforeNative = commandsA.commands.length;
+  const commandsBBeforeNative = commandsB.commands.length;
+  const fetchesBeforeNative = page.fetches;
+  const completionAtMs = 1_110;
+  page.clockedOut = true;
+  fixture.clock.value = 1_120;
+  const first = await fixture.router.observeNativeCompletion({
+    tabId: 701,
+    documentId: 'browser-document-701',
+    requestId: 'request-takeover-action-two-001',
+    nativeAction: 2,
+    completedAtMs: completionAtMs
+  });
+  const duplicate = await fixture.router.observeNativeCompletion({
+    tabId: 701,
+    documentId: 'browser-document-701',
+    requestId: 'request-takeover-action-two-001',
+    nativeAction: 2,
+    completedAtMs: completionAtMs
+  });
+  assert.deepEqual(first, { accepted: true, changed: true, reason: 'native-observation-forwarded' });
+  assert.deepEqual(duplicate, { accepted: true, changed: false, reason: 'native-observation-coalesced' });
+  await waitFor(() => fixture.area.read().document.timer.active === null,
+    'current OWNER did not commit the native-confirmed clock-out');
+
+  const afterNative = fixture.area.read().document;
+  const nativeDeliveries = fixture.deliveries.filter(delivery => delivery.message.event?.nativeEvidence);
+  assert.equal(nativeDeliveries.length, 1);
+  assert.equal(nativeDeliveries[0].tabId, 702);
+  assert.equal(nativeDeliveries[0].message.runtimeInstanceId, runtimeB);
+  assert.equal(nativeDeliveries.some(delivery => delivery.tabId === 701), false);
+  assert.equal(bridgeA.completions, 0);
+  assert.equal(bridgeB.completions, 1);
+  assert.equal(bridgeB.lastCompletion.accepted, true);
+  assert.equal(bridgeB.lastCompletion.needsVerification, true);
+  assert.equal(page.fetches, fetchesBeforeNative + 1);
+  assert.equal(commandsA.commands.length, commandsABeforeNative);
+  assert.equal(commandsB.commands.length, commandsBBeforeNative + 1);
+  assert.equal(afterNative.revision, beforeNative.revision + 1);
+  assert.equal(afterNative.timer.lastObservation.type, 'CLOCKED_OUT');
+  assert.equal(afterNative.timer.lastObservation.boundaryAtMs, completionAtMs);
+  assert.equal(afterNative.timer.lastObservation.boundaryCertainty, 'NATIVE_CONFIRMED');
+  assert.equal(afterNative.ledger.length, 1);
+  assert.equal(afterNative.ledger[0].endAtMs, completionAtMs);
+
+  await coreB.teardown();
+  await coreA.teardown();
+  await clientB.teardown();
+  await clientA.teardown();
 });
 
 test('IT-B2-BRIDGE-TIMER-002 MIG-C01 production OWNER performs one migration before creating the Bridge', async () => {

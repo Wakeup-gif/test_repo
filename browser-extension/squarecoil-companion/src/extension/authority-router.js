@@ -89,12 +89,14 @@ function hasPrivateAuthorityKey(value, seen = new WeakSet()) {
 
 function createAuthorityRouter(options = {}) {
   const randomId = options.randomId || defaultRandomId;
+  const now = options.now || (() => Date.now());
   const publish = typeof options.publish === 'function' ? options.publish : async () => false;
   const workerInstanceId = String(options.workerInstanceId || randomId('worker'));
   const sessions = new Map();
   const sessionByRuntime = new Map();
   const operationQueues = new Map();
   const forwardedCompletionKeys = new Map();
+  let authoritativeOwner = null;
   let nativeObservationAvailable = false;
   let adapter = validAdapter(options.adapter) ? options.adapter : null;
   let initializePromise = null;
@@ -170,6 +172,51 @@ function createAuthorityRouter(options = {}) {
 
   function setNativeObservationAvailable(value) { nativeObservationAvailable = value === true; }
 
+  function coordinationMarker(value) {
+    const epoch = Number.isSafeInteger(value?.coordinationEpoch)
+      ? value.coordinationEpoch
+      : Number.isSafeInteger(value?.epoch) ? value.epoch : -1;
+    const revision = Number.isSafeInteger(value?.coordinationRevision)
+      ? value.coordinationRevision
+      : -1;
+    return { epoch, revision };
+  }
+
+  function compareCoordination(left, right) {
+    if (left.epoch !== right.epoch) return left.epoch - right.epoch;
+    return left.revision - right.revision;
+  }
+
+  function reconcileAuthoritativeOwner(session) {
+    if (session.disposition !== 'OWNER') {
+      if (authoritativeOwner?.sessionId === session.sessionId) authoritativeOwner = null;
+      return;
+    }
+    const marker = coordinationMarker(session.connection);
+    if (authoritativeOwner && authoritativeOwner.sessionId !== session.sessionId &&
+        compareCoordination(marker, authoritativeOwner) < 0) {
+      session.disposition = 'OBSERVER_CONNECTED';
+      session.connection = { ...session.connection, disposition: session.disposition };
+      return;
+    }
+    authoritativeOwner = { sessionId: session.sessionId, ...marker };
+    for (const other of sessions.values()) {
+      if (other.sessionId === session.sessionId || other.disposition !== 'OWNER') continue;
+      other.disposition = 'OBSERVER_CONNECTED';
+      other.connection = { ...other.connection, disposition: other.disposition };
+    }
+  }
+
+  function currentSubscribedOwner() {
+    if (!authoritativeOwner) return null;
+    const subscribedOwners = [...sessions.values()].filter(session =>
+      session.disposition === 'OWNER' && session.unsubscribe);
+    if (subscribedOwners.length !== 1) return null;
+    return subscribedOwners[0].sessionId === authoritativeOwner.sessionId
+      ? subscribedOwners[0]
+      : null;
+  }
+
   function getSession(context, message) {
     const session = sessions.get(String(message.sessionId || ''));
     if (!session) return null;
@@ -227,6 +274,7 @@ function createAuthorityRouter(options = {}) {
     };
     sessions.set(session.sessionId, session);
     sessionByRuntime.set(key, session.sessionId);
+    reconcileAuthoritativeOwner(session);
     return response(message, publicConnection(session));
   }
 
@@ -373,6 +421,7 @@ function createAuthorityRouter(options = {}) {
     if (result && typeof result === 'object') {
       session.connection = { ...session.connection, ...result, disposition };
     }
+    reconcileAuthoritativeOwner(session);
     return response(message, publicConnection(session));
   }
 
@@ -382,13 +431,17 @@ function createAuthorityRouter(options = {}) {
       evidence.sourceRuntimeId === session.identity.runtimeInstanceId &&
       evidence.documentToken === session.identity.documentToken;
     if (isHint) {
-      const owner = [...sessions.values()].find(item => item.disposition === 'OWNER' && item.unsubscribe);
+      const owner = currentSubscribedOwner();
       if (!owner) return fail(message, 'authority-native-evidence-owner-unavailable', { retryable: true });
       owner.sequence += 1;
-      await publish({ tabId: owner.identity.tabId, expectedDocumentId: owner.identity.expectedDocumentId,
+      const delivered = await publish({ tabId: owner.identity.tabId,
+        expectedDocumentId: owner.identity.expectedDocumentId,
         documentToken: owner.identity.documentToken, runtimeInstanceId: owner.identity.runtimeInstanceId,
         sessionId: owner.sessionId, workerInstanceId, sequence: owner.sequence,
         event: { verificationHint: { kind: 'PASSIVE_ACTIVITY_HINT' } } });
+      if (!delivered) {
+        return fail(message, 'authority-native-evidence-delivery-failed', { retryable: true });
+      }
       return response(message, publicConnection(session, { result: { forwarded: true, verificationOnly: true } }));
     }
     return fail(message, 'authority-native-evidence-rejected');
@@ -396,11 +449,12 @@ function createAuthorityRouter(options = {}) {
 
   async function observeNativeCompletion(observation) {
     if (!nativeObservationAvailable) return { accepted: false, reason: 'native-observation-unavailable' };
-    const source = [...sessions.values()].find(session =>
+    const sources = [...sessions.values()].filter(session =>
       session.identity.tabId === observation?.tabId &&
       session.identity.expectedDocumentId === String(observation?.documentId || '') &&
       session.unsubscribe);
-    const nowMs = Date.now();
+    const source = sources.length === 1 ? sources[0] : null;
+    const nowMs = now();
     if (!source || !NATIVE_ACTIONS.has(Number(observation.nativeAction)) ||
         !Number.isSafeInteger(observation.completedAtMs) || observation.completedAtMs > nowMs + 1_000 ||
         nowMs - observation.completedAtMs > MAX_NATIVE_EVIDENCE_AGE_MS) {
@@ -418,7 +472,7 @@ function createAuthorityRouter(options = {}) {
     };
     const duplicate = forwardedCompletionKeys.has(evidence.completionKey);
     if (duplicate) return { accepted: true, changed: false, reason: 'native-observation-coalesced' };
-    const owner = [...sessions.values()].find(item => item.disposition === 'OWNER' && item.unsubscribe);
+    const owner = currentSubscribedOwner();
     if (!owner) return { accepted: false, reason: 'native-observation-owner-unavailable' };
     owner.sequence += 1;
     const delivered = await publish({ tabId: owner.identity.tabId, expectedDocumentId: owner.identity.expectedDocumentId,
@@ -439,6 +493,7 @@ function createAuthorityRouter(options = {}) {
       await adapter.disconnect(session.adapterSession);
       sessions.delete(session.sessionId);
       sessionByRuntime.delete(runtimeKey(session.identity));
+      if (authoritativeOwner?.sessionId === session.sessionId) authoritativeOwner = null;
       return response(message, { disconnected: true, sessionId: session.sessionId });
     } catch (error) {
       return fail(message, 'authority-disconnect-failed', {
@@ -500,6 +555,7 @@ function createAuthorityRouter(options = {}) {
     return {
       available: isAvailable(),
       workerInstanceId,
+      currentOwnerSessionId: authoritativeOwner?.sessionId || null,
       sessionCount: sessions.size,
       sessions: [...sessions.values()].map(session => ({
         sessionId: session.sessionId,

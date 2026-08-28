@@ -4,6 +4,7 @@ const {
   AUTHORITY_PROTOCOL_VERSION,
   AUTHORITY_MESSAGES,
   KERNEL_ONLY_DISPOSITION,
+  createAuthorityUpdateAcknowledgment,
   isConcreteId,
   isPlainObject
 } = require('./authority-protocol');
@@ -121,8 +122,16 @@ function createAuthorityClient(options = {}) {
     return true;
   }
 
+  function handleRuntimeUpdate(message, _sender, sendResponse) {
+    if (!handleWorkerUpdate(message)) return false;
+    if (typeof sendResponse === 'function') {
+      sendResponse(createAuthorityUpdateAcknowledgment(message));
+    }
+    return false;
+  }
+
   if (runtimeOnMessage && typeof runtimeOnMessage.addListener === 'function') {
-    runtimeOnMessage.addListener(handleWorkerUpdate);
+    runtimeOnMessage.addListener(handleRuntimeUpdate);
   }
 
   function request(type, values = {}, requestOptions = {}) {
@@ -396,7 +405,7 @@ function createAuthorityClient(options = {}) {
     disposed = true;
     stopHeartbeat();
     if (runtimeOnMessage && typeof runtimeOnMessage.removeListener === 'function') {
-      runtimeOnMessage.removeListener(handleWorkerUpdate);
+      runtimeOnMessage.removeListener(handleRuntimeUpdate);
     }
     updateListeners.clear();
   }
@@ -465,7 +474,8 @@ function createAuthorityClient(options = {}) {
     teardown,
     dispose,
     snapshot,
-    handleWorkerUpdate
+    handleWorkerUpdate,
+    handleRuntimeUpdate
   });
 }
 

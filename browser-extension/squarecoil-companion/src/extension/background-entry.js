@@ -17,6 +17,7 @@ const {
 const { createAuthorityRouter } = require('./authority-router');
 const { createDefaultAuthorityKernel } = require('./authority-kernel');
 const { createNativeCompletionObserver } = require('./native-completion-observer');
+const { createAuthorityUpdateTransport } = require('./authority-update-transport');
 
 const BOOT_MESSAGE = 'SC_COMPANION_BOOT';
 const HEALTH_MESSAGE = 'SC_COMPANION_GET_HEALTH';
@@ -28,27 +29,9 @@ const EXPECTED_B1_DEGRADED_REASON = 'coordination-not-implemented-b1';
 const PACKAGE_VERSION = String(chrome.runtime.getManifest().version || '0.0.0');
 const tabOperationQueues = new Map();
 
-async function publishAuthorityUpdate(update) {
-  if (!chrome.tabs || typeof chrome.tabs.sendMessage !== 'function') return false;
-  const options = update.expectedDocumentId
-    ? { documentId: update.expectedDocumentId }
-    : { frameId: 0 };
-  try {
-    await chrome.tabs.sendMessage(update.tabId, {
-      type: AUTHORITY_MESSAGES.UPDATE,
-      protocolVersion: AUTHORITY_PROTOCOL_VERSION,
-      documentToken: update.documentToken,
-      runtimeInstanceId: update.runtimeInstanceId,
-      sessionId: update.sessionId,
-      workerInstanceId: update.workerInstanceId,
-      sequence: update.sequence,
-      event: update.event
-    }, options);
-    return true;
-  } catch (_) {
-    return false;
-  }
-}
+const authorityUpdateTransport = createAuthorityUpdateTransport({ tabs: chrome.tabs });
+
+function publishAuthorityUpdate(update) { return authorityUpdateTransport.publish(update); }
 
 async function prepareIsolatedAuthorityTeardown(request, runtimeInstanceId) {
   if (!chrome.tabs || typeof chrome.tabs.sendMessage !== 'function') {

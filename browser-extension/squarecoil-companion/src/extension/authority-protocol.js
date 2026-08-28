@@ -19,6 +19,8 @@ const AUTHORITY_CONTROL_MESSAGES = Object.freeze({
   PREPARE_DISABLE: `${AUTHORITY_MESSAGE_PREFIX}PREPARE_DISABLE`
 });
 
+const AUTHORITY_UPDATE_ACK = `${AUTHORITY_MESSAGE_PREFIX}UPDATE_ACK`;
+
 const REQUEST_TYPES = new Set([
   AUTHORITY_MESSAGES.CONNECT,
   AUTHORITY_MESSAGES.READ,
@@ -45,6 +47,27 @@ function isPlainObject(value) {
 
 function isAuthorityMessageType(value) {
   return REQUEST_TYPES.has(value);
+}
+
+function createAuthorityUpdateAcknowledgment(message) {
+  return Object.freeze({
+    ok: true,
+    type: AUTHORITY_UPDATE_ACK,
+    protocolVersion: AUTHORITY_PROTOCOL_VERSION,
+    sessionId: message.sessionId,
+    workerInstanceId: message.workerInstanceId,
+    sequence: message.sequence
+  });
+}
+
+function isAuthorityUpdateAcknowledgment(value, message) {
+  if (!isPlainObject(value) || !isPlainObject(message)) return false;
+  const expected = createAuthorityUpdateAcknowledgment(message);
+  const keys = Object.keys(value).sort();
+  const expectedKeys = Object.keys(expected).sort();
+  return keys.length === expectedKeys.length &&
+    keys.every((key, index) => key === expectedKeys[index]) &&
+    expectedKeys.every(key => value[key] === expected[key]);
 }
 
 function validateAuthorityRequest(message) {
@@ -92,9 +115,12 @@ module.exports = {
   AUTHORITY_PROTOCOL_VERSION,
   AUTHORITY_MESSAGES,
   AUTHORITY_CONTROL_MESSAGES,
+  AUTHORITY_UPDATE_ACK,
   KERNEL_ONLY_DISPOSITION,
   isConcreteId,
   isPlainObject,
   isAuthorityMessageType,
+  createAuthorityUpdateAcknowledgment,
+  isAuthorityUpdateAcknowledgment,
   validateAuthorityRequest
 };

@@ -95,7 +95,10 @@ function createSquareCoilBridgeService(options = {}) {
     if (!Number.isSafeInteger(value) || value < 0) throw new Error('bridge-timing-invalid');
   }
 
-  let engineState = createBridgeEngineState(options.engineOptions);
+  let engineState = createBridgeEngineState({
+    ...(options.engineOptions || {}),
+    observationStreamId: sourceRuntimeId
+  });
   let initialized = false;
   let owner = false;
   let disposed = false;

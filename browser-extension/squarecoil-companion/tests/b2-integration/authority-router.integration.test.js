@@ -254,6 +254,78 @@ test('IT-B2-PLATFORM-026 webRequest completion uses stable identity, coalesces, 
   assert.equal(published.length, 1);
 });
 
+test('IT-B2-PLATFORM-027 lease takeover reconciles cached OWNER and routes native evidence only to the current owner', async () => {
+  const values = {};
+  const storageArea = {
+    async get(key) { return { [key]: values[key] === undefined ? undefined : structuredClone(values[key]) }; },
+    async set(patch) { Object.assign(values, structuredClone(patch)); }
+  };
+  let lockQueue = Promise.resolve();
+  const lockManager = {
+    request(_name, _options, callback) {
+      const run = lockQueue.then(callback, callback);
+      lockQueue = run.then(() => undefined, () => undefined);
+      return run;
+    }
+  };
+  let nowMs = 1_000;
+  let idSequence = 0;
+  const kernel = createAuthoritativeKernel({
+    adapter: createChromeAuthorityAdapter({ area: storageArea, key: 'takeover-authority', lockManager }),
+    now: () => nowMs,
+    makeId: prefix => `${prefix}-${++idSequence}`,
+    leaseDurationMs: 100,
+    workdayZone: 'UTC',
+    workdayZoneDisposition: { source: 'CONFIGURED', fallback: false, diagnostic: null },
+    applyCommand: async () => ({ applied: true })
+  });
+  const published = [];
+  const router = createAuthorityRouter({ adapter: kernel, workerInstanceId: 'worker-takeover-native',
+    randomId: createIdFactory('takeover-native'),
+    publish: async update => { published.push(update); return true; } });
+  router.setNativeObservationAvailable(true);
+  const runtimeA = 'runtime-takeover-owner-a';
+  const runtimeB = 'runtime-takeover-owner-b';
+  const contextA = context(101, 'document-takeover-owner-a');
+  const contextB = context(102, 'document-takeover-owner-b');
+  const connectionA = await router.route(contextA, request(AUTHORITY_MESSAGES.CONNECT, runtimeA));
+  const connectionB = await router.route(contextB, request(AUTHORITY_MESSAGES.CONNECT, runtimeB));
+  await router.route(contextA, request(AUTHORITY_MESSAGES.SUBSCRIBE, runtimeA,
+    { sessionId: connectionA.sessionId }));
+  await router.route(contextB, request(AUTHORITY_MESSAGES.SUBSCRIBE, runtimeB,
+    { sessionId: connectionB.sessionId }));
+
+  nowMs = 1_101;
+  const takeover = await router.route(contextB, request(AUTHORITY_MESSAGES.HEARTBEAT, runtimeB,
+    { sessionId: connectionB.sessionId }));
+  assert.equal(takeover.disposition, 'OWNER');
+  const afterTakeover = router.snapshot();
+  assert.equal(afterTakeover.currentOwnerSessionId, connectionB.sessionId);
+  assert.deepEqual(afterTakeover.sessions.map(session => [session.runtimeInstanceId, session.disposition]), [
+    [runtimeA, 'OBSERVER_CONNECTED'],
+    [runtimeB, 'OWNER']
+  ]);
+  published.length = 0;
+
+  const completion = { requestId: 'request-after-owner-takeover', tabId: contextA.tabId,
+    documentId: contextA.expectedDocumentId, nativeAction: 2, completedAtMs: Date.now() };
+  assert.equal((await router.observeNativeCompletion(completion)).changed, true);
+  assert.equal((await router.observeNativeCompletion(completion)).changed, false);
+  const hint = await router.route(contextA, request(AUTHORITY_MESSAGES.FORWARD_NATIVE_EVIDENCE, runtimeA, {
+    sessionId: connectionA.sessionId,
+    evidence: { kind: 'PASSIVE_ACTIVITY_HINT', sourceRuntimeId: runtimeA,
+      documentToken: contextA.documentToken }
+  }));
+
+  assert.equal(hint.ok, true);
+  assert.equal(hint.result.verificationOnly, true);
+  assert.equal(published.length, 2);
+  assert.ok(published.every(update => update.runtimeInstanceId === runtimeB));
+  assert.equal(published.filter(update => update.event.nativeEvidence).length, 1);
+  assert.equal(published.filter(update => update.event.verificationHint).length, 1);
+  assert.equal(published.some(update => update.runtimeInstanceId === runtimeA), false);
+});
+
 test('IT-B2-PLATFORM-006 teardown retains exact authority ownership until a failed disconnect succeeds', async () => {
   const adapter = createKernelAdapter();
   const router = createAuthorityRouter({
