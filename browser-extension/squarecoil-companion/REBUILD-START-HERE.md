@@ -18,7 +18,7 @@ If chat context is lost or implementation direction becomes unclear, start here 
 
 **Logic status:** L0-L8 settled + post-mine L5A tab/focus delta settled
 
-**Implementation status:** B1 through B6, B5-D, and the prior Glass/theme recovery batch remain accepted; the authorized UI/theme/lab/Figma stabilization candidate is pending exact aggregate, sealed-lab, visual, and installed Chrome/Edge acceptance
+**Implementation status:** B1 through B6, B5-D, the prior Glass/theme recovery batch, and the bounded UI/theme/lab/Figma stabilization are accepted; the latest exact implementation source is `4a9368bf4edde8cb10a7a53fcf16512e86b1b623`
 
 **Workspace UI:** canonical B3 Main/Recent/Overview/By Day/By Context/Context Detail/History implementation present
 
@@ -26,7 +26,7 @@ If chat context is lost or implementation direction becomes unclear, start here 
 
 **Logic delta authority:** `logic/L5A-TAB-PARITY-FOCUS-DELTA.md`
 
-**Next canonical build action:** finish the exact UI/theme/lab/Figma stabilization candidate, run clean-plus-upgrade installed Chrome/Edge acceptance on unchanged bytes, record evidence, and push the existing branch; optional live Bing permission remains supplemental and publication/promotion remain separately gated
+**Next canonical build action:** no implementation gate is open in this bounded batch; optional live Bing permission and target-file Figma comparison remain supplemental, while publication/promotion remain separately gated
 
 The user explicitly authorized sequential B3 through B6 work on this existing branch. That authorization does not promote the branch to production, authorize a release/store upload, or authorize new live SquareCoil mutations.
 

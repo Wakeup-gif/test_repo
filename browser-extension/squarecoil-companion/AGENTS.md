@@ -6,7 +6,7 @@ This file scopes only `browser-extension/squarecoil-companion/`.
 
 B2-C, B3, B4, B5-A, B5-B, B5-C, B5-D, and B6 are accepted on `codex/squarecoil-b2c-migration`. The prior Glass/theme and recovery stabilization remains accepted at exact implementation source `aabdebc87224211b8897a7e1ded7b94ddacdd19a`; its historical evidence remains SHA-bound in `implementation/B6-GLASS-STABILIZATION-EVIDENCE.md`.
 
-The current authorized batch is **UI/theme/lab/Figma stabilization**: a sealed fictional test website, coherent integrated Dark/Light Glass rendering, protruding horizontally scrollable and reorderable Context tabs, fail-closed drag-to-page Archive/Undo behavior, and a code-aligned Figma handoff. It is not accepted until the aggregate gate, deterministic lab/visual proof, and installed Chrome/Edge clean-plus-upgrade gates pass against the exact candidate bytes.
+The **UI/theme/lab/Figma stabilization** batch is accepted at exact implementation source `4a9368bf4edde8cb10a7a53fcf16512e86b1b623`: a sealed fictional test website, coherent integrated Dark/Light Glass rendering, protruding horizontally scrollable and reorderable Context tabs, fail-closed drag-to-page Archive/Undo behavior, and a code-aligned Figma handoff. The optional live Bing permission grant and comparison against an actual target Figma file remain supplemental/manual gates.
 
 Do not merge or promote to `main`, publish a release/store build, or add a new live SquareCoil mutation without separate exact approval.
 
