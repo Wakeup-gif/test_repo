@@ -1,6 +1,6 @@
 # Companion UI and Theme Integration
 
-**Status:** implementation under acceptance
+**Status:** exact clean candidate passed aggregate and installed Chrome/Edge acceptance; optional live Bing permission grant remains a manual supplemental check
 **Date:** 2026-08-28
 **Core boundary:** frozen; no Timer/Ledger writer, observation, settlement, migration, native clock, or SquareCoil business-action change.
 
@@ -82,7 +82,7 @@ The final dirty-development package completed the installed-browser matrix befor
 
 The 360 px viewport check measured the workspace at 336 px, from x=16 through x=352, with `scrollWidth === clientWidth === 336`. Keyboard traversal reached the Copy diagnostics control with a visible solid 3 px focus outline. The package archive remained byte-identical during the run and its extracted inventory matched the validated inventory.
 
-Durable pre-commit evidence is stored outside the repository at `C:/Users/iamva/Documents/SquareCoil Companion Acceptance/B5E-precommit-20260828`. It includes both browser screenshots, the JSON run record, package validation record, and the three visual baselines. The final clean-source evidence and install package are produced after commit so their embedded source SHA identifies the exact committed candidate.
+Durable pre-commit evidence is stored outside the repository at `C:/Users/iamva/Documents/SquareCoil Companion Acceptance/B5E-precommit-20260828`. It includes both browser screenshots, the JSON run record, package validation record, and the three visual baselines. Final clean-source evidence and the install package are recorded in `implementation/B6-GLASS-STABILIZATION-EVIDENCE.md`; their embedded source SHA identifies the exact committed candidate.
 
 ## Fidelity ledger
 

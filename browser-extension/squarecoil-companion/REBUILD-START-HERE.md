@@ -18,7 +18,7 @@ If chat context is lost or implementation direction becomes unclear, start here 
 
 **Logic status:** L0-L8 settled + post-mine L5A tab/focus delta settled
 
-**Implementation status:** B1 through B6 and B5-D accepted; the authorized Glass/theme and recovery stabilization batch is implemented in the current worktree and awaits an exact clean commit identity
+**Implementation status:** B1 through B6 and B5-D accepted; Glass/theme and recovery stabilization accepted at exact implementation source `aabdebc87224211b8897a7e1ded7b94ddacdd19a`, with optional live Bing permission proof still manual
 
 **Workspace UI:** canonical B3 Main/Recent/Overview/By Day/By Context/Context Detail/History implementation present
 
@@ -26,7 +26,7 @@ If chat context is lost or implementation direction becomes unclear, start here 
 
 **Logic delta authority:** `logic/L5A-TAB-PARITY-FOCUS-DELTA.md`
 
-**Next canonical build action:** finish exact-package Chrome/Edge acceptance for the stabilization commit, record evidence, and push the existing branch; publication and promotion remain separately gated
+**Next canonical build action:** manually confirm the optional Bing permission and rotating-image render on the exact ZIP before any store-submission decision; publication and promotion remain separately gated
 
 The user explicitly authorized sequential B3 through B6 work on this existing branch. That authorization does not promote the branch to production, authorize a release/store upload, or authorize new live SquareCoil mutations.
 

@@ -4,7 +4,7 @@ This file scopes only `browser-extension/squarecoil-companion/`.
 
 ## Current task
 
-B2-C, B3, B4, B5-A, B5-B, B5-C, B5-D, and B6 are accepted on `codex/squarecoil-b2c-migration`. The exact accepted B5-D implementation source is `4686ab0c92ce7e4b91a92bc64b479a2bd0ea01c0`; the separately authorized Glass/theme and recovery stabilization batch is implemented in the current worktree and awaits its exact clean commit identity.
+B2-C, B3, B4, B5-A, B5-B, B5-C, B5-D, and B6 are accepted on `codex/squarecoil-b2c-migration`. The exact accepted Glass/theme and recovery stabilization implementation source is `aabdebc87224211b8897a7e1ded7b94ddacdd19a`. Its aggregate gate and installed Chrome/Edge clean-plus-upgrade gates pass; the optional live Bing permission grant remains a manual supplemental check documented in `implementation/B6-GLASS-STABILIZATION-EVIDENCE.md`.
 
 Do not merge or promote to `main`, publish a release/store build, or add a new live SquareCoil mutation without separate exact approval.
 

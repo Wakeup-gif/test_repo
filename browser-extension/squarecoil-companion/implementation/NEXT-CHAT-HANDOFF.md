@@ -1,6 +1,6 @@
 # SquareCoil Companion Rebuild — Current Handoff
 
-Updated: 2026-08-28
+Updated: 2026-08-30
 Repository: `Wakeup-gif/test_repo`
 Branch: `codex/squarecoil-b2c-migration`
 
@@ -14,6 +14,7 @@ Branch: `codex/squarecoil-b2c-migration`
 - B5-C Probe-Backed Theme Delta: accepted at exact source `aeac7fe52a2e723106340bc6d283d2eb49521573`.
 - B6 Full Acceptance / Candidate Packaging: accepted against the same exact source.
 - B5-D Theme/UI Delta: accepted at exact implementation source `4686ab0c92ce7e4b91a92bc64b479a2bd0ea01c0`.
+- Glass/theme and recovery stabilization: aggregate and exact installed Chrome/Edge clean-plus-upgrade acceptance passed at implementation source `aabdebc87224211b8897a7e1ded7b94ddacdd19a`; the optional live Bing permission grant remains a manual supplemental check.
 
 No merge/promotion to `main`, release/store publication, or new live SquareCoil mutation is authorized.
 
@@ -21,7 +22,7 @@ No merge/promotion to `main`, release/store publication, or new live SquareCoil 
 
 The implementation preserves the accepted B1-B4 lifecycle, authority, Bridge, migration, Timer/Ledger, workspace, and data-safety gates. B5-A adds fenced Preferences, Settings, themes, and Support. B5-B adds the optional Cinematic and Design Dashboard packs, both off by default and without timing authority. B5-C adds only three probe-backed CSS adapter families. B6 reconciles that scope against one exact clean package. The separately authorized B5-D delta exposes zero-history navigation and completes the remaining route-bounded vendor/editor presentation adapters without timing authority.
 
-See `implementation/B5C-PROBE-THEME-EVIDENCE.md`, `implementation/B6-RELEASE-CANDIDATE-EVIDENCE.md`, `implementation/B5D-THEME-UI-EVIDENCE.md`, and `docs/FEATURE-LEDGER.md`.
+See `implementation/B5C-PROBE-THEME-EVIDENCE.md`, `implementation/B6-RELEASE-CANDIDATE-EVIDENCE.md`, `implementation/B5D-THEME-UI-EVIDENCE.md`, `implementation/B6-GLASS-STABILIZATION-EVIDENCE.md`, and `docs/FEATURE-LEDGER.md`.
 
 ## Accepted B5-A evidence
 
