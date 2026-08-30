@@ -6,15 +6,19 @@ const { OPTIONAL_PRESENTATION_FEATURES } = require('./optional-feature-registry'
 const CINEMATIC_STYLE_ID = 'squarecoil-companion-cinematic-style';
 const CINEMATIC_HOST_ID = 'squarecoil-companion-cinematic-host';
 const CINEMATIC_ATTRIBUTE = 'data-squarecoil-companion-cinematic';
-const REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const REFRESH_INTERVAL_MS = 30 * 60 * 1000;
 const IMAGE_TIMEOUT_MS = 12_000;
-const FALLBACK_IMAGE_DATA_URL = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900"%3E%3Cdefs%3E%3CradialGradient id="a" cx="22%25" cy="12%25" r="92%25"%3E%3Cstop stop-color="%232b5d78"/%3E%3Cstop offset=".48" stop-color="%23152331"/%3E%3Cstop offset="1" stop-color="%23090d12"/%3E%3C/radialGradient%3E%3C/defs%3E%3Crect width="1600" height="900" fill="url(%23a)"/%3E%3C/svg%3E';
 const CINEMATIC_CSS = `
-html[${CINEMATIC_ATTRIBUTE}="active"] body{background-color:transparent!important;background-image:none!important}
-#${CINEMATIC_HOST_ID}{position:fixed;inset:-4%;z-index:-2147483647;overflow:hidden;pointer-events:none;background:#090d12}
+html[${CINEMATIC_ATTRIBUTE}="active"]{min-height:100%;background:#090d12!important}
+html[${CINEMATIC_ATTRIBUTE}="active"] body{min-height:100%;isolation:isolate;background-color:transparent!important;background-image:none!important}
+#${CINEMATIC_HOST_ID}{position:fixed;inset:-4%;z-index:-1;overflow:hidden;pointer-events:none;background:#090d12}
+#${CINEMATIC_HOST_ID}[data-theme="SLEEK_DARK"]{background:radial-gradient(circle at 18% 10%,rgba(49,117,151,.92) 0,rgba(26,55,73,.76) 24%,transparent 47%),radial-gradient(circle at 82% 16%,rgba(76,56,123,.62) 0,transparent 38%),linear-gradient(145deg,#132531 0%,#0b141d 48%,#070b10 100%)}
+#${CINEMATIC_HOST_ID}[data-theme="LIGHT_GLASS"]{background:radial-gradient(circle at 18% 10%,rgba(255,255,255,.98) 0,rgba(223,239,248,.86) 30%,transparent 55%),radial-gradient(circle at 78% 18%,rgba(163,205,226,.58) 0,transparent 43%),linear-gradient(145deg,#d9e9f2 0%,#bfd4e0 52%,#91adbd 100%)}
 #${CINEMATIC_HOST_ID} .sc-cinematic-layer{position:absolute;inset:0;opacity:0;background-position:center;background-size:cover;background-repeat:no-repeat;transform:scale(1.08);transition:opacity 1200ms ease;will-change:transform,opacity}
 #${CINEMATIC_HOST_ID} .sc-cinematic-layer[data-active="true"]{opacity:1;animation:sc-companion-cinematic-drift 42s linear infinite alternate}
-#${CINEMATIC_HOST_ID}::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(3,8,12,.42),rgba(3,8,12,.68));pointer-events:none}
+#${CINEMATIC_HOST_ID}::after{content:"";position:absolute;inset:0;pointer-events:none}
+#${CINEMATIC_HOST_ID}[data-theme="SLEEK_DARK"]::after{background:linear-gradient(180deg,rgba(3,8,12,.30),rgba(3,8,12,.58))}
+#${CINEMATIC_HOST_ID}[data-theme="LIGHT_GLASS"]::after{background:linear-gradient(180deg,rgba(241,247,251,.16),rgba(225,236,243,.28))}
 @keyframes sc-companion-cinematic-drift{from{transform:translate3d(-1.2%,-.7%,0) scale(1.08)}to{transform:translate3d(1.2%,.7%,0) scale(1.13)}}
 #${CINEMATIC_HOST_ID}[data-reduced-motion="true"] .sc-cinematic-layer{transition:none!important;animation:none!important;transform:scale(1.08)!important}
 @media (prefers-reduced-motion:reduce){#${CINEMATIC_HOST_ID} .sc-cinematic-layer{transition:none!important;animation:none!important;transform:scale(1.08)!important}}
@@ -58,6 +62,7 @@ function createCinematicBackground(options = {}) {
   let reason = 'preference-none';
   let source = null;
   let currentImage = null;
+  let fallbackVisible = false;
   let activeLayer = 'a';
   let inFlight = null;
   let refreshTimer = null;
@@ -69,7 +74,7 @@ function createCinematicBackground(options = {}) {
       featureVersion: OPTIONAL_PRESENTATION_FEATURES.CINEMATIC_BACKGROUND.version,
       preference: preferences.cinematicBackground,
       state, reason, source,
-      imageDisplayed: Boolean(currentImage && document.getElementById?.(CINEMATIC_HOST_ID)),
+      imageDisplayed: Boolean((currentImage || fallbackVisible) && document.getElementById?.(CINEMATIC_HOST_ID)),
       reducedMotion: motionMedia?.matches === true,
       requestInFlight: Boolean(inFlight),
       nextRefreshAtMs,
@@ -96,7 +101,7 @@ function createCinematicBackground(options = {}) {
     clearTimer();
     for (const node of Array.from(document.querySelectorAll?.(`#${CINEMATIC_HOST_ID}, #${CINEMATIC_STYLE_ID}`) || [])) node.remove?.();
     document.documentElement?.removeAttribute?.(CINEMATIC_ATTRIBUTE);
-    if (!retainImage) { currentImage = null; source = null; activeLayer = 'a'; }
+    if (!retainImage) { currentImage = null; fallbackVisible = false; source = null; activeLayer = 'a'; }
   }
 
   function ensureOwned() {
@@ -129,6 +134,7 @@ function createCinematicBackground(options = {}) {
     }
     for (const duplicate of Array.from(document.querySelectorAll?.(`#${CINEMATIC_HOST_ID}`) || []).slice(1)) duplicate.remove?.();
     host.setAttribute?.('data-reduced-motion', motionMedia?.matches === true ? 'true' : 'false');
+    host.setAttribute?.('data-theme', basePresentation.websiteThemeEffective || 'SLEEK_DARK');
     document.documentElement?.setAttribute?.(CINEMATIC_ATTRIBUTE, 'active');
     return host;
   }
@@ -172,11 +178,29 @@ function createCinematicBackground(options = {}) {
     const incomingNode = host.querySelector?.(`[data-layer="${incoming}"]`);
     const outgoingNode = host.querySelector?.(`[data-layer="${activeLayer}"]`);
     if (!incomingNode || !outgoingNode) return false;
+    // The authoritative source composes the photograph with its light/dark
+    // overlays through this custom property. A direct background-image alone
+    // loses to that pinned !important declaration and makes the photo vanish.
+    incomingNode.style?.setProperty?.('--us-squarecoil-cine-image', cssUrl(dataUrl));
     incomingNode.style?.setProperty?.('background-image', cssUrl(dataUrl));
     incomingNode.setAttribute?.('data-active', 'true');
     outgoingNode.setAttribute?.('data-active', 'false');
     activeLayer = incoming;
     currentImage = dataUrl;
+    fallbackVisible = false;
+    return true;
+  }
+
+  function showFallback() {
+    const host = ensureOwned();
+    if (!host) return false;
+    for (const layer of Array.from(host.querySelectorAll?.('.sc-cinematic-layer') || [])) {
+      layer.setAttribute?.('data-active', 'false');
+      layer.style?.removeProperty?.('--us-squarecoil-cine-image');
+      layer.style?.removeProperty?.('background-image');
+    }
+    currentImage = null;
+    fallbackVisible = true;
     return true;
   }
 
@@ -198,15 +222,12 @@ function createCinematicBackground(options = {}) {
     publish(currentImage ? 'REFRESHING' : 'LOADING_INITIAL', trigger);
     inFlight = (async () => {
       let result;
-      try { result = await fetchWallpaper({ trigger, generation: requestGeneration }); }
+      try { result = await fetchWallpaper({ trigger, generation: requestGeneration,
+        websiteTheme: basePresentation.websiteThemeEffective }); }
       catch (error) { result = { ok: false, reason: String(error?.message || error) }; }
       if (disposed || requestGeneration !== generation || eligible()) return snapshot();
-      let candidate = result?.ok === true ? safeImageDataUrl(result.dataUrl) : null;
-      let candidateSource = result?.source || null;
-      if (!candidate && !currentImage) {
-        candidate = FALLBACK_IMAGE_DATA_URL;
-        candidateSource = 'FALLBACK';
-      }
+      const candidate = result?.ok === true ? safeImageDataUrl(result.dataUrl) : null;
+      const candidateSource = result?.source || null;
       if (candidate) {
         let ready = false;
         try { ready = await loadImage(candidate); } catch (_) { ready = false; }
@@ -214,13 +235,13 @@ function createCinematicBackground(options = {}) {
         if (ready && showImage(candidate)) {
           scheduleRefresh();
           if (candidateSource === 'CACHE') return publish('DEGRADED_CACHE', result?.reason || 'remote-failed-cache-used', 'CACHE');
-          if (candidateSource === 'FALLBACK') return publish('DEGRADED_FALLBACK', result?.reason || 'fallback-used', 'FALLBACK');
           if (candidateSource === 'CACHE_FRESH') return publish('SHOWING', result?.reason || 'fresh-cache-reused', 'CACHE_FRESH');
           return publish('SHOWING', 'valid-image-ready', 'REMOTE');
         }
       }
       scheduleRefresh();
       if (currentImage) return publish('SHOWING', 'candidate-rejected-current-retained', source);
+      if (showFallback()) return publish('DEGRADED_FALLBACK', result?.reason || 'fallback-used', 'FALLBACK');
       removeOwned({ retainImage: false });
       return publish('DEGRADED_NONE', result?.reason || 'no-safe-image', null);
     })().finally(() => { if (requestGeneration === generation) inFlight = null; });
@@ -239,10 +260,16 @@ function createCinematicBackground(options = {}) {
     if (!host) return publish('DEGRADED_NONE', 'owned-host-unavailable', null);
     if (currentImage) {
       const layer = host.querySelector?.(`[data-layer="${activeLayer}"]`);
+      layer?.style?.setProperty?.('--us-squarecoil-cine-image', cssUrl(currentImage));
       layer?.style?.setProperty?.('background-image', cssUrl(currentImage));
       layer?.setAttribute?.('data-active', 'true');
       scheduleRefresh();
       return publish(source === 'CACHE' ? 'DEGRADED_CACHE' : source === 'FALLBACK' ? 'DEGRADED_FALLBACK' : 'SHOWING', 'eligible-current-restored', source);
+    }
+    if (fallbackVisible) {
+      showFallback();
+      scheduleRefresh();
+      return publish('DEGRADED_FALLBACK', 'eligible-fallback-restored', 'FALLBACK');
     }
     if (document.hidden === true) return publish('LOADING_INITIAL', 'hidden-deferred', null);
     void refresh('initial');
@@ -299,4 +326,4 @@ function createCinematicBackground(options = {}) {
 }
 
 module.exports = { CINEMATIC_STYLE_ID, CINEMATIC_HOST_ID, CINEMATIC_ATTRIBUTE, REFRESH_INTERVAL_MS,
-  FALLBACK_IMAGE_DATA_URL, safeImageDataUrl, createCinematicBackground };
+  safeImageDataUrl, createCinematicBackground };

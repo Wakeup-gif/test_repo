@@ -13,7 +13,7 @@ This is one Manifest V3 codebase for installed Google Chrome and Microsoft Edge.
 - canonical Timer, Ledger, Today/Week/Context/History views, archives, backup/restore, and CSV tools;
 - revisioned Settings, Timer Limits, Light/Dark/Auto, Solid/Glass, and bounded website themes;
 - privacy-safe Support/Feedback and fail-closed unavailable Developer Support;
-- optional Cinematic and exact Design Dashboard presentation packs, both off by default.
+- Dark Glass and Light Glass each include the rotating Bing background and translucent treatment as one presentation choice; optional exact-origin Bing access is granted only from the toolbar popup, while the exact Design Dashboard profile remains independently off by default.
 
 The rebuild does not issue SquareCoil native clock mutations. Duplicate, stale-generation, retired-runtime, and superseded evidence fails closed.
 
@@ -40,12 +40,17 @@ The B6 candidate package contains exactly:
 - `dist/background.js`
 - `dist/build-info.json`
 - `dist/companion-app.js`
+- `dist/presentation-bootstrap.js`
 - `dist/content-controller.js`
 - `dist/popup.js`
+- `dist/themes/dark-glass.css`
+- `dist/themes/light-glass.css`
 - `popup/popup.html`
 - `popup/popup.css`
 
-`dist/build-info.json` binds the package to the source commit, clean/dirty state, build ID, stage, version, and candidate fingerprint. The fingerprint is embedded into all three runtime bundles.
+`dist/build-info.json` binds the package to the source commit, clean/dirty state, build ID, stage, version, and candidate fingerprint. The fingerprint is embedded into all four page/worker runtime bundles.
+
+Rotating Bing images use optional exact-origin access. Choose a Glass theme, then use **Allow rotating images** in the toolbar popup and accept the browser-owned prompt. If access is declined or unavailable, the same Glass theme remains active with its bundled readable gradient; no remote request is made. **Native / Off** removes the permission, cached wallpaper, and every Companion-owned presentation layer.
 
 ## Install the tested candidate
 

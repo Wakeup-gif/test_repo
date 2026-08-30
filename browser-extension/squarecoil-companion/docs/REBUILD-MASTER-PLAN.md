@@ -1,6 +1,6 @@
 # SquareCoil Companion Rebuild Master Plan
 
-Status: **B1 through B3 accepted; B4 active**
+Status: **structural authority; live implementation status is maintained in `REBUILD-START-HERE.md`**
 Planning branch: `planning/squarecoil-companion-rebuild`  
 Production baseline: `main` at `9378da24f393b40066816133e7fa0f48063115f0` (`v0.7.1 Chrome Interaction Recovery`)  
 Purpose: rebuild the Companion into a stable, modular, easy-to-update Chrome/Edge extension without losing established behavior, saved job history, or the UX improvements already developed.
@@ -873,6 +873,8 @@ Application code should remain packaged with the extension. GitHub is the build/
 
 The existing package-validation workflow is not sufficient as a runtime acceptance gate.
 
+Implementation flow, risk-based test selection, cross-stage impact reopening, failure/recovery pairing, and exact candidate advancement are governed by `docs/EXECUTION-ENFORCEMENT-PLAN.md`. The critical requirement-to-evidence ledger is `docs/EXECUTION-GATE-MATRIX.md`.
+
 The rebuilt pipeline should have four levels.
 
 ## Level 1: Static/package validation
@@ -1030,6 +1032,8 @@ Do not treat this filename tree as implementation law. The ownership map is the 
 ---
 
 # 27. Hardened Master Work List
+
+This is the original structural planning inventory, not the live completion ledger. Current stage status belongs in `REBUILD-START-HERE.md`; executable requirement/evidence status belongs in `docs/EXECUTION-GATE-MATRIX.md`.
 
 ## A. Product and UX
 

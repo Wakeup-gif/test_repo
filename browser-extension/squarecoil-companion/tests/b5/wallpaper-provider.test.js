@@ -19,7 +19,7 @@ test('UT-B5-CINE-013 provider policy sends only fixed public Bing parameters and
     return { ok: true, headers: { get(name) { return name === 'content-type' ? 'image/jpeg' : '4'; } },
       async arrayBuffer() { return Uint8Array.from([1, 2, 3, 4]).buffer; } };
   };
-  const provider = createWallpaperProvider({ permissions, storage, fetch });
+  const provider = createWallpaperProvider({ permissions, storage, fetch, markets: ['en-US'] });
   const result = await provider.getWallpaper();
   assert.equal(result.ok, true); assert.equal(result.source, 'REMOTE');
   assert.equal(requests[0], metadataUrl());
@@ -63,7 +63,7 @@ test('UT-B5-CINE-016 concurrent consumers share one provider retrieval', async (
     return { ok: true, headers: { get(name) { return name === 'content-type' ? 'image/jpeg' : '1'; } },
       async arrayBuffer() { return Uint8Array.from([1]).buffer; } };
   };
-  const provider = createWallpaperProvider({ permissions, storage, fetch });
+  const provider = createWallpaperProvider({ permissions, storage, fetch, markets: ['en-US'] });
   const first = provider.getWallpaper();
   const second = provider.getWallpaper();
   await metadataStarted;

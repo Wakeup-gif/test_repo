@@ -65,6 +65,7 @@ function safeTechnicalReason(value, fallback = 'none') {
 function createDiagnosticSnapshot(input = {}) {
   const browser = browserIdentity(input.userAgent);
   const presentation = input.presentation || {};
+  const cinematic = presentation.optional?.cinematic || {};
   const preferences = input.preferences || {};
   const rootCount = Number.isSafeInteger(input.rootCount) && input.rootCount >= 0 && input.rootCount <= 99 ? input.rootCount : 0;
   const capturedAtMs = Number.isSafeInteger(input.capturedAtMs) ? input.capturedAtMs : Date.now();
@@ -90,6 +91,9 @@ function createDiagnosticSnapshot(input = {}) {
     `Timer appearance: ${safeToken(preferences.timerAppearance)} / ${safeToken(presentation.timerAppearanceEffective)}`,
     `Panel finish: ${safeToken(preferences.panelFinish)} / ${safeToken(presentation.panelFinishEffective)}`,
     `Website theme: ${safeToken(preferences.websiteTheme)} / ${safeToken(presentation.websiteThemeEffective)}`,
+    `Cinematic: ${safeToken(preferences.cinematicBackground, 'NONE')} / ${safeToken(cinematic.state, 'DISABLED')} / ${safeToken(cinematic.source, 'none')}`,
+    `Cinematic reason: ${safeTechnicalReason(cinematic.reason, 'none')}`,
+    `Cinematic layers: ${Number.isSafeInteger(cinematic.ownedHostCount) ? cinematic.ownedHostCount : 0} host / ${Number.isSafeInteger(cinematic.ownedStyleCount) ? cinematic.ownedStyleCount : 0} style`,
     `Runtime roots: ${rootCount}`,
     `Captured: ${timestamp}`
   ];

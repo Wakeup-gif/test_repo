@@ -7,6 +7,7 @@ const ROOT_THEME_ATTRIBUTE = 'data-squarecoil-companion-site-theme';
 const ROOT_ROUTE_ATTRIBUTE = 'data-squarecoil-companion-site-route';
 const EDITOR_STYLE_ID = 'squarecoil-companion-ckeditor-document-theme';
 const EDITOR_FRAME_ATTRIBUTE = 'data-squarecoil-companion-editor-frame';
+const PRESENTATION_BOOTSTRAP_KEY = '__squareCoilCompanionPresentationBootstrap';
 const ROUTE_BY_PATH = Object.freeze({
   '/dashboard.php': 'DASHBOARD',
   '/project_milestones.php': 'PROJECT_MILESTONES',
@@ -87,8 +88,12 @@ html[${ROOT_THEME_ATTRIBUTE}="REFINED_LIGHT"] :focus-visible{outline:3px solid #
 const LIGHT_GLASS_CSS = `
 html[${ROOT_THEME_ATTRIBUTE}="LIGHT_GLASS"]{color-scheme:light;--sc-site-accent:#347fbd;--sc-site-text:#17212c;--sc-site-muted:#5d6975;--sc-site-border:rgba(63,88,111,.20);--sc-site-shell:rgba(248,251,254,.82);--sc-site-panel:rgba(255,255,255,.72);--sc-site-panel-2:rgba(239,245,250,.78)}
 html[${ROOT_THEME_ATTRIBUTE}="LIGHT_GLASS"] body{color:var(--sc-site-text);background-color:transparent!important;background-image:none!important}
+html[${ROOT_THEME_ATTRIBUTE}="LIGHT_GLASS"] :is(#main,#content_wrapper,#content){background-color:transparent!important;background-image:none!important}
+html[${ROOT_THEME_ATTRIBUTE}="LIGHT_GLASS"] #topbar{color:var(--sc-site-text)!important;background:rgba(248,251,254,.68)!important;border-color:var(--sc-site-border)!important;-webkit-backdrop-filter:blur(16px) saturate(118%);backdrop-filter:blur(16px) saturate(118%)}
 html[${ROOT_THEME_ATTRIBUTE}="LIGHT_GLASS"] :is(header.navbar,.navbar,#sidebar_left,.sidebar-left){color:var(--sc-site-text)!important;background:var(--sc-site-shell)!important;border-color:var(--sc-site-border)!important;-webkit-backdrop-filter:blur(16px) saturate(118%);backdrop-filter:blur(16px) saturate(118%)}
+html[${ROOT_THEME_ATTRIBUTE}="LIGHT_GLASS"] #sidebar_left :is(.sidebar-menu,.nano-content){background:transparent!important}
 html[${ROOT_THEME_ATTRIBUTE}="LIGHT_GLASS"] :is(.card,.panel,.well,.modal-content,.dropdown-menu,.tab-content){color:var(--sc-site-text);background:var(--sc-site-panel)!important;border-color:var(--sc-site-border)!important;box-shadow:0 12px 34px rgba(26,49,70,.12)}
+html[${ROOT_THEME_ATTRIBUTE}="LIGHT_GLASS"] :is(.card,.panel,.well,.modal-content){-webkit-backdrop-filter:blur(14px) saturate(112%);backdrop-filter:blur(14px) saturate(112%)}
 html[${ROOT_THEME_ATTRIBUTE}="LIGHT_GLASS"] :is(.panel .panel,.well .well,.modal-content .panel,.tab-content .panel){background:rgba(255,255,255,.50)!important;box-shadow:none!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
 html[${ROOT_THEME_ATTRIBUTE}="LIGHT_GLASS"] table{color:var(--sc-site-text);background:rgba(255,255,255,.58)!important}
 html[${ROOT_THEME_ATTRIBUTE}="LIGHT_GLASS"] :is(th,.table>thead>tr>th){color:#283949!important;background:rgba(229,238,246,.84)!important;border-color:var(--sc-site-border)!important}
@@ -117,12 +122,17 @@ html[${ROOT_THEME_ATTRIBUTE}="LIGHT_GLASS"] :focus-visible{outline:3px solid #2d
 const SLEEK_DARK_CSS = `
 html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"]{color-scheme:dark;--sc-site-accent:#61aef7;--sc-site-text:#eef5fb;--sc-site-muted:#a9b8c5;--sc-site-border:rgba(192,221,244,.13);--sc-site-shell:rgba(7,15,23,.62);--sc-site-panel:rgba(9,18,27,.57);--sc-site-panel-2:rgba(13,25,36,.74)}
 html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"] body{background-color:transparent!important;background-image:none!important;color:var(--sc-site-text)}
+html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"] :is(#main,#content_wrapper,#content){background-color:transparent!important;background-image:none!important}
+html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"] #topbar{color:var(--sc-site-text)!important;background:rgba(7,15,23,.55)!important;border-color:var(--sc-site-border)!important;-webkit-backdrop-filter:blur(16px) saturate(118%);backdrop-filter:blur(16px) saturate(118%)}
 html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"] header.navbar,
 html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"] .navbar{background:var(--sc-site-shell)!important;color:var(--sc-site-text);border-color:var(--sc-site-border);-webkit-backdrop-filter:blur(16px) saturate(118%);backdrop-filter:blur(16px) saturate(118%)}
+html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"] :is(#sidebar_left,.sidebar-left){color:var(--sc-site-text)!important;background:rgba(5,13,20,.82)!important;border-color:var(--sc-site-border)!important;-webkit-backdrop-filter:blur(18px) saturate(116%);backdrop-filter:blur(18px) saturate(116%)}
+html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"] #sidebar_left :is(.sidebar-menu,.nano-content){background:transparent!important}
 html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"] .card,
 html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"] .panel,
 html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"] .well,
 html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"] .modal-content{background:var(--sc-site-panel)!important;color:var(--sc-site-text);border-color:var(--sc-site-border);box-shadow:0 18px 46px rgba(0,0,0,.34)}
+html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"] :is(.card,.panel,.well,.modal-content){-webkit-backdrop-filter:blur(14px) saturate(112%);backdrop-filter:blur(14px) saturate(112%)}
 html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"] :is(.panel .panel,.well .well,.modal-content .panel,.tab-content .panel){background:rgba(8,17,25,.46)!important;box-shadow:none!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
 html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"] table{background-color:rgba(9,18,27,.66);color:var(--sc-site-text)}
 html[${ROOT_THEME_ATTRIBUTE}="SLEEK_DARK"] th{background-color:var(--sc-site-panel-2);color:#f1f5f8}
@@ -280,11 +290,11 @@ function createThemeService(options = {}) {
         if (!style) return false;
         style.id = EDITOR_STYLE_ID;
         style.setAttribute?.('data-squarecoil-companion-owned', 'ckeditor-document-theme');
-        const activeTheme = document.documentElement?.getAttribute?.(ROOT_THEME_ATTRIBUTE);
-        style.textContent = activeTheme === 'SLEEK_DARK' ? DARK_EDITOR_DOCUMENT_CSS : LIGHT_EDITOR_DOCUMENT_CSS;
         (editorDocument.head || editorDocument.documentElement).appendChild?.(style);
       }
       const activeTheme = document.documentElement?.getAttribute?.(ROOT_THEME_ATTRIBUTE);
+      style.textContent = activeTheme === 'SLEEK_DARK' ? DARK_EDITOR_DOCUMENT_CSS : LIGHT_EDITOR_DOCUMENT_CSS;
+      style.setAttribute?.('data-squarecoil-companion-editor-theme', activeTheme);
       frame.setAttribute?.(EDITOR_FRAME_ATTRIBUTE, activeTheme === 'SLEEK_DARK' ? 'dark' :
         activeTheme === 'LIGHT_GLASS' ? 'light-glass' : 'refined-light');
       return true;
@@ -376,8 +386,20 @@ function createThemeService(options = {}) {
     return 'configured-dark-logo';
   }
 
-  function removeOwnedTheme() {
+  function presentationBootstrap() {
+    return options.presentationBootstrap || globalThis[PRESENTATION_BOOTSTRAP_KEY] || null;
+  }
+
+  function removeOwnedTheme(options = {}) {
     removeOwnedEditorTheme();
+    const bootstrap = presentationBootstrap();
+    const bootstrapState = bootstrap?.snapshot?.() || null;
+    if (options.includeBootstrap === false && ['SLEEK_DARK', 'LIGHT_GLASS'].includes(bootstrapState?.activeTheme)) {
+      return;
+    }
+    if (options.includeBootstrap !== false) {
+      try { bootstrap?.removeTheme?.(options.reason || 'theme-service-remove'); } catch (_) {}
+    }
     const styles = Array.from(document.querySelectorAll?.(`#${STYLE_ID}`) || []);
     for (const style of styles) style.remove?.();
     document.documentElement?.removeAttribute?.(ROOT_THEME_ATTRIBUTE);
@@ -385,8 +407,25 @@ function createThemeService(options = {}) {
   }
 
   function applyOwnedTheme(websiteTheme) {
-    removeOwnedTheme();
-    if (websiteTheme === 'ORIGINAL') return { layerCount: 0, status: 'native' };
+    const bootstrap = presentationBootstrap();
+    if (websiteTheme === 'ORIGINAL') {
+      removeOwnedTheme({ reason: 'theme-original' });
+      return { layerCount: 0, status: 'native' };
+    }
+    if (['SLEEK_DARK', 'LIGHT_GLASS'].includes(websiteTheme) && bootstrap?.reconcile) {
+      const current = bootstrap.snapshot?.() || {};
+      if (current.activeTheme !== websiteTheme || current.stylePresent !== true) {
+        void Promise.resolve(bootstrap.reconcile(websiteTheme, 'theme-service')).then(() => scheduleEditorScans(), () => {});
+      } else {
+        bootstrap.syncRoute?.();
+      }
+      scheduleEditorScans();
+      return {
+        layerCount: current.activeTheme === websiteTheme && current.stylePresent === true ? 1 : 0,
+        status: current.activeTheme === websiteTheme && current.stylePresent === true ? 'applied-authoritative' : 'loading-authoritative'
+      };
+    }
+    removeOwnedTheme({ reason: 'theme-local-fallback' });
     const style = document.createElement?.('style');
     if (!style) return { layerCount: 0, status: 'style-element-unavailable' };
     style.id = STYLE_ID;
@@ -399,7 +438,7 @@ function createThemeService(options = {}) {
     scheduleEditorScans();
     const duplicateLayers = Array.from(document.querySelectorAll?.(`#${STYLE_ID}`) || []);
     for (const duplicate of duplicateLayers.slice(1)) duplicate.remove?.();
-    return { layerCount: Math.min(1, duplicateLayers.length || 1), status: 'applied' };
+    return { layerCount: Math.min(1, duplicateLayers.length || 1), status: 'applied-local-fallback' };
   }
 
   function glassSupported() {
@@ -496,7 +535,7 @@ function createThemeService(options = {}) {
     reducedTransparencyListening = false;
     document.removeEventListener?.('DOMContentLoaded', onDocumentReady);
     window.removeEventListener?.('pageshow', onDocumentReady);
-    removeOwnedTheme();
+    removeOwnedTheme({ includeBootstrap: false, reason: 'theme-service-teardown' });
     restoreLogo();
   }
 

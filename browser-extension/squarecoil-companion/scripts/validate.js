@@ -5,6 +5,7 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 const { BUILD_ID, BUILD_STAGE } = require('../src/core/build-identity');
 const { computeCandidateFingerprint } = require('./candidate-identity');
+const { PACKAGE_FILES, CANDIDATE_EMBEDDED_BUNDLES } = require('./package-inventory');
 
 const root = path.resolve(__dirname, '..');
 const manifest = JSON.parse(fs.readFileSync(path.join(root, 'manifest.json'), 'utf8'));
@@ -24,6 +25,10 @@ assert(BUILD_STAGE === 'B6', 'B6 release-candidate stage must remain explicit');
 assert(JSON.stringify(manifest.permissions || []) === JSON.stringify(['storage', 'scripting', 'webRequest']), 'B6 core permissions must preserve storage + scripting + passive webRequest observation only');
 assert(JSON.stringify(manifest.host_permissions || []) === JSON.stringify(['https://ussignandmill.squarecoil.net/*']), 'Rebuild host permission must remain limited to the exact SquareCoil tenant');
 assert(JSON.stringify(manifest.optional_host_permissions || []) === JSON.stringify(['https://www.bing.com/*']), 'B5-B may request only the exact optional Bing image origin');
+assert(JSON.stringify(manifest.web_accessible_resources || []) === JSON.stringify([{
+  resources: ['dist/themes/dark-glass.css', 'dist/themes/light-glass.css'],
+  matches: ['https://ussignandmill.squarecoil.net/*']
+}]), 'Authoritative theme resources must be limited to the two generated CSS ports on the exact SquareCoil tenant');
 assert(JSON.stringify(Object.keys(manifest.background || {}).sort()) === JSON.stringify(['service_worker']), 'B1 background policy must contain only the service worker entry');
 assert(manifest.background?.service_worker === 'dist/background.js', 'B1 manifest must use generated dist/background.js');
 assert(manifest.action?.default_popup === 'popup/popup.html', 'B1 popup path must be explicit');
@@ -40,21 +45,18 @@ assert(buildInfo.sourceSha === gitHead, `dist build-info source SHA ${buildInfo.
 const contentScripts = manifest.content_scripts || [];
 assert(contentScripts.length === 1, 'B1 expects exactly one content controller entry');
 assert(JSON.stringify(Object.keys(contentScripts[0]).sort()) === JSON.stringify(['all_frames', 'js', 'match_about_blank', 'matches', 'run_at']), 'B1 content controller policy contains unexpected fields');
-assert(JSON.stringify(contentScripts[0].js || []) === JSON.stringify(['dist/content-controller.js']), 'B1 content script must use dist/content-controller.js only');
+assert(JSON.stringify(contentScripts[0].js || []) === JSON.stringify(['dist/presentation-bootstrap.js', 'dist/content-controller.js']), 'B1 content entry must run the bounded presentation bootstrap before the authoritative content controller');
 assert((contentScripts[0].css || []).length === 0, 'B1 must not preload legacy website-theme CSS');
 assert(contentScripts[0].run_at === 'document_start', 'B1 content controller must start at document_start');
 assert(contentScripts[0].all_frames === false, 'B1 content controller must be top-frame only');
 assert(contentScripts[0].match_about_blank === false, 'B1 content controller must not enter about:blank frames');
 assert(JSON.stringify(contentScripts[0].matches || []) === JSON.stringify(['https://ussignandmill.squarecoil.net/*']), 'B1 content match must remain limited to the exact SquareCoil tenant');
 
+for (const file of PACKAGE_FILES) {
+  assert(fs.existsSync(path.join(root, ...file.split('/'))), `Missing canonical package file ${file}`);
+}
+
 const required = [
-  'dist/background.js',
-  'dist/companion-app.js',
-  'dist/content-controller.js',
-  'dist/popup.js',
-  'dist/build-info.json',
-  'popup/popup.html',
-  'popup/popup.css',
   'src/core/build-identity.js',
   'src/core/document-eligibility.js',
   'src/core/lifecycle.js',
@@ -74,7 +76,8 @@ const required = [
   'tests/b1-browser/README.md',
   'tests/b1-browser/run.js',
   'scripts/validate-package.js',
-  'scripts/candidate-identity.js'
+  'scripts/candidate-identity.js',
+  'scripts/package-inventory.js'
 ];
 
 const b2KernelRequired = [
@@ -194,11 +197,11 @@ for (const file of b5OptionalPresentationRequired) {
 
 const background = fs.readFileSync(path.join(root, 'dist/background.js'), 'utf8');
 assert(/["']dist\/companion-app\.js["']/.test(background), 'B1 background bundle must contain the local companion-app.js injection dependency');
-for (const name of ['background.js', 'companion-app.js', 'content-controller.js']) {
-  const source = fs.readFileSync(path.join(root, 'dist', name), 'utf8');
-  assert(source.includes(buildInfo.candidateFingerprint), `dist/${name} must embed the exact candidate fingerprint`);
+for (const relative of CANDIDATE_EMBEDDED_BUNDLES) {
+  const source = fs.readFileSync(path.join(root, ...relative.split('/')), 'utf8');
+  assert(source.includes(buildInfo.candidateFingerprint), `${relative} must embed the exact candidate fingerprint`);
 }
-const generatedBundles = ['background.js', 'companion-app.js', 'content-controller.js', 'popup.js']
+const generatedBundles = ['background.js', 'companion-app.js', 'presentation-bootstrap.js', 'content-controller.js', 'popup.js']
   .map(name => fs.readFileSync(path.join(root, 'dist', name), 'utf8'));
 for (const legacy of ['page/timer-runtime.js', 'page/timer-controls.js', 'page/timer-workspace.js', 'page/timer-surface.js']) {
   assert(generatedBundles.every(source => !source.includes(legacy)), `B1 generated code still references legacy module: ${legacy}`);

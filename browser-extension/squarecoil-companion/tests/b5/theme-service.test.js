@@ -319,3 +319,18 @@ test('UT-B5-THEME-019 Dark Glass keeps semantic colors SC lockup and single-row 
   assert.doesNotMatch(css, /https?:\/\/|@import|fonts\.googleapis/);
   h.service.teardown();
 });
+
+test('UT-B5-THEME-026 an existing CKEditor layer updates when authoritative Glass changes theme', () => {
+  const editor = editorFrame();
+  const h = harness({ pathname: '/project_designs.php', editorFrames: [editor.frame] });
+  h.service.apply(preferences({ websiteTheme: 'SLEEK_DARK' }));
+  const style = editor.head.children.find(child => child.id === EDITOR_STYLE_ID);
+  assert.match(style.textContent, /background:#0a1118/);
+  h.root.setAttribute(ROOT_THEME_ATTRIBUTE, 'LIGHT_GLASS');
+  editor.listeners.get('load')();
+  assert.equal(editor.head.children.filter(child => child.id === EDITOR_STYLE_ID).length, 1);
+  assert.match(style.textContent, /background:#f8fafc/);
+  assert.equal(style.getAttribute('data-squarecoil-companion-editor-theme'), 'LIGHT_GLASS');
+  assert.equal(editor.frame.getAttribute(EDITOR_FRAME_ATTRIBUTE), 'light-glass');
+  h.service.teardown();
+});

@@ -18,7 +18,7 @@ If chat context is lost or implementation direction becomes unclear, start here 
 
 **Logic status:** L0-L8 settled + post-mine L5A tab/focus delta settled
 
-**Implementation status:** B1 through B6 accepted; exact post-B5-C candidate source `aeac7fe52a2e723106340bc6d283d2eb49521573`
+**Implementation status:** B1 through B6 and B5-D accepted; the authorized Glass/theme and recovery stabilization batch is implemented in the current worktree and awaits an exact clean commit identity
 
 **Workspace UI:** canonical B3 Main/Recent/Overview/By Day/By Context/Context Detail/History implementation present
 
@@ -26,7 +26,7 @@ If chat context is lost or implementation direction becomes unclear, start here 
 
 **Logic delta authority:** `logic/L5A-TAB-PARITY-FOCUS-DELTA.md`
 
-**Next canonical build action:** none authorized; preserve the accepted candidate pending a separate promotion/publication decision
+**Next canonical build action:** finish exact-package Chrome/Edge acceptance for the stabilization commit, record evidence, and push the existing branch; publication and promotion remain separately gated
 
 The user explicitly authorized sequential B3 through B6 work on this existing branch. That authorization does not promote the branch to production, authorize a release/store upload, or authorize new live SquareCoil mutations.
 
@@ -39,6 +39,9 @@ The user explicitly authorized sequential B3 through B6 work on this existing br
 
 2. `docs/REBUILD-MASTER-PLAN.md`
    - Original structural architecture and ownership authority.
+
+   Then read `docs/EXECUTION-ENFORCEMENT-PLAN.md` and `docs/EXECUTION-GATE-MATRIX.md`.
+   - They define change-impact selection, stabilization/candidate lanes, stop/continue rules, failure/recovery pairing, and live requirement-to-evidence status.
 
 3. `docs/FEATURE-MINE-RECONCILIATION.md`
    - Current feature ledger after mining Timer v1.x, Companion v0.x, and historical Full UI/theme lineage.
@@ -182,7 +185,7 @@ Settlement remains acceptance-gated: all required automated checks, clean exact-
 
 ## Next action
 
-B5-C and B6 are complete. Preserve exact source `aeac7fe52a2e723106340bc6d283d2eb49521573`, its package/ZIP identities, and the B5-C/B6 evidence documents. No B5-D or later implementation, merge to `main`, production promotion, release/store publication, rollout, or new live mutation is authorized without a separate exact instruction.
+B5-D and B6 are complete, and the authorized Glass/theme and recovery stabilization batch is active on the existing branch. Preserve the historical SHA-bound B5-C/B5-D/B6 evidence, produce a new exact candidate without rewriting that history, run the required installed Chrome/Edge gates, commit the evidence, and push this branch. No merge to `main`, production promotion, release/store publication, rollout, or new live mutation is authorized without a separate exact instruction.
 
 ---
 

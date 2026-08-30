@@ -82,6 +82,35 @@ function legacyPreferencesFromSources(legacySources) {
   }
 }
 
+function capturedLegacyStorage(legacySources) {
+  return Object.freeze({
+    getItem(key) {
+      return Object.hasOwn(legacySources, key) ? legacySources[key] : null;
+    }
+  });
+}
+
+function captureV07LegacySources(storage) {
+  if (!storage || typeof storage.getItem !== 'function') throw new Error('legacy-local-storage-reader-required');
+  const captured = {};
+  for (const key of Object.values(LEGACY_SOURCE_KEYS)) {
+    const value = storage.getItem(key);
+    if (value !== null && value !== undefined) captured[key] = String(value);
+  }
+  return deepFreeze(captured);
+}
+
+function retainedLegacyPreferences(storage, document) {
+  const legacySources = captureV07LegacySources(storage);
+  const capturedPreflight = inspectLegacyMigration(capturedLegacyStorage(legacySources), document);
+  return Object.freeze({
+    preflight: capturedPreflight,
+    preferences: capturedPreflight.disposition === MIGRATION_DISPOSITIONS.COMPLETE_MATCH
+      ? legacyPreferencesFromSources(legacySources)
+      : null
+  });
+}
+
 function createTrustedTransitionCore(options = {}) {
   const authorityClient = options.authorityClient;
   const legacyStorage = options.legacyStorage;
@@ -110,6 +139,7 @@ function createTrustedTransitionCore(options = {}) {
   let prepareDisablePromise = null;
   let initializationPromise = null;
   let migrationInFlight = false;
+  let pendingLegacyPreferences = null;
   let lastStatus = 'not-initialized';
   let lastError = null;
   const stagedDataPlans = new Map();
@@ -296,44 +326,36 @@ function createTrustedTransitionCore(options = {}) {
       publishStatus('legacy-migration-in-progress');
       return snapshot();
     }
-    if (preflight && [
-      MIGRATION_DISPOSITIONS.SOURCE_CHANGED_AFTER_COMPLETION,
-      MIGRATION_DISPOSITIONS.UNAVAILABLE,
-      MIGRATION_DISPOSITIONS.FAILED
-    ].includes(preflight.disposition)) {
-      blocked = true;
-      publishStatus(preflight.reason);
-      return snapshot();
-    }
+    // Re-inspect on every explicit settlement. FAILED and UNAVAILABLE can be
+    // transient, and SOURCE_CHANGED may become COMPLETE_MATCH after the old
+    // runtime is stopped and the exact retained bytes are restored. The
+    // positive disposition allowlist below remains the only unblock path.
     preflight = inspectLegacyMigration(legacyStorage, authorityDocument);
     if (preflight.disposition === MIGRATION_DISPOSITIONS.REQUIRED && authorityOwner) {
       const legacySources = preflight.sources;
       const legacyPreferences = legacyPreferencesFromSources(legacySources);
+      if (legacyPreferences) pendingLegacyPreferences = legacyPreferences;
       migrationInFlight = true;
       publishStatus('legacy-migration-in-progress');
+      let migrationError = null;
       try {
         const envelope = commandEnvelope(AUTHORITY_COMMANDS.MIGRATE_V07, { legacySources });
         if (typeof authorityClient.migrationCommand !== 'function') {
           throw new Error('trusted-transition-migration-command-unavailable');
         }
         await authorityClient.migrationCommand(envelope);
-        await refreshDocument();
-        const preferenceSnapshot = normalizePreferenceSnapshot(authorityDocument?.dataSafety?.preferences);
-        if (legacyPreferences && !preferenceSnapshot.initialized) {
-          await commit(PREFERENCE_COMMANDS.INITIALIZE, {
-            legacyPreferences,
-            expectedPreferenceRevision: preferenceSnapshot.preferenceRevision
-          });
-        }
-        preflight = inspectLegacyMigration(legacyStorage, authorityDocument);
-        migrationInFlight = false;
       } catch (error) {
-        migrationInFlight = false;
+        migrationError = error;
+      }
+      try { await refreshDocument(); } catch (error) { migrationError = migrationError || error; }
+      preflight = inspectLegacyMigration(legacyStorage, authorityDocument);
+      migrationInFlight = false;
+      if (migrationError && preflight.disposition !== MIGRATION_DISPOSITIONS.COMPLETE_MATCH) {
         preflight = Object.freeze({ checked: false, blocked: true,
           reason: 'legacy-preflight-failed', disposition: MIGRATION_DISPOSITIONS.FAILED,
           presentKeys: preflight.presentKeys });
         blocked = true;
-        publishStatus(preflight.reason, error);
+        publishStatus(preflight.reason, migrationError);
         return snapshot();
       }
     }
@@ -341,6 +363,47 @@ function createTrustedTransitionCore(options = {}) {
     if (blocked) {
       publishStatus(preflight.reason);
       return snapshot();
+    }
+    const preferenceSnapshot = normalizePreferenceSnapshot(authorityDocument?.dataSafety?.preferences);
+    if (preferenceSnapshot.initialized) pendingLegacyPreferences = null;
+    if (!preferenceSnapshot.initialized && !pendingLegacyPreferences &&
+      preflight.disposition === MIGRATION_DISPOSITIONS.COMPLETE_MATCH) {
+      let retained;
+      try {
+        retained = retainedLegacyPreferences(legacyStorage, authorityDocument);
+      } catch (_) {
+        retained = { preflight: inspectLegacyMigration(legacyStorage, authorityDocument), preferences: null };
+      }
+      preflight = retained.preflight;
+      blocked = preflight.blocked;
+      if (blocked) {
+        publishStatus(preflight.reason);
+        return snapshot();
+      }
+      pendingLegacyPreferences = retained.preferences;
+    }
+    if (!preferenceSnapshot.initialized && pendingLegacyPreferences) {
+      // Confirm the retained authority-sensitive source still matches before
+      // deriving a second authoritative revision from its bounded settings.
+      // The source remains read-only throughout this recovery path.
+      preflight = inspectLegacyMigration(legacyStorage, authorityDocument);
+      blocked = preflight.blocked;
+      if (blocked) {
+        publishStatus(preflight.reason);
+        return snapshot();
+      }
+      try {
+        await commit(PREFERENCE_COMMANDS.INITIALIZE, {
+          legacyPreferences: pendingLegacyPreferences,
+          expectedPreferenceRevision: preferenceSnapshot.preferenceRevision
+        });
+        pendingLegacyPreferences = null;
+      } catch (error) {
+        // Timer/Ledger migration is already proven COMPLETE_MATCH. A settings
+        // initialization failure may retry later, but must not relabel the
+        // completed migration as FAILED or import it twice.
+        publishStatus('legacy-preferences-initialization-deferred', error);
+      }
     }
     if (!bridge) {
       // Recovery classification belongs to a fresh Bridge attachment (or an

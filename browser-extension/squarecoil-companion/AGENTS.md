@@ -4,9 +4,11 @@ This file scopes only `browser-extension/squarecoil-companion/`.
 
 ## Current task
 
-B2-C, B3, B4, B5-A, B5-B, B5-C, B5-D, and B6 are accepted on `codex/squarecoil-b2c-migration`. The exact B5-D implementation source is `4686ab0c92ce7e4b91a92bc64b479a2bd0ea01c0`.
+B2-C, B3, B4, B5-A, B5-B, B5-C, B5-D, and B6 are accepted on `codex/squarecoil-b2c-migration`. The exact accepted B5-D implementation source is `4686ab0c92ce7e4b91a92bc64b479a2bd0ea01c0`; the separately authorized Glass/theme and recovery stabilization batch is implemented in the current worktree and awaits its exact clean commit identity.
 
 Do not merge or promote to `main`, publish a release/store build, or add a new live SquareCoil mutation without separate exact approval.
+
+Before any implementation or stabilization batch, read `docs/EXECUTION-ENFORCEMENT-PLAN.md` and refresh the affected rows in `docs/EXECUTION-GATE-MATRIX.md`. Declare the change-impact tags and targeted gates before editing. Use targeted gates while debugging; run the aggregate and exact installed-browser candidate gates only after the impacted clusters are green. A normal in-scope test, harness, documentation, or packaging failure is diagnostic work rather than a new authorization boundary. Stop only for the explicit contradiction, safety, destructive-action, unrelated-work, or external-choice conditions in the execution plan.
 
 Before B3 changes, read:
 
@@ -137,4 +139,4 @@ Do not finish with unrelated changes.
 
 ## Stage boundary
 
-B6 and the separately authorized B5-D delta are complete. No later implementation, production promotion, publication/store submission, merge to `main`, rollout, or new live mutation is authorized. Preserve the accepted branch and wait for a separate exact instruction.
+B6 and B5-D are complete. The current authorization covers only the Glass/theme and recovery stabilization batch, its exact-package acceptance evidence, and pushing the existing branch. It does not authorize production promotion, publication/store submission, merge to `main`, rollout, or any new live mutation.

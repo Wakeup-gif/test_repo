@@ -9,7 +9,8 @@ const EXPLICIT_INPUTS = Object.freeze([
   'popup/popup.css',
   'popup/popup.html',
   'scripts/build.js',
-  'scripts/candidate-identity.js'
+  'scripts/candidate-identity.js',
+  'scripts/package-inventory.js'
 ]);
 
 function slash(value) {

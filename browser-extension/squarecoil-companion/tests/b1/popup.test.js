@@ -579,3 +579,46 @@ test('UT-B5-POPUP-002 raw READY without the exact healthy gate remains Limited',
   assert.equal(nodes.get('friendlyStatus').textContent, 'Limited');
   assert.equal(document.body.dataset.health, 'attention');
 });
+
+test('UT-B5-POPUP-003 popup requests exact Bing access from its trusted click and refreshes SquareCoil tabs', async () => {
+  const listeners = new Map(); const nodes = new Map();
+  for (const id of ['classification', 'lifecycle', 'reason', 'runtimeId', 'retryCleanup', 'startFresh', 'enabled', 'refresh',
+    'version', 'stage', 'friendlyStatus', 'friendlyMessage', 'statusIcon', 'enableWallpaper', 'wallpaperPermission']) {
+    nodes.set(id, { id, textContent: '', hidden: false, checked: true, disabled: false,
+      addEventListener(type, listener) { this[`on${type}`] = listener; } });
+  }
+  const permissionCard = { dataset: {} };
+  const document = {
+    body: { dataset: {} },
+    getElementById: id => nodes.get(id) || null,
+    querySelector: selector => selector === '.permission-card' ? permissionCard : null,
+    addEventListener: (type, listener) => listeners.set(type, listener)
+  };
+  let granted = false; const requests = []; const tabMessages = [];
+  const chrome = {
+    permissions: {
+      contains: async request => { requests.push({ type: 'contains', request }); return granted; },
+      request: async request => { requests.push({ type: 'request', request }); granted = true; return true; }
+    },
+    tabs: {
+      query: async () => [{ id: 7 }],
+      sendMessage: async (tabId, message) => {
+        tabMessages.push({ tabId, message });
+        return message.type === 'SC_COMPANION_GET_POPUP_SUMMARY' ? { ok: false } : { ok: true };
+      }
+    },
+    storage: { local: { get: async () => ({ timerEnabled: true }), set: async () => {} } },
+    runtime: { getManifest: () => ({ version: '0.7.1' }), sendMessage: async () => ({
+      ok: true, ready: true, classification: 'HEALTHY_SAME_BUILD', health: { state: 'READY', mode: 'ENABLED', reason: 'ready' }
+    }) }
+  };
+  const source = fs.readFileSync(path.resolve(__dirname, '../../src/popup/popup.js'), 'utf8');
+  vm.runInNewContext(source, { chrome, document, console }, { filename: 'src/popup/popup.js' });
+  await listeners.get('DOMContentLoaded')();
+  assert.equal(permissionCard.dataset.granted, 'false');
+  await nodes.get('enableWallpaper').onclick();
+  assert.equal(JSON.stringify(requests.find(item => item.type === 'request').request), JSON.stringify({ origins: ['https://www.bing.com/*'] }));
+  assert.equal(permissionCard.dataset.granted, 'true');
+  assert.match(nodes.get('wallpaperPermission').textContent, /Allowed for rotating Bing images/);
+  assert.equal(tabMessages.some(item => item.message.type === 'SC_COMPANION_B5B_PERMISSION_CHANGED'), true);
+});

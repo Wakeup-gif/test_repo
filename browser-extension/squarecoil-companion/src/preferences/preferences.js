@@ -21,6 +21,10 @@ const PREFERENCE_COMMANDS = Object.freeze({
 const PREFERENCE_COMMAND_TYPES = new Set(Object.values(PREFERENCE_COMMANDS));
 const VALUE_KEYS = Object.freeze(Object.keys(DEFAULT_PREFERENCES));
 
+function cinematicBackgroundForTheme(websiteTheme) {
+  return ['SLEEK_DARK', 'LIGHT_GLASS'].includes(websiteTheme) ? 'CINEMATIC' : 'NONE';
+}
+
 function enumValue(value, allowed, aliases = {}) {
   const key = String(value ?? '').trim().toUpperCase().replace(/[\s-]+/g, '_');
   const resolved = aliases[key] || key;
@@ -77,11 +81,15 @@ function normalizePreferenceSnapshot(raw, options = {}) {
   const fallback = isRecord(options.fallback) ? options.fallback : DEFAULT_PREFERENCES;
   const candidates = preferenceCandidates(source);
   const limits = validLimits(candidates) ? candidates : fallback;
+  const websiteTheme = candidates.websiteTheme || fallback.websiteTheme || DEFAULT_PREFERENCES.websiteTheme;
   const values = {
     timerAppearance: candidates.timerAppearance || fallback.timerAppearance || DEFAULT_PREFERENCES.timerAppearance,
     panelFinish: candidates.panelFinish || fallback.panelFinish || DEFAULT_PREFERENCES.panelFinish,
-    websiteTheme: candidates.websiteTheme || fallback.websiteTheme || DEFAULT_PREFERENCES.websiteTheme,
-    cinematicBackground: candidates.cinematicBackground || fallback.cinematicBackground || DEFAULT_PREFERENCES.cinematicBackground,
+    websiteTheme,
+    // Glass is one integrated presentation choice. Keep the compatibility
+    // field in the schema, but never let an older independent toggle split the
+    // translucent surfaces from their background again.
+    cinematicBackground: cinematicBackgroundForTheme(websiteTheme),
     dashboardProfile: candidates.dashboardProfile || fallback.dashboardProfile || DEFAULT_PREFERENCES.dashboardProfile,
     yellowMinutes: limits.yellowMinutes ?? DEFAULT_PREFERENCES.yellowMinutes,
     orangeMinutes: limits.orangeMinutes ?? DEFAULT_PREFERENCES.orangeMinutes,
@@ -134,13 +142,14 @@ function mergeLegacyPreferences(current, legacy) {
 }
 
 function preferenceStorage(snapshot, revision = snapshot.preferenceRevision) {
+  const cinematicBackground = cinematicBackgroundForTheme(snapshot.websiteTheme);
   return {
     preferencesSchemaVersion: PREFERENCE_SCHEMA_VERSION,
     preferenceRevision: revision,
     timerAppearance: snapshot.timerAppearance,
     panelFinish: snapshot.panelFinish,
     websiteTheme: snapshot.websiteTheme,
-    cinematicBackground: snapshot.cinematicBackground,
+    cinematicBackground,
     dashboardProfile: snapshot.dashboardProfile,
     yellowMinutes: snapshot.yellowMinutes,
     orangeMinutes: snapshot.orangeMinutes,
@@ -198,6 +207,7 @@ module.exports = {
   PREFERENCE_COMMAND_TYPES,
   VALUE_KEYS,
   validLimits,
+  cinematicBackgroundForTheme,
   preferenceCandidates,
   normalizePreferenceSnapshot,
   validatePreferencePatch,

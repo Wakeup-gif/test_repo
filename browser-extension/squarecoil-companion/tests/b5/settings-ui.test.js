@@ -46,7 +46,11 @@ async function harness({ confirms = [], clipboardAvailable = true, cinematicPerm
       core.timer.sourcePreferenceRevision = core.preferences.preferenceRevision;
       if (patch.timerAppearance) core.presentation.timerAppearanceEffective = patch.timerAppearance;
       if (patch.panelFinish) core.presentation.panelFinishEffective = patch.panelFinish;
-      if (patch.websiteTheme) core.presentation.websiteThemeEffective = patch.websiteTheme;
+      if (patch.websiteTheme) {
+        core.presentation.websiteThemeEffective = patch.websiteTheme;
+        core.preferences.cinematicBackground = ['SLEEK_DARK', 'LIGHT_GLASS'].includes(patch.websiteTheme) ? 'CINEMATIC' : 'NONE';
+        core.presentation.optional.cinematic.state = core.preferences.cinematicBackground === 'CINEMATIC' ? 'SHOWING' : 'DISABLED';
+      }
       if (patch.cinematicBackground) core.presentation.optional.cinematic.state = patch.cinematicBackground === 'CINEMATIC' ? 'DEGRADED_FALLBACK' : 'DISABLED';
       if (patch.dashboardProfile) core.presentation.optional.dashboard.state = patch.dashboardProfile === 'ON' ? 'INACTIVE_PAGE' : 'INACTIVE_THEME';
     },
@@ -179,22 +183,25 @@ test('UT-B5-UI-008 recovered Companion root returns to Settings Home without res
   h.ui.teardown();
 });
 
-test('UT-B5-UI-009 Cinematic enable requires optional permission while denial remains off', async () => {
+test('UT-B5-UI-009 Glass selection commits the integrated fallback without attempting an untrusted permission prompt', async () => {
   const denied = await harness({ cinematicPermission: false });
-  denied.click({ action: 'view', view: 'settings' }); denied.click({ action: 'settings-route', view: 'presentation-packs' });
-  denied.click({ action: 'preference-cinematic', value: 'CINEMATIC' }); await denied.drain();
-  assert.deepEqual(denied.permissionCalls, ['request']); assert.equal(denied.preferenceCommands.length, 0);
-  assert.match(denied.root.innerHTML, /Wallpaper permission was not granted/);
-  assert.doesNotMatch(denied.root.innerHTML, /cinematic-permission-not-granted/);
-  denied.click({ action: 'settings-back', view: 'settings' });
-  denied.click({ action: 'settings-route', view: 'advanced-diagnostics' });
-  assert.match(denied.root.innerHTML, /Last internal error: cinematic-permission-not-granted/);
+  denied.click({ action: 'view', view: 'settings' }); denied.click({ action: 'settings-route', view: 'website-theme' });
+  assert.doesNotMatch(denied.root.innerHTML, /preference-cinematic/);
+  denied.click({ action: 'preference-site', value: 'SLEEK_DARK' }); await denied.drain();
+  assert.deepEqual(denied.permissionCalls, []);
+  assert.deepEqual(denied.preferenceCommands[0], { patch: { websiteTheme: 'SLEEK_DARK' }, expectedPreferenceRevision: 1 });
+  assert.equal(denied.core.preferences.websiteTheme, 'SLEEK_DARK');
+  assert.equal(denied.core.preferences.cinematicBackground, 'CINEMATIC');
+  assert.match(denied.root.innerHTML, /readable gradient fallback/i);
   denied.ui.teardown();
 
   const granted = await harness({ cinematicPermission: true });
-  granted.click({ action: 'view', view: 'settings' }); granted.click({ action: 'settings-route', view: 'presentation-packs' });
-  granted.click({ action: 'preference-cinematic', value: 'CINEMATIC' }); await granted.drain();
-  assert.deepEqual(granted.preferenceCommands[0], { patch: { cinematicBackground: 'CINEMATIC' }, expectedPreferenceRevision: 1 });
+  granted.click({ action: 'view', view: 'settings' }); granted.click({ action: 'settings-route', view: 'website-theme' });
+  granted.click({ action: 'preference-site', value: 'SLEEK_DARK' }); await granted.drain();
+  assert.deepEqual(granted.permissionCalls, []);
+  assert.deepEqual(granted.preferenceCommands[0], { patch: { websiteTheme: 'SLEEK_DARK' }, expectedPreferenceRevision: 1 });
+  assert.equal(granted.core.preferences.cinematicBackground, 'CINEMATIC');
+  assert.match(granted.root.innerHTML, /rotating Bing background and translucent surfaces as one theme/i);
   granted.ui.teardown();
 });
 
@@ -203,7 +210,7 @@ test('UT-B5-UI-010 Restore Native commits one fenced presentation batch and remo
   Object.assign(h.core.preferences, { websiteTheme: 'SLEEK_DARK', cinematicBackground: 'CINEMATIC', dashboardProfile: 'ON' });
   h.ui.render(); h.click({ action: 'view', view: 'settings' }); h.click({ action: 'settings-route', view: 'presentation-packs' });
   h.click({ action: 'restore-native' }); await h.drain();
-  assert.deepEqual(h.preferenceCommands[0].patch, { websiteTheme: 'ORIGINAL', cinematicBackground: 'NONE', dashboardProfile: 'OFF' });
+  assert.deepEqual(h.preferenceCommands[0].patch, { websiteTheme: 'ORIGINAL', dashboardProfile: 'OFF' });
   assert.deepEqual(h.permissionCalls, ['remove']); h.ui.teardown();
 });
 
@@ -228,6 +235,7 @@ test('UT-B5-UI-012 theme choices and Advanced diagnostics stay available with ze
   for (const label of ['Native / Off', 'Dark Glass', 'Light Glass', 'Refined Light']) assert.match(h.root.innerHTML, new RegExp(label));
   h.click({ action: 'preference-site', value: 'LIGHT_GLASS' });
   await h.drain();
+  assert.deepEqual(h.permissionCalls, []);
   assert.deepEqual(h.preferenceCommands[0], { patch: { websiteTheme: 'LIGHT_GLASS' }, expectedPreferenceRevision: 1 });
   h.click({ action: 'settings-back', view: 'settings' });
   h.click({ action: 'settings-route', view: 'advanced-diagnostics' });
@@ -250,5 +258,22 @@ test('UT-B5-UI-013 long job labels remain contained and escaped in the compact w
   assert.doesNotMatch(h.root.innerHTML, /<script>private<\/script>/);
   assert.match(h.root.innerHTML, /&lt;script&gt;private&lt;\/script&gt;/);
   assert.match(h.root.innerHTML, /overflow-wrap:anywhere/);
+  h.ui.teardown();
+});
+
+test('UT-B5-UI-014 blocked startup keeps safe Settings and diagnostics available while Timer actions stay absent', async () => {
+  const h = await harness();
+  h.core.blocked = true;
+  h.core.status = 'legacy-preflight-failed';
+  h.core.timer = null;
+  h.ui.render();
+  assert.match(h.root.innerHTML, /Needs attention/);
+  assert.match(h.root.innerHTML, /Appearance, support and privacy-safe diagnostics remain available/);
+  assert.doesNotMatch(h.root.innerHTML, /data-timer-action/);
+  h.click({ action: 'view', view: 'settings' });
+  assert.match(h.root.innerHTML, /Companion appearance/);
+  assert.match(h.root.innerHTML, /SquareCoil theme/);
+  h.click({ action: 'open-diagnostics' });
+  assert.match(h.root.innerHTML, /Advanced diagnostics/);
   h.ui.teardown();
 });

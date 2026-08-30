@@ -4,24 +4,27 @@ This harness loads one exact unpacked package into installed, branded Google Chr
 
 ## Required package
 
-The `--package` directory must contain exactly the eight allowlisted release files:
+The `--package` directory must contain exactly the eleven allowlisted candidate files:
 
 - `manifest.json`
 - `dist/background.js`
 - `dist/build-info.json`
 - `dist/companion-app.js`
+- `dist/presentation-bootstrap.js`
 - `dist/content-controller.js`
 - `dist/popup.js`
+- `dist/themes/dark-glass.css`
+- `dist/themes/light-glass.css`
 - `popup/popup.html`
 - `popup/popup.css`
 
-`--archive` must name the ZIP from which the directory was extracted. The harness reads each ZIP entry and requires its eight file hashes and byte counts to match the extracted inventory exactly. It records the ZIP filename, SHA-256, optional single root prefix, and shared inventory digest, then verifies both the ZIP and directory are unchanged after both browsers. Stored and deflated ZIP entries are supported; encrypted, multi-disk, and ZIP64 archives fail closed.
+`--archive` must name the ZIP from which the directory was extracted. The harness reads each ZIP entry and requires its eleven file hashes and byte counts to match the extracted inventory exactly. It records the ZIP filename, SHA-256, optional single root prefix, and shared inventory digest, then verifies both the ZIP and directory are unchanged after both browsers. Stored and deflated ZIP entries are supported; encrypted, multi-disk, and ZIP64 archives fail closed.
 
 `dist/build-info.json` must contain:
 
 - `buildId: "rebuild-b6-release-candidate"`;
 - `stage: "B6"`;
-- a lowercase 64-character `candidateFingerprint` embedded exactly in `dist/background.js`, `dist/companion-app.js`, and `dist/content-controller.js`;
+- a lowercase 64-character `candidateFingerprint` embedded exactly in `dist/background.js`, `dist/companion-app.js`, `dist/presentation-bootstrap.js`, and `dist/content-controller.js`;
 - a lowercase 40-character `sourceSha` exactly matching `--expected-source-sha`;
 - boolean `sourceDirty`, which must be `false` for acceptance.
 
@@ -43,6 +46,8 @@ The harness also locates the bundled Codex Playwright runtime automatically when
 
 Use `--headed` only when visible browser windows are useful. Browser executables default to the standard Windows Chrome and Edge locations and can be overridden with `--chrome-executable` and `--edge-executable`.
 
+The default headless run leaves optional permission absent and requires the integrated Glass fallback to remain readable without a Bing request; it does not open a browser prompt that headless automation cannot answer. Prove the explicit granted path separately with `--interactive-permission-only`. That supplemental gate opens one short isolated Chrome window, loads one synthetic SquareCoil page, and waits for a human to choose **Allow** in the browser-owned prompt. In that same browser session it then requires the real wallpaper provider to request the fixed Bing metadata/image routes and paint the integrated Dark Glass background before closing. It does not run the full lifecycle matrix, cannot reach the real SquareCoil site, and never fabricates a grant. The normal clean/upgrade Chrome and Edge matrix remains headless and must pass independently.
+
 The default `--profile all` is mandatory for acceptance. `--profile clean` and `--profile upgrade` are diagnostic subsets and are always labeled `NON_ACCEPTANCE`, even with clean package bytes.
 
 `--allow-dirty-development` permits a temporary dirty build for harness development. Such a run is always labeled `NON_ACCEPTANCE`; it cannot produce an acceptance pass.
@@ -54,7 +59,7 @@ The default `--profile all` is mandatory for acceptance. `--profile clean` and `
 - Exit `1`, status `FAIL`: a browser assertion, package check, or byte-integrity check failed.
 - Exit `2`, status `UNSUPPORTED`: a required browser/control capability could not be exercised. This is not a pass.
 
-The JSON evidence records browser/CDP identity, profile class, executable hash, extension ID/path/version, exact build/package/candidate identity, candidate embedding counts for all three runtime bundles, commanded and packaged source SHA, ZIP filename/hash, exact ZIP/extracted inventory binding, synthetic-network ledger, test results, lifecycle/root snapshots, and isolated-world authority snapshots. Evidence output must be outside the tested package and cannot overwrite the ZIP. A browser launch or extension load never counts as a gate pass by itself.
+The JSON evidence records browser/CDP identity, profile class, executable hash, extension ID/path/version, exact build/package/candidate identity, candidate embedding counts for all four page/worker runtime bundles, commanded and packaged source SHA, ZIP filename/hash, exact ZIP/extracted inventory binding, synthetic-network ledger, test results, lifecycle/root snapshots, and isolated-world authority snapshots. Evidence output must be outside the tested package and cannot overwrite the ZIP. A browser launch or extension load never counts as a gate pass by itself.
 
 Every message the harness sends directly from the content-script execution world carries the exact packaged `buildId`, `packageVersion`, and `candidateFingerprint` plus the live document token. Popup messages originate from an extension page and remain extension-origin messages; the harness does not mislabel them as content-origin traffic.
 
@@ -93,13 +98,13 @@ Every message the harness sends directly from the content-script execution world
 - Archive and Restore preserve Context totals while passing through the fenced authoritative writer;
 - an exact backup merge dedupes existing history and cannot double-count ledger time.
 - Settings Home remains available with zero history and exposes Appearance, Time tracking, Jobs and watching, Notifications, Dashboard, Privacy and permissions, and Advanced diagnostics;
-- Native/Off, Dark Glass, Light Glass, and Refined Light settle independently, report their real effective presentation, and own at most one removable style layer;
+- Native/Off, Dark Glass, Light Glass, and Refined Light are mutually exclusive, report their real effective presentation, and own at most one removable style layer;
 - Light Glass and Refined Light apply bounded same-origin CKEditor document treatment; Dark Glass retains the accepted vendor, overlay, calendar, and responsive adapters;
 - one revisioned Preferences service synchronizes owner/observer tabs and rejects a stale Timer Limits form before allowing one coherent replacement batch;
 - Support diagnostics are opt-in and frozen, expose only coarse allowlisted state, and delivery remains an explicit user action;
 - dirty Settings drafts require confirmation, missing Developer Support configuration stays unavailable, and no settings action mutates Timer/Ledger or native SquareCoil state.
-- optional presentation is off by default and makes no Bing request without the optional host permission;
-- Cinematic owns one bounded host/style, settles safely to cache/fallback/base presentation, and Restore Native removes its resources;
+- Bing cinematic presentation is active only with Dark Glass or Light Glass and makes no Bing request without exact optional host permission;
+- each Glass theme owns one bounded background host/style, settles safely to cache/gradient fallback/remote presentation, and Restore Native removes its resources;
 - the Design Dashboard profile applies only to exact `/dashboard.php?show=2`, preserves native KPI text, row order/targets, selects, disabled controls, and warnings, adds one non-interactive read-only Companion summary, and does not leak to another dashboard mode;
 - optional presentation changes no Timer/Ledger/native-clock authority and attempts no native SquareCoil mutation.
 - a fresh clean profile contains no inherited authority document or runtime before the B6 candidate begins its inherited gates;

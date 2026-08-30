@@ -35,8 +35,9 @@ test('UT-B5-SUPPORT-003 diagnostics use only the frozen whitelist and omit priva
     runtimeInstanceId: 'runtime-safe-001', workerInstanceId: 'worker-safe-001', coordinationEpoch: 7,
     settlementStatus: 'ready', migrationDisposition: 'COMPLETE_MATCH', migrationReason: 'none',
     bridgeGeneration: 3, bridgeReason: 'native-observation-current', lastTechnicalError: 'private customer failure',
-    preferences: { timerAppearance: 'AUTO', panelFinish: 'GLASS', websiteTheme: 'SLEEK_DARK' },
-    presentation: { timerAppearanceEffective: 'DARK', panelFinishEffective: 'GLASS', websiteThemeEffective: 'SLEEK_DARK' },
+    preferences: { timerAppearance: 'AUTO', panelFinish: 'GLASS', websiteTheme: 'SLEEK_DARK', cinematicBackground: 'CINEMATIC' },
+    presentation: { timerAppearanceEffective: 'DARK', panelFinishEffective: 'GLASS', websiteThemeEffective: 'SLEEK_DARK',
+      optional: { cinematic: { state: 'SHOWING', source: 'REMOTE', reason: 'remote-image-ready', ownedHostCount: 1, ownedStyleCount: 1 } } },
     rootCount: 1, capturedAtMs: Date.parse('2026-08-28T15:00:00Z'),
     customerName: 'VeryPrivate', contextId: 'job:260701', history: ['private']
   });
@@ -50,6 +51,9 @@ test('UT-B5-SUPPORT-003 diagnostics use only the frozen whitelist and omit priva
   assert.match(diagnostics.text, /Migration: COMPLETE_MATCH \/ none/);
   assert.match(diagnostics.text, /Bridge generation: 3/);
   assert.match(diagnostics.text, /Last internal error: none/);
+  assert.match(diagnostics.text, /Cinematic: CINEMATIC \/ SHOWING \/ REMOTE/);
+  assert.match(diagnostics.text, /Cinematic reason: remote-image-ready/);
+  assert.match(diagnostics.text, /Cinematic layers: 1 host \/ 1 style/);
   assert.doesNotMatch(diagnostics.text, /260701|VeryPrivate|customer|history|project\.php/);
 });
 

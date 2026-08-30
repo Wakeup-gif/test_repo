@@ -4,20 +4,14 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { BUILD_ID, BUILD_STAGE } = require('../src/core/build-identity');
-
-const ALLOWLIST = Object.freeze([
-  'dist/background.js',
-  'dist/build-info.json',
-  'dist/companion-app.js',
-  'dist/content-controller.js',
-  'dist/popup.js',
-  'manifest.json',
-  'popup/popup.css',
-  'popup/popup.html'
-]);
+const { PACKAGE_FILES } = require('./package-inventory');
 const EXPECTED_PERMISSIONS = Object.freeze(['storage', 'scripting', 'webRequest']);
 const EXPECTED_HOST_PERMISSIONS = Object.freeze(['https://ussignandmill.squarecoil.net/*']);
 const EXPECTED_OPTIONAL_HOST_PERMISSIONS = Object.freeze(['https://www.bing.com/*']);
+const EXPECTED_WEB_ACCESSIBLE_RESOURCES = Object.freeze([Object.freeze({
+  resources: Object.freeze(['dist/themes/dark-glass.css', 'dist/themes/light-glass.css']),
+  matches: Object.freeze(['https://ussignandmill.squarecoil.net/*'])
+})]);
 const EXPECTED_CONTENT_SCRIPT_KEYS = Object.freeze(['all_frames', 'js', 'match_about_blank', 'matches', 'run_at']);
 
 function assert(condition, message) {
@@ -114,6 +108,7 @@ function validateManifestPolicy(manifest) {
   assert(JSON.stringify(manifest.permissions || []) === JSON.stringify(EXPECTED_PERMISSIONS), 'Packaged permissions must remain storage + scripting + passive webRequest observation only');
   assert(JSON.stringify(manifest.host_permissions || []) === JSON.stringify(EXPECTED_HOST_PERMISSIONS), 'Packaged host permission must remain limited to the exact SquareCoil tenant');
   assert(JSON.stringify(manifest.optional_host_permissions || []) === JSON.stringify(EXPECTED_OPTIONAL_HOST_PERMISSIONS), 'Packaged optional host permission must remain limited to the exact Bing image origin');
+  assert(JSON.stringify(manifest.web_accessible_resources || []) === JSON.stringify(EXPECTED_WEB_ACCESSIBLE_RESOURCES), 'Packaged authoritative theme resources must remain limited to the exact CSS files and tenant');
   assert(JSON.stringify(Object.keys(manifest.background || {}).sort()) === JSON.stringify(['service_worker']), 'Packaged background policy must contain only the service worker entry');
   assert(manifest.background.service_worker === 'dist/background.js', 'Packaged service worker reference is invalid');
   assert(manifest.action?.default_popup === 'popup/popup.html', 'Packaged popup reference is invalid');
@@ -123,7 +118,7 @@ function validateManifestPolicy(manifest) {
   const contentScript = contentScripts[0];
   assert(JSON.stringify(Object.keys(contentScript).sort()) === JSON.stringify([...EXPECTED_CONTENT_SCRIPT_KEYS].sort()), 'Packaged content controller policy contains unexpected fields');
   assert(JSON.stringify(contentScript.matches || []) === JSON.stringify(EXPECTED_HOST_PERMISSIONS), 'Packaged content match must remain limited to the exact SquareCoil tenant');
-  assert(JSON.stringify(contentScript.js || []) === JSON.stringify(['dist/content-controller.js']), 'Packaged content controller reference is invalid');
+  assert(JSON.stringify(contentScript.js || []) === JSON.stringify(['dist/presentation-bootstrap.js', 'dist/content-controller.js']), 'Packaged content entry ordering is invalid');
   assert(contentScript.run_at === 'document_start', 'Packaged content controller must start at document_start');
   assert(contentScript.all_frames === false, 'Packaged content controller must be top-frame only');
   assert(contentScript.match_about_blank === false, 'Packaged content controller must not enter about:blank frames');
@@ -136,7 +131,7 @@ assert(fs.existsSync(packageRoot), `Package directory does not exist: ${packageR
 assert(fs.statSync(packageRoot).isDirectory(), `Package path is not a directory: ${packageRoot}`);
 
 const files = listFiles(packageRoot);
-assert(JSON.stringify(files) === JSON.stringify([...ALLOWLIST].sort()), `Package allowlist mismatch. Actual: ${files.join(', ')}`);
+assert(JSON.stringify(files) === JSON.stringify([...PACKAGE_FILES].sort()), `Package allowlist mismatch. Actual: ${files.join(', ')}`);
 
 const manifest = JSON.parse(fs.readFileSync(path.join(packageRoot, 'manifest.json'), 'utf8'));
 const buildInfo = JSON.parse(fs.readFileSync(path.join(packageRoot, 'dist/build-info.json'), 'utf8'));
@@ -156,7 +151,7 @@ const references = [
   ...contentScripts.flatMap(entry => [...(entry.js || []), ...(entry.css || [])])
 ];
 for (const reference of references) {
-  assert(ALLOWLIST.includes(reference), `Manifest reference is outside the package allowlist: ${reference}`);
+  assert(PACKAGE_FILES.includes(reference), `Manifest reference is outside the package allowlist: ${reference}`);
   assert(fs.existsSync(path.join(packageRoot, reference)), `Packaged manifest reference is missing: ${reference}`);
 }
 

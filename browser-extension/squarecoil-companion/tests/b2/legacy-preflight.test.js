@@ -80,3 +80,20 @@ test('UT-B2-MIG-028 MIG-C07 ACTIVITY-only changes are diagnostic and nonblocking
   assert.equal(result.activityChanged, true);
   assert.equal(result.blocked, false);
 });
+
+test('UT-B2-MIG-032 malformed retained authority source fails before migration and corrected bytes become required', () => {
+  const malformed = { [LEGACY_KEYS[0]]: 'A4-SENSITIVE-LEGACY-VALUE-MUST-NOT-LEAK' };
+  const failed = inspectLegacyMigration(storage(malformed), createEmptyDocument({ nowMs: 1, workdayZone: 'UTC' }));
+  assert.equal(failed.disposition, MIGRATION_DISPOSITIONS.FAILED);
+  assert.equal(failed.reason, 'legacy-preflight-failed');
+  assert.equal(failed.checked, false);
+  assert.deepEqual(failed.presentKeys, [LEGACY_KEYS[0]]);
+  assert.equal(JSON.stringify(failed).includes(malformed[LEGACY_KEYS[0]]), false);
+
+  const corrected = inspectLegacyMigration(
+    storage({ [LEGACY_KEYS[0]]: JSON.stringify({ contexts: {} }) }),
+    createEmptyDocument({ nowMs: 1, workdayZone: 'UTC' })
+  );
+  assert.equal(corrected.disposition, MIGRATION_DISPOSITIONS.REQUIRED);
+  assert.equal(corrected.checked, true);
+});

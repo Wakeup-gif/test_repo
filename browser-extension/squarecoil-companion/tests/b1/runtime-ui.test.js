@@ -150,6 +150,24 @@ test('connected owned root with a changed id is repaired without leaking a secon
   assert.equal(doc._nodes.filter(node => node.isConnected).length, 1);
 });
 
+test('MAIN lifecycle fallback keeps technical codes in datasets without overwriting workspace status copy', async () => {
+  const doc = createFakeDocument();
+  const ui = createRuntimeUi({ document: doc, runtimeInstanceId: 'r1', buildId: BUILD_ID });
+  await ui.ensure();
+  const owned = doc.querySelectorAll(`#${ROOT_ID}`)[0];
+  const workspaceStatus = { textContent: 'Needs attention' };
+  const fallbackStatus = { textContent: '' };
+  owned.querySelector = selector => selector === '[data-sc-lifecycle-fallback-status]' ? fallbackStatus
+    : selector === '[data-sc-status]' ? workspaceStatus : null;
+
+  ui.setLifecycle({ state: 'DEGRADED', reason: 'coordination-not-implemented-b1' });
+
+  assert.equal(owned.dataset.lifecycleState, 'DEGRADED');
+  assert.equal(owned.dataset.lifecycleReason, 'coordination-not-implemented-b1');
+  assert.equal(workspaceStatus.textContent, 'Needs attention');
+  assert.equal(fallbackStatus.textContent, 'Companion is reconnecting. No SquareCoil data was changed.');
+});
+
 test('teardown removes the owned root and interaction readiness', async () => {
   const doc = createFakeDocument();
   const ui = createRuntimeUi({ document: doc, runtimeInstanceId: 'r1', buildId: BUILD_ID });

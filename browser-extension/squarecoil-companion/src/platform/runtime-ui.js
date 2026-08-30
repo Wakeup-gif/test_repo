@@ -47,7 +47,7 @@ function createRuntimeUi(options = {}) {
       'font:13px/1.35 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif',
       'box-shadow:0 10px 30px rgba(0,0,0,.22)'
     ].join(';');
-    element.innerHTML = '<strong>SquareCoil Companion</strong><div data-sc-status>Starting lifecycle…</div>';
+    element.innerHTML = '<strong>SquareCoil Companion</strong><div data-sc-lifecycle-fallback-status>Starting Companion…</div>';
     host.appendChild(element);
     return element;
   }
@@ -156,10 +156,13 @@ function createRuntimeUi(options = {}) {
     if (!root || !snapshot) return;
     root.dataset.lifecycleState = snapshot.state || 'UNKNOWN';
     root.dataset.lifecycleReason = snapshot.reason || '';
-    const status = root.querySelector('[data-sc-status]');
+    const status = root.querySelector('[data-sc-lifecycle-fallback-status]');
     if (status) {
-      const suffix = snapshot.reason && snapshot.reason !== 'ready' ? ` · ${snapshot.reason}` : '';
-      status.textContent = `${snapshot.state || 'UNKNOWN'}${suffix}`;
+      status.textContent = snapshot.state === 'READY'
+        ? 'Companion is ready.'
+        : snapshot.state === 'FAILED'
+          ? 'Companion needs attention. Open the extension for details.'
+          : 'Companion is reconnecting. No SquareCoil data was changed.';
     }
   }
 

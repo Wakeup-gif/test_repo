@@ -2,6 +2,7 @@
 
 const { BUILD_ID, BUILD_STAGE, CANDIDATE_FINGERPRINT } = require('../core/build-identity');
 const { ROOT_ID, createWorkspaceUi } = require('./workspace-ui');
+const { createWorkspaceStarter } = require('./workspace-start');
 
 const SEARCH_INPUT_SELECTOR = `#${ROOT_ID} [data-sc-search-form] input[name="projectId"]`;
 const SEARCH_FORM_SELECTOR = `#${ROOT_ID} [data-sc-search-form]`;
@@ -77,9 +78,14 @@ function createSearchFocusGuard() {
     getCoreHandle: () => globalThis.__squareCoilCompanionAuthorityHealth || null
   });
 
-  ui.start().catch(() => {});
-  window.addEventListener('pagehide', () => {
+  let retired = false;
+  const workspaceStarter = createWorkspaceStarter({ ui, document, rootId: ROOT_ID });
+  void workspaceStarter.start();
+  window.addEventListener('pagehide', event => {
+    if (event.persisted === true || retired) return;
+    retired = true;
+    workspaceStarter.retire();
     releaseSearchFocusGuard();
     ui.teardown();
-  }, { once: true });
+  });
 })();

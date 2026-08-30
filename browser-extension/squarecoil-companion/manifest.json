@@ -21,10 +21,16 @@
   "content_scripts": [
     {
       "matches": ["https://ussignandmill.squarecoil.net/*"],
-      "js": ["dist/content-controller.js"],
+      "js": ["dist/presentation-bootstrap.js", "dist/content-controller.js"],
       "run_at": "document_start",
       "all_frames": false,
       "match_about_blank": false
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["dist/themes/dark-glass.css", "dist/themes/light-glass.css"],
+      "matches": ["https://ussignandmill.squarecoil.net/*"]
     }
   ]
 }

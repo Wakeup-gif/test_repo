@@ -74,11 +74,11 @@ function prefs(values = {}) {
 
 const sleek = { websiteThemeEffective: 'SLEEK_DARK', forcedColors: false, reducedTransparency: false };
 
-test('UT-B5-CINE-001 default NONE makes no wallpaper request or owned host', () => {
+test('UT-B5-CINE-001 an older Glass plus NONE snapshot automatically restores the integrated background', () => {
   const h = harness();
   const snapshot = h.service.apply(prefs({ cinematic: 'NONE' }), sleek);
-  assert.equal(snapshot.state, 'DISABLED'); assert.equal(h.calls(), 0);
-  assert.equal(h.document.getElementById(CINEMATIC_HOST_ID), null);
+  assert.equal(snapshot.state, 'LOADING_INITIAL'); assert.equal(h.calls(), 1);
+  assert.ok(h.document.getElementById(CINEMATIC_HOST_ID));
 });
 
 test('UT-B5-CINE-002 eligible enable displays only after candidate image readiness', async () => {
@@ -118,23 +118,25 @@ test('UT-B5-CINE-006 a late request cannot overwrite a newer theme generation', 
   h.service.apply(prefs(), sleek); await Promise.resolve();
   h.service.apply(prefs({ revision: 2, theme: 'ORIGINAL' }), { websiteThemeEffective: 'ORIGINAL' });
   resolveProvider({ ok: true, source: 'REMOTE', dataUrl: 'data:image/png;base64,AAAA' }); await Promise.resolve(); await Promise.resolve();
-  assert.equal(h.service.snapshot().state, 'SUSPENDED_THEME'); assert.equal(h.document.getElementById(CINEMATIC_HOST_ID), null);
+  assert.equal(h.service.snapshot().state, 'DISABLED'); assert.equal(h.document.getElementById(CINEMATIC_HOST_ID), null);
 });
 
-test('UT-B5-CINE-007 Original removes cinematic artifacts without erasing the preference', async () => {
+test('UT-B5-CINE-007 Original derives the background off and removes cinematic artifacts', async () => {
   const h = harness(); h.service.apply(prefs(), sleek); await h.service.refresh();
   const snapshot = h.service.apply(prefs({ revision: 2, theme: 'ORIGINAL' }), { websiteThemeEffective: 'ORIGINAL' });
-  assert.equal(snapshot.preference, 'CINEMATIC'); assert.equal(snapshot.state, 'SUSPENDED_THEME');
+  assert.equal(snapshot.preference, 'NONE'); assert.equal(snapshot.state, 'DISABLED');
   assert.equal(h.root.getAttribute(CINEMATIC_ATTRIBUTE), null);
 });
 
-test('UT-B5-CINE-008 returning to Sleek Dark restores only a still-preferred cinematic image', async () => {
+test('UT-B5-CINE-008 returning to Glass starts its integrated background again and raw NONE cannot split it', async () => {
   const h = harness(); h.service.apply(prefs(), sleek); await h.service.refresh();
   h.service.apply(prefs({ revision: 2, theme: 'ORIGINAL' }), { websiteThemeEffective: 'ORIGINAL' });
   const restored = h.service.apply(prefs({ revision: 3 }), sleek);
-  assert.equal(restored.state, 'SHOWING'); assert.equal(restored.imageDisplayed, true);
+  assert.equal(restored.state, 'LOADING_INITIAL');
+  await h.service.refresh();
+  assert.equal(h.service.snapshot().state, 'SHOWING'); assert.equal(h.service.snapshot().imageDisplayed, true);
   const off = h.service.apply(prefs({ revision: 4, cinematic: 'NONE' }), sleek);
-  assert.equal(off.state, 'DISABLED');
+  assert.notEqual(off.state, 'DISABLED');
 });
 
 test('UT-B5-CINE-009 reduced motion keeps the selected image static', async () => {

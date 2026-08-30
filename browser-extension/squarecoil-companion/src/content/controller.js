@@ -25,6 +25,7 @@ const ENABLE_MESSAGE = 'SC_COMPANION_SET_ENABLED';
 const REVALIDATE_MESSAGE = 'SC_COMPANION_REVALIDATE';
 const B5B_PERMISSION_MESSAGE = 'SC_COMPANION_B5B_REQUEST_PERMISSION';
 const B5B_REMOVE_PERMISSION_MESSAGE = 'SC_COMPANION_B5B_REMOVE_PERMISSION';
+const B5B_PERMISSION_CHANGED_MESSAGE = 'SC_COMPANION_B5B_PERMISSION_CHANGED';
 const B5B_WALLPAPER_MESSAGE = 'SC_COMPANION_B5B_GET_WALLPAPER';
 const B5B_ACK_MESSAGE = 'SC_COMPANION_B5B_ACK';
 const POPUP_SUMMARY_MESSAGE = 'SC_COMPANION_GET_POPUP_SUMMARY';
@@ -114,9 +115,9 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
     return `${prefix}-${suffix}`;
   }
 
-  async function sendB5B(type) {
+  async function sendB5B(type, details = {}) {
     const requestId = b5bRequestId('b5b');
-    const response = await send({ type, requestId });
+    const response = await send({ type, requestId, ...details });
     if (response?.type !== B5B_ACK_MESSAGE || response?.requestId !== requestId ||
         response?.buildId !== BUILD_ID || response?.packageVersion !== PACKAGE_VERSION ||
         response?.candidateFingerprint !== CANDIDATE_FINGERPRINT) {
@@ -129,7 +130,7 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
     if (!cinematicService) cinematicService = createCinematicBackground({
       document,
       window,
-      fetchWallpaper: () => sendB5B(B5B_WALLPAPER_MESSAGE),
+      fetchWallpaper: request => sendB5B(B5B_WALLPAPER_MESSAGE, { websiteTheme: request?.websiteTheme }),
       onChange: value => setDataset('squarecoilCompanionCinematic', value.state)
     });
     if (!dashboardProfile) dashboardProfile = createDashboardProfile({ document, window });
@@ -275,8 +276,18 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
         if (!trustedCore) throw new Error('trusted-transition-core-unavailable');
         return trustedCore.preferenceCommand(patch, expectedPreferenceRevision);
       },
-      requestCinematicAccess: async () => sendB5B(B5B_PERMISSION_MESSAGE),
-      removeCinematicAccess: async () => sendB5B(B5B_REMOVE_PERMISSION_MESSAGE),
+      requestCinematicAccess: async () => {
+        const response = await sendB5B(B5B_PERMISSION_MESSAGE);
+        if (response?.ok === true && response?.granted === true && cinematicService) {
+          void cinematicService.refresh('permission-granted');
+        }
+        return response;
+      },
+      removeCinematicAccess: async () => {
+        const response = await sendB5B(B5B_REMOVE_PERMISSION_MESSAGE);
+        if (cinematicService) void cinematicService.refresh('permission-removed');
+        return response;
+      },
       initializePreferences: async legacyPreferences => {
         if (!trustedCore) throw new Error('trusted-transition-core-unavailable');
         return trustedCore.initializePreferences(legacyPreferences);
@@ -688,6 +699,15 @@ const AUTHORITY_HEALTH_KEY = '__squareCoilCompanionAuthorityHealth';
   }
 
   function onAuthorityControl(message, sender, sendResponse) {
+    if (message?.type === B5B_PERMISSION_CHANGED_MESSAGE) {
+      if (sender?.id && sender.id !== chrome.runtime.id) {
+        sendResponse({ ok: false, reason: 'extension-sender-required' });
+        return false;
+      }
+      if (cinematicService) void cinematicService.refresh('permission-granted-popup');
+      sendResponse({ ok: true });
+      return false;
+    }
     if (message?.type === POPUP_SUMMARY_MESSAGE) {
       if (sender?.id && sender.id !== chrome.runtime.id) {
         sendResponse({ ok: false, status: 'UNAVAILABLE', reason: 'extension-sender-required' });

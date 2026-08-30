@@ -446,6 +446,8 @@ Framework + Logic are ready for staged implementation.
 
 Do not begin full implementation merely because L1 is complete.
 
+All implementation stages also use `docs/EXECUTION-ENFORCEMENT-PLAN.md`. A later-stage change that touches an earlier ownership, lifecycle, storage, UI, or packaging boundary automatically reopens the affected regression evidence without granting permission to redesign the settled behavior.
+
 Recommended implementation gating:
 
 ### Build Stage B1 can start after L0-L1
@@ -488,6 +490,9 @@ To prevent the project from becoming too noisy:
 6. Freeze a logic stage once accepted and reference it by file.
 7. Update `REBUILD-START-HERE.md` after each accepted stage.
 8. Do not advance the Chrome package until the relevant acceptance gates are green.
+9. Use targeted gates to debug one impact cluster; use the aggregate/full browser gate once to certify the completed candidate.
+10. Treat a normal in-scope test failure as diagnostic work, not a new authorization boundary.
+11. Pair recoverable fail-closed scenarios with an explicit repaired-cause recovery test.
 
 ---
 

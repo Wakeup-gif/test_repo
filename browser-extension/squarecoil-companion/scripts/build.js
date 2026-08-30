@@ -5,12 +5,14 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 const { BUILD_ID, BUILD_STAGE, CANDIDATE_FINGERPRINT } = require('../src/core/build-identity');
 const { computeCandidateFingerprint } = require('./candidate-identity');
+const { PACKAGE_FILES, listFiles } = require('./package-inventory');
 
 const root = path.resolve(__dirname, '..');
 const dist = path.join(root, 'dist');
 const entries = [
   ['src/extension/background-entry.js', 'background.js'],
   ['src/page/entry.js', 'companion-app.js'],
+  ['src/content/presentation-bootstrap.js', 'presentation-bootstrap.js'],
   ['src/content/controller.js', 'content-controller.js'],
   ['src/popup/popup.js', 'popup.js']
 ];
@@ -48,5 +50,13 @@ const candidateFingerprint=computeCandidateFingerprint(root);
 if(!/^[0-9a-f]{64}$/.test(candidateFingerprint)) throw new Error('Candidate fingerprint must be a concrete SHA-256');
 fs.rmSync(dist,{recursive:true,force:true});fs.mkdirSync(dist,{recursive:true});
 for(const [input,output] of entries){let code=bundle(slash(input));if(output==='content-controller.js'){code+='\n/* Proto Squirel Coil nested workspace, isolated-world only. */\n';code+=bundle('src/ui/entry.js');}code=code.split(CANDIDATE_FINGERPRINT).join(candidateFingerprint);if(code.includes(CANDIDATE_FINGERPRINT))throw new Error(`Candidate fingerprint placeholder remained in dist/${output}`);fs.writeFileSync(path.join(dist,output),code,'utf8');console.log(`Built dist/${output}`);}
+const themeDist=path.join(dist,'themes');fs.mkdirSync(themeDist,{recursive:true});
+for(const name of ['dark-glass.css','light-glass.css']){
+  fs.copyFileSync(path.join(root,'src','presentation','ports',name),path.join(themeDist,name));
+  console.log(`Copied dist/themes/${name}`);
+}
 const manifest=JSON.parse(fs.readFileSync(path.join(root,'manifest.json'),'utf8'));
 fs.writeFileSync(path.join(dist,'build-info.json'),JSON.stringify({packageVersion:manifest.version,buildId:BUILD_ID,stage:BUILD_STAGE,candidateFingerprint,sourceSha:identity.sourceSha,sourceDirty:identity.sourceDirty},null,2)+'\n');
+const expectedDist=PACKAGE_FILES.filter(relative=>relative.startsWith('dist/')).map(relative=>relative.slice(5)).sort();
+const actualDist=listFiles(dist);
+if(JSON.stringify(actualDist)!==JSON.stringify(expectedDist))throw new Error(`Canonical dist inventory mismatch. Actual: ${actualDist.join(', ')}`);

@@ -117,7 +117,11 @@ test('B1-LC-005/008: BFCache and service-worker restart reuse the live page runt
   assert.equal(page.metrics.contentExecutions, 1);
   assert.equal(page.metrics.companionInjections, 1);
   assert.equal(page.window.listenerCount('pageshow'), 2);
+  await page.runIntervals();
+  await harness.waitFor(() => /sc-proto-shell/.test(page.root.innerHTML), 'workspace shell startup');
+  assert.match(page.root.innerHTML, /sc-proto-shell/);
 
+  page.dispatchPageHide(true);
   page.dispatchPageShow(true);
   page.dispatchPageShow(true);
   await harness.tick(8);
@@ -125,6 +129,14 @@ test('B1-LC-005/008: BFCache and service-worker restart reuse the live page runt
   assert.equal(page.metrics.companionInjections, 1);
   assert.equal(page.roots.length, 1);
   assert.equal(page.window.listenerCount('pageshow'), 2);
+  assert.match(page.root.innerHTML, /sc-proto-shell/);
+  const settingsButton = page.document.createElement('button');
+  settingsButton.dataset.action = 'view';
+  settingsButton.dataset.view = 'settings';
+  settingsButton.closest = selector => selector === '[data-action]' ? settingsButton : null;
+  page.root.appendChild(settingsButton);
+  page.root.dispatchEvent({ type: 'click', target: settingsButton, isTrusted: true });
+  assert.match(page.root.innerHTML, /Companion appearance/);
 
   harness.restartWorker();
   const result = await harness.sendFromPage(page, { type: MESSAGES.BOOT });

@@ -4,6 +4,8 @@ const HEALTH_MESSAGE = 'SC_COMPANION_GET_HEALTH';
 const ENABLE_MESSAGE = 'SC_COMPANION_SET_ENABLED';
 const RETRY_TEARDOWN_MESSAGE = 'SC_COMPANION_RETRY_TEARDOWN';
 const POPUP_SUMMARY_MESSAGE = 'SC_COMPANION_GET_POPUP_SUMMARY';
+const WALLPAPER_PERMISSION_CHANGED_MESSAGE = 'SC_COMPANION_B5B_PERMISSION_CHANGED';
+const BING_ORIGIN_PATTERN = 'https://www.bing.com/*';
 const SETTLEMENT_RETRY_DELAYS_MS = Object.freeze([50, 150, 450]);
 let operationEpoch = 0;
 let settingQueue = Promise.resolve();
@@ -100,6 +102,36 @@ function renderSummary(summary) {
   setText('summaryToday', formatDuration(current.todayMs));
   setText('summarySession', formatDuration(current.sessionMs));
   setText('summaryState', summary.status === 'WORKING' ? 'Working' : 'Ready');
+}
+
+async function renderWallpaperPermission() {
+  const card = document.querySelector?.('.permission-card') || null;
+  const button = document.getElementById('enableWallpaper');
+  let granted = false;
+  try { granted = await chrome.permissions?.contains?.({ origins: [BING_ORIGIN_PATTERN] }) === true; } catch (_) {}
+  if (card) card.dataset.granted = granted ? 'true' : 'false';
+  if (button) button.textContent = granted ? 'Allowed' : 'Allow access';
+  setText('wallpaperPermission', granted
+    ? 'Allowed for rotating Bing images. Native / Off removes this access.'
+    : 'Not allowed. Glass stays readable with its built-in gradient.');
+  return granted;
+}
+
+async function grantWallpaperPermission() {
+  const button = document.getElementById('enableWallpaper');
+  if (button) button.disabled = true;
+  let granted = false;
+  try { granted = await chrome.permissions?.request?.({ origins: [BING_ORIGIN_PATTERN] }) === true; } catch (_) {}
+  await renderWallpaperPermission();
+  if (granted) {
+    try {
+      const tabs = await chrome.tabs.query({ url: 'https://ussignandmill.squarecoil.net/*' });
+      await Promise.allSettled(tabs.map(tab => Number.isInteger(tab.id)
+        ? chrome.tabs.sendMessage(tab.id, { type: WALLPAPER_PERMISSION_CHANGED_MESSAGE })
+        : Promise.resolve()));
+    } catch (_) {}
+  }
+  if (button) button.disabled = false;
 }
 
 async function loadSummary(tabId, epoch) {
@@ -227,6 +259,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   document.getElementById('refresh')?.addEventListener('click', refreshHealth);
+  document.getElementById('enableWallpaper')?.addEventListener('click', grantWallpaperPermission);
   document.getElementById('retryCleanup')?.addEventListener('click', () => sendToActiveTab(RETRY_TEARDOWN_MESSAGE));
   document.getElementById('startFresh')?.addEventListener('click', () => {
     const currentToggle = document.getElementById('enabled');
@@ -248,5 +281,5 @@ document.addEventListener('DOMContentLoaded', async () => {
       setText('copyResult', 'Copied');
     } catch (_) { setText('copyResult', 'Copy unavailable'); }
   });
-  await refreshHealth();
+  await Promise.all([refreshHealth(), renderWallpaperPermission()]);
 });

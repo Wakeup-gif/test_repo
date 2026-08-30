@@ -84,7 +84,16 @@ function inspectLegacyMigration(storage, document) {
   const presentKeys = Object.keys(sources);
   if (!presentKeys.length) return result(MIGRATION_DISPOSITIONS.NOT_REQUIRED);
   const marker = document?.migration?.completedSources?.[V07_MIGRATION_MARKER_ID];
-  if (!marker) return result(MIGRATION_DISPOSITIONS.REQUIRED, presentKeys, { sources: Object.freeze(sources) });
+  if (!marker) {
+    // Validate the captured authority-sensitive source before reporting it as
+    // migration-ready. This keeps malformed retained bytes terminal and
+    // inspectable without repeatedly dispatching a migration command on every
+    // health settlement. A later explicit settlement still re-reads storage,
+    // so corrected bytes can advance to REQUIRED and migrate normally.
+    try { candidateEvidence(sources); }
+    catch (_) { return result(MIGRATION_DISPOSITIONS.FAILED, presentKeys); }
+    return result(MIGRATION_DISPOSITIONS.REQUIRED, presentKeys, { sources: Object.freeze(sources) });
+  }
   if (marker.completionState !== 'COMPLETE') return result(MIGRATION_DISPOSITIONS.IN_PROGRESS, presentKeys);
   try {
     const candidate = candidateEvidence(sources);

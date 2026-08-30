@@ -90,6 +90,12 @@ class FakeElement extends ListenerTarget {
     this._id = '';
     this._innerHTML = '';
     this._attributes = new Map();
+    const classes = new Set();
+    this.classList = {
+      add: (...values) => values.forEach(value => classes.add(String(value))),
+      remove: (...values) => values.forEach(value => classes.delete(String(value))),
+      contains: value => classes.has(String(value))
+    };
     const rawDataset = Object.create(null);
     this.dataset = new Proxy(rawDataset, {
       set: (target, property, value) => {
@@ -128,12 +134,27 @@ class FakeElement extends ListenerTarget {
       status.setAttribute('data-sc-status', '');
       this.appendChild(status);
     }
+    if (this._innerHTML.includes('data-sc-lifecycle-fallback-status')) {
+      const fallback = new FakeElement(this._page, 'div');
+      fallback.ownerDocument = this.ownerDocument;
+      fallback.setAttribute('data-sc-lifecycle-fallback-status', '');
+      this.appendChild(fallback);
+    }
   }
 
   get isConnected() {
     let current = this;
     while (current) {
       if (current === this.ownerDocument) return true;
+      current = current.parentNode;
+    }
+    return false;
+  }
+
+  contains(candidate) {
+    let current = candidate;
+    while (current) {
+      if (current === this) return true;
       current = current.parentNode;
     }
     return false;
@@ -196,6 +217,9 @@ class FakeElement extends ListenerTarget {
     if (selector === '[data-sc-status]') {
       return this._attributes.has('data-sc-status') || Object.prototype.hasOwnProperty.call(this.dataset, 'scStatus');
     }
+    if (selector === '[data-sc-lifecycle-fallback-status]') {
+      return this._attributes.has('data-sc-lifecycle-fallback-status');
+    }
     return false;
   }
 
@@ -214,6 +238,7 @@ class FakeElement extends ListenerTarget {
   querySelector(selector) {
     return this.querySelectorAll(selector)[0] || null;
   }
+
 }
 
 class FakeDocument extends ListenerTarget {
@@ -244,6 +269,10 @@ class FakeDocument extends ListenerTarget {
 
   querySelector(selector) {
     return this.querySelectorAll(selector)[0] || null;
+  }
+
+  getElementById(id) {
+    return this.querySelector(`#${String(id)}`);
   }
 }
 
@@ -625,6 +654,10 @@ class FakePage {
 
   dispatchPageShow(persisted = true) {
     this.window.dispatchEvent({ type: 'pageshow', persisted: Boolean(persisted) });
+  }
+
+  dispatchPageHide(persisted = true) {
+    this.window.dispatchEvent({ type: 'pagehide', persisted: Boolean(persisted) });
   }
 
   async runIntervals() {

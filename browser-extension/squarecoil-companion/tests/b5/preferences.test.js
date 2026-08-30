@@ -53,7 +53,7 @@ test('UT-B5-PREF-002 initialization preserves valid v0.7 appearance and Timer Li
   assert.equal(validateDocument(document), true);
 });
 
-test('UT-B5-PREF-012 page-local v0.7 settings preserve nested appearance and limits with optional packs still off', () => {
+test('UT-B5-PREF-012 page-local v0.7 Glass settings preserve appearance and limits with the background integrated', () => {
   const raw = JSON.stringify({
     settings: {
       themePreference: 'auto',
@@ -73,7 +73,7 @@ test('UT-B5-PREF-012 page-local v0.7 settings preserve nested appearance and lim
     timerAppearance: 'AUTO',
     panelFinish: 'GLASS',
     websiteTheme: 'SLEEK_DARK',
-    cinematicBackground: 'NONE',
+    cinematicBackground: 'CINEMATIC',
     dashboardProfile: 'OFF',
     yellowMinutes: 15,
     orangeMinutes: 45,
@@ -158,13 +158,13 @@ test('UT-B5-PREF-009 unsupported preference fields and duplicate initialization 
   assert.throws(() => validatePreferencePatch({ secretFeature: true }), /preference-patch-field-unsupported/);
 });
 
-test('UT-B5-PREF-010 v1 preference storage migrates to v2 with optional packs off by default', () => {
+test('UT-B5-PREF-010 v1 preference storage migrates to v2 with Glass background integrated and dashboard off', () => {
   const legacy = { preferencesSchemaVersion: 1, preferenceRevision: 7, timerAppearance: 'DARK', panelFinish: 'GLASS',
     websiteTheme: 'SLEEK_DARK', yellowMinutes: 15, orangeMinutes: 30, redMinutes: 60 };
   const normalized = normalizePreferenceSnapshot(legacy);
   assert.equal(normalized.initialized, true);
   assert.equal(normalized.preferenceRevision, 7);
-  assert.equal(normalized.cinematicBackground, 'NONE');
+  assert.equal(normalized.cinematicBackground, 'CINEMATIC');
   assert.equal(normalized.dashboardProfile, 'OFF');
   const restored = restoredPreferenceStorage(legacy, legacy);
   assert.equal(restored.preferencesSchemaVersion, 2);
@@ -188,4 +188,6 @@ test('UT-B5-PREF-013 Light Glass is durable while the Dark Glass name preserves 
   assert.equal(validatePreferencePatch({ websiteTheme: 'LIGHT_GLASS' }).websiteTheme, 'LIGHT_GLASS');
   assert.equal(normalizePreferenceSnapshot({ websiteTheme: 'DARK_GLASS' }).websiteTheme, 'SLEEK_DARK');
   assert.equal(normalizePreferenceSnapshot({ websiteTheme: 'LIGHT_GLASS' }).websiteTheme, 'LIGHT_GLASS');
+  assert.equal(normalizePreferenceSnapshot({ websiteTheme: 'LIGHT_GLASS', cinematicBackground: 'NONE' }).cinematicBackground, 'CINEMATIC');
+  assert.equal(normalizePreferenceSnapshot({ websiteTheme: 'REFINED_LIGHT', cinematicBackground: 'CINEMATIC' }).cinematicBackground, 'NONE');
 });
