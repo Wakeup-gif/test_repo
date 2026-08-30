@@ -15,6 +15,7 @@ Branch: `codex/squarecoil-b2c-migration`
 - B6 Full Acceptance / Candidate Packaging: accepted against the same exact source.
 - B5-D Theme/UI Delta: accepted at exact implementation source `4686ab0c92ce7e4b91a92bc64b479a2bd0ea01c0`.
 - Glass/theme and recovery stabilization: aggregate and exact installed Chrome/Edge clean-plus-upgrade acceptance passed at implementation source `aabdebc87224211b8897a7e1ded7b94ddacdd19a`; the optional live Bing permission grant remains a manual supplemental check.
+- UI/theme/lab/Figma stabilization: authorized and in exact-candidate acceptance. Scope is limited to the sealed fictional lab, coherent integrated Glass presentation, protruding scroll/reorder/archive tabs, fail-closed archive authority, and the code-aligned Figma handoff.
 
 No merge/promotion to `main`, release/store publication, or new live SquareCoil mutation is authorized.
 
@@ -44,7 +45,7 @@ Exact clean implementation source `4686ab0c92ce7e4b91a92bc64b479a2bd0ea01c0` pas
 
 ## Next authorization boundary
 
-There is no later implementation gate authorized. Merge/promotion to `main`, release/store publication, rollout, further feature work, and new live SquareCoil mutations require separate exact instructions.
+Complete and push only the current UI/theme/lab/Figma stabilization batch and its exact evidence. There is no later implementation gate authorized. Merge/promotion to `main`, release/store publication, rollout, B7 work, further feature expansion, and live SquareCoil mutations require separate exact instructions.
 
 ## Safety boundary
 

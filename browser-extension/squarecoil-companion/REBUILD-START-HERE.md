@@ -18,7 +18,7 @@ If chat context is lost or implementation direction becomes unclear, start here 
 
 **Logic status:** L0-L8 settled + post-mine L5A tab/focus delta settled
 
-**Implementation status:** B1 through B6 and B5-D accepted; Glass/theme and recovery stabilization accepted at exact implementation source `aabdebc87224211b8897a7e1ded7b94ddacdd19a`, with optional live Bing permission proof still manual
+**Implementation status:** B1 through B6, B5-D, and the prior Glass/theme recovery batch remain accepted; the authorized UI/theme/lab/Figma stabilization candidate is pending exact aggregate, sealed-lab, visual, and installed Chrome/Edge acceptance
 
 **Workspace UI:** canonical B3 Main/Recent/Overview/By Day/By Context/Context Detail/History implementation present
 
@@ -26,7 +26,7 @@ If chat context is lost or implementation direction becomes unclear, start here 
 
 **Logic delta authority:** `logic/L5A-TAB-PARITY-FOCUS-DELTA.md`
 
-**Next canonical build action:** manually confirm the optional Bing permission and rotating-image render on the exact ZIP before any store-submission decision; publication and promotion remain separately gated
+**Next canonical build action:** finish the exact UI/theme/lab/Figma stabilization candidate, run clean-plus-upgrade installed Chrome/Edge acceptance on unchanged bytes, record evidence, and push the existing branch; optional live Bing permission remains supplemental and publication/promotion remain separately gated
 
 The user explicitly authorized sequential B3 through B6 work on this existing branch. That authorization does not promote the branch to production, authorize a release/store upload, or authorize new live SquareCoil mutations.
 
@@ -185,7 +185,7 @@ Settlement remains acceptance-gated: all required automated checks, clean exact-
 
 ## Next action
 
-B5-D and B6 are complete, and the authorized Glass/theme and recovery stabilization batch is active on the existing branch. Preserve the historical SHA-bound B5-C/B5-D/B6 evidence, produce a new exact candidate without rewriting that history, run the required installed Chrome/Edge gates, commit the evidence, and push this branch. No merge to `main`, production promotion, release/store publication, rollout, or new live mutation is authorized without a separate exact instruction.
+B5-D and B6 remain complete, and the authorized UI/theme/lab/Figma stabilization batch is active on the existing branch. Preserve the historical SHA-bound B5-C/B5-D/B6 and Glass-recovery evidence, produce a new exact candidate without rewriting that history, run the required sealed-lab and installed Chrome/Edge gates, commit the evidence, and push this branch. No merge to `main`, production promotion, release/store publication, rollout, B7 work, or live mutation is authorized without a separate exact instruction.
 
 ---
 
@@ -233,6 +233,6 @@ Optional presentation must never block a core build that does not include it.
 
 ## Logic readiness
 
-**Accepted through B6; no later gate is authorized.**
+**Accepted through B6; the bounded UI/theme/lab/Figma stabilization batch is authorized, but no later product gate is authorized.**
 
 There are no open framework or Logic blockers in the accepted candidate. Promotion and publication remain separate decisions.

@@ -10,6 +10,7 @@ const {
   assertWorkdayZone,
   assertLocalDate,
   timerKind,
+  isCleanCheckpointDisposition,
   validateSegment,
   validateMigrationMetadata,
   validateDocument
@@ -206,18 +207,39 @@ function currentNativeContextId(document) {
   return typeof observation.contextId === 'string' ? observation.contextId : null;
 }
 
+function unresolvedRecoveryContextIds(document) {
+  const knownContextIds = new Set(Object.keys(document.contexts || {}).map(String));
+  const result = new Set();
+  const checkpoint = document.checkpoint;
+  const checkpointId = checkpoint?.contextId;
+  if (typeof checkpointId === 'string' && knownContextIds.has(checkpointId) &&
+      !isCleanCheckpointDisposition(checkpoint?.terminationDisposition)) {
+    result.add(checkpointId);
+  }
+  const candidates = document.migration?.recoveryCandidates;
+  if (isRecord(candidates)) {
+    const records = [candidates, ...Object.values(candidates)].filter(isRecord);
+    for (const candidate of records) {
+      const contextId = candidate.contextId;
+      if (typeof contextId === 'string' && knownContextIds.has(contextId)) result.add(contextId);
+    }
+  }
+  return result;
+}
+
 function protectedContextIds(document) {
   return new Set([
     document.timer?.active?.contextId,
     document.timer?.pending?.contextId,
     document.timer?.localPause?.contextId,
-    currentNativeContextId(document)
+    currentNativeContextId(document),
+    ...unresolvedRecoveryContextIds(document)
   ].filter(Boolean).map(String));
 }
 
 function unresolvedRecovery(document) {
   const checkpoint = document.checkpoint;
-  const checkpointTiming = checkpoint && [
+  const checkpointTiming = checkpoint && !isCleanCheckpointDisposition(checkpoint.terminationDisposition) && [
     checkpoint.contextId,
     checkpoint.sessionId,
     checkpoint.cycleId,
@@ -991,6 +1013,9 @@ function stageDataOperation(document, request = {}, options = {}) {
     const contextId = requireText(request.contextId, 'data-context-id-required');
     const context = candidate.contexts[contextId];
     if (!context) throw new Error('data-context-not-found');
+    if (context.workspaceMembership !== 'RECENT' || context.archivedAtMs != null) {
+      throw new Error('data-context-not-recent');
+    }
     if (protectedIds.has(contextId)) throw new Error('data-context-protected');
     context.workspaceMembership = 'ARCHIVED'; context.archivedAtMs = nonNegativeInteger(request.atMs, 'data-operation-time-invalid');
     summary.archivedCount = 1;

@@ -3,12 +3,14 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { canonicalFileBytes } = require('./canonical-text');
 
 const EXPLICIT_INPUTS = Object.freeze([
   'manifest.json',
   'popup/popup.css',
   'popup/popup.html',
   'scripts/build.js',
+  'scripts/canonical-text.js',
   'scripts/candidate-identity.js',
   'scripts/package-inventory.js'
 ]);
@@ -36,13 +38,13 @@ function candidateInputFiles(root) {
 
 function computeCandidateFingerprint(root) {
   const hash = crypto.createHash('sha256');
-  hash.update('squarecoil-companion-rebuild-candidate-v2\0', 'utf8');
+  hash.update('squarecoil-companion-rebuild-candidate-v3\0', 'utf8');
   for (const relative of candidateInputFiles(root)) {
     const absolute = path.join(root, ...relative.split('/'));
     if (!fs.existsSync(absolute) || !fs.statSync(absolute).isFile()) {
       throw new Error(`Missing candidate identity input: ${relative}`);
     }
-    const contents = fs.readFileSync(absolute);
+    const contents = canonicalFileBytes(absolute);
     hash.update(relative, 'utf8');
     hash.update('\0', 'utf8');
     hash.update(String(contents.length), 'utf8');

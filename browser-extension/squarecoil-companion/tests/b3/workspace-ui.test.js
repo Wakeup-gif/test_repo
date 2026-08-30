@@ -52,13 +52,34 @@ async function harness(options = {}) {
   const storageListeners = new Set();
   const writes = [];
   const timerActions = [];
+  let tabNodes = [];
   let intervalCallback = null;
   let throwRead = false;
+  let renderedHtml = '';
+  const technicalDetails = { open: false };
+  const fileInput = {
+    files: [], value: '', clickCount: 0,
+    click() { this.clickCount += 1; },
+    closest(selector) { return selector === '[data-sc-data-file]' ? this : null; }
+  };
   const root = {
-    dataset: {}, innerHTML: '', classList: { add() {} },
+    dataset: {}, classList: { add() {} },
+    get innerHTML() { return renderedHtml; },
+    set innerHTML(value) {
+      renderedHtml = String(value);
+      if (renderedHtml.includes('class="sc-technical"')) {
+        technicalDetails.open = /class="sc-technical" open/.test(renderedHtml);
+      }
+    },
     addEventListener(type, listener) { listeners[type] = listener; },
     removeEventListener(type, listener) { if (listeners[type] === listener) delete listeners[type]; },
-    contains() { return true; }, querySelector() { return null; }
+    contains() { return true; },
+    querySelector(selector) {
+      if (selector === '.sc-technical' && renderedHtml.includes('class="sc-technical"')) return technicalDetails;
+      if (selector === '[data-sc-data-file]' && renderedHtml.includes('data-sc-data-file')) return fileInput;
+      return null;
+    },
+    querySelectorAll(selector) { return selector === '.sc-tab[data-context]' ? tabNodes : []; }
   };
   const document = { getElementById(id) { return id === ROOT_ID ? root : null; } };
   const window = {
@@ -75,10 +96,17 @@ async function harness(options = {}) {
   };
   const timer = makeTimer();
   options.prepareTimer?.(timer);
-  const core = { status: 'trusted-core-owner-active', blocked: false, timer };
+  const core = { initialized: true, status: 'trusted-core-owner-active', blocked: false, timer,
+    data: { revision: timer.revision, recentRows: timer.contextRows.map(row => ({
+      contextId: row.contextId, label: row.label, protected: row.status !== 'NOT_RUNNING'
+    })) } };
   const handle = {
     coreSnapshot(view) {
       if (throwRead) throw new Error('transient-read');
+      core.data.revision = timer.revision;
+      core.data.recentRows = timer.contextRows.filter(row => row.workspaceMembership === 'RECENT').map(row => ({
+        contextId: row.contextId, label: row.label, protected: row.status !== 'NOT_RUNNING'
+      }));
       timer.historyHasMore = view.historyLimit < timer.historyTotal;
       timer.historyRows = Array.from({ length: Math.min(view.historyLimit, timer.historyTotal) }, (_, index) => ({ logicalSessionId: `logical-${index}`, sessionId: `session-${index}`, cycleId: `cycle-${index}`, contextId: 'job:101', label: 'Job 101', startAtMs: index * 1000, endAtMs: index * 1000 + 500, durationMs: 500, localDate: '2026-08-28', localDates: ['2026-08-28'], segmentIds: [`segment-${index}`] }));
       return structuredClone(core);
@@ -96,7 +124,22 @@ async function harness(options = {}) {
     listeners.dblclick({ target, isTrusted: true });
   }
   function storageChange(changes) { for (const listener of storageListeners) listener(changes, 'local'); }
-  return { ui, root, timer, core, writes, timerActions, click, doubleClick, storageChange, setThrowRead(value) { throwRead = value; }, intervalCallback: () => intervalCallback };
+  function beginNativeDrag(contextId) {
+    const target = { dataset: { context: contextId }, closest(selector) { return selector === '.sc-tab[data-context]' ? target : null; } };
+    listeners.dragstart({ target, isTrusted: true, dataTransfer: { setData() {}, effectAllowed: '' } });
+  }
+  function arrowKey(contextIds, activeIndex, key) {
+    tabNodes = contextIds.map(contextId => ({ dataset: { context: contextId },
+      closest(selector) { return selector === '.sc-tab[data-context]' ? this : null; } }));
+    listeners.keydown({ target: tabNodes[activeIndex], key, preventDefault() {}, stopPropagation() {} });
+  }
+  return { ui, root, timer, core, writes, timerActions, click, doubleClick, storageChange, beginNativeDrag,
+    endNativeDrag() { listeners.dragend?.({}); }, arrowKey,
+    setThrowRead(value) { throwRead = value; }, intervalCallback: () => intervalCallback,
+    setTechnicalDetailsOpen(value) { technicalDetails.open = value === true; },
+    fileInput,
+    cancelFilePicker() { listeners.cancel?.({ target: fileInput }); }
+  };
 }
 
 test('UT-B3-UI-001 compact tabs expose Today, threshold meaning, operational status, and accessibility text together', async () => {
@@ -105,6 +148,8 @@ test('UT-B3-UI-001 compact tabs expose Today, threshold meaning, operational sta
   assert.match(h.root.innerHTML, /Yellow timer limit/);
   assert.match(h.root.innerHTML, /Today 1h 00m/);
   assert.match(h.root.innerHTML, /Running/);
+  assert.match(h.root.innerHTML, /\.sc-tab\[data-threshold="YELLOW"\]\{--sc-tab-threshold:#d9a51f\}/);
+  assert.match(h.root.innerHTML, /button\.sc-tab\{[^}]*box-shadow:inset 0 3px var\(--sc-tab-threshold\)[^}]*!important/);
   h.ui.teardown();
 });
 
@@ -272,5 +317,163 @@ test('UT-B3-UI-013 double click selects and expands while the single-click path 
   assert.equal(h.root.dataset.protoCollapsed, 'false');
   assert.match(h.root.innerHTML, /Job 202/);
   assert.deepEqual(h.timerActions, []);
+  h.ui.teardown();
+});
+
+test('UT-B3-UI-014 job tabs protrude above the Companion frame with scroll and drag instructions', async () => {
+  const h = await harness();
+  const tabsAt = h.root.innerHTML.indexOf('class="sc-tabs"');
+  const shellAt = h.root.innerHTML.indexOf('class="sc-proto-shell"');
+  assert.ok(tabsAt >= 0 && shellAt > tabsAt);
+  assert.match(h.root.innerHTML, /role="tablist"/);
+  assert.match(h.root.innerHTML, /Swipe sideways to see more jobs\. Drag tabs to reorder/);
+  assert.match(h.root.innerHTML, /class="sc-tab-slot"/);
+  assert.match(h.root.innerHTML, /class="sc-tab-x"/);
+  assert.equal(h.root.dataset.hasTabs, 'true');
+  h.ui.teardown();
+});
+
+test('UT-B3-UI-015 a cross-tab workspace update cancels an active drag before rerendering', async () => {
+  const h = await harness();
+  h.beginNativeDrag('job:202');
+  assert.equal(h.root.dataset.dragging, 'true');
+  h.storageChange({ b3WorkspaceOrder: { newValue: ['job:303', 'job:202', 'job:101'] },
+    b3WorkspaceRevision: { newValue: Date.now() + 5_000 } });
+  assert.equal(h.root.dataset.dragging, 'false');
+  assert.equal(h.timerActions.length, 0);
+  h.ui.teardown();
+});
+
+test('UT-B3-UI-016 tab Arrow, Home, and End keys use manual activation without Timer commands', async () => {
+  const h = await harness();
+  h.arrowKey(['job:101', 'job:202', 'job:303'], 0, 'ArrowRight');
+  assert.equal(h.writes.at(-1).b3LastSelectedContextId, 'job:202');
+  h.arrowKey(['job:101', 'job:202', 'job:303'], 1, 'End');
+  assert.equal(h.writes.at(-1).b3LastSelectedContextId, 'job:303');
+  h.arrowKey(['job:101', 'job:202', 'job:303'], 2, 'Home');
+  assert.equal(h.writes.at(-1).b3LastSelectedContextId, 'job:101');
+  assert.deepEqual(h.timerActions, []);
+  h.ui.teardown();
+});
+
+test('UT-B3-UI-017 narrow archive guidance rises above the Companion instead of hiding under it', async () => {
+  const h = await harness();
+  assert.match(h.root.innerHTML, /@media\(max-width:760px\)\{#ussign-job-timer \.sc-archive-veil\{z-index:9;place-items:center;padding:20px\}\}/);
+  assert.match(h.root.innerHTML, /\.sc-archive-veil\{position:fixed;z-index:1;inset:0/);
+  assert.match(h.root.innerHTML, /\.sc-archive-veil>div\{[^}]*background:#141b22/);
+  assert.match(h.root.innerHTML, /\.sc-archive-veil small\{color:#d6e0e8!important\}/);
+  assert.match(h.root.innerHTML, /@media\(forced-colors:active\)[\s\S]*\.sc-archive-veil small\{color:CanvasText!important\}/);
+  assert.deepEqual(h.timerActions, []);
+  h.ui.teardown();
+});
+
+test('UT-B3-UI-018 Main rejects a persisted archived selection but explicit Context Detail preserves it', async () => {
+  const h = await harness({
+    preferences: { b3LastSelectedContextId: 'job:202' },
+    prepareTimer(timer) {
+      const archived = timer.contextRows.find(row => row.contextId === 'job:202');
+      archived.workspaceMembership = 'ARCHIVED';
+      archived.archivedAtMs = 5_000;
+    }
+  });
+
+  assert.match(h.root.innerHTML, /data-context="job:101" data-selected="true"/);
+  assert.doesNotMatch(h.root.innerHTML, /data-context="job:202" data-selected="true"/);
+  assert.equal(h.writes.some(write => write.b3LastSelectedContextId === 'job:101'), true);
+
+  h.click({ action: 'context-detail', context: 'job:202' });
+  assert.match(h.root.innerHTML, /Context Detail/);
+  assert.match(h.root.innerHTML, /Job 202/);
+  h.ui.teardown();
+});
+
+test('UT-B3-UI-019 Main reconciles when another authority archives the selected job', async () => {
+  const h = await harness();
+  h.click({ action: 'select', context: 'job:202' });
+  assert.match(h.root.innerHTML, /data-context="job:202" data-selected="true"/);
+
+  const archived = h.timer.contextRows.find(row => row.contextId === 'job:202');
+  archived.workspaceMembership = 'ARCHIVED';
+  archived.archivedAtMs = 6_000;
+  h.timer.revision += 1;
+  h.ui.render();
+
+  assert.match(h.root.innerHTML, /data-context="job:101" data-selected="true"/);
+  assert.doesNotMatch(h.root.innerHTML, /data-context="job:202" data-selected="true"/);
+  assert.equal(h.writes.at(-1).b3LastSelectedContextId, 'job:101');
+  assert.deepEqual(h.timerActions, []);
+  h.ui.teardown();
+});
+
+test('UT-B3-UI-020 Show in Tabs promotes and selects an automatically overflowed job', async () => {
+  const h = await harness({
+    prepareTimer(timer) {
+      for (const [projectId, lastSeenAtMs] of [['404', 2_997], ['505', 2_996], ['606', 1]]) {
+        const template = structuredClone(timer.contextRows[1]);
+        Object.assign(template, {
+          contextId: `job:${projectId}`, projectId, label: `Job ${projectId}`, shortLabel: projectId,
+          lastSeenAtMs, lastRecordedActivityAtMs: lastSeenAtMs, todayMs: 0, totalMs: 0,
+          status: 'NOT_RUNNING', isOperational: false
+        });
+        timer.contextRows.push(template);
+        timer.contextDetails[template.contextId] = { ...structuredClone(template), weekMs: 0, datedMs: 0, dailyRows: [], finalizedSessions: [] };
+      }
+    }
+  });
+
+  h.click({ action: 'view', view: 'recent' });
+  assert.match(h.root.innerHTML, /data-action="show-tab" data-context="job:606"/);
+  h.click({ action: 'show-tab', context: 'job:606' });
+
+  assert.match(h.root.innerHTML, /data-context="job:606" data-selected="true"/);
+  assert.deepEqual(h.timerActions, []);
+  h.ui.teardown();
+});
+
+test('UT-B3-UI-021 drag end flushes an authoritative Context change deferred during the native drag', async () => {
+  const h = await harness();
+  h.beginNativeDrag('job:202');
+  const first = h.timer.contextRows.find(row => row.contextId === 'job:101');
+  const second = h.timer.contextRows.find(row => row.contextId === 'job:202');
+  first.status = 'NOT_RUNNING'; first.isOperational = false;
+  second.status = 'RUNNING'; second.isOperational = true;
+  h.timer.currentContextId = second.contextId;
+  h.timer.revision += 1;
+  h.intervalCallback()();
+  assert.doesNotMatch(h.root.innerHTML, /Working now[\s\S]*Job 202/);
+  h.endNativeDrag();
+  assert.match(h.root.innerHTML, /Working now[\s\S]*Job 202/);
+  assert.equal(h.root.dataset.dragging, 'false');
+  h.ui.teardown();
+});
+
+test('UT-B3-UI-022 live diagnostics refresh preserves the user-open Technical details section', async () => {
+  const h = await harness();
+  h.click({ action: 'open-diagnostics' });
+  assert.match(h.root.innerHTML, /<details class="sc-technical">/);
+  h.setTechnicalDetailsOpen(true);
+  h.timer.revision += 1;
+  h.intervalCallback()();
+  assert.match(h.root.innerHTML, /<details class="sc-technical" open>/);
+  h.ui.teardown();
+});
+
+test('UT-B3-UI-023 canceling the file picker resumes live authority refresh', async () => {
+  const h = await harness();
+  h.click({ action: 'view', view: 'data-tools' });
+  h.click({ action: 'pick-file', fileMode: 'BACKUP_MERGE' });
+  assert.equal(h.fileInput.clickCount, 1);
+
+  const first = h.timer.contextRows.find(row => row.contextId === 'job:101');
+  const second = h.timer.contextRows.find(row => row.contextId === 'job:202');
+  first.status = 'NOT_RUNNING'; first.isOperational = false;
+  second.status = 'RUNNING'; second.isOperational = true;
+  h.timer.currentContextId = second.contextId;
+  h.timer.revision += 1;
+  h.intervalCallback()();
+  assert.doesNotMatch(h.root.innerHTML, /data-context="job:202"[^>]*data-operational="true"/);
+
+  h.cancelFilePicker();
+  assert.match(h.root.innerHTML, /data-context="job:202"[^>]*data-operational="true"/);
   h.ui.teardown();
 });

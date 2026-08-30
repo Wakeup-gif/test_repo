@@ -23,8 +23,51 @@ test('UT-B5-THEME-020 authoritative Glass ports preserve the pinned source layer
   assert.match(dark, /Theme-v2\.3\.4\.user\.js/);
   assert.match(light, /html\.us-sign-v240\.us-sign-theme-light-glass/);
   assert.match(light, /Light-Glass-Theme-v1\.0\.0\.user\.js/);
-  assert.match(light, /Companion compatibility delta/);
-  assert.match(light, /html\.us-sign-v240 body #content :is\(\.panel-body,\.panel-footer,\.table-responsive\)/);
+  assert.match(light, /Companion compatibility delta for Light Glass/);
+  assert.match(light, /html\.us-sign-v240\.us-sign-theme-light-glass body/);
+});
+
+test('UT-B5-THEME-027 terminal Glass compatibility owns production outer surfaces and Light rail text', () => {
+  const generator = read('scripts/generate-authoritative-theme-port.js');
+  const dark = read('src/presentation/ports/dark-glass.css');
+  const light = read('src/presentation/ports/light-glass.css');
+  assert.match(generator, /10af15634a10026c536f5dc570ec781af700c908/);
+  assert.doesNotMatch(generator, /origin\/codex\/squarecoil-theme-v2\.3\.3/);
+  assert.match(generator, /readFileSync\(outputPath, 'utf8'\)\.replace\(\/\\r\\n\?\/g, '\\n'\)/);
+  assert.match(dark, /Companion compatibility delta for Dark Glass/);
+  assert.match(dark, /html\.us-sign-v230\.us-sign-theme-dark-glass body/);
+  assert.match(dark, /background-color:\s*var\(--v230-surface\)\s*!important/);
+  assert.match(light, /#customer-name,#customer-info,#showbtns,#mapcontainer,#filesbox/);
+  assert.match(light, /#descriptionbox,#projectbox,#designbox,#us-sign-design-project-header/);
+  assert.match(light, /background-color:\s*var\(--usl-surface\)\s*!important/);
+  assert.match(light, /body #pmlt[\s\S]*background-color:\s*var\(--us-squarecoil-glass\)\s*!important/);
+  assert.match(light, /html\.us-sign-v240\.us-sign-theme-light-glass \{[\s\S]*--us-text:\s*var\(--usl-text\)\s*!important[\s\S]*--us-text-soft:\s*var\(--usl-text-soft\)\s*!important[\s\S]*--us-text-muted:\s*var\(--usl-muted\)\s*!important/);
+  assert.match(light, /html\.us-sign-v240\.us-sign-theme-light-glass body :is\([\s\S]*\)::placeholder \{[\s\S]*color:\s*var\(--usl-muted\)\s*!important[\s\S]*opacity:\s*\.82\s*!important/);
+  assert.match(light, /body #customer-name :is\(h1,h2,h3,\.panel-title,\.project-number,\.project-name\)/);
+  assert.match(light, /body #content :is\(\.panel-body,\.panel-footer,\.table-responsive\)/);
+  assert.match(light, /background-color:\s*transparent\s*!important[\s\S]*backdrop-filter:\s*none\s*!important/);
+});
+
+test('UT-B5-THEME-028 terminal Light compatibility owns generic content panels without selecting native controls', () => {
+  const light = read('src/presentation/ports/light-glass.css');
+  const rule = /html\.us-sign-v240\.us-sign-theme-light-glass body #content :is\(\.panel,\.panel-default\):not\(\.alert\):not\(\[data-us-state\]\) \{[\s\S]*?\}/.exec(light)?.[0];
+  const textRule = /body #content :is\(\.panel,\.panel-default\):not\(\.alert\):not\(\[data-us-state\]\) :is\([\s\S]*?strong,b,small,a:not\(\.btn\)[\s\S]*?\) \{[\s\S]*?\}/.exec(light)?.[0];
+  assert.ok(rule);
+  assert.ok(textRule);
+  assert.match(rule, /background-color:\s*var\(--usl-surface\)\s*!important/);
+  assert.match(rule, /backdrop-filter:\s*var\(--us-squarecoil-live-frost\)\s*!important/);
+  assert.doesNotMatch(rule, /button|input|select|textarea|\.btn/);
+  assert.match(textRule, /color:\s*var\(--usl-text\)\s*!important/);
+  assert.match(textRule, /text-shadow:\s*none\s*!important/);
+});
+
+test('UT-B5-THEME-029 terminal Dark compatibility replaces old graphite generic panels and clears nested exact layers', () => {
+  const dark = read('src/presentation/ports/dark-glass.css');
+  const generic = /html\.us-sign-v230\.us-sign-theme-dark-glass body #content :is\(\.panel,\.panel-default,\.well\):not\(\.alert\):not\(\[data-us-state\]\) \{[\s\S]*?\}/.exec(dark)?.[0];
+  assert.ok(generic);
+  assert.match(generic, /background-color:\s*var\(--v230-surface\)\s*!important/);
+  assert.doesNotMatch(generic, /rgba\(11,\s*11,\s*14/);
+  assert.match(dark, /body #content :is\([\s\S]*?#customer-name,#customer-info[\s\S]*?\) :is\(\.panel,\.well,\.panel-body,\.panel-footer,\.table-responsive\) \{[\s\S]*?background-color:\s*transparent\s*!important[\s\S]*?backdrop-filter:\s*none\s*!important/);
 });
 
 test('UT-B5-THEME-021 document start orders the bounded fail-open presentation bootstrap before authority startup', () => {

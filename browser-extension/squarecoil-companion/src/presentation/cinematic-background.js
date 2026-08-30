@@ -62,7 +62,9 @@ function createCinematicBackground(options = {}) {
   let reason = 'preference-none';
   let source = null;
   let currentImage = null;
+  let currentImageSource = null;
   let fallbackVisible = false;
+  let fallbackReason = null;
   let activeLayer = 'a';
   let inFlight = null;
   let refreshTimer = null;
@@ -101,7 +103,14 @@ function createCinematicBackground(options = {}) {
     clearTimer();
     for (const node of Array.from(document.querySelectorAll?.(`#${CINEMATIC_HOST_ID}, #${CINEMATIC_STYLE_ID}`) || [])) node.remove?.();
     document.documentElement?.removeAttribute?.(CINEMATIC_ATTRIBUTE);
-    if (!retainImage) { currentImage = null; fallbackVisible = false; source = null; activeLayer = 'a'; }
+    if (!retainImage) {
+      currentImage = null;
+      currentImageSource = null;
+      fallbackVisible = false;
+      fallbackReason = null;
+      source = null;
+      activeLayer = 'a';
+    }
   }
 
   function ensureOwned() {
@@ -141,12 +150,12 @@ function createCinematicBackground(options = {}) {
 
   function eligible() {
     if (preferences.cinematicBackground !== 'CINEMATIC') return { state: 'DISABLED', reason: 'preference-none' };
-    if (!['SLEEK_DARK', 'LIGHT_GLASS'].includes(basePresentation.websiteThemeEffective)) {
-      return { state: 'SUSPENDED_THEME', reason: 'glass-theme-required' };
-    }
     if (basePresentation.forcedColors === true || basePresentation.reducedTransparency === true ||
         forcedMedia?.matches === true || transparencyMedia?.matches === true) {
       return { state: 'SUSPENDED_ACCESSIBILITY', reason: 'accessibility-override' };
+    }
+    if (!['SLEEK_DARK', 'LIGHT_GLASS'].includes(basePresentation.websiteThemeEffective)) {
+      return { state: 'SUSPENDED_THEME', reason: 'glass-theme-required' };
     }
     return null;
   }
@@ -171,7 +180,7 @@ function createCinematicBackground(options = {}) {
     });
   }
 
-  function showImage(dataUrl) {
+  function showImage(dataUrl, imageSource) {
     const host = ensureOwned();
     if (!host) return false;
     const incoming = activeLayer === 'a' ? 'b' : 'a';
@@ -187,11 +196,13 @@ function createCinematicBackground(options = {}) {
     outgoingNode.setAttribute?.('data-active', 'false');
     activeLayer = incoming;
     currentImage = dataUrl;
+    currentImageSource = imageSource;
     fallbackVisible = false;
+    fallbackReason = null;
     return true;
   }
 
-  function showFallback() {
+  function showFallback(nextReason = fallbackReason) {
     const host = ensureOwned();
     if (!host) return false;
     for (const layer of Array.from(host.querySelectorAll?.('.sc-cinematic-layer') || [])) {
@@ -200,7 +211,9 @@ function createCinematicBackground(options = {}) {
       layer.style?.removeProperty?.('background-image');
     }
     currentImage = null;
+    currentImageSource = null;
     fallbackVisible = true;
+    fallbackReason = typeof nextReason === 'string' && nextReason ? nextReason : 'fallback-used';
     return true;
   }
 
@@ -232,7 +245,9 @@ function createCinematicBackground(options = {}) {
         let ready = false;
         try { ready = await loadImage(candidate); } catch (_) { ready = false; }
         if (disposed || requestGeneration !== generation || eligible()) return snapshot();
-        if (ready && showImage(candidate)) {
+        const acceptedSource = candidateSource === 'CACHE' ? 'CACHE' :
+          candidateSource === 'CACHE_FRESH' ? 'CACHE_FRESH' : 'REMOTE';
+        if (ready && showImage(candidate, acceptedSource)) {
           scheduleRefresh();
           if (candidateSource === 'CACHE') return publish('DEGRADED_CACHE', result?.reason || 'remote-failed-cache-used', 'CACHE');
           if (candidateSource === 'CACHE_FRESH') return publish('SHOWING', result?.reason || 'fresh-cache-reused', 'CACHE_FRESH');
@@ -240,8 +255,10 @@ function createCinematicBackground(options = {}) {
         }
       }
       scheduleRefresh();
-      if (currentImage) return publish('SHOWING', 'candidate-rejected-current-retained', source);
-      if (showFallback()) return publish('DEGRADED_FALLBACK', result?.reason || 'fallback-used', 'FALLBACK');
+      if (currentImage) return publish(currentImageSource === 'CACHE' ? 'DEGRADED_CACHE' : 'SHOWING',
+        'candidate-rejected-current-retained', currentImageSource);
+      const nextFallbackReason = result?.reason || 'fallback-used';
+      if (showFallback(nextFallbackReason)) return publish('DEGRADED_FALLBACK', nextFallbackReason, 'FALLBACK');
       removeOwned({ retainImage: false });
       return publish('DEGRADED_NONE', result?.reason || 'no-safe-image', null);
     })().finally(() => { if (requestGeneration === generation) inFlight = null; });
@@ -264,12 +281,14 @@ function createCinematicBackground(options = {}) {
       layer?.style?.setProperty?.('background-image', cssUrl(currentImage));
       layer?.setAttribute?.('data-active', 'true');
       scheduleRefresh();
-      return publish(source === 'CACHE' ? 'DEGRADED_CACHE' : source === 'FALLBACK' ? 'DEGRADED_FALLBACK' : 'SHOWING', 'eligible-current-restored', source);
+      return publish(currentImageSource === 'CACHE' ? 'DEGRADED_CACHE' : 'SHOWING',
+        'eligible-current-restored', currentImageSource);
     }
     if (fallbackVisible) {
-      showFallback();
+      const restoredReason = fallbackReason || 'eligible-fallback-restored';
+      showFallback(restoredReason);
       scheduleRefresh();
-      return publish('DEGRADED_FALLBACK', 'eligible-fallback-restored', 'FALLBACK');
+      return publish('DEGRADED_FALLBACK', restoredReason, 'FALLBACK');
     }
     if (document.hidden === true) return publish('LOADING_INITIAL', 'hidden-deferred', null);
     void refresh('initial');

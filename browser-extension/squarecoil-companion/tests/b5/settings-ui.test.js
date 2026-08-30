@@ -277,3 +277,30 @@ test('UT-B5-UI-014 blocked startup keeps safe Settings and diagnostics available
   assert.match(h.root.innerHTML, /Advanced diagnostics/);
   h.ui.teardown();
 });
+
+test('UT-B5-UI-017 SquareCoil theme reports the real Bing source instead of calling every fallback a saved wallpaper', async () => {
+  const h = await harness();
+  h.core.presentation.optional.cinematic = { state: 'DEGRADED_FALLBACK', source: 'FALLBACK', reason: 'optional-origin-permission-required' };
+  h.click({ action: 'view', view: 'settings' });
+  h.click({ action: 'settings-route', view: 'website-theme' });
+  assert.match(h.root.innerHTML, /Built-in gradient active; allow Bing access in the toolbar popup/);
+  assert.doesNotMatch(h.root.innerHTML, /Using saved wallpaper/);
+  h.core.presentation.optional.cinematic = { state: 'SHOWING', source: 'REMOTE', reason: 'remote-loaded' };
+  h.ui.render();
+  assert.match(h.root.innerHTML, /Bing background active/);
+  h.ui.teardown();
+});
+
+test('UT-B5-UI-018 initial Bing loading and accessibility suspension have truthful status copy', async () => {
+  const h = await harness();
+  h.core.presentation.optional.cinematic = { state: 'LOADING_INITIAL', source: null, reason: 'initial' };
+  h.click({ action: 'view', view: 'settings' });
+  h.click({ action: 'settings-route', view: 'website-theme' });
+  assert.match(h.root.innerHTML, /Loading the Bing background; the readable gradient remains active/);
+
+  h.core.presentation.optional.cinematic = { state: 'SUSPENDED_ACCESSIBILITY', source: null, reason: 'accessibility-override' };
+  h.ui.render();
+  assert.match(h.root.innerHTML, /Built-in background only for accessibility/);
+  assert.doesNotMatch(h.root.innerHTML, /Choose Dark Glass or Light Glass/);
+  h.ui.teardown();
+});

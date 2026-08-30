@@ -20,6 +20,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Theme ports are regenerated from exact commits on the accepted
+          # theme-source branch. A shallow single-branch checkout cannot prove
+          # that provenance and makes the freshness check fail in CI.
+          fetch-depth: 0
 
       - name: Setup Node
         uses: actions/setup-node@v4

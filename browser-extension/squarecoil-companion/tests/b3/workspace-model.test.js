@@ -8,7 +8,8 @@ const {
   deriveTabWorkspace,
   focusIntentFromTimer,
   focusIntentIsCurrent,
-  moveContext
+  moveContext,
+  placeContext
 } = require('../../src/workspace/model');
 
 function row(index, values = {}) {
@@ -88,4 +89,23 @@ test('UT-B3-WORKSPACE-005 focus intent exists only for real incoming Context obs
 test('UT-B3-WORKSPACE-006 durable reorder moves presentation only and preserves every Context identity', () => {
   assert.deepEqual(moveContext(['job:1', 'job:2', 'job:3'], 'job:3', 'job:1'), ['job:3', 'job:1', 'job:2']);
   assert.deepEqual(moveContext(['job:1', 'job:2'], 'job:1'), ['job:2', 'job:1']);
+});
+
+test('UT-B3-WORKSPACE-007 placement-aware reorder supports before, after, and strip-end drops without losing identity', () => {
+  const order = ['job:1', 'job:2', 'job:3', 'job:4'];
+  assert.deepEqual(placeContext(order, 'job:4', 'job:2', 'before'), ['job:1', 'job:4', 'job:2', 'job:3']);
+  assert.deepEqual(placeContext(order, 'job:1', 'job:3', 'after'), ['job:2', 'job:3', 'job:1', 'job:4']);
+  assert.deepEqual(placeContext(order, 'job:2', null, 'after'), ['job:1', 'job:3', 'job:4', 'job:2']);
+  assert.deepEqual(new Set(placeContext(order, 'job:4', 'job:1', 'after')), new Set(order));
+});
+
+test('UT-B3-WORKSPACE-008 only exact RECENT membership can appear in tabs', () => {
+  const rows = [
+    row(1, { lastSeenAtMs: 30 }),
+    row(2, { lastSeenAtMs: 20, workspaceMembership: 'INACTIVE_NON_RECENT' }),
+    row(3, { lastSeenAtMs: 10, workspaceMembership: 'ARCHIVED', archivedAtMs: 10 })
+  ];
+  const value = deriveTabWorkspace(rows, { durableOrder: ['job:3', 'job:2', 'job:1'] });
+  assert.deepEqual(value.order, ['job:1']);
+  assert.deepEqual(value.visibleRows.map(item => item.contextId), ['job:1']);
 });

@@ -15,7 +15,7 @@ const {
   THRESHOLD_LABELS,
   deriveTabWorkspace,
   focusIntentIsCurrent,
-  moveContext
+  placeContext
 } = require('../workspace/model');
 
 const ROOT_ID = 'ussign-job-timer';
@@ -49,6 +49,7 @@ const TIMER_ACTIONS = Object.freeze({
 });
 const REFRESH_MS = 1_000;
 const HISTORY_PAGE_SIZE = 100;
+const COMPANION_DRAG_MIME = 'application/x-squarecoil-companion-tab';
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
@@ -112,7 +113,7 @@ function safeProjectId(value) {
 
 function eligibleRows(timer) {
   return (timer?.contextRows || []).filter(row => row.archivedAtMs == null &&
-    String(row.workspaceMembership || '').toUpperCase() !== 'ARCHIVED');
+    String(row.workspaceMembership || '').toUpperCase() === 'RECENT');
 }
 
 function deriveVisibleTabs(rows, state = {}) {
@@ -121,6 +122,30 @@ function deriveVisibleTabs(rows, state = {}) {
     ...state,
     hiddenContextIds: (state.hiddenContextIds || []).filter(value => !protectedIds.has(String(value)))
   }).visibleRows;
+}
+
+function archiveGestureEligibility(core, contextId, options = {}) {
+  const id = String(contextId || '');
+  const timer = core?.timer;
+  const data = core?.data;
+  const fail = (reason, message) => Object.freeze({ eligible: false, reason, message, contextId: id, label: null });
+  if (!id || core?.initialized !== true || options.snapshotStale === true || options.busy === true || core?.blocked === true) {
+    return fail('WORKSPACE_NOT_SETTLED', 'Companion is still verifying this workspace. The job was not archived.');
+  }
+  if (!timer || !data || !Number.isSafeInteger(timer.revision) || data.revision !== timer.revision) {
+    return fail('PROTECTION_STATE_UNAVAILABLE', 'Job protection could not be verified. The job was not archived.');
+  }
+  const timerRow = (timer.contextRows || []).find(row => String(row.contextId) === id);
+  const dataRow = (data.recentRows || []).find(row => String(row.contextId) === id);
+  if (!timerRow || !dataRow || timerRow.archivedAtMs != null ||
+      String(timerRow.workspaceMembership || '').toUpperCase() !== 'RECENT') {
+    return fail('CONTEXT_NOT_RECENT', 'Only a visible, inactive recent job can be archived from the tab strip.');
+  }
+  if (dataRow.protected !== false || timer.currentContextId === id || timerRow.status !== 'NOT_RUNNING') {
+    return fail('CONTEXT_PROTECTED', 'Current, paused, pending, or recovery-protected jobs cannot be archived.');
+  }
+  return Object.freeze({ eligible: true, reason: 'ELIGIBLE', message: 'Hours and history stay saved.',
+    contextId: id, label: String(timerRow.label || dataRow.label || id) });
 }
 
 function createWorkspaceUi(options = {}) {
@@ -167,7 +192,13 @@ function createWorkspaceUi(options = {}) {
   let selectionSerial = 0;
   let routeProtection = { dirty: false, inProgress: false };
   let draggedContextId = null;
+  let draggedArchiveEligibility = null;
+  let dragAttemptedOutside = false;
+  let ownedDragActive = false;
+  let archiveNotice = null;
+  let archiveNoticeTimer = null;
   let pendingFileMode = null;
+  let advancedDiagnosticsOpen = false;
   let pendingImport = null;
   let dataMessage = null;
   let legacyPreferenceCandidates = {};
@@ -223,7 +254,10 @@ function createWorkspaceUi(options = {}) {
 
   function mountRoot() {
     const candidate = document.getElementById(ROOT_ID);
-    if (!candidate) return null;
+    if (!candidate) {
+      if (draggedContextId) clearDragState({ preserveOwnership: true });
+      return null;
+    }
     if (root === candidate) return root;
     if (root && root !== candidate && SETTINGS_VIEW_IDS.has(view)) {
       view = 'settings';
@@ -235,6 +269,15 @@ function createWorkspaceUi(options = {}) {
       supportMessage = null;
       supportManualCopy = null;
     }
+    if (root && root !== candidate) {
+      if (draggedContextId) clearDragState({ preserveOwnership: true });
+      root.removeEventListener('click', onClick); root.removeEventListener('dblclick', onDoubleClick);
+      root.removeEventListener('submit', onSubmit); root.removeEventListener('dragstart', onDragStart);
+      root.removeEventListener('dragover', onDragOver); root.removeEventListener('drop', onDrop);
+      root.removeEventListener('dragend', onDragEnd); root.removeEventListener('change', onChange);
+      root.removeEventListener('cancel', onFileCancel);
+      root.removeEventListener('input', onInput); root.removeEventListener('keydown', onKeyDown);
+    }
     root = candidate;
     root.classList.add('sc-proto-root');
     root.addEventListener('click', onClick);
@@ -243,7 +286,9 @@ function createWorkspaceUi(options = {}) {
     root.addEventListener('dragstart', onDragStart);
     root.addEventListener('dragover', onDragOver);
     root.addEventListener('drop', onDrop);
+    root.addEventListener('dragend', onDragEnd);
     root.addEventListener('change', onChange);
+    root.addEventListener('cancel', onFileCancel);
     root.addEventListener('input', onInput);
     root.addEventListener('keydown', onKeyDown);
     return root;
@@ -272,6 +317,7 @@ function createWorkspaceUi(options = {}) {
   }
 
   function savePreferences() {
+    if (disposed) return;
     workspaceRevision = Math.max(workspaceRevision + 1, Date.now());
     storage.set({
       protoUiCollapsed: collapsed,
@@ -320,6 +366,7 @@ function createWorkspaceUi(options = {}) {
   }
 
   function onStorageChanged(changes, areaName) {
+    if (disposed) return;
     if (areaName && areaName !== 'local') return;
     if (!Object.keys(changes || {}).some(key => WORKSPACE_STORAGE_KEYS.has(key))) return;
     const incomingRevision = changes.b3WorkspaceRevision?.newValue;
@@ -327,6 +374,7 @@ function createWorkspaceUi(options = {}) {
     if (changes.protoUiHiddenTabs) hiddenTabs = new Set(Array.isArray(changes.protoUiHiddenTabs.newValue) ? changes.protoUiHiddenTabs.newValue.map(String) : []);
     if (changes.b3WorkspaceOrder) durableOrder = Array.isArray(changes.b3WorkspaceOrder.newValue) ? changes.b3WorkspaceOrder.newValue.map(String) : [];
     if (Number.isSafeInteger(incomingRevision)) workspaceRevision = incomingRevision;
+    if (draggedContextId) clearDragState({ preserveOwnership: true });
     render();
   }
 
@@ -338,7 +386,7 @@ function createWorkspaceUi(options = {}) {
   }
 
   function applyFocusIntent(intent, timer) {
-    if (!focusIntentIsCurrent(intent, timer)) return false;
+    if (!focusIntentIsCurrent(intent, timer) || !eligibleRows(timer).some(row => row.contextId === intent.contextId)) return false;
     hiddenTabs.delete(intent.contextId);
     selectedContextId = intent.contextId;
     view = 'main';
@@ -350,32 +398,40 @@ function createWorkspaceUi(options = {}) {
   }
 
   function syncSelection(timer) {
-    const rows = timer?.contextRows || [];
+    const allRows = timer?.contextRows || [];
+    const rows = eligibleRows(timer);
     const operational = timer?.currentContextId || null;
+    const operationalIsRecent = Boolean(operational && rows.some(row => row.contextId === operational));
     const intent = timer?.focusIntent || null;
+    const intentIsCurrent = Boolean(intent && operationalIsRecent && focusIntentIsCurrent(intent, timer));
     const firstSnapshot = lastOperationalContextId === null && processedFocusIntentId === null;
     let visibilityChanged = false;
+    let selectionReconciled = false;
     if (operational && hiddenTabs.has(operational)) {
       hiddenTabs.delete(operational);
       visibilityChanged = true;
     }
-    if (firstSnapshot && intent && focusIntentIsCurrent(intent, timer)) {
+    if (firstSnapshot && intentIsCurrent) {
       selectedContextId = operational;
-    } else if (!selectedContextId || !rows.some(row => row.contextId === selectedContextId)) {
-      const visible = deriveTabWorkspace(rows, { hiddenContextIds: [...hiddenTabs], durableOrder, selectedContextId: null, operationalContextId: operational });
-      selectedContextId = (intent && operational) || visible.visibleRows[0]?.contextId || null;
+    } else if (!selectedContextId || (view === 'main'
+      ? !rows.some(row => row.contextId === selectedContextId)
+      : !allRows.some(row => row.contextId === selectedContextId))) {
+      const priorSelection = selectedContextId;
+      const visible = deriveTabWorkspace(rows, { hiddenContextIds: [...hiddenTabs], durableOrder, selectedContextId: null, operationalContextId: operationalIsRecent ? operational : null });
+      selectedContextId = (intentIsCurrent && operational) || visible.visibleRows[0]?.contextId || (view === 'main' ? null : allRows[0]?.contextId) || null;
+      selectionReconciled = Boolean(priorSelection && priorSelection !== selectedContextId);
     }
 
     if (firstSnapshot) {
       processedFocusIntentId = intent?.intentId || '__baseline__';
-    } else if (intent && intent.intentId !== processedFocusIntentId && focusIntentIsCurrent(intent, timer)) {
+    } else if (intent && intent.intentId !== processedFocusIntentId && intentIsCurrent) {
       if (routeProtection.dirty || currentDraftKind() || routeProtection.inProgress || busyAction) {
         if (!pendingFocusIntent || intent.sourceStateRevision >= pendingFocusIntent.intent.sourceStateRevision) {
           pendingFocusIntent = { intent, selectionSerialAtDeferral: selectionSerial };
         }
         processedFocusIntentId = intent.intentId;
       } else applyFocusIntent(intent, timer);
-    } else if (timer.lastObservation === undefined && operational && lastOperationalContextId && operational !== lastOperationalContextId) {
+    } else if (timer.lastObservation === undefined && operationalIsRecent && lastOperationalContextId && operational !== lastOperationalContextId) {
       // Compatibility for the inherited B2 prototype fixture. Canonical B3
       // snapshots always include lastObservation/focusIntent provenance.
       selectedContextId = operational;
@@ -383,7 +439,7 @@ function createWorkspaceUi(options = {}) {
       collapsed = false;
     }
     lastOperationalContextId = operational;
-    if (visibilityChanged) savePreferences();
+    if (visibilityChanged || selectionReconciled) savePreferences();
   }
 
   function flushDeferredFocus(timer) {
@@ -396,17 +452,18 @@ function createWorkspaceUi(options = {}) {
 
   function styleBlock() {
     return `<style data-sc-proto-style>
-#${ROOT_ID}.sc-proto-root{all:initial;box-sizing:border-box!important;position:fixed!important;right:20px!important;bottom:20px!important;z-index:2147483640!important;width:420px!important;max-width:calc(100vw - 24px)!important;padding:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;color-scheme:light;--sc-bg:#f5f8fb;--sc-panel:#fff;--sc-panel-2:#edf3f7;--sc-text:#17212c;--sc-muted:#65717d;--sc-border:#d2dbe4;--sc-accent:#347fbd;--sc-accent-soft:#e5f1fa;--sc-positive:#26734d;--sc-positive-soft:#e4f3eb;--sc-warning:#8b5a12;--sc-warning-soft:#fff1d7;--sc-danger:#a13a3a;--sc-danger-soft:#fae6e6;--sc-shadow:0 22px 60px rgba(17,30,42,.24),0 3px 14px rgba(17,30,42,.12);font:400 13.5px/1.45 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important}
+#${ROOT_ID}.sc-proto-root{all:initial;box-sizing:border-box!important;position:fixed!important;right:20px!important;bottom:20px!important;z-index:2147483640!important;width:460px!important;max-width:calc(100vw - 24px)!important;padding:42px 0 0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important;color-scheme:light;--sc-bg:#f5f8fb;--sc-panel:#fff;--sc-panel-2:#edf3f7;--sc-text:#17212c;--sc-muted:#65717d;--sc-border:#d2dbe4;--sc-accent:#347fbd;--sc-accent-soft:#e5f1fa;--sc-positive:#26734d;--sc-positive-soft:#e4f3eb;--sc-warning:#8b5a12;--sc-warning-soft:#fff1d7;--sc-danger:#a13a3a;--sc-danger-soft:#fae6e6;--sc-shadow:0 22px 60px rgba(17,30,42,.24),0 3px 14px rgba(17,30,42,.12);font:400 13.5px/1.45 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif!important}#${ROOT_ID}.sc-proto-root[data-has-tabs="false"]{padding-top:0!important}
 #${ROOT_ID}.sc-proto-root[data-proto-theme="dark"]{color-scheme:dark;--sc-bg:#0e151c;--sc-panel:#151e27;--sc-panel-2:#1c2934;--sc-text:#eef5fb;--sc-muted:#9aa9b6;--sc-border:rgba(192,221,244,.14);--sc-accent:#61aef7;--sc-accent-soft:#17344b;--sc-positive:#7bcfa3;--sc-positive-soft:#163729;--sc-warning:#edbe6f;--sc-warning-soft:#3b2f1b;--sc-danger:#f09d9d;--sc-danger-soft:#442323;--sc-shadow:0 24px 64px rgba(0,0,0,.52),0 3px 14px rgba(0,0,0,.34)}
-#${ROOT_ID}.sc-proto-root *{box-sizing:border-box!important;font:inherit}#${ROOT_ID} .sc-proto-shell{overflow:hidden;border:1px solid var(--sc-border);border-radius:15px;background:var(--sc-bg);color:var(--sc-text);box-shadow:var(--sc-shadow)}#${ROOT_ID}[data-proto-surface="glass"] .sc-proto-shell{background:color-mix(in srgb,var(--sc-bg) 84%,transparent);-webkit-backdrop-filter:blur(18px) saturate(120%);backdrop-filter:blur(18px) saturate(120%)}
+#${ROOT_ID}.sc-proto-root *{box-sizing:border-box!important;font:inherit}#${ROOT_ID} .sc-proto-shell{position:relative;z-index:3;overflow:hidden;border:1px solid var(--sc-border);border-radius:15px;background:var(--sc-bg);color:var(--sc-text);box-shadow:var(--sc-shadow)}#${ROOT_ID}[data-has-tabs="true"] .sc-proto-shell{border-top-left-radius:9px}#${ROOT_ID}[data-proto-surface="glass"] .sc-proto-shell{background:color-mix(in srgb,var(--sc-bg) 84%,transparent);-webkit-backdrop-filter:blur(18px) saturate(120%);backdrop-filter:blur(18px) saturate(120%)}
 #${ROOT_ID} .sc-proto-topbar{display:flex;align-items:center;gap:9px;min-height:52px;padding:9px 10px;background:color-mix(in srgb,var(--sc-panel) 92%,transparent);border-bottom:1px solid var(--sc-border)}#${ROOT_ID} .sc-brand-mark{display:grid;place-items:center;width:32px;height:32px;flex:0 0 32px;border-radius:9px;background:var(--sc-accent);color:#fff;font-size:11px;font-weight:800;letter-spacing:.03em;box-shadow:0 4px 14px color-mix(in srgb,var(--sc-accent) 28%,transparent)}#${ROOT_ID} .sc-proto-brand{min-width:0;flex:1}#${ROOT_ID} .sc-proto-brand strong{display:block;font-weight:720;font-size:13px;letter-spacing:-.01em}#${ROOT_ID} .sc-proto-brand small{display:block;color:var(--sc-muted);font-size:9.5px}#${ROOT_ID} .sc-proto-status{display:inline-flex;align-items:center;gap:5px;color:var(--sc-muted);font-size:10px;white-space:nowrap}#${ROOT_ID} .sc-proto-status::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}#${ROOT_ID} .sc-proto-status[data-tone="positive"]{color:var(--sc-positive)}#${ROOT_ID} .sc-proto-status[data-tone="warning"]{color:var(--sc-warning)}#${ROOT_ID} .sc-proto-status[data-tone="danger"]{color:var(--sc-danger)}#${ROOT_ID} button,#${ROOT_ID} input{color:inherit}#${ROOT_ID} button{border:1px solid var(--sc-border);background:var(--sc-panel);border-radius:8px;padding:6px 9px;cursor:pointer;transition:background-color .14s ease,border-color .14s ease,transform .14s ease}#${ROOT_ID} button:hover{background:var(--sc-panel-2);border-color:color-mix(in srgb,var(--sc-accent) 38%,var(--sc-border))}#${ROOT_ID} button:active{transform:translateY(1px)}#${ROOT_ID} button:focus-visible,#${ROOT_ID} input:focus-visible,#${ROOT_ID} select:focus-visible,#${ROOT_ID} textarea:focus-visible,#${ROOT_ID} summary:focus-visible{outline:2px solid var(--sc-accent);outline-offset:2px}#${ROOT_ID} button[disabled]{opacity:.5;cursor:not-allowed}#${ROOT_ID} .sc-icon-btn{width:30px;height:30px;padding:0;display:grid;place-items:center}
-#${ROOT_ID} .sc-tabs{display:flex;gap:4px;align-items:stretch;padding:8px 8px 0;overflow-x:auto;background:var(--sc-panel-2);border-bottom:1px solid var(--sc-border)}#${ROOT_ID} .sc-tab{min-width:68px;max-width:108px;min-height:42px;display:grid;grid-template-columns:8px minmax(0,1fr) auto;grid-template-rows:auto auto;gap:0 5px;padding:4px 6px;border-radius:8px 8px 0 0;border-bottom:0;background:transparent;color:var(--sc-muted)}#${ROOT_ID} .sc-tab[data-selected="true"]{background:var(--sc-bg);color:var(--sc-text);position:relative;top:1px}#${ROOT_ID} .sc-tab-label,#${ROOT_ID} .sc-tab-time{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}#${ROOT_ID} .sc-tab-label{font-size:10.5px;font-weight:650}#${ROOT_ID} .sc-tab-time{font-size:9px}#${ROOT_ID} .sc-tab-x{border:0;background:transparent;padding:0;width:14px;height:14px;font-size:12px}#${ROOT_ID} .sc-dot{width:6px;height:6px;border-radius:50%;align-self:center;background:var(--sc-muted)}#${ROOT_ID} .sc-dot[data-tone="positive"]{background:var(--sc-positive)}#${ROOT_ID} .sc-dot[data-tone="warning"]{background:var(--sc-warning)}#${ROOT_ID} .sc-dot[data-tone="danger"]{background:var(--sc-danger)}#${ROOT_ID} .sc-tab[data-threshold="YELLOW"]{box-shadow:inset 0 3px #d9a51f}#${ROOT_ID} .sc-tab[data-threshold="ORANGE"]{box-shadow:inset 0 3px #d97820}#${ROOT_ID} .sc-tab[data-threshold="RED"]{box-shadow:inset 0 3px var(--sc-danger)}
-#${ROOT_ID} .sc-content{max-height:min(700px,calc(100vh - 112px));overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}#${ROOT_ID} .sc-view{padding:12px}#${ROOT_ID} .sc-current-strip{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;margin-bottom:9px;border:1px solid var(--sc-border);background:var(--sc-panel);border-radius:10px}#${ROOT_ID} .sc-eyebrow{color:var(--sc-muted);font-size:9.5px;text-transform:uppercase;letter-spacing:.075em;font-weight:650}#${ROOT_ID} .sc-title{margin-top:2px;font-size:15px;font-weight:700;overflow-wrap:anywhere}#${ROOT_ID} .sc-status{display:inline-flex;align-items:center;gap:6px;margin-top:6px;border-radius:999px;padding:3px 7px;font-size:10.5px;font-weight:650;background:var(--sc-panel-2);color:var(--sc-muted)}#${ROOT_ID} .sc-status[data-tone="positive"]{background:var(--sc-positive-soft);color:var(--sc-positive)}#${ROOT_ID} .sc-status[data-tone="warning"]{background:var(--sc-warning-soft);color:var(--sc-warning)}#${ROOT_ID} .sc-status[data-tone="danger"]{background:var(--sc-danger-soft);color:var(--sc-danger)}
+#${ROOT_ID} .sc-tabs{position:absolute;z-index:4;top:0;right:10px;left:10px;height:43px;display:flex;gap:3px;align-items:flex-end;padding:3px 0 0;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scrollbar-width:none;touch-action:pan-x pinch-zoom;background:transparent;border:0;scroll-snap-type:x proximity}#${ROOT_ID} .sc-tabs::-webkit-scrollbar{display:none;width:0;height:0}#${ROOT_ID} .sc-tab-help{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}#${ROOT_ID} .sc-tab-slot{position:relative;flex:0 0 116px;min-width:82px;max-width:132px;height:40px;scroll-snap-align:start}#${ROOT_ID} .sc-tab{--sc-tab-threshold:transparent;width:100%;height:40px;display:grid;grid-template-columns:8px minmax(0,1fr);grid-template-rows:auto auto;gap:0 5px;padding:5px 25px 5px 9px;border:1px solid var(--sc-border);border-bottom-color:color-mix(in srgb,var(--sc-border) 78%,transparent);border-radius:12px 12px 0 0;background:var(--sc-panel-2);color:var(--sc-muted);box-shadow:inset 0 3px var(--sc-tab-threshold),0 -2px 9px rgba(17,30,42,.08);cursor:grab}#${ROOT_ID} .sc-tab:active{cursor:grabbing}#${ROOT_ID} .sc-tab[data-selected="true"]{position:relative;z-index:2;color:var(--sc-text);background:var(--sc-panel);border-bottom-color:var(--sc-panel);box-shadow:inset 0 3px var(--sc-tab-threshold),0 -5px 16px rgba(17,30,42,.13)}#${ROOT_ID} .sc-tab-slot[data-selected="true"]::after{content:"";position:absolute;z-index:3;right:0;bottom:-1px;left:0;height:2px;background:var(--sc-panel)}#${ROOT_ID} .sc-tab-label,#${ROOT_ID} .sc-tab-time{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left}#${ROOT_ID} .sc-tab-label{font-size:10.5px;font-weight:700}#${ROOT_ID} .sc-tab-time{font-size:9px}#${ROOT_ID} .sc-tab-x{position:absolute;z-index:5;top:7px;right:5px;width:19px;height:19px;display:grid;place-items:center;padding:0;border:0;border-radius:50%;background:transparent;font-size:13px;line-height:1}#${ROOT_ID} .sc-tab-slot[data-drop-position="before"]::before,#${ROOT_ID} .sc-tab-slot[data-drop-position="after"]::after{content:"";position:absolute;z-index:8;top:4px;bottom:2px;width:3px;border-radius:3px;background:var(--sc-accent);box-shadow:0 0 0 2px var(--sc-accent-soft)}#${ROOT_ID} .sc-tab-slot[data-drop-position="before"]::before{left:-3px}#${ROOT_ID} .sc-tab-slot[data-drop-position="after"]::after{right:-3px}#${ROOT_ID} .sc-dot{width:6px;height:6px;border-radius:50%;align-self:center;background:var(--sc-muted)}#${ROOT_ID} .sc-dot[data-tone="positive"]{background:var(--sc-positive)}#${ROOT_ID} .sc-dot[data-tone="warning"]{background:var(--sc-warning)}#${ROOT_ID} .sc-dot[data-tone="danger"]{background:var(--sc-danger)}#${ROOT_ID} .sc-tab[data-threshold="YELLOW"]{--sc-tab-threshold:#d9a51f}#${ROOT_ID} .sc-tab[data-threshold="ORANGE"]{--sc-tab-threshold:#d97820}#${ROOT_ID} .sc-tab[data-threshold="RED"]{--sc-tab-threshold:var(--sc-danger)}
+#${ROOT_ID} .sc-content{max-height:min(700px,calc(100vh - 154px));overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}#${ROOT_ID} .sc-view{padding:12px}#${ROOT_ID} .sc-current-strip{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;margin-bottom:9px;border:1px solid var(--sc-border);background:var(--sc-panel);border-radius:10px}#${ROOT_ID} .sc-eyebrow{color:var(--sc-muted);font-size:9.5px;text-transform:uppercase;letter-spacing:.075em;font-weight:650}#${ROOT_ID} .sc-title{margin-top:2px;font-size:15px;font-weight:700;overflow-wrap:anywhere}#${ROOT_ID} .sc-status{display:inline-flex;align-items:center;gap:6px;margin-top:6px;border-radius:999px;padding:3px 7px;font-size:10.5px;font-weight:650;background:var(--sc-panel-2);color:var(--sc-muted)}#${ROOT_ID} .sc-status[data-tone="positive"]{background:var(--sc-positive-soft);color:var(--sc-positive)}#${ROOT_ID} .sc-status[data-tone="warning"]{background:var(--sc-warning-soft);color:var(--sc-warning)}#${ROOT_ID} .sc-status[data-tone="danger"]{background:var(--sc-danger-soft);color:var(--sc-danger)}
 #${ROOT_ID} .sc-timer-card{padding:13px;border:1px solid var(--sc-border);border-radius:11px;background:var(--sc-panel)}#${ROOT_ID} .sc-metrics,#${ROOT_ID} .sc-summary-grid{display:grid;grid-template-columns:1.25fr 1fr;gap:9px;margin-top:12px}#${ROOT_ID} .sc-metric,#${ROOT_ID} .sc-summary{padding:10px;border:1px solid var(--sc-border);border-radius:9px;background:var(--sc-panel-2)}#${ROOT_ID} .sc-metric strong,#${ROOT_ID} .sc-summary strong{display:block;margin-top:2px;font-size:18px;font-weight:700}#${ROOT_ID} .sc-session{margin-top:10px;color:var(--sc-muted);font-size:11px;display:flex;justify-content:space-between}#${ROOT_ID} .sc-actions,#${ROOT_ID} .sc-row-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}#${ROOT_ID} .sc-actions .sc-primary{background:var(--sc-accent);border-color:var(--sc-accent);color:var(--sc-bg);font-weight:650}#${ROOT_ID} .sc-nav-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}#${ROOT_ID} .sc-nav-grid button{text-align:left;min-height:44px}#${ROOT_ID} .sc-nav-grid strong{display:block;font-size:11.5px;font-weight:650}#${ROOT_ID} .sc-nav-grid small{display:block;color:var(--sc-muted);font-size:9.5px;margin-top:2px}#${ROOT_ID} .sc-search{display:flex;gap:7px;margin-top:10px}#${ROOT_ID} .sc-search input{min-width:0;flex:1;border:1px solid var(--sc-border);border-radius:8px;background:var(--sc-panel);padding:7px 9px}
-#${ROOT_ID} .sc-view-head{display:flex;align-items:center;gap:8px;margin-bottom:12px}#${ROOT_ID} .sc-view-head strong{flex:1;font-size:14px;font-weight:700}#${ROOT_ID} .sc-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--sc-border)}#${ROOT_ID} .sc-row-title{font-weight:640;font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#${ROOT_ID} .sc-row-meta{color:var(--sc-muted);font-size:10px;margin-top:2px}#${ROOT_ID} .sc-row-actions{margin-top:0;justify-content:flex-end}#${ROOT_ID} .sc-row-actions button{padding:4px 7px;font-size:10px}#${ROOT_ID} .sc-choice{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:7px}#${ROOT_ID} .sc-choice button[data-active="true"]{border-color:var(--sc-accent);background:var(--sc-accent-soft);color:var(--sc-accent);font-weight:650}#${ROOT_ID} .sc-note,#${ROOT_ID} .sc-stale{margin-top:9px;padding:8px 9px;border-radius:8px;background:var(--sc-panel-2);color:var(--sc-muted);font-size:10px}#${ROOT_ID} .sc-stale{background:var(--sc-warning-soft);color:var(--sc-warning)}#${ROOT_ID} .sc-error{margin:0 12px 10px;padding:8px 9px;border-radius:8px;background:var(--sc-danger-soft);color:var(--sc-danger);font-size:10px}#${ROOT_ID} .sc-empty{padding:20px 10px;text-align:center;color:var(--sc-muted);font-size:11px}#${ROOT_ID} .sc-empty strong{display:block;margin-bottom:4px;color:var(--sc-text);font-size:12px}#${ROOT_ID} .sc-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-top:1px solid var(--sc-border);background:var(--sc-panel);color:var(--sc-muted);font-size:9.5px}#${ROOT_ID} .sc-foot button{border:0;background:transparent;padding:3px;color:var(--sc-muted);font-size:9.5px}#${ROOT_ID}[data-proto-collapsed="true"]{width:292px!important}#${ROOT_ID}[data-proto-collapsed="true"] .sc-tabs,#${ROOT_ID}[data-proto-collapsed="true"] .sc-content,#${ROOT_ID}[data-proto-collapsed="true"] .sc-foot{display:none}@media(max-width:460px){#${ROOT_ID}.sc-proto-root{right:8px!important;bottom:8px!important;width:calc(100vw - 16px)!important}}
+#${ROOT_ID} .sc-view-head{display:flex;align-items:center;gap:8px;margin-bottom:12px}#${ROOT_ID} .sc-view-head strong{flex:1;font-size:14px;font-weight:700}#${ROOT_ID} .sc-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--sc-border)}#${ROOT_ID} .sc-row-title{font-weight:640;font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#${ROOT_ID} .sc-row-meta{color:var(--sc-muted);font-size:10px;margin-top:2px}#${ROOT_ID} .sc-row-actions{margin-top:0;justify-content:flex-end}#${ROOT_ID} .sc-row-actions button{padding:4px 7px;font-size:10px}#${ROOT_ID} .sc-choice{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:7px}#${ROOT_ID} .sc-choice button[data-active="true"]{border-color:var(--sc-accent);background:var(--sc-accent-soft);color:var(--sc-accent);font-weight:650}#${ROOT_ID} .sc-note,#${ROOT_ID} .sc-stale{margin-top:9px;padding:8px 9px;border-radius:8px;background:var(--sc-panel-2);color:var(--sc-muted);font-size:10px}#${ROOT_ID} .sc-stale{background:var(--sc-warning-soft);color:var(--sc-warning)}#${ROOT_ID} .sc-error{margin:0 12px 10px;padding:8px 9px;border-radius:8px;background:var(--sc-danger-soft);color:var(--sc-danger);font-size:10px}#${ROOT_ID} .sc-empty{padding:20px 10px;text-align:center;color:var(--sc-muted);font-size:11px}#${ROOT_ID} .sc-empty strong{display:block;margin-bottom:4px;color:var(--sc-text);font-size:12px}#${ROOT_ID} .sc-archive-notice{display:flex;align-items:center;gap:8px;margin:10px 12px 0;padding:9px 10px;border:1px solid color-mix(in srgb,var(--sc-positive) 34%,var(--sc-border));border-radius:9px;background:var(--sc-positive-soft);color:var(--sc-positive);font-size:10.5px}#${ROOT_ID} .sc-archive-notice span{min-width:0;flex:1}#${ROOT_ID} .sc-archive-notice button{padding:4px 8px;font-weight:700}#${ROOT_ID} .sc-archive-veil{position:fixed;z-index:1;inset:0;display:grid;place-items:center;padding:24px 520px 24px 24px;pointer-events:none;visibility:hidden;opacity:0;background:rgba(51,58,66,.32);transition:opacity .14s ease,visibility .14s ease}#${ROOT_ID} .sc-archive-veil[data-visible="true"]{visibility:visible;opacity:1}#${ROOT_ID} .sc-archive-veil[data-tone="blocked"]{background:rgba(76,68,55,.22)}#${ROOT_ID} .sc-archive-veil>div{width:min(440px,100%);padding:14px 18px;color:#fff;background:#141b22;border:1px solid rgba(255,255,255,.22);border-radius:12px;box-shadow:0 18px 48px rgba(0,0,0,.28);text-align:center;font-weight:750}#${ROOT_ID} .sc-archive-veil small{display:block;margin-top:4px;color:#d6e0e8;font-weight:500}#${ROOT_ID} .sc-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-top:1px solid var(--sc-border);background:var(--sc-panel);color:var(--sc-muted);font-size:9.5px}#${ROOT_ID} .sc-foot button{border:0;background:transparent;padding:3px;color:var(--sc-muted);font-size:9.5px}#${ROOT_ID}[data-proto-collapsed="true"][data-has-tabs="false"]{width:292px!important}#${ROOT_ID}[data-proto-collapsed="true"] .sc-content,#${ROOT_ID}[data-proto-collapsed="true"] .sc-foot{display:none}@media(max-width:760px){#${ROOT_ID} .sc-archive-veil{place-items:start center;padding:20px}}@media(max-width:500px){#${ROOT_ID}.sc-proto-root{right:8px!important;bottom:8px!important;width:calc(100vw - 16px)!important}}
 #${ROOT_ID} .sc-section-label{margin-top:16px}#${ROOT_ID} .sc-choice-three{grid-template-columns:repeat(3,1fr)}#${ROOT_ID} label{display:block;margin-top:9px;color:var(--sc-muted);font-size:10px}#${ROOT_ID} label input,#${ROOT_ID} label select,#${ROOT_ID} label textarea{display:block;width:100%;margin-top:4px;padding:7px 8px;border:1px solid var(--sc-border);border-radius:8px;background:var(--sc-panel);color:var(--sc-text)}#${ROOT_ID} label textarea{resize:vertical;min-height:86px}#${ROOT_ID} .sc-field-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}#${ROOT_ID} .sc-check{display:flex;align-items:center;gap:7px}#${ROOT_ID} .sc-check input{display:inline-block;width:auto;margin:0}#${ROOT_ID} .sc-unavailable{min-height:48px;padding:8px 9px;border:1px dashed var(--sc-border);border-radius:9px;background:color-mix(in srgb,var(--sc-panel-2) 60%,transparent);opacity:.78}#${ROOT_ID} .sc-unavailable strong,#${ROOT_ID} .sc-unavailable small{display:block}#${ROOT_ID} .sc-unavailable strong{font-size:11.5px}#${ROOT_ID} .sc-unavailable small{margin-top:2px;color:var(--sc-muted);font-size:9.5px}#${ROOT_ID} .sc-theme-list{display:grid;gap:7px}#${ROOT_ID} .sc-theme-choice{display:grid;grid-template-columns:44px minmax(0,1fr) 18px;align-items:center;gap:10px;width:100%;padding:8px;text-align:left}#${ROOT_ID} .sc-theme-choice>span:nth-child(2)>strong,#${ROOT_ID} .sc-theme-choice>span:nth-child(2)>small{display:block}#${ROOT_ID} .sc-theme-choice small{margin-top:2px;color:var(--sc-muted);font-size:9.5px}#${ROOT_ID} .sc-theme-choice[data-active="true"]{border-color:var(--sc-accent);box-shadow:inset 0 0 0 1px var(--sc-accent)}#${ROOT_ID} .sc-theme-swatch{display:grid;place-items:center;height:36px;border:1px solid var(--sc-border);border-radius:7px;font-weight:750}#${ROOT_ID} .sc-theme-swatch[data-theme-swatch="SLEEK_DARK"]{color:#eef5fb;background:#0c1721}#${ROOT_ID} .sc-theme-swatch[data-theme-swatch="LIGHT_GLASS"]{color:#243441;background:rgba(248,251,254,.78)}#${ROOT_ID} .sc-theme-swatch[data-theme-swatch="REFINED_LIGHT"]{color:#17212c;background:#fff}#${ROOT_ID} .sc-radio{width:14px;height:14px;border:2px solid var(--sc-border);border-radius:50%}#${ROOT_ID} .sc-theme-choice[data-active="true"] .sc-radio{border:4px solid var(--sc-accent)}#${ROOT_ID} .sc-health-summary{display:flex;align-items:center;gap:10px;padding:11px;border:1px solid var(--sc-border);border-radius:10px;background:var(--sc-panel)}#${ROOT_ID} .sc-health-icon{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:var(--sc-positive-soft);color:var(--sc-positive);font-weight:800}#${ROOT_ID} .sc-health-summary[data-tone="warning"] .sc-health-icon{background:var(--sc-warning-soft);color:var(--sc-warning)}#${ROOT_ID} .sc-health-summary[data-tone="danger"] .sc-health-icon{background:var(--sc-danger-soft);color:var(--sc-danger)}#${ROOT_ID} .sc-health-summary strong,#${ROOT_ID} .sc-health-summary small{display:block}#${ROOT_ID} .sc-health-summary small{margin-top:2px;color:var(--sc-muted);font-size:10px}#${ROOT_ID} .sc-technical{margin-top:10px;padding:9px;border:1px solid var(--sc-border);border-radius:9px;background:var(--sc-panel)}#${ROOT_ID} .sc-technical summary{cursor:pointer;font-weight:650}#${ROOT_ID} .sc-technical p{margin:8px 0 0;color:var(--sc-muted);font-size:10px}#${ROOT_ID} .sc-diagnostics{max-height:190px;overflow:auto;white-space:pre-wrap;word-break:break-word;margin:9px 0 0;padding:8px;border:1px solid var(--sc-border);border-radius:8px;background:var(--sc-panel-2);color:var(--sc-text);font:10px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace!important}
-#${ROOT_ID} .sc-proto-shell{color:var(--sc-text)!important;background:var(--sc-bg)!important;border-color:var(--sc-border)!important}#${ROOT_ID}[data-proto-surface="glass"] .sc-proto-shell{background:color-mix(in srgb,var(--sc-bg) 84%,transparent)!important}#${ROOT_ID} .sc-proto-topbar,#${ROOT_ID} .sc-foot{color:var(--sc-text)!important;background:color-mix(in srgb,var(--sc-panel) 92%,transparent)!important;border-color:var(--sc-border)!important}#${ROOT_ID} .sc-tabs{background:var(--sc-panel-2)!important;border-color:var(--sc-border)!important}#${ROOT_ID} button{color:var(--sc-text)!important;background:var(--sc-panel)!important;border-color:var(--sc-border)!important;box-shadow:none!important}#${ROOT_ID} button:hover{background:var(--sc-panel-2)!important}#${ROOT_ID} button.sc-primary,#${ROOT_ID} .sc-actions .sc-primary{color:var(--sc-bg)!important;background:var(--sc-accent)!important;border-color:var(--sc-accent)!important}#${ROOT_ID} strong,#${ROOT_ID} .sc-title,#${ROOT_ID} .sc-view-head{color:var(--sc-text)!important}#${ROOT_ID} small,#${ROOT_ID} .sc-note,#${ROOT_ID} .sc-empty,#${ROOT_ID} .sc-row-meta,#${ROOT_ID} .sc-eyebrow{color:var(--sc-muted)!important}#${ROOT_ID} .sc-brand-mark{color:#fff!important;background:var(--sc-accent)!important}#${ROOT_ID} .sc-theme-choice[data-active="true"],#${ROOT_ID} .sc-choice button[data-active="true"]{color:var(--sc-accent)!important;background:var(--sc-accent-soft)!important;border-color:var(--sc-accent)!important}#${ROOT_ID} input,#${ROOT_ID} select,#${ROOT_ID} textarea{color:var(--sc-text)!important;background:var(--sc-panel)!important;border-color:var(--sc-border)!important}
-@media(prefers-reduced-motion:reduce){#${ROOT_ID} button{transition:none}}@media(forced-colors:active){#${ROOT_ID}.sc-proto-root{forced-color-adjust:auto}#${ROOT_ID} .sc-proto-shell,#${ROOT_ID} button,#${ROOT_ID} input,#${ROOT_ID} select,#${ROOT_ID} textarea{border:1px solid ButtonText!important;box-shadow:none!important;background:Canvas!important;color:CanvasText!important}#${ROOT_ID}[data-proto-surface="glass"] .sc-proto-shell{-webkit-backdrop-filter:none;backdrop-filter:none}}
+#${ROOT_ID} .sc-proto-shell{color:var(--sc-text)!important;background:var(--sc-bg)!important;border-color:var(--sc-border)!important}#${ROOT_ID}[data-proto-surface="glass"] .sc-proto-shell{background:color-mix(in srgb,var(--sc-bg) 84%,transparent)!important}#${ROOT_ID} .sc-proto-topbar,#${ROOT_ID} .sc-foot{color:var(--sc-text)!important;background:color-mix(in srgb,var(--sc-panel) 92%,transparent)!important;border-color:var(--sc-border)!important}#${ROOT_ID} button{color:var(--sc-text)!important;background:var(--sc-panel)!important;border-color:var(--sc-border)!important;box-shadow:none!important}#${ROOT_ID} button:hover{background:var(--sc-panel-2)!important}#${ROOT_ID} button.sc-tab{color:var(--sc-muted)!important;background:var(--sc-panel-2)!important;border-color:var(--sc-border)!important;box-shadow:inset 0 3px var(--sc-tab-threshold),0 -2px 9px rgba(17,30,42,.08)!important}#${ROOT_ID} button.sc-tab[data-selected="true"]{color:var(--sc-text)!important;background:var(--sc-panel)!important;border-bottom-color:var(--sc-panel)!important;box-shadow:inset 0 3px var(--sc-tab-threshold),0 -5px 16px rgba(17,30,42,.13)!important}#${ROOT_ID} button.sc-tab-x{background:transparent!important;border:0!important}#${ROOT_ID} button.sc-primary,#${ROOT_ID} .sc-actions .sc-primary{color:var(--sc-bg)!important;background:var(--sc-accent)!important;border-color:var(--sc-accent)!important}#${ROOT_ID} strong,#${ROOT_ID} .sc-title,#${ROOT_ID} .sc-view-head{color:var(--sc-text)!important}#${ROOT_ID} small,#${ROOT_ID} .sc-note,#${ROOT_ID} .sc-empty,#${ROOT_ID} .sc-row-meta,#${ROOT_ID} .sc-eyebrow{color:var(--sc-muted)!important}#${ROOT_ID} .sc-archive-veil small{color:#d6e0e8!important}#${ROOT_ID} .sc-brand-mark{color:#fff!important;background:var(--sc-accent)!important}#${ROOT_ID} .sc-theme-choice[data-active="true"],#${ROOT_ID} .sc-choice button[data-active="true"]{color:var(--sc-accent)!important;background:var(--sc-accent-soft)!important;border-color:var(--sc-accent)!important}#${ROOT_ID} input,#${ROOT_ID} select,#${ROOT_ID} textarea{color:var(--sc-text)!important;background:var(--sc-panel)!important;border-color:var(--sc-border)!important}
+@media(prefers-reduced-motion:reduce){#${ROOT_ID} button,#${ROOT_ID} .sc-archive-veil{transition:none}}@media(forced-colors:active){#${ROOT_ID}.sc-proto-root{forced-color-adjust:auto}#${ROOT_ID} .sc-proto-shell,#${ROOT_ID} button,#${ROOT_ID} input,#${ROOT_ID} select,#${ROOT_ID} textarea{border:1px solid ButtonText!important;box-shadow:none!important;background:Canvas!important;color:CanvasText!important}#${ROOT_ID}[data-proto-surface="glass"] .sc-proto-shell{-webkit-backdrop-filter:none;backdrop-filter:none}#${ROOT_ID} .sc-archive-veil{background:Canvas!important}#${ROOT_ID} .sc-archive-veil>div{color:CanvasText!important;background:Canvas!important;border:2px solid CanvasText!important}#${ROOT_ID} .sc-archive-veil small{color:CanvasText!important}}
+@media(max-width:760px){#${ROOT_ID} .sc-archive-veil{z-index:9;place-items:center;padding:20px}}
 </style>`;
   }
 
@@ -416,18 +473,18 @@ function createWorkspaceUi(options = {}) {
     return '';
   }
 
-  function tabMarkup(timer) {
+  function tabMarkup(timer, core) {
     const workspace = deriveTabWorkspace(eligibleRows(timer), { hiddenContextIds: [...hiddenTabs], durableOrder, selectedContextId, operationalContextId: timer.currentContextId });
     durableOrder = [...workspace.order];
-    if (!workspace.visibleRows.length) return '<div class="sc-tabs"><span class="sc-empty">No recent jobs</span></div>';
-    return `<div class="sc-tabs">${workspace.visibleRows.map(row => {
+    if (!workspace.visibleRows.length) return '';
+    return `<div class="sc-tabs" role="tablist" aria-label="Open job tabs"><span class="sc-tab-help" id="sc-tab-help">Swipe sideways to see more jobs. Drag tabs to reorder. Drag an inactive job onto the SquareCoil page to archive it without deleting its history.</span>${workspace.visibleRows.map(row => {
       const selected = row.contextId === selectedContextId;
-      const canHide = !row.isOperational && !selected;
+      const archiveEligibility = archiveGestureEligibility(core, row.contextId, { snapshotStale, busy: Boolean(busyAction) });
+      const canHide = archiveEligibility.eligible;
       const threshold = row.thresholdLevel || 'NONE';
       const thresholdText = THRESHOLD_LABELS[threshold] || THRESHOLD_LABELS.NONE;
-      return `<button class="sc-tab" draggable="true" data-action="select" data-context="${escapeHtml(row.contextId)}" data-selected="${selected}" data-threshold="${escapeHtml(threshold)}" aria-label="${escapeHtml(`${row.label}, Today ${formatDuration(row.todayMs, { compact: true })}, ${thresholdText}, ${statusLabel(row.status)}${marker(row)}`)}">
-        <span class="sc-dot" data-tone="${statusTone(row.status)}"></span><span class="sc-tab-label">${escapeHtml(row.shortLabel)}</span>${canHide ? `<span class="sc-tab-x" data-action="hide-tab" data-context="${escapeHtml(row.contextId)}" aria-label="Hide tab">×</span>` : '<span></span>'}<span></span><span class="sc-tab-time">${formatDuration(row.todayMs, { compact: true })}${row.isProvisional ? '*' : ''} · ${escapeHtml(threshold)}</span><span></span>
-      </button>`;
+      const label = `${row.label}, Today ${formatDuration(row.todayMs, { compact: true })}, ${thresholdText}, ${statusLabel(row.status)}${marker(row)}`;
+      return `<div class="sc-tab-slot" data-context="${escapeHtml(row.contextId)}" data-selected="${selected}"><button class="sc-tab" draggable="true" role="tab" aria-selected="${selected}" aria-controls="sc-workspace-panel" aria-describedby="sc-tab-help" tabindex="${selected ? '0' : '-1'}" data-action="select" data-context="${escapeHtml(row.contextId)}" data-selected="${selected}" data-operational="${row.isOperational === true}" data-threshold="${escapeHtml(threshold)}" aria-label="${escapeHtml(label)}" title="${escapeHtml(label)}"><span class="sc-dot" data-tone="${statusTone(row.status)}"></span><span class="sc-tab-label">${escapeHtml(row.shortLabel || row.label)}</span><span></span><span class="sc-tab-time">${formatDuration(row.todayMs, { compact: true })}${row.isProvisional ? '*' : ''} · ${escapeHtml(threshold)}</span></button>${canHide ? `<button class="sc-tab-x" data-action="hide-tab" data-context="${escapeHtml(row.contextId)}" aria-label="Hide ${escapeHtml(row.label)} from the tab strip" title="Hide from tabs">×</button>` : ''}</div>`;
     }).join('')}</div>`;
   }
 
@@ -469,12 +526,13 @@ function createWorkspaceUi(options = {}) {
     return `<div class="sc-view">${currentStrip(timer, operational, selected)}<section class="sc-timer-card"><div class="sc-eyebrow">${selected.kind === 'job' ? `Job ${escapeHtml(selected.projectId)}` : 'General context'}</div><div class="sc-title">${escapeHtml(selected.label)}</div><div class="sc-status" data-tone="${statusTone(status)}"><span class="sc-dot" data-tone="${statusTone(status)}"></span>${escapeHtml(statusLabel(status))}</div><div class="sc-metrics"><div class="sc-metric"><span class="sc-eyebrow">Today</span><strong>${formatDuration(selected.todayMs)}${selected.isProvisional ? '*' : ''}</strong></div><div class="sc-metric"><span class="sc-eyebrow">${selected.kind === 'job' ? 'Job total' : 'Context total'}</span><strong>${formatDuration(selected.totalMs)}${selected.isProvisional ? '*' : ''}</strong></div></div>${activeSession ? `<div class="sc-session"><span>Current session${timer.running.provisional ? ' · provisional' : ''}</span><strong>${formatDuration(timer.running.elapsedMs)}</strong></div>` : ''}${pending}${hold}${native}<div class="sc-actions">${busyAction ? '<button disabled>Working…</button>' : actions.join('')}</div></section>${mainNavigationMarkup()}${searchMarkup()}</div>`;
   }
 
-  function recentView(timer) {
+  function recentView(timer, core) {
     const rows = eligibleRows(timer);
     const workspace = deriveTabWorkspace(rows, { hiddenContextIds: [...hiddenTabs], durableOrder, selectedContextId, operationalContextId: timer.currentContextId });
     return `<div class="sc-view">${viewHeader('Recent Jobs')}<div class="sc-actions"><button data-action="data-simple" data-data-type="${DATA_COMMANDS.ARCHIVE_ELIGIBLE}">Archive eligible</button><button data-action="data-simple" data-data-type="${DATA_COMMANDS.CLEAR_RECENT}">Clear Recent</button></div><div class="sc-note">Clear Recent only removes inactive jobs from this workspace. It never deletes their Companion history.</div>${rows.length ? rows.map(row => {
       const disposition = workspace.dispositionByContextId[row.contextId] || 'OVERFLOW';
-      return `<div class="sc-row"><div><div class="sc-row-title">${escapeHtml(row.label)}</div><div class="sc-row-meta">Today ${formatDuration(row.todayMs, { compact: true })}${marker(row)} · Total ${formatDuration(row.totalMs, { compact: true })} · ${escapeHtml(statusLabel(row.status))}</div><div class="sc-row-meta">Last seen ${escapeHtml(formatDateTime(row.lastSeenAtMs))} · Last recorded ${escapeHtml(formatDateTime(row.lastRecordedActivityAtMs))} · ${escapeHtml(disposition.toLowerCase())}</div></div><div class="sc-row-actions"><button data-action="select" data-context="${escapeHtml(row.contextId)}">View</button><button data-action="data-context" data-data-type="${DATA_COMMANDS.ARCHIVE_CONTEXT}" data-context="${escapeHtml(row.contextId)}" ${row.status !== 'NOT_RUNNING' ? 'disabled' : ''}>Archive</button>${disposition !== 'VISIBLE' ? `<button data-action="show-tab" data-context="${escapeHtml(row.contextId)}">Show in Tabs</button>` : ''}${openButton(row, 'Open')}</div></div>`;
+      const archiveEligibility = archiveGestureEligibility(core, row.contextId, { snapshotStale, busy: Boolean(busyAction) });
+      return `<div class="sc-row"><div><div class="sc-row-title">${escapeHtml(row.label)}</div><div class="sc-row-meta">Today ${formatDuration(row.todayMs, { compact: true })}${marker(row)} · Total ${formatDuration(row.totalMs, { compact: true })} · ${escapeHtml(statusLabel(row.status))}</div><div class="sc-row-meta">Last seen ${escapeHtml(formatDateTime(row.lastSeenAtMs))} · Last recorded ${escapeHtml(formatDateTime(row.lastRecordedActivityAtMs))} · ${escapeHtml(disposition.toLowerCase())}</div></div><div class="sc-row-actions"><button data-action="select" data-context="${escapeHtml(row.contextId)}">View</button><button data-action="data-context" data-data-type="${DATA_COMMANDS.ARCHIVE_CONTEXT}" data-context="${escapeHtml(row.contextId)}" title="${escapeHtml(archiveEligibility.message)}" ${archiveEligibility.eligible ? '' : 'disabled'}>Archive</button>${disposition !== 'VISIBLE' ? `<button data-action="show-tab" data-context="${escapeHtml(row.contextId)}">Show in Tabs</button>` : ''}${openButton(row, 'Open')}</div></div>`;
     }).join('') : '<div class="sc-empty">No recent jobs in the workspace.</div>'}</div>`;
   }
 
@@ -529,12 +587,31 @@ function createWorkspaceUi(options = {}) {
     return 'Off';
   }
 
+  function cinematicStateLabel(feature) {
+    const state = String(feature?.state || 'DISABLED');
+    const source = String(feature?.source || 'NONE');
+    const reason = String(feature?.reason || '');
+    if (state === 'SHOWING' && source === 'REMOTE') return 'Bing background active';
+    if (state === 'SHOWING' && source === 'CACHE_FRESH') return 'Recent Bing background active';
+    if (state === 'DEGRADED_CACHE' || source === 'CACHE') return 'Saved Bing background active; refresh unavailable';
+    if (state === 'DEGRADED_FALLBACK' || source === 'FALLBACK') {
+      if (/permission|access|provider-unavailable/i.test(reason)) return 'Built-in gradient active; allow Bing access in the toolbar popup';
+      return 'Built-in gradient active; the Bing response was unavailable or rejected';
+    }
+    if (state === 'LOADING_INITIAL' || state === 'LOADING' || state === 'REFRESHING') return 'Loading the Bing background; the readable gradient remains active';
+    if (state === 'SUSPENDED_ACCESSIBILITY') return 'Built-in background only for accessibility';
+    if (state === 'SUSPENDED_THEME') return 'Choose Dark Glass or Light Glass to use a Bing background';
+    if (state === 'INACTIVE_PAGE') return 'Bing background ready on supported SquareCoil pages';
+    return 'Background off';
+  }
+
   function settingsView() {
     return `<div class="sc-view">${viewHeader('Settings')}<div class="sc-eyebrow">Appearance</div><div class="sc-nav-grid">${settingsNav('timer-appearance', 'Companion appearance', `${theme === 'AUTO' ? 'System' : theme === 'DARK' ? 'Dark' : 'Light'} · ${surface === 'GLASS' ? 'Glass' : 'Solid'}`)}${settingsNav('website-theme', 'SquareCoil theme', websiteThemeLabel(websiteTheme))}</div><div class="sc-eyebrow sc-section-label">Time tracking</div><div class="sc-nav-grid">${settingsNav('timer-limits', 'Time color limits', `${limitDraft?.yellowMinutes ?? 60} / ${limitDraft?.orangeMinutes ?? 120} / ${limitDraft?.redMinutes ?? 240} min`)}${settingsNav('overview', 'Time overview', 'Today, week, day and job')}${settingsNav('history', 'History', 'Completed Companion sessions')}</div><div class="sc-eyebrow sc-section-label">Jobs and watching</div><div class="sc-nav-grid">${settingsNav('recent', 'Recent jobs', 'Visibility and archive actions')}<div class="sc-unavailable" aria-disabled="true"><strong>Watched-job changes</strong><small>Not available yet · needs a verified read-only source</small></div></div><div class="sc-eyebrow sc-section-label">Notifications</div><div class="sc-unavailable" aria-disabled="true"><strong>SquareCoil alerts</strong><small>Not available yet · no proven notification source</small></div><div class="sc-eyebrow sc-section-label">Dashboard</div><div class="sc-nav-grid">${settingsNav('presentation-packs', 'Design dashboard', `Dashboard profile ${dashboardProfile === 'ON' ? 'on' : 'off'}`)}</div><div class="sc-eyebrow sc-section-label">Privacy and permissions</div><div class="sc-nav-grid">${settingsNav('data-tools', 'Local data and backups', 'Export, restore and cleanup')}</div><div class="sc-eyebrow sc-section-label">Advanced diagnostics</div><div class="sc-nav-grid">${settingsNav('advanced-diagnostics', 'Technical details', 'Status and privacy-safe diagnostics')}${settingsNav('submit-ticket', 'Submit a ticket', `Email ${SUPPORT_EMAIL}`)}${settingsNav('send-feedback', 'Send feedback', 'Suggestion, UI / UX or feature idea')}${settingsNav('developer-support', 'Support the developer', 'Free app · optional tips')}</div></div>`;
   }
 
   function choiceMarkup(action, values, current) {
-    return `<div class="sc-choice sc-choice-three">${values.map(([value, label]) => `<button data-action="${action}" data-value="${value}" data-active="${current === value}">${label}</button>`).join('')}</div>`;
+    const disabled = busyAction ? ' disabled aria-disabled="true"' : '';
+    return `<div class="sc-choice sc-choice-three">${values.map(([value, label]) => `<button data-action="${action}" data-value="${value}" data-active="${current === value}"${disabled}>${label}</button>`).join('')}</div>`;
   }
 
   function timerAppearanceView() {
@@ -546,12 +623,13 @@ function createWorkspaceUi(options = {}) {
   }
 
   function websiteThemeView() {
+    const cinematic = presentation?.optional?.cinematic || {};
     return `<div class="sc-view">${viewHeader('SquareCoil theme', 'settings')}<div class="sc-theme-list">${[
       ['ORIGINAL', 'Native / Off', 'Use SquareCoil as provided.'],
       ['SLEEK_DARK', 'Dark Glass', 'v2.3.4 · cinematic night scene + glass'],
       ['LIGHT_GLASS', 'Light Glass', 'v1.0.0 · cinematic daylight scene + glass'],
       ['REFINED_LIGHT', 'Refined Light', 'v1.0.1 · bright, high-clarity workspace']
-    ].map(([value, label, detail]) => `<button class="sc-theme-choice" data-action="preference-site" data-value="${value}" data-active="${websiteTheme === value}"><span class="sc-theme-swatch" data-theme-swatch="${value}">SC</span><span><strong>${label}</strong><small>${detail}</small></span><span class="sc-radio" aria-hidden="true"></span></button>`).join('')}</div><div class="sc-note">Dark Glass and Light Glass include the rotating Bing background and translucent surfaces as one theme. Use Allow access in the Companion toolbar popup to grant optional access to www.bing.com. Requests use fixed public image-feed parameters only—never job, timer, page, identity, or user content. If access is unavailable, Companion uses a readable gradient fallback. SquareCoil controls and data remain untouched.</div></div>`;
+    ].map(([value, label, detail]) => `<button class="sc-theme-choice" data-action="preference-site" data-value="${value}" data-active="${websiteTheme === value}"${busyAction ? ' disabled aria-disabled="true"' : ''}><span class="sc-theme-swatch" data-theme-swatch="${value}">SC</span><span><strong>${label}</strong><small>${detail}</small></span><span class="sc-radio" aria-hidden="true"></span></button>`).join('')}</div><div class="sc-note"><strong>Background status:</strong> ${escapeHtml(cinematicStateLabel(cinematic))}.</div><div class="sc-note">Dark Glass and Light Glass include the rotating Bing background and translucent surfaces as one theme. Use Allow access in the Companion toolbar popup to grant optional access to www.bing.com. Requests use fixed public image-feed parameters only—never job, timer, page, identity, or user content. If access is unavailable, Companion uses a readable gradient fallback. SquareCoil controls and data remain untouched.</div></div>`;
   }
 
   function presentationPacksView() {
@@ -584,7 +662,7 @@ function createWorkspaceUi(options = {}) {
   function advancedDiagnosticsView(core) {
     const status = friendlyCompanionStatus(core, core?.timer);
     const diagnostics = frozenDiagnostics();
-    return `<div class="sc-view">${viewHeader('Advanced diagnostics', 'settings')}<section class="sc-health-summary" data-tone="${status.tone}"><span class="sc-health-icon" aria-hidden="true">${status.tone === 'positive' ? '✓' : '!'}</span><div><strong>${escapeHtml(status.label)}</strong><small>${escapeHtml(status.message)}</small></div></section><details class="sc-technical"><summary>Technical details</summary><p>Privacy-safe status only. Job names, customer data, page content and account tokens are excluded.</p><pre class="sc-diagnostics" data-sc-advanced-diagnostics>${escapeHtml(diagnostics.text)}</pre></details>${supportMessage ? `<div class="sc-note">${escapeHtml(supportMessage)}</div>` : ''}${supportManualCopy ? `<pre class="sc-diagnostics" data-sc-manual-copy>${escapeHtml(supportManualCopy)}</pre>` : ''}<div class="sc-actions"><button class="sc-primary" data-action="copy-advanced-diagnostics">Copy diagnostics</button><button data-action="sync">Refresh status</button></div></div>`;
+    return `<div class="sc-view">${viewHeader('Advanced diagnostics', 'settings')}<section class="sc-health-summary" data-tone="${status.tone}"><span class="sc-health-icon" aria-hidden="true">${status.tone === 'positive' ? '✓' : '!'}</span><div><strong>${escapeHtml(status.label)}</strong><small>${escapeHtml(status.message)}</small></div></section><details class="sc-technical"${advancedDiagnosticsOpen ? ' open' : ''}><summary>Technical details</summary><p>Privacy-safe status only. Job names, customer data, page content and account tokens are excluded.</p><pre class="sc-diagnostics" data-sc-advanced-diagnostics>${escapeHtml(diagnostics.text)}</pre></details>${supportMessage ? `<div class="sc-note">${escapeHtml(supportMessage)}</div>` : ''}${supportManualCopy ? `<pre class="sc-diagnostics" data-sc-manual-copy>${escapeHtml(supportManualCopy)}</pre>` : ''}<div class="sc-actions"><button class="sc-primary" data-action="copy-advanced-diagnostics">Copy diagnostics</button><button data-action="sync">Refresh status</button></div></div>`;
   }
 
   function conflictMarkup() {
@@ -620,7 +698,7 @@ function createWorkspaceUi(options = {}) {
       if (view === 'advanced-diagnostics') return advancedDiagnosticsView(core);
       return unavailableMainView(core);
     }
-    if (view === 'recent') return recentView(timer);
+    if (view === 'recent') return recentView(timer, core);
     if (view === 'overview') return overviewView(timer);
     if (view === 'by-day') return byDayView(timer);
     if (view === 'by-context') return byContextView(timer);
@@ -639,11 +717,50 @@ function createWorkspaceUi(options = {}) {
     return mainView(timer);
   }
 
+  function archiveNoticeMarkup() {
+    if (!archiveNotice) return '';
+    return `<div class="sc-archive-notice" role="status"><span><strong>${escapeHtml(archiveNotice.label)}</strong> was archived. Its Companion time and history are still saved.</span><button data-action="undo-archive" data-context="${escapeHtml(archiveNotice.contextId)}">Undo</button></div>`;
+  }
+
+  const FOCUS_DATA_KEYS = Object.freeze(['action', 'context', 'view', 'timerAction', 'dataType', 'value', 'supportKind', 'supportField']);
+
+  function captureFocusDescriptor(target) {
+    const node = document.activeElement;
+    if (!node || !target?.contains?.(node)) return null;
+    const data = {};
+    for (const key of FOCUS_DATA_KEYS) {
+      if (node.dataset?.[key] !== undefined) data[key] = String(node.dataset[key]);
+    }
+    return Object.freeze({
+      tagName: String(node.tagName || '').toLowerCase(),
+      name: node.getAttribute?.('name') || null,
+      role: node.getAttribute?.('role') || null,
+      data: Object.freeze(data)
+    });
+  }
+
+  function findFocusDescriptor(target, descriptor) {
+    if (!descriptor) return null;
+    const candidates = Array.from(target.querySelectorAll?.('button,input,select,textarea,summary,[tabindex]') || []);
+    return candidates.find(node => {
+      if (descriptor.tagName && String(node.tagName || '').toLowerCase() !== descriptor.tagName) return false;
+      if ((node.getAttribute?.('name') || null) !== descriptor.name || (node.getAttribute?.('role') || null) !== descriptor.role) return false;
+      return Object.entries(descriptor.data).every(([key, value]) => String(node.dataset?.[key]) === value);
+    }) || null;
+  }
+
   function render({ allowInteractionDeferral = false } = {}) {
     if (disposed) return;
     const target = mountRoot(); if (!target) return;
-    if (allowInteractionDeferral && (collapsed || draggedContextId || pendingFileMode || target.querySelector?.('input:focus, textarea:focus, select:focus, summary:focus, button:focus-visible'))) return;
+    // Replacing the subtree detaches the native drag source. Every render path,
+    // including async completions and notice timers, must wait for dragend/drop.
+    if (draggedContextId) return;
+    if (allowInteractionDeferral && (pendingFileMode || target.querySelector?.('input:focus, textarea:focus, select:focus'))) return;
+    const technicalDetails = target.querySelector?.('.sc-technical');
+    if (technicalDetails) advancedDiagnosticsOpen = technicalDetails.open === true;
+    const retainedFocus = captureFocusDescriptor(target);
     const previousScroll = target.querySelector?.('.sc-content')?.scrollTop || 0;
+    const previousTabScroll = target.querySelector?.('.sc-tabs')?.scrollLeft || 0;
     const core = readCoreSnapshot();
     const timer = core?.timer || null;
     if (timer) { syncSelection(timer); flushDeferredFocus(timer); }
@@ -651,14 +768,24 @@ function createWorkspaceUi(options = {}) {
     target.dataset.protoSurface = String(presentation?.panelFinishEffective || surface).startsWith('GLASS') ? 'glass' : 'solid';
     target.dataset.protoCollapsed = collapsed ? 'true' : 'false';
     target.dataset.workspaceState = snapshotStale ? 'stale' : timer ? 'loaded' : 'loading';
+    target.dataset.busy = busyAction ? 'true' : 'false';
+    target.setAttribute?.('aria-busy', busyAction ? 'true' : 'false');
+    const tabs = timer ? tabMarkup(timer, core) : '';
+    target.dataset.hasTabs = tabs ? 'true' : 'false';
+    target.dataset.dragging = draggedContextId ? 'true' : 'false';
     const friendlyStatus = friendlyCompanionStatus(core, timer);
     const basis = timer?.timeBasis?.disclosed ? timer.timeBasis.label : timer?.workdayZone || 'waiting for time basis';
-    target.innerHTML = `${styleBlock()}<div class="sc-proto-shell"><div class="sc-proto-topbar"><div class="sc-brand-mark" aria-hidden="true">SC</div><div class="sc-proto-brand"><strong>SquareCoil</strong><small>Companion</small></div><span class="sc-proto-status" data-tone="${friendlyStatus.tone}" data-sc-status>${escapeHtml(friendlyStatus.label)}</span><button class="sc-icon-btn" data-action="sync" aria-label="Refresh">↻</button><button class="sc-icon-btn" data-action="collapse" aria-label="${collapsed ? 'Expand' : 'Collapse'}">${collapsed ? '▣' : '–'}</button></div>${timer ? tabMarkup(timer) : ''}<div class="sc-content">${snapshotStale ? '<div class="sc-stale">Showing the last saved view while Companion reconnects.</div>' : ''}${bodyMarkup(timer, core)}</div>${errorMessage ? `<div class="sc-error">${escapeHtml(errorMessage)}</div>` : ''}<div class="sc-foot"><span>${escapeHtml(basis)}</span><button data-action="open-diagnostics">Technical details</button></div></div>`;
+    target.innerHTML = `${styleBlock()}<div class="sc-archive-veil" data-visible="false" data-tone="eligible" aria-hidden="true"><div><span data-sc-archive-veil-title>Release to archive</span><small data-sc-archive-veil-detail>Hours and history stay saved.</small></div></div>${tabs}<div class="sc-proto-shell"><div class="sc-proto-topbar"><div class="sc-brand-mark" aria-hidden="true">SC</div><div class="sc-proto-brand"><strong>SquareCoil</strong><small>Companion</small></div><span class="sc-proto-status" data-tone="${friendlyStatus.tone}" data-sc-status>${escapeHtml(friendlyStatus.label)}</span><button class="sc-icon-btn" data-action="sync" aria-label="Refresh">↻</button><button class="sc-icon-btn" data-action="collapse" aria-label="${collapsed ? 'Expand' : 'Collapse'}">${collapsed ? '▣' : '–'}</button></div><div class="sc-content" role="tabpanel" id="sc-workspace-panel">${archiveNoticeMarkup()}${snapshotStale ? '<div class="sc-stale">Showing the last saved view while Companion reconnects.</div>' : ''}${bodyMarkup(timer, core)}</div>${errorMessage ? `<div class="sc-error">${escapeHtml(errorMessage)}</div>` : ''}<div class="sc-foot"><span>${escapeHtml(basis)}</span><button data-action="open-diagnostics">Technical details</button></div></div>`;
     const content = target.querySelector?.('.sc-content'); if (content) content.scrollTop = previousScroll;
-    if (focusTarget) {
+    const tabStrip = target.querySelector?.('.sc-tabs'); if (tabStrip) tabStrip.scrollLeft = previousTabScroll;
+    if (focusTarget || retainedFocus) {
       const selector = focusTarget;
       focusTarget = null;
-      target.querySelector?.(selector)?.focus?.({ preventScroll: true });
+      const focusNode = selector ? target.querySelector?.(selector) : findFocusDescriptor(target, retainedFocus);
+      focusNode?.focus?.({ preventScroll: true });
+      if (focusNode?.matches?.('[role="tab"]')) {
+        focusNode.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+      }
     }
   }
 
@@ -761,10 +888,12 @@ function createWorkspaceUi(options = {}) {
   async function runDataAction(type, values = {}) {
     const handle = coreHandle();
     if (!handle || typeof handle.stageDataAction !== 'function') throw new Error('This data tool is not available yet.');
-    const request = { ...workspaceData(), ...values };
+    // UI workspace ordering lives in revisioned extension preferences. Do not
+    // merge a possibly stale local tab order into authoritative data mutations.
+    const request = { ...values };
     if ([DATA_COMMANDS.ARCHIVE_CONTEXT, DATA_COMMANDS.ARCHIVE_ELIGIBLE].includes(type)) request.atMs = Date.now();
     const plan = await handle.stageDataAction(type, request);
-    await commitDataPlan(plan, {
+    return commitDataPlan(plan, {
       confirm: type === DATA_COMMANDS.DELETE_CONTEXT,
       description: destructiveDescription(type, values)
     });
@@ -932,8 +1061,36 @@ function createWorkspaceUi(options = {}) {
     if (action === 'settings-close') { navigateSettings('main', { close: true }); return; }
     if (action === 'select') { selectContext(button.dataset.context); render(); return; }
     if (action === 'context-detail') { selectContext(button.dataset.context, 'context-detail'); render(); return; }
-    if (action === 'hide-tab') { event.stopPropagation(); const id = button.dataset.context; const timer = lastGoodCore?.timer; if (id && id !== selectedContextId && id !== timer?.currentContextId) hiddenTabs.add(id); savePreferences(); render(); return; }
-    if (action === 'show-tab') { const id = button.dataset.context; if (id) hiddenTabs.delete(id); savePreferences(); render(); return; }
+    if (action === 'hide-tab') {
+      event.stopPropagation();
+      if (event.isTrusted !== true) return;
+      const id = button.dataset.context;
+      const eligibility = archiveGestureEligibility(lastGoodCore, id, { snapshotStale, busy: Boolean(busyAction) });
+      if (!eligibility.eligible) { errorMessage = eligibility.message; render(); return; }
+      hiddenTabs.add(id);
+      if (!reconcileWorkspaceSelection()) savePreferences();
+      render(); return;
+    }
+    if (action === 'show-tab') {
+      const id = button.dataset.context;
+      if (!id || event.isTrusted !== true) return;
+      hiddenTabs.delete(id);
+      selectContext(id);
+      focusTarget = '[role="tab"][aria-selected="true"]';
+      render(); return;
+    }
+    if (action === 'undo-archive' && event.isTrusted === true) {
+      const contextId = button.dataset.context;
+      withBusy('restore-archive', async () => {
+        const committed = await runDataAction(DATA_COMMANDS.RESTORE_ARCHIVED, { contextId, label: archiveNotice?.label || contextId });
+        if (committed) {
+          archiveNotice = null;
+          if (archiveNoticeTimer !== null) window.clearTimeout?.(archiveNoticeTimer);
+          archiveNoticeTimer = null;
+        }
+      });
+      return;
+    }
     if (action === 'load-history') { historyLimit += HISTORY_PAGE_SIZE; render(); return; }
     if (action === 'timer') { invokeTimerAction(button.dataset.timerAction, event); return; }
     if (action === 'open-job') { if (event.isTrusted === true) openJob(button.dataset.project); return; }
@@ -1006,17 +1163,35 @@ function createWorkspaceUi(options = {}) {
     }
     if (action === 'data-context' && event.isTrusted === true) {
       const type = button.dataset.dataType;
-      withBusy('data-context', () => runDataAction(type, { contextId: button.dataset.context, label: button.dataset.label || button.dataset.context }));
+      withBusy('data-context', async () => {
+        const contextId = button.dataset.context;
+        const committed = await runDataAction(type, { contextId, label: button.dataset.label || contextId });
+        if (committed && [DATA_COMMANDS.ARCHIVE_CONTEXT, DATA_COMMANDS.RESTORE_ARCHIVED].includes(type)) reconcileWorkspaceSelection();
+      });
       return;
     }
     if (action === 'data-simple' && event.isTrusted === true) {
       const type = button.dataset.dataType;
-      withBusy('data-simple', () => runDataAction(type, { description: destructiveDescription(type) }));
+      withBusy('data-simple', async () => {
+        const committed = await runDataAction(type, { description: destructiveDescription(type) });
+        if (committed && [DATA_COMMANDS.ARCHIVE_ELIGIBLE, DATA_COMMANDS.CLEAR_RECENT].includes(type)) reconcileWorkspaceSelection();
+      });
       return;
     }
     if (action === 'pick-file' && event.isTrusted === true) {
+      const input = root.querySelector?.('[data-sc-data-file]');
+      if (!input) {
+        errorMessage = 'The file picker is not available. Reopen Local data and backups and try again.';
+        render();
+        return;
+      }
       pendingFileMode = button.dataset.fileMode;
-      root.querySelector?.('[data-sc-data-file]')?.click();
+      try { input.click(); }
+      catch (error) {
+        pendingFileMode = null;
+        recordTechnicalError(error, 'The file picker could not open. No Companion data was changed.');
+        render();
+      }
       return;
     }
     if (action === 'resolve-conflict' && event.isTrusted === true && pendingImport) {
@@ -1048,7 +1223,13 @@ function createWorkspaceUi(options = {}) {
       return;
     }
     const input = event.target?.closest?.('[data-sc-data-file]');
-    if (!input || !root?.contains(input) || !input.files?.[0] || !pendingFileMode) return;
+    if (!input || !root?.contains(input) || !pendingFileMode) return;
+    if (!input.files?.[0]) {
+      pendingFileMode = null;
+      input.value = '';
+      render();
+      return;
+    }
     const file = input.files[0];
     const mode = pendingFileMode;
     pendingFileMode = null;
@@ -1058,6 +1239,14 @@ function createWorkspaceUi(options = {}) {
       else await stageImport(DATA_COMMANDS.RESTORE_BACKUP, { input: text, mode: mode === 'BACKUP_REPLACE' ? 'REPLACE' : 'MERGE', importWorkspace: true, importPreferences: true });
       input.value = '';
     });
+  }
+
+  function onFileCancel(event) {
+    const input = event.target?.closest?.('[data-sc-data-file]');
+    if (!input || !root?.contains(input) || !pendingFileMode) return;
+    pendingFileMode = null;
+    input.value = '';
+    render();
   }
 
   function onInput(event) {
@@ -1080,6 +1269,21 @@ function createWorkspaceUi(options = {}) {
   }
 
   function onKeyDown(event) {
+    const focusedTab = event.target?.closest?.('.sc-tab[data-context]');
+    if (focusedTab && root?.contains(focusedTab) && ['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+      const tabs = Array.from(root.querySelectorAll?.('.sc-tab[data-context]') || []);
+      const index = tabs.indexOf(focusedTab);
+      if (index >= 0 && tabs.length) {
+        event.preventDefault?.();
+        event.stopPropagation?.();
+        const nextIndex = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1
+          : event.key === 'ArrowLeft' ? (index - 1 + tabs.length) % tabs.length : (index + 1) % tabs.length;
+        selectContext(tabs[nextIndex].dataset.context);
+        focusTarget = '[role="tab"][aria-selected="true"]';
+        render();
+      }
+      return;
+    }
     if (!SETTINGS_VIEW_IDS.has(view)) return;
     if (event.target?.closest?.('input, textarea, select, [role="dialog"]')) event.stopPropagation?.();
   }
@@ -1089,21 +1293,224 @@ function createWorkspaceUi(options = {}) {
     selectContext(tab.dataset.context); collapsed = false; savePreferences(); render();
   }
 
-  function onDragStart(event) {
-    const tab = event.target.closest?.('.sc-tab[data-context]'); if (!tab || !root?.contains(tab)) return;
-    draggedContextId = tab.dataset.context || null;
-    try { event.dataTransfer?.setData('text/plain', draggedContextId); if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move'; } catch (_) {}
+  function clearDropIndicators() {
+    for (const slot of root?.querySelectorAll?.('.sc-tab-slot[data-drop-position]') || []) delete slot.dataset.dropPosition;
   }
 
-  function onDragOver(event) { if (event.target.closest?.('.sc-tab[data-context]')) event.preventDefault(); }
+  function setArchiveVeil(visible, eligibility = null) {
+    const veil = root?.querySelector?.('.sc-archive-veil');
+    if (!veil) return;
+    veil.dataset.visible = visible ? 'true' : 'false';
+    veil.dataset.tone = eligibility?.eligible === false ? 'blocked' : 'eligible';
+    veil.setAttribute?.('aria-hidden', visible ? 'false' : 'true');
+    const title = veil.querySelector?.('[data-sc-archive-veil-title]');
+    const detail = veil.querySelector?.('[data-sc-archive-veil-detail]');
+    if (title) title.textContent = eligibility?.eligible === false ? 'This job stays open' : 'Release to archive';
+    if (detail) detail.textContent = eligibility?.message || 'Hours and history stay saved.';
+  }
+
+  function clearDragState(options = {}) {
+    clearDropIndicators();
+    setArchiveVeil(false);
+    draggedContextId = null;
+    draggedArchiveEligibility = null;
+    dragAttemptedOutside = false;
+    if (options.preserveOwnership !== true) ownedDragActive = false;
+    if (root) root.dataset.dragging = 'false';
+  }
+
+  function isOwnedDragEvent(event) {
+    if (!ownedDragActive || !event?.dataTransfer) return false;
+    try {
+      const types = Array.from(event.dataTransfer.types || [], value => String(value).toLowerCase());
+      if (types.includes(COMPANION_DRAG_MIME)) return true;
+      return event.type === 'drop' && event.dataTransfer.getData?.(COMPANION_DRAG_MIME) === 'owned';
+    } catch (_) { return false; }
+  }
+
+  function consumeDragEvent(event) {
+    event.preventDefault?.();
+    event.stopPropagation?.();
+  }
+
+  function refreshDraggedEligibility(options = {}) {
+    if (!draggedContextId) return null;
+    // Dragover can fire dozens of times per second. Keep its visual preview on
+    // the fenced drag-start snapshot and perform exactly one fresh read on the
+    // final drop. The data authority also revalidates during stage and commit.
+    if (options.force !== true && draggedArchiveEligibility) return draggedArchiveEligibility;
+    const core = readCoreSnapshot();
+    draggedArchiveEligibility = archiveGestureEligibility(core, draggedContextId, {
+      snapshotStale,
+      busy: Boolean(busyAction)
+    });
+    return draggedArchiveEligibility;
+  }
+
+  function reconcileWorkspaceSelection() {
+    const core = readCoreSnapshot();
+    const timer = core?.timer;
+    if (!timer) return false;
+    const rows = eligibleRows(timer);
+    const selectedVisible = rows.some(row => row.contextId === selectedContextId && !hiddenTabs.has(String(row.contextId)));
+    if (!selectedVisible) {
+      const operational = rows.some(row => row.contextId === timer.currentContextId) ? timer.currentContextId : null;
+      const workspace = deriveTabWorkspace(rows, {
+        hiddenContextIds: [...hiddenTabs], durableOrder, selectedContextId: null, operationalContextId: operational
+      });
+      selectedContextId = operational || workspace.visibleRows[0]?.contextId || null;
+      durableOrder = [...workspace.order];
+      savePreferences();
+      return true;
+    }
+    return false;
+  }
+
+  function showArchiveNotice(contextId, label) {
+    if (disposed) return;
+    if (archiveNoticeTimer !== null) window.clearTimeout?.(archiveNoticeTimer);
+    archiveNotice = { contextId: String(contextId), label: String(label || contextId) };
+    archiveNoticeTimer = window.setTimeout?.(() => {
+      archiveNotice = null;
+      archiveNoticeTimer = null;
+      render();
+    }, 8_000) ?? null;
+  }
+
+  function onDragStart(event) {
+    const tab = event.target.closest?.('.sc-tab[data-context]');
+    if (!tab || !root?.contains(tab) || event.isTrusted !== true || !event.dataTransfer) return;
+    draggedContextId = tab.dataset.context || null;
+    dragAttemptedOutside = false;
+    draggedArchiveEligibility = archiveGestureEligibility(lastGoodCore, draggedContextId, {
+      snapshotStale,
+      busy: Boolean(busyAction)
+    });
+    if (root) root.dataset.dragging = draggedContextId ? 'true' : 'false';
+    try {
+      // Keep the authoritative Context id in closure state. The page only sees
+      // a generic drag payload, so a SquareCoil drop target cannot read a job id.
+      event.dataTransfer.setData('text/plain', 'SquareCoil Companion job tab');
+      event.dataTransfer.setData(COMPANION_DRAG_MIME, 'owned');
+      event.dataTransfer.effectAllowed = 'move';
+      ownedDragActive = true;
+    } catch (_) { clearDragState(); }
+  }
+
+  function onDragOver(event) {
+    if (!draggedContextId || event.isTrusted !== true || !isOwnedDragEvent(event)) return;
+    if (!root?.contains(event.target)) return;
+    consumeDragEvent(event);
+    const slot = event.target.closest?.('.sc-tab-slot');
+    if (!slot || !root.contains(slot)) {
+      setArchiveVeil(false);
+      clearDropIndicators();
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'none';
+      return;
+    }
+    setArchiveVeil(false);
+    clearDropIndicators();
+    const rect = slot.getBoundingClientRect?.();
+    const placement = rect && Number.isFinite(event.clientX) && event.clientX > rect.left + (rect.width / 2) ? 'after' : 'before';
+    slot.dataset.dropPosition = placement;
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+  }
 
   function onDrop(event) {
-    const target = event.target.closest?.('.sc-tab[data-context]'); if (!target || !root?.contains(target)) return;
-    event.preventDefault();
-    const source = draggedContextId || event.dataTransfer?.getData('text/plain');
-    const before = target.dataset.context;
-    if (source && before && source !== before) { durableOrder = moveContext(durableOrder, source, before); savePreferences(); render(); }
-    draggedContextId = null;
+    if (!draggedContextId || event.isTrusted !== true || !isOwnedDragEvent(event) || !root?.contains(event.target)) return;
+    consumeDragEvent(event);
+    const slot = event.target.closest?.('.sc-tab-slot');
+    if (!slot || !root.contains(slot)) { clearDragState(); return; }
+    const source = draggedContextId;
+    const target = slot.dataset.context;
+    const placement = slot.dataset.dropPosition === 'after' ? 'after' : 'before';
+    clearDragState();
+    if (source && target && source !== target) {
+      const currentOrder = lastGoodCore?.timer
+        ? deriveTabWorkspace(eligibleRows(lastGoodCore.timer), {
+            hiddenContextIds: [...hiddenTabs],
+            durableOrder,
+            selectedContextId,
+            operationalContextId: lastGoodCore.timer.currentContextId
+          }).order
+        : durableOrder;
+      durableOrder = placeContext(currentOrder, source, target, placement);
+      savePreferences();
+      render();
+    }
+  }
+
+  function onDocumentDragOver(event) {
+    if (event.isTrusted !== true || !isOwnedDragEvent(event)) return;
+    if (!draggedContextId) {
+      consumeDragEvent(event);
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'none';
+      return;
+    }
+    if (root?.isConnected !== true || document.getElementById(ROOT_ID) !== root) {
+      consumeDragEvent(event);
+      if (event.dataTransfer) event.dataTransfer.dropEffect = 'none';
+      clearDragState({ preserveOwnership: true });
+      return;
+    }
+    if (root.contains(event.target)) return;
+    consumeDragEvent(event);
+    dragAttemptedOutside = true;
+    clearDropIndicators();
+    const eligibility = refreshDraggedEligibility();
+    setArchiveVeil(true, eligibility);
+    if (event.dataTransfer) event.dataTransfer.dropEffect = eligibility?.eligible ? 'move' : 'none';
+  }
+
+  function onDocumentDrop(event) {
+    if (event.isTrusted !== true || !isOwnedDragEvent(event)) return;
+    if (!draggedContextId) {
+      consumeDragEvent(event);
+      clearDragState();
+      return;
+    }
+    if (root?.isConnected !== true || document.getElementById(ROOT_ID) !== root) {
+      consumeDragEvent(event);
+      clearDragState();
+      return;
+    }
+    if (root.contains(event.target)) return;
+    consumeDragEvent(event);
+    const contextId = draggedContextId;
+    const previewEligibility = draggedArchiveEligibility;
+    const eligibility = refreshDraggedEligibility({ force: true });
+    clearDragState();
+    if (!previewEligibility?.eligible || !eligibility?.eligible) {
+      errorMessage = previewEligibility?.eligible === false
+        ? previewEligibility.message
+        : eligibility?.message || 'The job was not archived because its protection state could not be verified.';
+      render();
+      return;
+    }
+    withBusy('archive-drag', async () => {
+      const committed = await runDataAction(DATA_COMMANDS.ARCHIVE_CONTEXT, { contextId, label: eligibility.label });
+      if (!committed || disposed) return;
+      showArchiveNotice(contextId, eligibility.label);
+      reconcileWorkspaceSelection();
+    });
+  }
+
+  function onDragEnd() {
+    if (!ownedDragActive && !draggedContextId && !dragAttemptedOutside) return;
+    clearDragState();
+    render();
+  }
+
+  function onGlobalKeyDown(event) {
+    if (event.key === 'Escape' && draggedContextId) clearDragState({ preserveOwnership: true });
+  }
+
+  function onWindowBlur() {
+    if (draggedContextId) clearDragState({ preserveOwnership: true });
+  }
+
+  function onVisibilityChange() {
+    if (document.visibilityState === 'hidden' && draggedContextId) clearDragState({ preserveOwnership: true });
   }
 
   function onSubmit(event) {
@@ -1157,7 +1564,10 @@ function createWorkspaceUi(options = {}) {
     const rows = lastGoodCore?.timer?.contextRows || [];
     const lower = query.toLowerCase();
     const known = rows.find(row => row.contextId.toLowerCase() === lower || row.label.toLowerCase().includes(lower) || String(row.projectId || '') === query);
-    if (known) { selectContext(known.contextId); render(); return; }
+    if (known) {
+      const targetView = eligibleRows(lastGoodCore?.timer).some(row => row.contextId === known.contextId) ? 'main' : 'context-detail';
+      selectContext(known.contextId, targetView); render(); return;
+    }
     if (safeProjectId(query)) { openJob(query); return; }
     errorMessage = 'No matching job found.'; render();
   }
@@ -1168,6 +1578,13 @@ function createWorkspaceUi(options = {}) {
     if (disposed || started) return;
     started = true;
     storageChanges?.addListener?.(onStorageChanged);
+    document.addEventListener?.('dragover', onDocumentDragOver, true);
+    document.addEventListener?.('drop', onDocumentDrop, true);
+    document.addEventListener?.('dragend', onDragEnd, true);
+    document.addEventListener?.('keydown', onGlobalKeyDown, true);
+    document.addEventListener?.('visibilitychange', onVisibilityChange);
+    window.addEventListener?.('blur', onWindowBlur);
+    window.addEventListener?.('pagehide', onWindowBlur);
     render();
     intervalId = window.setInterval(() => render({ allowInteractionDeferral: true }), REFRESH_MS);
   }
@@ -1182,12 +1599,24 @@ function createWorkspaceUi(options = {}) {
     disposed = true;
     if (intervalId !== null) window.clearInterval(intervalId);
     intervalId = null;
+    if (archiveNoticeTimer !== null) window.clearTimeout?.(archiveNoticeTimer);
+    archiveNoticeTimer = null;
+    clearDragState();
     storageChanges?.removeListener?.(onStorageChanged);
+    document.removeEventListener?.('dragover', onDocumentDragOver, true);
+    document.removeEventListener?.('drop', onDocumentDrop, true);
+    document.removeEventListener?.('dragend', onDragEnd, true);
+    document.removeEventListener?.('keydown', onGlobalKeyDown, true);
+    document.removeEventListener?.('visibilitychange', onVisibilityChange);
+    window.removeEventListener?.('blur', onWindowBlur);
+    window.removeEventListener?.('pagehide', onWindowBlur);
     if (root) {
       root.removeEventListener('click', onClick); root.removeEventListener('dblclick', onDoubleClick);
       root.removeEventListener('submit', onSubmit); root.removeEventListener('dragstart', onDragStart);
       root.removeEventListener('dragover', onDragOver); root.removeEventListener('drop', onDrop);
+      root.removeEventListener('dragend', onDragEnd);
       root.removeEventListener('change', onChange);
+      root.removeEventListener('cancel', onFileCancel);
       root.removeEventListener('input', onInput); root.removeEventListener('keydown', onKeyDown);
     }
     root = null;
@@ -1196,4 +1625,5 @@ function createWorkspaceUi(options = {}) {
   return Object.freeze({ start, render, setRouteProtection, teardown });
 }
 
-module.exports = { ROOT_ID, UI_STORAGE_DEFAULTS, MAX_VISIBLE_JOB_TABS, formatDuration, safeProjectId, deriveVisibleTabs, createWorkspaceUi };
+module.exports = { ROOT_ID, UI_STORAGE_DEFAULTS, MAX_VISIBLE_JOB_TABS, formatDuration, safeProjectId, deriveVisibleTabs,
+  archiveGestureEligibility, createWorkspaceUi };

@@ -73,6 +73,7 @@ function prefs(values = {}) {
 }
 
 const sleek = { websiteThemeEffective: 'SLEEK_DARK', forcedColors: false, reducedTransparency: false };
+const light = { websiteThemeEffective: 'LIGHT_GLASS', forcedColors: false, reducedTransparency: false };
 
 test('UT-B5-CINE-001 an older Glass plus NONE snapshot automatically restores the integrated background', () => {
   const h = harness();
@@ -190,4 +191,62 @@ test('UT-B5-CINE-020 fresh cache is healthy presentation evidence rather than re
     dataUrl: 'data:image/jpeg;base64,AQ==' }) });
   h.service.apply(prefs(), sleek); await h.service.refresh();
   assert.equal(h.service.snapshot().state, 'SHOWING'); assert.equal(h.service.snapshot().source, 'CACHE_FRESH');
+});
+
+test('UT-B5-CINE-022 a no-permission fallback keeps its truthful reason across Dark to Light restoration', async () => {
+  const h = harness({ provider: async () => ({ ok: false, reason: 'optional-origin-permission-required' }) });
+  h.service.apply(prefs(), sleek); await h.service.refresh();
+  assert.equal(h.service.snapshot().state, 'DEGRADED_FALLBACK');
+  assert.equal(h.service.snapshot().reason, 'optional-origin-permission-required');
+
+  const restored = h.service.apply(prefs({ revision: 2, theme: 'LIGHT_GLASS' }), light);
+  assert.equal(restored.state, 'DEGRADED_FALLBACK');
+  assert.equal(restored.source, 'FALLBACK');
+  assert.equal(restored.reason, 'optional-origin-permission-required');
+  assert.equal(h.document.getElementById(CINEMATIC_HOST_ID).getAttribute('data-theme'), 'LIGHT_GLASS');
+});
+
+test('UT-B5-CINE-023 accessibility suspension wins when forced colors makes the effective website theme Native', () => {
+  const h = harness();
+  const snapshot = h.service.apply(prefs(), {
+    websiteThemeEffective: 'ORIGINAL',
+    forcedColors: true,
+    reducedTransparency: false
+  });
+  assert.equal(snapshot.state, 'SUSPENDED_ACCESSIBILITY');
+  assert.equal(snapshot.reason, 'accessibility-override');
+  assert.equal(snapshot.preference, 'CINEMATIC');
+  assert.equal(h.calls(), 0);
+});
+
+test('UT-B5-CINE-024 a retained remote image keeps its truthful source across a transient theme suspension', async () => {
+  const h = harness();
+  h.service.apply(prefs(), sleek); await h.service.refresh();
+  assert.equal(h.service.snapshot().source, 'REMOTE');
+
+  const suspended = h.service.apply(prefs({ revision: 2 }), { websiteThemeEffective: 'ORIGINAL' });
+  assert.equal(suspended.state, 'SUSPENDED_THEME');
+  assert.equal(suspended.source, null);
+  assert.equal(suspended.imageDisplayed, false);
+
+  const restored = h.service.apply(prefs({ revision: 3 }), sleek);
+  assert.equal(restored.state, 'SHOWING');
+  assert.equal(restored.source, 'REMOTE');
+  assert.equal(restored.imageDisplayed, true);
+  assert.equal(h.calls(), 1);
+});
+
+test('UT-B5-CINE-025 a retained cache image restores as degraded cache instead of losing provenance', async () => {
+  const h = harness({ provider: async () => ({ ok: true, source: 'CACHE', reason: 'remote-failed-cache-used',
+    dataUrl: 'data:image/jpeg;base64,AQ==' }) });
+  h.service.apply(prefs(), sleek); await h.service.refresh();
+  assert.equal(h.service.snapshot().state, 'DEGRADED_CACHE');
+  assert.equal(h.service.snapshot().source, 'CACHE');
+
+  h.service.apply(prefs({ revision: 2 }), { websiteThemeEffective: 'ORIGINAL' });
+  const restored = h.service.apply(prefs({ revision: 3 }), sleek);
+  assert.equal(restored.state, 'DEGRADED_CACHE');
+  assert.equal(restored.source, 'CACHE');
+  assert.equal(restored.imageDisplayed, true);
+  assert.equal(h.calls(), 1);
 });

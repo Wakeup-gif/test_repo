@@ -4,7 +4,9 @@ This file scopes only `browser-extension/squarecoil-companion/`.
 
 ## Current task
 
-B2-C, B3, B4, B5-A, B5-B, B5-C, B5-D, and B6 are accepted on `codex/squarecoil-b2c-migration`. The exact accepted Glass/theme and recovery stabilization implementation source is `aabdebc87224211b8897a7e1ded7b94ddacdd19a`. Its aggregate gate and installed Chrome/Edge clean-plus-upgrade gates pass; the optional live Bing permission grant remains a manual supplemental check documented in `implementation/B6-GLASS-STABILIZATION-EVIDENCE.md`.
+B2-C, B3, B4, B5-A, B5-B, B5-C, B5-D, and B6 are accepted on `codex/squarecoil-b2c-migration`. The prior Glass/theme and recovery stabilization remains accepted at exact implementation source `aabdebc87224211b8897a7e1ded7b94ddacdd19a`; its historical evidence remains SHA-bound in `implementation/B6-GLASS-STABILIZATION-EVIDENCE.md`.
+
+The current authorized batch is **UI/theme/lab/Figma stabilization**: a sealed fictional test website, coherent integrated Dark/Light Glass rendering, protruding horizontally scrollable and reorderable Context tabs, fail-closed drag-to-page Archive/Undo behavior, and a code-aligned Figma handoff. It is not accepted until the aggregate gate, deterministic lab/visual proof, and installed Chrome/Edge clean-plus-upgrade gates pass against the exact candidate bytes.
 
 Do not merge or promote to `main`, publish a release/store build, or add a new live SquareCoil mutation without separate exact approval.
 
@@ -139,4 +141,4 @@ Do not finish with unrelated changes.
 
 ## Stage boundary
 
-B6 and B5-D are complete. The current authorization covers only the Glass/theme and recovery stabilization batch, its exact-package acceptance evidence, and pushing the existing branch. It does not authorize production promotion, publication/store submission, merge to `main`, rollout, or any new live mutation.
+B6 and B5-D remain complete. The current authorization covers only the UI/theme/lab/Figma stabilization batch described above, its exact-package acceptance evidence, and pushing the existing branch. It does not authorize production promotion, publication/store submission, merge to `main`, rollout, a B7 stage, or any live SquareCoil mutation.

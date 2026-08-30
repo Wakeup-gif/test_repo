@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { canonicalFileBytes } = require('./canonical-text');
 
 const PACKAGE_FILES = Object.freeze([
   'dist/background.js',
@@ -60,7 +61,7 @@ function copyPackageFiles(sourceRoot, destinationRoot) {
     }
     const destination = path.join(destinationRoot, ...relative.split('/'));
     fs.mkdirSync(path.dirname(destination), { recursive: true });
-    fs.copyFileSync(source, destination);
+    fs.writeFileSync(destination, canonicalFileBytes(source));
   }
   assertExactPackageFiles(destinationRoot);
   return destinationRoot;

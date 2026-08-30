@@ -53,7 +53,7 @@ function stableRowOrder(rows, durableOrder = []) {
 function deriveTabWorkspace(rows, state = {}) {
   const eligible = (rows || []).filter(row =>
     row?.contextId && row.archivedAtMs == null &&
-    String(row.workspaceMembership || '').toUpperCase() !== 'ARCHIVED'
+    String(row.workspaceMembership || '').toUpperCase() === 'RECENT'
   );
   const byId = new Map(eligible.map(row => [String(row.contextId), row]));
   const order = stableRowOrder(eligible, state.durableOrder);
@@ -149,6 +149,17 @@ function moveContext(order, contextId, beforeContextId = null) {
   return next;
 }
 
+function placeContext(order, contextId, targetContextId = null, placement = 'before') {
+  const id = String(contextId || '');
+  const target = targetContextId == null ? null : String(targetContextId);
+  const next = (order || []).map(String).filter(value => value !== id);
+  if (!id) return next;
+  const targetIndex = target === null ? -1 : next.indexOf(target);
+  if (targetIndex < 0) next.push(id);
+  else next.splice(placement === 'after' ? targetIndex + 1 : targetIndex, 0, id);
+  return next;
+}
+
 module.exports = {
   MAX_VISIBLE_JOB_TABS,
   DEFAULT_TIMER_LIMITS_MS,
@@ -159,5 +170,6 @@ module.exports = {
   deriveTabWorkspace,
   focusIntentFromTimer,
   focusIntentIsCurrent,
-  moveContext
+  moveContext,
+  placeContext
 };

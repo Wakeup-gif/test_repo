@@ -912,10 +912,12 @@ function editorFrameHtml() {
 
 function b5dThemeFixtureHtml(kind) {
   const clock = clockContextHtml({ projectId: '260701', label: '260701 - Design' });
-  const nativeCss = '<style>body{margin:0}.vendor-native,.dataTables_wrapper,.select2-dropdown,.select2-selection--single,.qtip,.mfp-content,.fancybox-skin,.fancybox-inner,.dropzone,.cke,.cke_top,.cke_contents,.gantt-container,.gantt_grid,.gantt_task{color:rgb(20,30,40);background:rgb(255,255,255);border:1px solid rgb(180,185,190);border-radius:0}.paginate_button{color:rgb(20,30,40);background:rgb(245,245,245);border:1px solid rgb(180,185,190)}.mfp-bg,.fancybox-overlay{background:rgba(20,20,20,.25)}#content{padding:30px;overflow-x:visible}.panel-body,.table-responsive{max-width:none;overflow-x:visible}</style>';
-  const vendor = kind === 'vendor' ? '<main id="content"><section id="data-table" class="dataTables_wrapper"><div class="dataTables_info">Showing rows</div><div class="dataTables_paginate"><button id="paginate-current" class="paginate_button current">1</button></div></section><section id="select2" class="select2-container--default"><div id="select2-selection" class="select2-selection--single"><span class="select2-selection__rendered">Selected</span></div><div id="select2-dropdown" class="select2-dropdown"><div class="select2-results__option select2-results__option--highlighted">Option</div></div></section><aside id="qtip" class="qtip"><div class="qtip-titlebar">Tip</div><div class="qtip-content">Tip content</div></aside><div id="magnific-bg" class="mfp-bg"></div><div id="magnific" class="mfp-content"><button class="mfp-close">Close</button></div><div id="fancybox-overlay" class="fancybox-overlay"></div><div id="fancybox" class="fancybox-skin"><div class="fancybox-inner">Preview</div></div><div id="dropzone" class="dropzone dz-drag-hover">Drop files</div><div id="ckeditor" class="cke"><div id="cke-toolbar" class="cke_top"><div class="cke_toolbox"><span class="cke_toolgroup"><button class="cke_button"><span id="cke-icon" class="cke_button_icon">icon</span></button><button class="cke_button cke_button_disabled"><span id="cke-disabled-icon" class="cke_button_icon">disabled</span></button></span></div></div><div class="cke_contents"><iframe id="editor-frame" class="cke_wysiwyg_frame" src="' + EDITOR_FRAME_PATH + '"></iframe></div></div><div class="panel-body"><div class="table-responsive">Responsive table</div></div></main>' : '';
+  const nativeCss = '<style>body{margin:0}.vendor-native,.dataTables_wrapper,.select2-dropdown,.select2-selection--single,.qtip,.mfp-content,.fancybox-skin,.fancybox-inner,.dropzone,.cke,.cke_top,.cke_contents,.gantt-container,.gantt_grid,.gantt_task,#pmlt,#customer-name,#customer-info,#showbtns,#projectbox,#descriptionbox,#designbox,#filesbox{color:rgb(20,30,40);background:rgb(255,255,255);border:1px solid rgb(180,185,190);border-radius:0}.paginate_button{color:rgb(20,30,40);background:rgb(245,245,245);border:1px solid rgb(180,185,190)}.mfp-bg,.fancybox-overlay{background:rgba(20,20,20,.25)}#content{padding:30px;overflow-x:visible}.panel-body,.table-responsive{max-width:none;overflow-x:visible}</style>';
+  const projectRail = kind === 'vendor' ? '<aside id="pmlt"><h1 id="project-number" class="project-number">260701</h1><div id="project-name" class="project-name">Production fixture</div><strong id="project-owner">Assigned user</strong><nav id="project_menu"><a href="#design">Design</a><a href="#files">Files</a></nav></aside>' : '';
+  const productionSurfaces = kind === 'vendor' ? '<section id="customer-name"><h1 id="customer-heading" class="panel-title">Production fixture</h1></section><section id="customer-info" class="panel"><div class="panel-heading"><strong>Project information</strong></div><div class="panel-body">Project detail</div></section><section id="showbtns"><button class="btn">Edit</button></section><section id="projectbox" class="panel"><div class="panel-heading">Project</div><div class="panel-body">Project status</div></section><section id="descriptionbox" class="panel"><div class="panel-heading">Description</div><div id="production-panel-body" class="panel-body"><strong id="description-strong">Readable description</strong></div></section><section id="designbox" class="panel"><div class="panel-heading">Designs</div><div class="panel-body">Design rows</div></section><section id="filesbox" class="panel"><div class="panel-heading">Files</div><div class="panel-body">File rows</div></section>' : '';
+  const vendor = kind === 'vendor' ? '<main id="content">' + productionSurfaces + '<section id="data-table" class="dataTables_wrapper"><div class="dataTables_info">Showing rows</div><div class="dataTables_paginate"><button id="paginate-current" class="paginate_button current">1</button></div></section><section id="select2" class="select2-container--default"><div id="select2-selection" class="select2-selection--single"><span class="select2-selection__rendered">Selected</span></div><div id="select2-dropdown" class="select2-dropdown"><div class="select2-results__option select2-results__option--highlighted">Option</div></div></section><aside id="qtip" class="qtip"><div class="qtip-titlebar">Tip</div><div class="qtip-content">Tip content</div></aside><div id="magnific-bg" class="mfp-bg"></div><div id="magnific" class="mfp-content"><button class="mfp-close">Close</button></div><div id="fancybox-overlay" class="fancybox-overlay"></div><div id="fancybox" class="fancybox-skin"><div class="fancybox-inner">Preview</div></div><div id="dropzone" class="dropzone dz-drag-hover">Drop files</div><div id="ckeditor" class="cke"><div id="cke-toolbar" class="cke_top"><div class="cke_toolbox"><span class="cke_toolgroup"><button class="cke_button"><span id="cke-icon" class="cke_button_icon">icon</span></button><button class="cke_button cke_button_disabled"><span id="cke-disabled-icon" class="cke_button_icon">disabled</span></button></span></div></div><div class="cke_contents"><iframe id="editor-frame" class="cke_wysiwyg_frame" src="' + EDITOR_FRAME_PATH + '"></iframe></div></div><div id="standalone-panel-body" class="panel-body"><div class="table-responsive">Responsive table</div></div></main>' : '';
   const gantt = kind === 'gantt' ? '<main id="content"><section id="gantt" class="gantt-container"><div class="gantt_grid"><div class="gantt_grid_scale"><div id="gantt-head" class="gantt_grid_head_cell">Milestone</div></div><div class="gantt_row">Row</div></div><div class="gantt_task"><div class="gantt_task_scale"><div class="gantt_scale_cell">Day</div></div><div class="gantt_task_row">Task</div></div></section></main>' : '';
-  return '<!doctype html><html><head><meta charset="utf-8"><title>SquareCoil B5-D Theme Fixture</title><link rel="icon" href="data:,">' + nativeCss + '</head><body class="mobile-view sb-l-m"><div id="content_wrapper"><div id="topbar">Topbar</div>' + vendor + gantt + '</div><section class="timeclock-container"><button id="clockin" hidden>Clock in</button><button id="clockout">Clock out</button><span id="clockin-debug"></span><span id="clockin-remaining-time">' + clock + '</span><div class="clock-actions"></div></section></body></html>';
+  return '<!doctype html><html><head><meta charset="utf-8"><title>SquareCoil B5-D Theme Fixture</title><link rel="icon" href="data:,">' + nativeCss + '</head><body class="mobile-view sb-l-m"><div id="content_wrapper"><div id="topbar">Topbar</div>' + projectRail + vendor + gantt + '</div><section class="timeclock-container"><button id="clockin" hidden>Clock in</button><button id="clockout">Clock out</button><span id="clockin-debug"></span><span id="clockin-remaining-time">' + clock + '</span><div class="clock-actions"></div></section></body></html>';
 }
 
 function dashboardFixtureHtml() {
@@ -990,12 +992,15 @@ async function installSyntheticRouting(context, networkEvidence, transitionFixtu
       const market = url.searchParams.get('mkt');
       networkEvidence.bing.push({ url: url.href, resourceType: request.resourceType(), kind: 'metadata' });
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ images: [{
-        url: `/th?id=OHR.SquareCoilAcceptance_${market}_UHD.jpg`, title: `Synthetic ${market} acceptance wallpaper`, startdate: '20260828'
+        url: `/th?id=OHR.SquareCoilAcceptance_${market}_UHD.jpg&rf=LaDigue_UHD.jpg&pid=hp&w=3840&h=2160&rs=1&c=4`, title: `Synthetic ${market} acceptance wallpaper`, startdate: '20260828'
       }] }) });
     }
     if (url.origin === 'https://www.bing.com' && url.pathname === '/th' &&
         /^OHR\.SquareCoilAcceptance_[A-Za-z-]+_UHD\.jpg$/.test(url.searchParams.get('id') || '') &&
-        [...url.searchParams.keys()].every(key => ['id', 'rf', 'pid'].includes(key))) {
+        url.searchParams.get('rf') === 'LaDigue_UHD.jpg' && url.searchParams.get('pid') === 'hp' &&
+        url.searchParams.get('w') === '3840' && url.searchParams.get('h') === '2160' &&
+        url.searchParams.get('rs') === '1' && url.searchParams.get('c') === '4' &&
+        [...url.searchParams.keys()].length === 7) {
       networkEvidence.bing.push({ url: url.href, resourceType: request.resourceType(), kind: 'image' });
       return route.fulfill({ status: 200, contentType: 'image/png',
         body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64') });
@@ -1184,6 +1189,91 @@ async function capturePageEvidence(page, options, family, name) {
   return outputPath;
 }
 
+async function beginTrustedTabDragOutside(page, contextId, timeoutMs) {
+  const box = await waitFor(async () => page.evaluate(({ rootId, id }) => {
+    const tab = document.querySelector(`#${rootId} .sc-tab[data-context="${CSS.escape(id)}"]`);
+    if (!tab) return null;
+    const rect = tab.getBoundingClientRect();
+    return rect.width > 0 && rect.height > 0
+      ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+      : null;
+  }, { rootId: ROOT_ID, id: contextId }), `trusted drag source ${contextId}`, timeoutMs);
+  assert(box && box.width > 0 && box.height > 0, `Tab ${contextId} was not available for a trusted drag`, box);
+  const viewport = page.viewportSize();
+  assert(viewport, 'Installed-browser drag acceptance requires a fixed viewport');
+  const source = { x: box.x + (box.width / 2), y: box.y + (box.height / 2) };
+  const target = { x: Math.min(48, viewport.width - 1), y: Math.min(120, viewport.height - 1) };
+  const targetState = await page.evaluate(({ rootId, point }) => {
+    const root = document.getElementById(rootId);
+    const targetNode = document.elementFromPoint(point.x, point.y);
+    return {
+      hasTarget: Boolean(targetNode),
+      targetInsideCompanion: Boolean(root && targetNode && root.contains(targetNode))
+    };
+  }, { rootId: ROOT_ID, point: target });
+  assert(targetState.hasTarget && !targetState.targetInsideCompanion,
+    'Trusted drag target must resolve to the visible website outside Companion', { target, targetState });
+  await page.mouse.move(source.x, source.y);
+  await page.mouse.down();
+  await page.mouse.move(source.x - 8, source.y - 8, { steps: 4 });
+  await page.mouse.move(target.x, target.y, { steps: 24 });
+  return { source, target };
+}
+
+async function visibleArchiveVeil(page, timeoutMs, expectedTone) {
+  return waitFor(async () => page.evaluate(({ rootId, tone }) => {
+    const root = document.getElementById(rootId);
+    const veil = document.querySelector(`#${rootId} .sc-archive-veil`);
+    if (!veil || veil.dataset.visible !== 'true' || veil.dataset.tone !== tone) return null;
+    const rect = veil.getBoundingClientRect();
+    const style = getComputedStyle(veil);
+    const shell = root?.querySelector('.sc-proto-shell');
+    const topbar = root?.querySelector('.sc-proto-topbar');
+    const content = root?.querySelector('.sc-content');
+    const elementState = element => {
+      if (!element) return null;
+      const elementRect = element.getBoundingClientRect();
+      const elementStyle = getComputedStyle(element);
+      return {
+        connected: element.isConnected,
+        childElementCount: element.childElementCount,
+        textLength: String(element.innerText || '').trim().length,
+        display: elementStyle.display,
+        visibility: elementStyle.visibility,
+        opacity: elementStyle.opacity,
+        color: elementStyle.color,
+        backgroundColor: elementStyle.backgroundColor,
+        rect: { left: elementRect.left, top: elementRect.top, right: elementRect.right, bottom: elementRect.bottom,
+          width: elementRect.width, height: elementRect.height }
+      };
+    };
+    return {
+      tone: veil.dataset.tone,
+      title: veil.querySelector('[data-sc-archive-veil-title]')?.textContent || '',
+      detail: veil.querySelector('[data-sc-archive-veil-detail]')?.textContent || '',
+      rect: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
+      viewport: { width: document.documentElement.clientWidth, height: document.documentElement.clientHeight },
+      backgroundColor: style.backgroundColor,
+      companionDom: {
+        rootConnected: Boolean(root?.isConnected),
+        rootDragging: root?.dataset.dragging || null,
+        shell: elementState(shell),
+        topbar: elementState(topbar),
+        content: elementState(content)
+      }
+    };
+  }, { rootId: ROOT_ID, tone: expectedTone }).then(value => {
+    if (!value) return null;
+    const dom = value.companionDom;
+    const elementVisible = element => element?.connected === true && element.display !== 'none' && element.visibility === 'visible' &&
+      Number(element.opacity) > 0 && element.rect.width > 0 && element.rect.height > 0 && element.childElementCount > 0 && element.textLength > 0;
+    return value.rect.left <= 0 && value.rect.top <= 0 && value.rect.right >= value.viewport.width &&
+      value.rect.bottom >= value.viewport.height && value.backgroundColor !== 'rgba(0, 0, 0, 0)' &&
+      dom?.rootConnected === true && dom.rootDragging === 'true' && elementVisible(dom.shell) &&
+      elementVisible(dom.topbar) && elementVisible(dom.content) ? value : null;
+  }), `${expectedTone} whole-page archive veil`, timeoutMs);
+}
+
 function runB6CandidateBrowserCase(cases, family, fixtureIds, slug, name, task, extraMetadata = {}) {
   for (const fixtureId of fixtureIds) {
     if (!REQUIRED_B6_A4_FIXTURE_IDS.includes(fixtureId)) throw new Error(`Unknown B6 A4 fixture ID: ${fixtureId}`);
@@ -1210,6 +1300,24 @@ async function clickWorkspaceControl(page, selector, timeoutMs) {
   const control = page.locator(`#${ROOT_ID} ${selector}`);
   await control.hover({ timeout: timeoutMs });
   await control.click({ timeout: timeoutMs });
+}
+
+async function revealWorkspaceTab(page, contextId, timeoutMs) {
+  const tab = page.locator(`#${ROOT_ID} .sc-tab[data-context="${contextId}"]`);
+  await tab.waitFor({ state: 'attached', timeout: timeoutMs });
+  await tab.evaluate(node => node.scrollIntoView({ block: 'nearest', inline: 'center' }));
+  await waitFor(async () => {
+    const tabBox = await tab.boundingBox();
+    const stripBox = await page.locator(`#${ROOT_ID} .sc-tabs`).boundingBox();
+    return tabBox && stripBox && tabBox.width > 0 && tabBox.height > 0 &&
+      tabBox.x >= stripBox.x - 1 && tabBox.x + tabBox.width <= stripBox.x + stripBox.width + 1 ? true : null;
+  }, `visible workspace tab ${contextId}`, timeoutMs);
+  return tab;
+}
+
+async function clickWorkspaceTab(page, contextId, timeoutMs) {
+  const tab = await revealWorkspaceTab(page, contextId, timeoutMs);
+  await tab.click({ timeout: timeoutMs });
 }
 
 async function openSettingsHome(page, timeoutMs) {
@@ -2405,7 +2513,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
               ? { owner, observer } : null;
           }, 'B3 incoming Context focus in OWNER and OBSERVER workspaces', options.timeoutMs);
 
-          await page.locator(`#${ROOT_ID} .sc-tab[data-context="job:260701"]`).click({ force: true });
+          await clickWorkspaceTab(page, 'job:260701', options.timeoutMs);
           await clickWorkspaceControl(page, `[data-action="collapse"]`, options.timeoutMs);
           await bridge.syncBridge();
           const heartbeatEvidence = await waitFor(async () => page.evaluate(rootId => {
@@ -2418,7 +2526,8 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
           await page.locator(`#${ROOT_ID} .sc-content`).waitFor({ state: 'visible', timeout: options.timeoutMs });
 
           const presentationBefore = await bridge.coreSnapshot();
-          await page.locator(`#${ROOT_ID} .sc-tab[data-context="job:260702"]`).click({ force: true });
+          await clickWorkspaceTab(page, 'job:260702', options.timeoutMs);
+          await revealWorkspaceTab(page, 'job:260701', options.timeoutMs);
           await page.locator(`#${ROOT_ID} [data-action="hide-tab"][data-context="job:260701"]`).click({ force: true });
           await waitFor(async () => {
             const ownerVisible = await page.locator(`#${ROOT_ID} .sc-tab[data-context="job:260701"]`).count();
@@ -2432,6 +2541,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
             const observerVisible = await observerPage.locator(`#${ROOT_ID} .sc-tab[data-context="job:260701"]`).count();
             return ownerVisible === 1 && observerVisible === 1 ? true : null;
           }, 'cross-tab B3 restored-tab synchronization', options.timeoutMs);
+          await revealWorkspaceTab(page, 'job:260701', options.timeoutMs);
           await page.locator(`#${ROOT_ID} .sc-tab[data-context="job:260702"]`).dragTo(
             page.locator(`#${ROOT_ID} .sc-tab[data-context="job:260701"]`),
             { force: true }
@@ -2461,7 +2571,7 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
       family,
       ['B4-DATA-002', 'B4-DATA-003', 'B4-DATA-004'],
       'ARCHIVE-RESTORE-FAIL-CLOSED',
-      'B4 archive, restore, duplicate merge, and invalid replace preserve authoritative time',
+      'B4 drag Archive/Undo, protected cancel, duplicate merge, and invalid Replace preserve authoritative time',
       async () => {
         const before = await bridge.coreSnapshot();
         const jobABefore = before.timer.contextRows.find(row => row.contextId === 'job:260701');
@@ -2479,25 +2589,132 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
           stableJson(afterMalformed.preferences) === stableJson(before.preferences),
         'Malformed restore changed authoritative data; unrelated Bridge verification may still advance the live Timer revision', { before, afterMalformed });
 
-        await page.locator(`#${ROOT_ID} [data-action="view"][data-view="main"]`).click({ force: true });
+        const originalViewport = page.viewportSize();
+        assert(originalViewport, 'B4 short-viewport acceptance requires a fixed viewport');
+        await openSettingsHome(page, options.timeoutMs);
+        await page.setViewportSize({ width: 900, height: 440 });
+        const shortViewport = await page.evaluate(rootId => {
+          const root = document.getElementById(rootId);
+          const tabs = root?.querySelector('.sc-tabs');
+          const content = root?.querySelector('.sc-content');
+          const shell = root?.querySelector('.sc-proto-shell');
+          if (!root || !tabs || !content || !shell) return null;
+          const rootRect = root.getBoundingClientRect();
+          const tabsRect = tabs.getBoundingClientRect();
+          const shellRect = shell.getBoundingClientRect();
+          content.scrollTop = content.scrollHeight;
+          return {
+            root: { top: rootRect.top, right: rootRect.right, bottom: rootRect.bottom, left: rootRect.left },
+            tabs: { top: tabsRect.top, right: tabsRect.right, bottom: tabsRect.bottom, left: tabsRect.left },
+            shell: { top: shellRect.top, right: shellRect.right, bottom: shellRect.bottom, left: shellRect.left },
+            viewport: { width: document.documentElement.clientWidth, height: document.documentElement.clientHeight },
+            content: { clientHeight: content.clientHeight, scrollHeight: content.scrollHeight, scrollTop: content.scrollTop }
+          };
+        }, ROOT_ID);
+        assert(shortViewport && shortViewport.root.top >= 0 && shortViewport.root.left >= 0 &&
+          shortViewport.root.right <= shortViewport.viewport.width && shortViewport.root.bottom <= shortViewport.viewport.height,
+        'B4 Companion root was not fully reachable in a short viewport', shortViewport);
+        assert(shortViewport.tabs.top >= 0 && shortViewport.tabs.bottom <= shortViewport.shell.bottom &&
+          shortViewport.content.scrollHeight > shortViewport.content.clientHeight && shortViewport.content.scrollTop > 0,
+        'B4 tabs or settings content were not reachable and scrollable in a short viewport', shortViewport);
+        const shortViewportScreenshot = await capturePageEvidence(page, options, family, 'b4-short-viewport-scroll');
+        await page.setViewportSize(originalViewport);
+        await page.locator(`#${ROOT_ID} [data-action="settings-close"]`).click({ force: true });
+        const mainWorkspaceButton = page.locator(`#${ROOT_ID} [data-action="view"][data-view="main"]`);
+        if (await mainWorkspaceButton.count()) await mainWorkspaceButton.click({ force: true });
         await page.locator(`#${ROOT_ID} [data-action="view"][data-view="recent"]`).click({ force: true });
-        await page.locator(`#${ROOT_ID} [data-action="data-context"][data-data-type="DATA_ARCHIVE_CONTEXT"][data-context="job:260701"]`).click({ force: true });
+        const archiveAuthorityBefore = await bridge.coreSnapshot();
+        let mouseHeld = false;
+        let eligibleVeil = null;
+        try {
+          await beginTrustedTabDragOutside(page, 'job:260701', options.timeoutMs);
+          mouseHeld = true;
+          eligibleVeil = await visibleArchiveVeil(page, options.timeoutMs, 'eligible');
+          assert(eligibleVeil.title === 'Release to archive' && /hours and history stay saved/i.test(eligibleVeil.detail),
+            'Eligible drag veil did not explain the safe Archive boundary', eligibleVeil);
+          await capturePageEvidence(page, options, family, 'b4-drag-archive-eligible');
+          await page.mouse.up();
+          mouseHeld = false;
+        } finally {
+          if (mouseHeld) await page.mouse.up().catch(() => {});
+        }
         const archived = await waitFor(async () => {
           const snapshot = await bridge.coreSnapshot();
           return snapshot?.data?.archivedRows?.some(row => row.contextId === 'job:260701') ? snapshot : null;
-        }, 'B4 archived Context commit', options.timeoutMs);
+        }, 'B4 trusted drag archived Context commit', options.timeoutMs);
         const archivedRow = archived.data.archivedRows.find(row => row.contextId === 'job:260701');
         assert(archivedRow.totalMs === jobABefore.totalMs, 'Archive changed the Context total', { jobABefore, archivedRow });
-
-        await openSettingsHome(page, options.timeoutMs);
-        await page.locator(`#${ROOT_ID} [data-action="settings-route"][data-view="data-tools"]`).click({ force: true });
-        await page.locator(`#${ROOT_ID} [data-action="data-context"][data-data-type="DATA_RESTORE_ARCHIVED"][data-context="job:260701"]`).click({ force: true });
+        assert(archived.data?.lastMutation?.type === 'DATA_ARCHIVE_CONTEXT',
+          'Drag release did not route through authoritative DATA_ARCHIVE_CONTEXT', archived.data?.lastMutation);
+        assert(archived.ledgerSegmentCount === archiveAuthorityBefore.ledgerSegmentCount &&
+          stableJson(archived.timer?.historyRows || []) === stableJson(archiveAuthorityBefore.timer?.historyRows || []) &&
+          archived.timer?.currentContextId === archiveAuthorityBefore.timer?.currentContextId,
+        'Drag Archive changed Timer/Ledger/history authority', { archiveAuthorityBefore, archived });
+        const undo = page.locator(`#${ROOT_ID} [data-action="undo-archive"][data-context="job:260701"]`);
+        await undo.waitFor({ state: 'visible', timeout: options.timeoutMs });
+        await undo.click({ force: true });
         const restored = await waitFor(async () => {
           const snapshot = await bridge.coreSnapshot();
           return snapshot?.data?.recentRows?.some(row => row.contextId === 'job:260701') && !snapshot.data.archivedRows.some(row => row.contextId === 'job:260701') ? snapshot : null;
-        }, 'B4 restored Context commit', options.timeoutMs);
+        }, 'B4 Undo restored Context commit', options.timeoutMs);
         const restoredRow = restored.data.recentRows.find(row => row.contextId === 'job:260701');
         assert(restoredRow.totalMs === jobABefore.totalMs, 'Restore changed the Context total', { jobABefore, restoredRow });
+        assert(restored.ledgerSegmentCount === archiveAuthorityBefore.ledgerSegmentCount &&
+          stableJson(restored.timer?.historyRows || []) === stableJson(archiveAuthorityBefore.timer?.historyRows || []) &&
+          restored.timer?.currentContextId === archiveAuthorityBefore.timer?.currentContextId,
+        'Archive Undo changed Timer/Ledger/history authority', { archiveAuthorityBefore, restored });
+        await waitFor(async () => page.evaluate(rootId => {
+          const root = document.getElementById(rootId);
+          return root?.dataset.busy === 'false' && !root.querySelector('.sc-archive-notice') ? true : null;
+        }, ROOT_ID), 'B4 Undo presentation settlement before protected drag', options.timeoutMs);
+
+        const protectedBefore = await bridge.coreSnapshot();
+        let protectedMouseHeld = false;
+        let blockedVeil = null;
+        try {
+          await beginTrustedTabDragOutside(page, 'job:260702', options.timeoutMs);
+          protectedMouseHeld = true;
+          blockedVeil = await visibleArchiveVeil(page, options.timeoutMs, 'blocked');
+          assert(blockedVeil.title === 'This job stays open' && /cannot be archived/i.test(blockedVeil.detail),
+            'Protected drag veil did not explain its fail-closed decision', blockedVeil);
+          await capturePageEvidence(page, options, family, 'b4-drag-archive-protected');
+          await page.mouse.up();
+          protectedMouseHeld = false;
+        } finally {
+          if (protectedMouseHeld) await page.mouse.up().catch(() => {});
+        }
+        await page.waitForTimeout(200);
+        const protectedAfter = await bridge.coreSnapshot();
+        assert(!protectedAfter.data?.archivedRows?.some(row => row.contextId === 'job:260702') &&
+          protectedAfter.timer?.currentContextId === 'job:260702' &&
+          protectedAfter.ledgerSegmentCount === protectedBefore.ledgerSegmentCount &&
+          stableJson(protectedAfter.timer?.historyRows || []) === stableJson(protectedBefore.timer?.historyRows || []) &&
+          stableJson(protectedAfter.data?.lastMutation) === stableJson(protectedBefore.data?.lastMutation),
+        'Current/protected tab drag did not fail closed', { protectedBefore, protectedAfter });
+
+        const cancelBefore = await bridge.coreSnapshot();
+        let cancelMouseHeld = false;
+        try {
+          await beginTrustedTabDragOutside(page, 'job:260701', options.timeoutMs);
+          cancelMouseHeld = true;
+          await visibleArchiveVeil(page, options.timeoutMs, 'eligible');
+          await page.keyboard.press('Escape');
+          await page.mouse.up();
+          cancelMouseHeld = false;
+        } finally {
+          if (cancelMouseHeld) await page.mouse.up().catch(() => {});
+        }
+        await waitFor(async () => page.locator(`#${ROOT_ID} .sc-archive-veil[data-visible="true"]`).count().then(count => count === 0 ? true : null),
+          'B4 Escape canceled outside drag veil', options.timeoutMs);
+        const cancelAfter = await bridge.coreSnapshot();
+        assert(!cancelAfter.data?.archivedRows?.some(row => row.contextId === 'job:260701') &&
+          cancelAfter.ledgerSegmentCount === cancelBefore.ledgerSegmentCount &&
+          stableJson(cancelAfter.timer?.historyRows || []) === stableJson(cancelBefore.timer?.historyRows || []) &&
+          stableJson(cancelAfter.data?.lastMutation) === stableJson(cancelBefore.data?.lastMutation),
+        'Escape/off-panel cancel archived or mutated authoritative history', { cancelBefore, cancelAfter });
+
+        await openSettingsHome(page, options.timeoutMs);
+        await page.locator(`#${ROOT_ID} [data-action="settings-route"][data-view="data-tools"]`).click({ force: true });
 
         const backup = await bridge.dataExport('FULL_BACKUP', {
           backupId: `a4-b4-${family}-dedupe`,
@@ -2523,6 +2740,10 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
         await page.locator(`#${ROOT_ID} [data-action="settings-close"]`).click({ force: true });
         return {
           malformedError,
+          shortViewport,
+          shortViewportScreenshot,
+          eligibleVeil,
+          blockedVeil,
           archivedRevision: archived.revision,
           restoredRevision: restored.revision,
           duplicateSummary: duplicatePlan.summary,
@@ -3164,12 +3385,25 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
           const [vendorPage, ganttPage, lookalikePage] = pages;
           const vendor = await waitFor(async () => vendorPage.evaluate(() => {
             const style = id => getComputedStyle(document.getElementById(id));
+            const surface = id => ({ id, color: style(id).color, background: style(id).backgroundColor,
+              backgroundImage: style(id).backgroundImage, backdrop: style(id).backdropFilter || style(id).webkitBackdropFilter });
             const frame = document.getElementById('editor-frame');
             const editorDocument = frame?.contentDocument;
+            const host = document.getElementById('squarecoil-companion-cinematic-host');
             const state = {
               theme: document.documentElement.getAttribute('data-squarecoil-companion-site-theme'),
               route: document.documentElement.getAttribute('data-squarecoil-companion-site-route'),
               layers: document.querySelectorAll('#squarecoil-companion-site-theme').length,
+              production: {
+                rail: surface('pmlt'),
+                railHeadingColor: style('project-number').color,
+                customerHeadingColor: style('customer-heading').color,
+                surfaces: ['customer-name','customer-info','showbtns','projectbox','descriptionbox','designbox','filesbox'].map(surface),
+                inner: surface('production-panel-body'),
+                strongColor: style('description-strong').color,
+                host: host ? { theme: host.dataset.theme || null, backgroundImage: getComputedStyle(host).backgroundImage,
+                  zIndex: getComputedStyle(host).zIndex } : null
+              },
               paginate: { color: style('paginate-current').color, background: style('paginate-current').backgroundColor, radius: style('paginate-current').borderRadius },
               select: { color: style('select2-selection').color, background: style('select2-selection').backgroundColor, radius: style('select2-selection').borderRadius },
               qtip: { color: style('qtip').color, background: style('qtip').backgroundColor, radius: style('qtip').borderRadius },
@@ -3212,6 +3446,13 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
           assert(vendor.editor.bodyBackground === 'rgb(10, 17, 24)' && vendor.editor.bodyColor === 'rgb(220, 229, 238)' &&
             vendor.editor.copyColor === 'rgb(230, 237, 244)' && vendor.editor.linkColor === 'rgb(143, 201, 255)',
           'B5-D CKEditor document adapter is incomplete', vendor.editor);
+          assert(vendor.production.rail.background === 'rgba(5, 12, 19, 0.68)' &&
+            vendor.production.railHeadingColor === 'rgb(238, 245, 251)' &&
+            vendor.production.customerHeadingColor === 'rgb(238, 245, 251)' &&
+            vendor.production.surfaces.every(surface => surface.background === 'rgba(9, 18, 27, 0.57)' && surface.backgroundImage !== 'none') &&
+            vendor.production.host?.theme === 'SLEEK_DARK' && /gradient/i.test(vendor.production.host.backgroundImage) &&
+            Number(vendor.production.host.zIndex) < 0,
+          'B5-D Dark Glass did not present one coherent translucent production surface stack', vendor.production);
 
           const gantt = await waitFor(async () => ganttPage.evaluate(() => {
             const container = getComputedStyle(document.getElementById('gantt'));
@@ -3248,12 +3489,26 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
           const lightGlass = await waitFor(async () => vendorPage.evaluate(() => {
             const frame = document.getElementById('editor-frame');
             const editorDocument = frame?.contentDocument;
-            const panel = getComputedStyle(document.querySelector('.panel-body'));
+            const style = id => getComputedStyle(document.getElementById(id));
+            const surface = id => ({ id, color: style(id).color, background: style(id).backgroundColor,
+              backgroundImage: style(id).backgroundImage, backdrop: style(id).backdropFilter || style(id).webkitBackdropFilter });
+            const panel = style('standalone-panel-body');
+            const host = document.getElementById('squarecoil-companion-cinematic-host');
             return {
               theme: document.documentElement.getAttribute('data-squarecoil-companion-site-theme'),
               layers: document.querySelectorAll('#squarecoil-companion-site-theme').length,
               panelColor: panel.color,
               panelBackground: panel.backgroundColor,
+              production: {
+                rail: surface('pmlt'),
+                railHeadingColor: style('project-number').color,
+                customerHeadingColor: style('customer-heading').color,
+                surfaces: ['customer-name','customer-info','showbtns','projectbox','descriptionbox','designbox','filesbox'].map(surface),
+                inner: surface('production-panel-body'),
+                strongColor: style('description-strong').color,
+                host: host ? { theme: host.dataset.theme || null, backgroundImage: getComputedStyle(host).backgroundImage,
+                  zIndex: getComputedStyle(host).zIndex } : null
+              },
               editorFrameMarker: frame?.getAttribute('data-squarecoil-companion-editor-frame') || null,
               editorDocumentLayers: editorDocument?.querySelectorAll('#squarecoil-companion-ckeditor-document-theme').length || 0,
               editorBodyColor: editorDocument?.body ? getComputedStyle(editorDocument.body).color : null,
@@ -3264,6 +3519,15 @@ async function runBrowserSuite({ playwright, family, executablePath, packageDire
           assert(lightGlass.panelColor === 'rgb(23, 37, 50)' && lightGlass.panelBackground === 'rgba(0, 0, 0, 0)' &&
             lightGlass.editorBodyColor === 'rgb(24, 33, 43)' && lightGlass.editorBodyBackground === 'rgb(248, 250, 252)',
           'B5-E Light Glass did not preserve transparent inner glass with readable dark text and a readable editor', lightGlass);
+          assert(lightGlass.production.rail.background === 'rgba(242, 249, 253, 0.62)' &&
+            lightGlass.production.railHeadingColor === 'rgb(23, 37, 50)' &&
+            lightGlass.production.customerHeadingColor === 'rgb(23, 37, 50)' &&
+            lightGlass.production.surfaces.every(surface => surface.background === 'rgba(255, 255, 255, 0.54)' && surface.backgroundImage !== 'none') &&
+            lightGlass.production.inner.background === 'rgba(0, 0, 0, 0)' &&
+            lightGlass.production.strongColor === 'rgb(23, 37, 50)' &&
+            lightGlass.production.host?.theme === 'LIGHT_GLASS' && /gradient/i.test(lightGlass.production.host.backgroundImage) &&
+            Number(lightGlass.production.host.zIndex) < 0,
+          'B5-E Light Glass retained dark foundation paint or unreadable production text', lightGlass.production);
 
           const lightCurrent = await bridge.coreSnapshot();
           await bridge.preferenceAction({ websiteTheme: 'REFINED_LIGHT' }, lightCurrent.preferences.preferenceRevision);

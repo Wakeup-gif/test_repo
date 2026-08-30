@@ -404,3 +404,132 @@ test('UT-B4-DATA-008 the data read model exposes archives without becoming anoth
   assert.equal('ledger' in view, false);
   validateDocument(document);
 });
+
+test('UT-B4-DATA-009 unresolved checkpoint and recovery candidates remain protected from archive', () => {
+  const checkpointDocument = documentFixture();
+  const checkpointId = addContext(checkpointDocument, '260819');
+  checkpointDocument.checkpoint = {
+    schemaVersion: 1,
+    runtimeInstanceId: 'runtime-checkpoint',
+    contextId: checkpointId,
+    sessionId: 'session-checkpoint',
+    cycleId: 'cycle-checkpoint',
+    startedAtMs: NOW - 5_000,
+    lastVerifiedAtMs: NOW - 1_000,
+    checkpointedAtMs: NOW,
+    terminationDisposition: 'UNEXPECTED_INTERRUPTION',
+    buildVersion: 'fixture',
+    source: 'companion',
+    ownershipEvidence: {
+      disposition: 'OWNER',
+      ownerRuntimeId: 'runtime-checkpoint',
+      coordinationEpoch: 1,
+      fencingToken: 'fence-checkpoint'
+    }
+  };
+  assert.equal(createDataSafetyReadModel(checkpointDocument).recentRows[0].protected, true);
+  assert.throws(() => stageDataOperation(checkpointDocument, {
+    type: DATA_COMMANDS.ARCHIVE_CONTEXT,
+    contextId: checkpointId,
+    atMs: NOW
+  }), /data-context-protected/);
+  const cleanCheckpointDocument = structuredClone(checkpointDocument);
+  cleanCheckpointDocument.checkpoint.terminationDisposition = 'CLEAN_TEARDOWN';
+  assert.equal(stageDataOperation(cleanCheckpointDocument, {
+    type: DATA_COMMANDS.ARCHIVE_CONTEXT,
+    contextId: checkpointId,
+    atMs: NOW
+  }).plan.blocked, false);
+  assert.equal(stageDataOperation(cleanCheckpointDocument, {
+    type: DATA_COMMANDS.WIPE_HISTORY
+  }).plan.blocked, false);
+
+  const recoveryDocument = documentFixture();
+  const recoveryId = addContext(recoveryDocument, '260820');
+  recoveryDocument.migration.recoveryCandidates = {
+    localPause: {
+      kind: 'LEGACY_LOCAL_PAUSE',
+      live: false,
+      contextId: recoveryId,
+      cycleId: 'cycle-recovery',
+      pausedAtMs: NOW - 1_000,
+      source: 'fixture'
+    }
+  };
+  assert.equal(createDataSafetyReadModel(recoveryDocument).recentRows[0].protected, true);
+  assert.throws(() => stageDataOperation(recoveryDocument, {
+    type: DATA_COMMANDS.ARCHIVE_CONTEXT,
+    contextId: recoveryId,
+    atMs: NOW
+  }), /data-context-protected/);
+
+  const activeRecoveryDocument = documentFixture();
+  const activeRecoveryId = addContext(activeRecoveryDocument, '260821');
+  activeRecoveryDocument.migration.recoveryCandidates = {
+    active: { kind: 'LEGACY_ACTIVE', contextId: activeRecoveryId, sessionId: 'session-recovery',
+      cycleId: 'cycle-active-recovery', startedAtMs: NOW - 2_000, source: 'fixture' }
+  };
+  assert.equal(createDataSafetyReadModel(activeRecoveryDocument).recentRows[0].protected, true);
+
+  const unrelatedDocument = documentFixture();
+  const unrelatedId = addContext(unrelatedDocument, '260822');
+  unrelatedDocument.migration.recoveryCandidates = { diagnostics: { nested: { contextId: unrelatedId } } };
+  assert.equal(createDataSafetyReadModel(unrelatedDocument).recentRows[0].protected, false);
+  assert.equal(stageDataOperation(unrelatedDocument, {
+    type: DATA_COMMANDS.ARCHIVE_CONTEXT, contextId: unrelatedId, atMs: NOW
+  }).plan.blocked, false);
+});
+
+test('UT-B4-DATA-010 a protection transition after staging prevents the stale Archive commit', () => {
+  const document = documentFixture();
+  const contextId = addContext(document, '260823');
+  const request = { type: DATA_COMMANDS.ARCHIVE_CONTEXT, contextId, atMs: NOW };
+  const staged = stageDataOperation(document, request, { nowMs: NOW });
+  document.timer.pending = { contextId, safeStartAnchorMs: NOW - 1_000, lastContinuityVerifiedAtMs: NOW - 500, continuityState: 'VALID' };
+  const before = structuredClone(document);
+  assert.throws(() => commitStagedDataOperation(document, {
+    request,
+    stagedRevision: staged.plan.stagedRevision,
+    planId: staged.plan.planId,
+    operationId: 'operation-protection-transition',
+    confirmationTokens: staged.plan.requiredConfirmations
+  }, { nowMs: NOW }), /data-context-protected|data-plan-stale/);
+  assert.deepEqual(document, before);
+});
+
+test('UT-B4-DATA-011 archive requires a currently Recent and unarchived Context at stage and commit', () => {
+  const inactiveDocument = documentFixture();
+  const inactiveId = addContext(inactiveDocument, '260824', { membership: 'INACTIVE_NON_RECENT' });
+  const inactiveBefore = structuredClone(inactiveDocument);
+  assert.throws(() => stageDataOperation(inactiveDocument, {
+    type: DATA_COMMANDS.ARCHIVE_CONTEXT,
+    contextId: inactiveId,
+    atMs: NOW
+  }), /data-context-not-recent/);
+  assert.deepEqual(inactiveDocument, inactiveBefore);
+
+  const archivedDocument = documentFixture();
+  const archivedId = addContext(archivedDocument, '260825', { membership: 'ARCHIVED' });
+  const archivedBefore = structuredClone(archivedDocument);
+  assert.throws(() => stageDataOperation(archivedDocument, {
+    type: DATA_COMMANDS.ARCHIVE_CONTEXT,
+    contextId: archivedId,
+    atMs: NOW
+  }), /data-context-not-recent/);
+  assert.deepEqual(archivedDocument, archivedBefore);
+
+  const racedDocument = documentFixture();
+  const racedId = addContext(racedDocument, '260826');
+  const request = { type: DATA_COMMANDS.ARCHIVE_CONTEXT, contextId: racedId, atMs: NOW };
+  const staged = stageDataOperation(racedDocument, request, { nowMs: NOW });
+  racedDocument.contexts[racedId].workspaceMembership = 'INACTIVE_NON_RECENT';
+  const racedBefore = structuredClone(racedDocument);
+  assert.throws(() => commitStagedDataOperation(racedDocument, {
+    request,
+    stagedRevision: staged.plan.stagedRevision,
+    planId: staged.plan.planId,
+    operationId: 'operation-membership-transition',
+    confirmationTokens: staged.plan.requiredConfirmations
+  }, { nowMs: NOW }), /data-context-not-recent/);
+  assert.deepEqual(racedDocument, racedBefore);
+});

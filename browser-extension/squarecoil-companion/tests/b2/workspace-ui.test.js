@@ -73,7 +73,7 @@ function makeTimer() {
   };
 }
 
-async function createHarness() {
+async function createHarness(options = {}) {
   const listeners = {};
   const writes = [];
   const opens = [];
@@ -114,11 +114,15 @@ async function createHarness() {
   };
 
   const timer = makeTimer();
+  options.prepareTimer?.(timer);
   const core = {
     status: 'trusted-core-owner-active',
     blocked: false,
     timer,
     initialized: true,
+    data: { revision: timer.revision, recentRows: timer.contextRows.map(row => ({
+      contextId: row.contextId, label: row.label, protected: row.status !== 'NOT_RUNNING'
+    })) },
     preferences: { initialized: true, preferenceRevision: 1, timerAppearance: 'LIGHT', panelFinish: 'SOLID',
       websiteTheme: 'ORIGINAL', yellowMinutes: 60, orangeMinutes: 120, redMinutes: 240 },
     presentation: { timerAppearanceEffective: 'LIGHT', panelFinishEffective: 'SOLID', websiteThemeEffective: 'ORIGINAL' }
@@ -196,7 +200,9 @@ test('UT-B2-PROTOUI-003 visible tabs keep operational and selected contexts prot
   const rows = Array.from({ length: 8 }, (_, index) => ({
     contextId: `job:${index + 1}`,
     label: `Job ${index + 1}`,
-    lastActivityAtMs: 100 - index
+    lastActivityAtMs: 100 - index,
+    workspaceMembership: 'RECENT',
+    archivedAtMs: null
   }));
   const visible = deriveVisibleTabs(rows, {
     hiddenContextIds: ['job:8', 'job:7'],
@@ -324,5 +330,35 @@ test('UT-B2-PROTOUI-011 B4 data controls cannot bypass an unavailable trusted da
   assert.match(h.root.innerHTML, /That change could not be completed\. No SquareCoil data was changed/);
   assert.doesNotMatch(h.root.innerHTML, /This data tool is not available yet/);
   assert.equal(h.timerActions.length, 0);
+  h.ui.teardown();
+});
+
+test('UT-B2-PROTOUI-012 preference choices are disabled while the prior Settings write is still finishing', async () => {
+  const h = await createHarness();
+  h.click({ action: 'view', view: 'settings' });
+  h.click({ action: 'settings-route', view: 'timer-appearance' });
+  h.click({ action: 'preference', value: 'DARK' });
+  assert.equal(h.root.dataset.busy, 'true');
+  assert.match(h.root.innerHTML, /data-action="preference-finish"[^>]*disabled aria-disabled="true"/);
+  await h.drain();
+  assert.equal(h.root.dataset.busy, 'false');
+  assert.doesNotMatch(h.root.innerHTML, /data-action="preference-finish"[^>]*disabled aria-disabled="true"/);
+  h.ui.teardown();
+});
+
+test('UT-B2-PROTOUI-013 collapsed mode keeps visible job and status surfaces live on refresh', async () => {
+  const h = await createHarness({ prepareTimer(timer) { timer.lastObservation = null; timer.focusIntent = null; } });
+  h.click({ action: 'collapse' });
+  assert.equal(h.root.dataset.protoCollapsed, 'true');
+  const first = h.timer.contextRows[0];
+  const second = h.timer.contextRows[1];
+  first.status = 'NOT_RUNNING'; first.isOperational = false;
+  second.status = 'RUNNING'; second.isOperational = true;
+  h.timer.currentContextId = second.contextId;
+  h.timer.revision += 1;
+  h.getIntervalCallback()();
+  assert.equal(h.root.dataset.protoCollapsed, 'true');
+  assert.match(h.root.innerHTML, /Working now[\s\S]*Job 202 - Selected/);
+  assert.match(h.root.innerHTML, /data-context="job:202"[^>]*data-operational="true"/);
   h.ui.teardown();
 });
