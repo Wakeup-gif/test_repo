@@ -1,0 +1,957 @@
+// ==UserScript==
+// @name         US Sign Wallpaper HUD
+// @namespace    us-sign-full-modules
+// @version      1.0.1
+// @description  Minimal bottom-left Bing wallpaper HUD for the US Sign Full UI Theme. Cycles distinctly, remembers selection, shows photo credit, and downloads the current image.
+// @match        https://ussignandmill.squarecoil.net/*
+// @run-at       document-idle
+// @grant        GM_addStyle
+// @grant        GM_xmlhttpRequest
+// @grant        GM_download
+// @connect      www.bing.com
+// @noframes
+// ==/UserScript==
+
+(function () {
+  "use strict";
+
+  if (window.__usSignWallpaperHudV101) return;
+  window.__usSignWallpaperHudV101 = true;
+
+  const root = document.documentElement;
+  const THEME_CACHE_KEY = "us-sign-squarecoil-bing-fresh-v1";
+  const PREF_KEY = "us-sign-wallpaper-hud-selection-v1";
+  const META_CACHE_KEY = "us-sign-wallpaper-hud-meta-v1";
+  const META_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+  const THEME_FADE_MS = 7200;
+  const HUD_ID = "us-sign-wallpaper-hud";
+
+  let hud = null;
+  let captionEl = null;
+  let creditEl = null;
+  let infoLink = null;
+  let nextButton = null;
+  let downloadButton = null;
+  let wallpaperHost = null;
+  let wallpaperObserver = null;
+  let rootObserver = null;
+  let sidebarObserver = null;
+  let pinnedImage = null;
+  let manualAdvancePending = false;
+  let suspendPinUntil = 0;
+  let enforcementQueued = false;
+  let metaRequestToken = 0;
+
+  const ICONS = {
+    next: `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M19.5 7.5V3.75l-1.7 1.7A8 8 0 1 0 20 13.2"/>
+        <path d="M19.5 3.75h-3.75"/>
+      </svg>`,
+    download: `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 3.75v10.5"/>
+        <path d="m8.25 10.5 3.75 3.75 3.75-3.75"/>
+        <path d="M5.25 18.75h13.5"/>
+      </svg>`,
+    check: `
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="m6.75 12.5 3.25 3.25 7.25-7.5"/>
+      </svg>`
+  };
+
+  GM_addStyle(String.raw`
+    #${HUD_ID} {
+      position: fixed !important;
+      left: 11px !important;
+      bottom: 14px !important;
+      z-index: 2147482500 !important;
+      width: 182px !important;
+      min-width: 182px !important;
+      height: 44px !important;
+      display: grid !important;
+      grid-template-columns: 28px minmax(0, 1fr) 28px !important;
+      align-items: center !important;
+      gap: 5px !important;
+      padding: 5px 6px !important;
+      box-sizing: border-box !important;
+      color: rgba(238,242,246,.94) !important;
+      background-color: rgba(8,10,9,.48) !important;
+      background-image: linear-gradient(180deg,rgba(255,255,255,.026),rgba(255,255,255,.004)) !important;
+      border: 1px solid rgba(255,255,255,.075) !important;
+      border-radius: 11px !important;
+      box-shadow: 0 10px 28px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.025) !important;
+      -webkit-backdrop-filter: blur(16px) saturate(116%) brightness(90%) !important;
+      backdrop-filter: blur(16px) saturate(116%) brightness(90%) !important;
+      opacity: .68 !important;
+      transform: translateZ(0) !important;
+      transition: opacity 150ms ease, background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease !important;
+      isolation: isolate !important;
+      overflow: hidden !important;
+      user-select: none !important;
+    }
+
+    #${HUD_ID}:hover,
+    #${HUD_ID}:focus-within {
+      opacity: .98 !important;
+      background-color: rgba(9,11,10,.60) !important;
+      border-color: rgba(255,255,255,.105) !important;
+      box-shadow: 0 13px 32px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.035) !important;
+    }
+
+    #${HUD_ID} .us-wallpaper-hud-btn {
+      width: 28px !important;
+      height: 28px !important;
+      min-width: 28px !important;
+      min-height: 28px !important;
+      display: grid !important;
+      place-items: center !important;
+      padding: 0 !important;
+      margin: 0 !important;
+      color: rgba(226,232,238,.78) !important;
+      background: rgba(255,255,255,.026) !important;
+      background-image: none !important;
+      border: 1px solid rgba(255,255,255,.060) !important;
+      border-radius: 8px !important;
+      box-shadow: none !important;
+      outline: none !important;
+      cursor: pointer !important;
+      opacity: .88 !important;
+      transition: color 130ms ease, background-color 130ms ease, border-color 130ms ease, transform 130ms ease, opacity 130ms ease !important;
+    }
+
+    #${HUD_ID} .us-wallpaper-hud-btn:hover {
+      color: rgba(248,250,252,.97) !important;
+      background: rgba(255,255,255,.065) !important;
+      border-color: rgba(255,255,255,.095) !important;
+      opacity: 1 !important;
+    }
+
+    #${HUD_ID} .us-wallpaper-hud-btn:active {
+      transform: translateY(1px) scale(.97) !important;
+    }
+
+    #${HUD_ID} .us-wallpaper-hud-btn:focus-visible,
+    #${HUD_ID} .us-wallpaper-hud-meta:focus-visible {
+      outline: 2px solid rgba(142,203,255,.48) !important;
+      outline-offset: 1px !important;
+    }
+
+    #${HUD_ID} .us-wallpaper-hud-btn svg {
+      width: 14px !important;
+      height: 14px !important;
+      fill: none !important;
+      stroke: currentColor !important;
+      stroke-width: 1.75 !important;
+      stroke-linecap: round !important;
+      stroke-linejoin: round !important;
+      pointer-events: none !important;
+    }
+
+    #${HUD_ID} .us-wallpaper-hud-meta {
+      min-width: 0 !important;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: center !important;
+      gap: 1px !important;
+      padding: 1px 1px 0 !important;
+      margin: 0 !important;
+      color: inherit !important;
+      text-decoration: none !important;
+      background: transparent !important;
+      border: 0 !important;
+      outline: none !important;
+      cursor: default !important;
+    }
+
+    #${HUD_ID} .us-wallpaper-hud-meta[href] { cursor: pointer !important; }
+
+    #${HUD_ID} .us-wallpaper-hud-caption,
+    #${HUD_ID} .us-wallpaper-hud-credit {
+      display: block !important;
+      max-width: 100% !important;
+      overflow: hidden !important;
+      white-space: nowrap !important;
+      text-overflow: ellipsis !important;
+      font-family: var(--us-font,"Manrope","Segoe UI",Arial,sans-serif) !important;
+      text-align: left !important;
+    }
+
+    #${HUD_ID} .us-wallpaper-hud-caption {
+      color: rgba(244,247,250,.94) !important;
+      font-size: 10.5px !important;
+      font-weight: 650 !important;
+      line-height: 12px !important;
+      letter-spacing: -.01em !important;
+    }
+
+    #${HUD_ID} .us-wallpaper-hud-credit {
+      color: rgba(195,203,211,.64) !important;
+      font-size: 8.6px !important;
+      font-weight: 500 !important;
+      line-height: 10px !important;
+      letter-spacing: .005em !important;
+    }
+
+    #${HUD_ID}[data-busy="true"] .us-wallpaper-hud-next svg {
+      animation: us-wallpaper-hud-spin 950ms linear infinite !important;
+    }
+
+    #${HUD_ID}[data-download="done"] .us-wallpaper-hud-download {
+      color: rgba(169,221,186,.95) !important;
+    }
+
+    @keyframes us-wallpaper-hud-spin { to { transform: rotate(360deg); } }
+
+    @media (prefers-reduced-motion: reduce) {
+      #${HUD_ID}, #${HUD_ID} * {
+        transition-duration: .01ms !important;
+        animation-duration: .01ms !important;
+      }
+    }
+
+    @media (max-width: 720px) {
+      #${HUD_ID} {
+        width: 150px !important;
+        min-width: 150px !important;
+      }
+    }
+
+    @supports not ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+      #${HUD_ID} { background-color: rgba(8,10,9,.88) !important; }
+    }
+  `);
+
+  function safeJsonParse(raw, fallback = null) {
+    try { return raw ? JSON.parse(raw) : fallback; }
+    catch (_) { return fallback; }
+  }
+
+  function readWallpaperPool() {
+    const parsed = safeJsonParse(localStorage.getItem(THEME_CACHE_KEY), null);
+    if (!parsed || !Array.isArray(parsed.images)) return [];
+    return parsed.images.filter((image) => image && typeof image.url === "string" && image.url);
+  }
+
+  function readPreference() {
+    const parsed = safeJsonParse(localStorage.getItem(PREF_KEY), null);
+    if (!parsed || typeof parsed !== "object" || !parsed.image) return null;
+    const image = parsed.image;
+    return image.url && image.key ? image : null;
+  }
+
+  function writePreference(image) {
+    try {
+      localStorage.setItem(PREF_KEY, JSON.stringify({
+        version: 1,
+        savedAt: Date.now(),
+        image: {
+          key: String(image.key || image.url),
+          url: String(image.url),
+          title: String(image.title || "Bing wallpaper"),
+          market: String(image.market || ""),
+          startdate: String(image.startdate || "")
+        }
+      }));
+    } catch (_) {}
+  }
+
+  function clearPreference() {
+    try { localStorage.removeItem(PREF_KEY); }
+    catch (_) {}
+  }
+
+  function readMetaCache() {
+    const parsed = safeJsonParse(localStorage.getItem(META_CACHE_KEY), {});
+    return parsed && typeof parsed === "object" ? parsed : {};
+  }
+
+  function writeMetaCache(cache) {
+    try { localStorage.setItem(META_CACHE_KEY, JSON.stringify(cache)); }
+    catch (_) {}
+  }
+
+  function normalizeUrl(value) {
+    try {
+      const url = new URL(String(value || ""), location.href);
+      url.hash = "";
+      return url.href;
+    } catch (_) {
+      return String(value || "");
+    }
+  }
+
+  function cssUrl(value) {
+    return `url("${String(value || "").replace(/"/g, "%22")}")`;
+  }
+
+  function extractCssUrl(value) {
+    const raw = String(value || "").trim();
+    const match = raw.match(/^url\(["']?(.*?)["']?\)$/i);
+    return match ? match[1].replace(/%22/g, '"') : "";
+  }
+
+  function getLayers() {
+    if (!wallpaperHost?.isConnected) {
+      wallpaperHost = document.getElementById("us-squarecoil-cinematic-wallpaper");
+    }
+    if (!wallpaperHost) return [];
+    return Array.from(wallpaperHost.querySelectorAll(".us-squarecoil-cine-layer"));
+  }
+
+  function getActiveLayer() {
+    const layers = getLayers();
+    if (!layers.length) return null;
+
+    const named = root.dataset.usSignWallpaperLayer;
+    if (named) {
+      const match = layers.find((layer) => layer.dataset.usSquarecoilCineLayer === named);
+      if (match) return match;
+    }
+
+    return layers.find((layer) => layer.dataset.active === "true") || layers[0];
+  }
+
+  function currentImageUrl() {
+    const layer = getActiveLayer();
+    if (!layer) return "";
+    return extractCssUrl(layer.style.getPropertyValue("--us-squarecoil-cine-image"));
+  }
+
+  function matchPoolImage(url, title, market) {
+    const pool = readWallpaperPool();
+    const normalized = normalizeUrl(url);
+
+    let found = pool.find((image) => normalizeUrl(image.url) === normalized);
+    if (found) return found;
+
+    if (title) {
+      found = pool.find((image) =>
+        String(image.title || "") === String(title || "") &&
+        (!market || String(image.market || "") === String(market || ""))
+      );
+      if (found) return found;
+    }
+
+    return null;
+  }
+
+  function detectCurrentImage() {
+    const url = currentImageUrl();
+    const title = root.dataset.usSignBingWallpaper || "Bing wallpaper";
+    const market = root.dataset.usSignBingMarket || "";
+    const matched = matchPoolImage(url, title, market);
+
+    if (matched) return matched;
+    if (!url) return null;
+
+    return { key: url, url, title, market, startdate: "" };
+  }
+
+  function findSavedImage() {
+    const saved = readPreference();
+    if (!saved) return null;
+    const pool = readWallpaperPool();
+    return pool.find((image) => String(image.key || image.url) === String(saved.key)) || saved;
+  }
+
+  function extractCredit(copyright, fallbackMarket = "") {
+    const value = String(copyright || "").trim();
+
+    if (value) {
+      const parenthetical = value.match(/\((©[^)]+)\)\s*$/i);
+      if (parenthetical) return parenthetical[1].trim();
+
+      const copyrightIndex = value.lastIndexOf("©");
+      if (copyrightIndex >= 0) {
+        const credit = value.slice(copyrightIndex).replace(/[()]+$/g, "").trim();
+        if (credit) return credit;
+      }
+    }
+
+    return fallbackMarket ? `Bing · ${fallbackMarket}` : "Bing wallpaper";
+  }
+
+  function validHttpsUrl(value) {
+    try {
+      const url = new URL(String(value || ""), "https://www.bing.com/");
+      return url.protocol === "https:" ? url.href : "";
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function requestBingMeta(image) {
+    return new Promise((resolve) => {
+      if (!image?.market || typeof GM_xmlhttpRequest !== "function") {
+        resolve(null);
+        return;
+      }
+
+      const endpoint =
+        `https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=${encodeURIComponent(image.market)}` +
+        `&uhd=1&uhdwidth=3840&uhdheight=2160&_=${Date.now()}`;
+
+      GM_xmlhttpRequest({
+        method: "GET",
+        url: endpoint,
+        timeout: 10000,
+        headers: {
+          Accept: "application/json,text/plain,*/*",
+          "Cache-Control": "no-cache"
+        },
+        onload(response) {
+          if (response.status < 200 || response.status >= 300) {
+            resolve(null);
+            return;
+          }
+
+          try {
+            const payload = JSON.parse(response.responseText || "{}");
+            const images = Array.isArray(payload.images) ? payload.images : [];
+            const wantedKey = String(image.key || "");
+            const wantedUrl = normalizeUrl(image.url);
+
+            const match = images.find((entry) => {
+              const key = String(entry?.urlbase || "");
+              const url = entry?.url
+                ? normalizeUrl(new URL(entry.url, "https://www.bing.com/").href)
+                : "";
+              return (wantedKey && key === wantedKey) || (wantedUrl && url === wantedUrl);
+            });
+
+            if (!match) {
+              resolve(null);
+              return;
+            }
+
+            resolve({
+              fetchedAt: Date.now(),
+              title: String(match.title || image.title || match.copyright || "Bing wallpaper"),
+              copyright: String(match.copyright || ""),
+              copyrightlink: validHttpsUrl(match.copyrightlink || ""),
+              market: String(image.market || "")
+            });
+          } catch (_) {
+            resolve(null);
+          }
+        },
+        onerror() { resolve(null); },
+        ontimeout() { resolve(null); }
+      });
+    });
+  }
+
+  async function getMetadata(image) {
+    if (!image) return null;
+
+    const key = String(image.key || image.url);
+    const cache = readMetaCache();
+    const cached = cache[key];
+
+    if (
+      cached &&
+      Number.isFinite(Number(cached.fetchedAt)) &&
+      Date.now() - Number(cached.fetchedAt) < META_MAX_AGE
+    ) {
+      return cached;
+    }
+
+    const meta = await requestBingMeta(image);
+    if (!meta) return cached || null;
+
+    cache[key] = meta;
+    writeMetaCache(cache);
+    return meta;
+  }
+
+  function setHudText(image, metadata = null) {
+    if (!hud || !captionEl || !creditEl || !infoLink) return;
+
+    const title = String(
+      metadata?.title ||
+      image?.title ||
+      root.dataset.usSignBingWallpaper ||
+      "Bing wallpaper"
+    );
+
+    const credit = extractCredit(
+      metadata?.copyright,
+      image?.market || root.dataset.usSignBingMarket || ""
+    );
+
+    const infoUrl = validHttpsUrl(metadata?.copyrightlink || "");
+
+    captionEl.textContent = title;
+    captionEl.title = title;
+    creditEl.textContent = credit;
+    creditEl.title = metadata?.copyright || credit;
+
+    if (infoUrl) {
+      infoLink.href = infoUrl;
+      infoLink.target = "_blank";
+      infoLink.rel = "noopener noreferrer";
+      infoLink.title = "Open photo details on Bing";
+    } else {
+      infoLink.removeAttribute("href");
+      infoLink.removeAttribute("target");
+      infoLink.removeAttribute("rel");
+      infoLink.title = title;
+    }
+  }
+
+  async function updateHudForImage(image) {
+    if (!image) return;
+
+    setHudText(image, null);
+    const token = ++metaRequestToken;
+    const metadata = await getMetadata(image);
+    if (token !== metaRequestToken) return;
+
+    const current = pinnedImage || detectCurrentImage();
+    if (!current || String(current.key || current.url) !== String(image.key || image.url)) return;
+
+    setHudText(image, metadata);
+  }
+
+  function persistPinnedImage(image) {
+    if (!image) return;
+
+    pinnedImage = {
+      key: String(image.key || image.url),
+      url: String(image.url),
+      title: String(image.title || "Bing wallpaper"),
+      market: String(image.market || ""),
+      startdate: String(image.startdate || "")
+    };
+
+    writePreference(pinnedImage);
+    if (hud) hud.dataset.pinned = "true";
+    updateHudForImage(pinnedImage);
+  }
+
+  function setLayerToPinned(layer, image) {
+    if (!layer || !image?.url) return;
+
+    const current = extractCssUrl(
+      layer.style.getPropertyValue("--us-squarecoil-cine-image")
+    );
+
+    if (normalizeUrl(current) === normalizeUrl(image.url)) return;
+    layer.style.setProperty("--us-squarecoil-cine-image", cssUrl(image.url));
+  }
+
+  function enforcePinnedImage() {
+    if (!pinnedImage || Date.now() < suspendPinUntil) return;
+
+    const layers = getLayers();
+    if (!layers.length) return;
+
+    layers.forEach((layer) => setLayerToPinned(layer, pinnedImage));
+
+    if (root.dataset.usSignBingWallpaper !== pinnedImage.title) {
+      root.dataset.usSignBingWallpaper = pinnedImage.title;
+    }
+
+    if (root.dataset.usSignBingMarket !== pinnedImage.market) {
+      root.dataset.usSignBingMarket = pinnedImage.market;
+    }
+  }
+
+  function queuePinEnforcement() {
+    if (enforcementQueued || !pinnedImage || Date.now() < suspendPinUntil) return;
+
+    enforcementQueued = true;
+    queueMicrotask(() => {
+      enforcementQueued = false;
+      enforcePinnedImage();
+    });
+  }
+
+  function clearPinAndResumeAuto() {
+    pinnedImage = null;
+    clearPreference();
+    suspendPinUntil = 0;
+    if (hud) hud.dataset.pinned = "false";
+
+    if (typeof window.__usSquareCoilWallpaperNext === "function") {
+      window.__usSquareCoilWallpaperNext();
+      setTimeout(() => {
+        const current = detectCurrentImage();
+        if (current) updateHudForImage(current);
+      }, 500);
+    } else {
+      const current = detectCurrentImage();
+      if (current) updateHudForImage(current);
+    }
+  }
+
+  function waitForWallpaperAdvance(beforeKey, beforeLayer, timeoutMs = 13000) {
+    return new Promise((resolve) => {
+      const started = Date.now();
+
+      function check() {
+        const current = detectCurrentImage();
+        const currentKey = String(current?.key || current?.url || "");
+        const currentLayer = root.dataset.usSignWallpaperLayer || "";
+
+        if (currentKey && currentKey !== beforeKey) {
+          resolve({ type: "changed", image: current });
+          return;
+        }
+
+        /*
+          If the theme toggled layers but the visible image key is still the
+          same, the first click only synchronized the theme's hidden internal
+          lastWallpaperKey with our remembered image. The caller should ask
+          for the next image again instead of saving the same photo.
+        */
+        if (currentLayer && beforeLayer && currentLayer !== beforeLayer) {
+          resolve({ type: "aligned", image: current });
+          return;
+        }
+
+        if (Date.now() - started >= timeoutMs) {
+          resolve({ type: "timeout", image: current });
+          return;
+        }
+
+        setTimeout(check, 100);
+      }
+
+      setTimeout(check, 80);
+    });
+  }
+
+  async function beginManualAdvance() {
+    if (manualAdvancePending || !hud) return;
+
+    const pool = readWallpaperPool();
+
+    if (pool.length < 2) {
+      if (typeof window.__usSquareCoilBingRefresh === "function") {
+        window.__usSquareCoilBingRefresh();
+      }
+      return;
+    }
+
+    manualAdvancePending = true;
+    hud.dataset.busy = "true";
+
+    /*
+      Stop the persisted pin from fighting the Full UI Theme while its own
+      cinematic wallpaper engine performs the transition.
+    */
+    suspendPinUntil = Date.now() + (THEME_FADE_MS * 2) + 4000;
+
+    try {
+      const originalVisible = pinnedImage || detectCurrentImage();
+      const originalKey = String(originalVisible?.key || originalVisible?.url || "");
+
+      if (typeof window.__usSquareCoilWallpaperNext !== "function") {
+        const currentIndex = pool.findIndex(
+          (image) => String(image.key || image.url) === originalKey
+        );
+
+        let nextIndex = currentIndex >= 0 ? (currentIndex + 1) % pool.length : 0;
+        if (String(pool[nextIndex]?.key || pool[nextIndex]?.url || "") === originalKey) {
+          nextIndex = (nextIndex + 1) % pool.length;
+        }
+
+        const next = pool[nextIndex];
+        if (next?.url) {
+          persistPinnedImage(next);
+          getLayers().forEach((layer) => setLayerToPinned(layer, pinnedImage));
+        }
+        return;
+      }
+
+      /*
+        The key fix: after a reload the HUD may visually pin photo B while the
+        theme internally still thinks photo A is current. Calling the theme's
+        next function once can therefore transition A -> B, which looks like
+        the same picture to the user. We detect that alignment pass and request
+        another transition until the visible key is genuinely different.
+      */
+      const maxAttempts = Math.min(Math.max(pool.length + 1, 2), 16);
+
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const before = detectCurrentImage();
+        const beforeKey = String(before?.key || before?.url || "");
+        const beforeLayer = root.dataset.usSignWallpaperLayer || "";
+
+        window.__usSquareCoilWallpaperNext();
+
+        const result = await waitForWallpaperAdvance(beforeKey, beforeLayer);
+        const after = result.image || detectCurrentImage();
+        const afterKey = String(after?.key || after?.url || "");
+
+        if (after && afterKey && afterKey !== originalKey) {
+          persistPinnedImage(after);
+          return;
+        }
+
+        if (result.type === "aligned") continue;
+        if (result.type === "changed" && afterKey === originalKey) continue;
+        if (result.type === "timeout") break;
+      }
+    } finally {
+      manualAdvancePending = false;
+      hud.dataset.busy = "false";
+
+      const remaining = Math.max(0, suspendPinUntil - Date.now());
+      setTimeout(() => {
+        suspendPinUntil = 0;
+        if (pinnedImage) enforcePinnedImage();
+      }, remaining + 50);
+    }
+  }
+
+  function sanitizeFilename(value) {
+    const safe = String(value || "Bing-wallpaper")
+      .normalize("NFKD")
+      .replace(/[\\/:*?"<>|]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 90);
+
+    return `${safe || "Bing-wallpaper"}.jpg`;
+  }
+
+  function flashDownloadDone() {
+    if (!hud || !downloadButton) return;
+
+    hud.dataset.download = "done";
+    downloadButton.innerHTML = ICONS.check;
+
+    setTimeout(() => {
+      if (!downloadButton?.isConnected) return;
+      downloadButton.innerHTML = ICONS.download;
+      hud.dataset.download = "";
+    }, 1200);
+  }
+
+  function fallbackOpenImage(url) {
+    const popup = window.open(url, "_blank", "noopener,noreferrer");
+    if (popup) popup.opener = null;
+  }
+
+  function downloadCurrentImage() {
+    const image = pinnedImage || detectCurrentImage();
+    if (!image?.url) return;
+
+    const name = sanitizeFilename(image.title || root.dataset.usSignBingWallpaper);
+
+    if (typeof GM_download === "function") {
+      try {
+        GM_download({
+          url: image.url,
+          name,
+          saveAs: true,
+          onload: flashDownloadDone,
+          onerror: () => fallbackOpenImage(image.url),
+          ontimeout: () => fallbackOpenImage(image.url)
+        });
+        return;
+      } catch (_) {}
+    }
+
+    if (typeof GM_xmlhttpRequest === "function") {
+      GM_xmlhttpRequest({
+        method: "GET",
+        url: image.url,
+        responseType: "blob",
+        timeout: 20000,
+        onload(response) {
+          if (response.status < 200 || response.status >= 300 || !response.response) {
+            fallbackOpenImage(image.url);
+            return;
+          }
+
+          try {
+            const objectUrl = URL.createObjectURL(response.response);
+            const anchor = document.createElement("a");
+            anchor.href = objectUrl;
+            anchor.download = name;
+            anchor.style.display = "none";
+            document.body.appendChild(anchor);
+            anchor.click();
+            anchor.remove();
+            setTimeout(() => URL.revokeObjectURL(objectUrl), 2500);
+            flashDownloadDone();
+          } catch (_) {
+            fallbackOpenImage(image.url);
+          }
+        },
+        onerror: () => fallbackOpenImage(image.url),
+        ontimeout: () => fallbackOpenImage(image.url)
+      });
+      return;
+    }
+
+    fallbackOpenImage(image.url);
+  }
+
+  function positionHudForSidebar() {
+    if (!hud) return;
+
+    const sidebar = document.getElementById("sidebar_left");
+    if (!sidebar) {
+      hud.style.setProperty("left", "11px", "important");
+      hud.style.setProperty("bottom", "14px", "important");
+      return;
+    }
+
+    const width = Math.round(sidebar.getBoundingClientRect().width || 0);
+
+    if (width > 0 && width < 150) {
+      hud.style.setProperty("left", `${width + 11}px`, "important");
+      hud.style.setProperty("bottom", "14px", "important");
+    } else {
+      hud.style.setProperty("left", "11px", "important");
+      hud.style.setProperty("bottom", "14px", "important");
+    }
+  }
+
+  function createHud() {
+    const existing = document.getElementById(HUD_ID);
+    if (existing) {
+      hud = existing;
+      return;
+    }
+
+    hud = document.createElement("div");
+    hud.id = HUD_ID;
+    hud.dataset.busy = "false";
+    hud.dataset.pinned = pinnedImage ? "true" : "false";
+    hud.setAttribute("role", "group");
+    hud.setAttribute("aria-label", "Wallpaper controls");
+
+    nextButton = document.createElement("button");
+    nextButton.type = "button";
+    nextButton.className = "us-wallpaper-hud-btn us-wallpaper-hud-next";
+    nextButton.innerHTML = ICONS.next;
+    nextButton.setAttribute("aria-label", "Next wallpaper");
+    nextButton.title = "Next wallpaper · Shift-click to resume automatic rotation";
+
+    infoLink = document.createElement("a");
+    infoLink.className = "us-wallpaper-hud-meta";
+
+    captionEl = document.createElement("span");
+    captionEl.className = "us-wallpaper-hud-caption";
+    captionEl.textContent = "Bing wallpaper";
+
+    creditEl = document.createElement("span");
+    creditEl.className = "us-wallpaper-hud-credit";
+    creditEl.textContent = "Loading photo credit…";
+
+    infoLink.append(captionEl, creditEl);
+
+    downloadButton = document.createElement("button");
+    downloadButton.type = "button";
+    downloadButton.className = "us-wallpaper-hud-btn us-wallpaper-hud-download";
+    downloadButton.innerHTML = ICONS.download;
+    downloadButton.setAttribute("aria-label", "Download current wallpaper");
+    downloadButton.title = "Download current wallpaper";
+
+    nextButton.addEventListener("click", (event) => {
+      if (event.shiftKey) {
+        clearPinAndResumeAuto();
+        return;
+      }
+      beginManualAdvance();
+    });
+
+    downloadButton.addEventListener("click", downloadCurrentImage);
+
+    hud.append(nextButton, infoLink, downloadButton);
+    document.body.appendChild(hud);
+    positionHudForSidebar();
+
+    const sidebar = document.getElementById("sidebar_left");
+    if (sidebar && typeof ResizeObserver === "function") {
+      sidebarObserver = new ResizeObserver(positionHudForSidebar);
+      sidebarObserver.observe(sidebar);
+    }
+  }
+
+  function installObservers() {
+    wallpaperHost = document.getElementById("us-squarecoil-cinematic-wallpaper");
+
+    if (wallpaperHost && typeof MutationObserver === "function") {
+      wallpaperObserver?.disconnect();
+      wallpaperObserver = new MutationObserver(() => {
+        if (pinnedImage && !manualAdvancePending) queuePinEnforcement();
+      });
+
+      wallpaperObserver.observe(wallpaperHost, {
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["style", "data-active"]
+      });
+    }
+
+    if (typeof MutationObserver === "function") {
+      rootObserver?.disconnect();
+      rootObserver = new MutationObserver(() => {
+        if (manualAdvancePending) return;
+
+        if (pinnedImage) {
+          queuePinEnforcement();
+          return;
+        }
+
+        const current = detectCurrentImage();
+        if (current) updateHudForImage(current);
+      });
+
+      rootObserver.observe(root, {
+        attributes: true,
+        attributeFilter: [
+          "data-us-sign-bing-wallpaper",
+          "data-us-sign-bing-market",
+          "data-us-sign-wallpaper-layer"
+        ]
+      });
+    }
+  }
+
+  async function waitForWallpaperEngine(timeoutMs = 12000) {
+    const started = Date.now();
+
+    while (Date.now() - started < timeoutMs) {
+      const host = document.getElementById("us-squarecoil-cinematic-wallpaper");
+      const layers = host?.querySelectorAll(".us-squarecoil-cine-layer");
+
+      if (host && layers && layers.length >= 2 && readWallpaperPool().length) {
+        wallpaperHost = host;
+        return true;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 160));
+    }
+
+    return false;
+  }
+
+  async function init() {
+    if (!document.body) return;
+
+    await waitForWallpaperEngine();
+
+    pinnedImage = findSavedImage();
+    createHud();
+    installObservers();
+
+    if (pinnedImage) {
+      hud.dataset.pinned = "true";
+      enforcePinnedImage();
+      updateHudForImage(pinnedImage);
+    } else {
+      const current = detectCurrentImage();
+      if (current) updateHudForImage(current);
+    }
+  }
+
+  init();
+})();
