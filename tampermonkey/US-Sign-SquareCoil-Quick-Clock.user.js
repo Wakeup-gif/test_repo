@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         US Sign - SquareCoil Quick Clock
 // @namespace    us-sign-local-tools
-// @version      0.1.0
+// @version      0.1.1
 // @description  Compact designer-focused Quick Clock modal for SquareCoil with streamlined project/general clock switching.
 // @match        https://ussignandmill.squarecoil.net/*
 // @run-at       document-idle
@@ -16,7 +16,7 @@
 (function () {
   "use strict";
 
-  const VERSION = "0.1.0";
+  const VERSION = "0.1.1";
   const ROOT_ID = "us-sign-quick-clock";
   const STYLE_ID = "us-sign-quick-clock-style";
   const OPEN_BUTTON_ID = "us-sign-quick-clock-open";
@@ -78,10 +78,15 @@
     const bodyText = clean(doc.body?.textContent);
     const link = [...doc.querySelectorAll("a[href]")].map(a => a.getAttribute("href") || "").find(href => /project\.php\?id=\d+/i.test(href));
     const projectId = link?.match(/project\.php\?id=(\d+)/i)?.[1] || "";
-    if (projectId) return { type: "job", projectId, label: bodyText };
-    if (/Production\s*\(General\)/i.test(bodyText)) return { type: "general", general: "production-general", label: bodyText };
-    if (/Meeting/i.test(bodyText)) return { type: "general", general: "meeting", label: bodyText };
-    if (/Training/i.test(bodyText)) return { type: "general", general: "training", label: bodyText };
+    const label = bodyText;
+
+    // SquareCoil uses project.php?id=0 for Production (General); id=0 is not a real job.
+    // Resolve supported general contexts before nonzero project/job contexts.
+    if (/Production\s*\(General\)/i.test(bodyText)) return { type: "general", general: "production-general", label };
+    if (/Meeting/i.test(bodyText)) return { type: "general", general: "meeting", label };
+    if (/Training/i.test(bodyText)) return { type: "general", general: "training", label };
+    if (projectId && projectId !== "0") return { type: "job", projectId, label };
+
     const clockIn = document.querySelector("#clockin");
     const clockOut = document.querySelector("#clockout");
     const clockInVisible = clockIn && getComputedStyle(clockIn).display !== "none";
