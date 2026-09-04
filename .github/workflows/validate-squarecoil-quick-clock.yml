@@ -32,3 +32,4 @@ jobs:
           grep -q 'Production General' "$file"
           grep -q 'Materials logged' "$file"
           grep -q 'us-qc-pending-ok' "$file"
+          grep -q 'raw.githubusercontent.com/Wakeup-gif/test_repo/utility/squarecoil-quick-clock-v0.3.0' "$file"
