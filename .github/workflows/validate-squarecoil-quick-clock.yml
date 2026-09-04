@@ -1,0 +1,34 @@
+name: Validate SquareCoil Quick Clock
+
+on:
+  push:
+    branches:
+      - utility/squarecoil-quick-clock-v0.3.0
+    paths:
+      - tampermonkey/US-Sign-SquareCoil-Quick-Clock.user.js
+      - .github/workflows/validate-squarecoil-quick-clock.yml
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: JavaScript syntax
+        run: node --check tampermonkey/US-Sign-SquareCoil-Quick-Clock.user.js
+      - name: Required Quick Clock flows
+        shell: bash
+        run: |
+          set -euo pipefail
+          file=tampermonkey/US-Sign-SquareCoil-Quick-Clock.user.js
+          grep -q '@version      0.3.0' "$file"
+          grep -q 'action: 15' "$file"
+          grep -q 'action: 12' "$file"
+          grep -q 'action: 14' "$file"
+          grep -q 'notes_from_session = 1' "$file"
+          grep -q 'Production General' "$file"
+          grep -q 'Materials logged' "$file"
+          grep -q 'us-qc-pending-ok' "$file"
