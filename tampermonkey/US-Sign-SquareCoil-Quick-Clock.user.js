@@ -8,8 +8,8 @@
 // @noframes
 // @homepageURL  https://github.com/Wakeup-gif/test_repo
 // @source       https://github.com/Wakeup-gif/test_repo/blob/utility/squarecoil-quick-clock-v0.3.0/tampermonkey/US-Sign-SquareCoil-Quick-Clock.user.js
-// @updateURL    https://github.com/Wakeup-gif/test_repo/raw/refs/heads/utility/squarecoil-quick-clock-v0.3.0/tampermonkey/US-Sign-SquareCoil-Quick-Clock.user.js
-// @downloadURL  https://github.com/Wakeup-gif/test_repo/raw/refs/heads/utility/squarecoil-quick-clock-v0.3.0/tampermonkey/US-Sign-SquareCoil-Quick-Clock.user.js
+// @updateURL    https://raw.githubusercontent.com/Wakeup-gif/test_repo/utility/squarecoil-quick-clock-v0.3.0/tampermonkey/US-Sign-SquareCoil-Quick-Clock.user.js
+// @downloadURL  https://raw.githubusercontent.com/Wakeup-gif/test_repo/utility/squarecoil-quick-clock-v0.3.0/tampermonkey/US-Sign-SquareCoil-Quick-Clock.user.js
 // ==/UserScript==
 
 (() => {
